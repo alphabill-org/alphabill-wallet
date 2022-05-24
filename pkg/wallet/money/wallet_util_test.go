@@ -1,37 +1,35 @@
-package wallet
+package money
 
 import (
 	"os"
+	"path"
 	"testing"
 
 	"gitdc.ee.guardtime.com/alphabill/alphabill/internal/block"
-
-	"path"
-
-	"gitdc.ee.guardtime.com/alphabill/alphabill/internal/transaction"
+	"gitdc.ee.guardtime.com/alphabill/alphabill/internal/txsystem"
 	"github.com/stretchr/testify/require"
 )
 
 type mockAlphabillClient struct {
-	txs        []*transaction.Transaction
-	txResponse *transaction.TransactionResponse
+	txs        []*txsystem.Transaction
+	txResponse *txsystem.TransactionResponse
 	maxBlockNo uint64
 	shutdown   bool
 }
 
-func (c *mockAlphabillClient) SendTransaction(tx *transaction.Transaction) (*transaction.TransactionResponse, error) {
+func (c *mockAlphabillClient) SendTransaction(tx *txsystem.Transaction) (*txsystem.TransactionResponse, error) {
 	c.txs = append(c.txs, tx)
 	if c.txResponse != nil {
 		return c.txResponse, nil
 	}
-	return &transaction.TransactionResponse{Ok: true}, nil
+	return &txsystem.TransactionResponse{Ok: true}, nil
 }
 
 func (c *mockAlphabillClient) GetBlock(uint64) (*block.Block, error) {
 	return nil, nil
 }
 
-func (c *mockAlphabillClient) GetMaxBlockNo() (uint64, error) {
+func (c *mockAlphabillClient) GetMaxBlockNumber() (uint64, error) {
 	return c.maxBlockNo, nil
 }
 
@@ -45,28 +43,28 @@ func (c *mockAlphabillClient) IsShutdown() bool {
 
 func CreateTestWallet(t *testing.T) (*Wallet, *mockAlphabillClient) {
 	_ = DeleteWalletDb(os.TempDir())
-	c := Config{DbPath: os.TempDir()}
-	w, err := CreateNewWallet(c)
+	c := WalletConfig{DbPath: os.TempDir()}
+	w, err := CreateNewWallet("", c)
 	t.Cleanup(func() {
 		DeleteWallet(w)
 	})
 	require.NoError(t, err)
 
 	mockClient := &mockAlphabillClient{}
-	w.alphaBillClient = mockClient
+	w.AlphabillClient = mockClient
 	return w, mockClient
 }
 
 func CreateTestWalletFromSeed(t *testing.T) (*Wallet, *mockAlphabillClient) {
 	_ = DeleteWalletDb(os.TempDir())
-	w, err := CreateWalletFromSeed(testMnemonic, Config{DbPath: os.TempDir()})
+	w, err := CreateNewWallet(testMnemonic, WalletConfig{DbPath: os.TempDir()})
 	t.Cleanup(func() {
 		DeleteWallet(w)
 	})
 	require.NoError(t, err)
 
 	mockClient := &mockAlphabillClient{}
-	w.alphaBillClient = mockClient
+	w.AlphabillClient = mockClient
 	return w, mockClient
 }
 
