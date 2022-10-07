@@ -13,50 +13,41 @@ import (
 	"github.com/alphabill-org/alphabill/internal/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/internal/rootchain"
 	"github.com/alphabill-org/alphabill/internal/rpc/alphabill"
+	"github.com/alphabill-org/alphabill/internal/script"
 	testsig "github.com/alphabill-org/alphabill/internal/testutils/sig"
 	testtime "github.com/alphabill-org/alphabill/internal/testutils/time"
 	"github.com/alphabill-org/alphabill/internal/txsystem"
+	"github.com/alphabill-org/alphabill/internal/txsystem/tokens"
 	"github.com/alphabill-org/alphabill/internal/util"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
-func TestRunVD(t *testing.T) {
-	homeDirVD := setupTestHomeDir(t, "vd")
-	keysFileLocation := path.Join(homeDirVD, defaultKeysFileName)
-	nodeGenesisFileLocation := path.Join(homeDirVD, nodeGenesisFileName)
-	partitionGenesisFileLocation := path.Join(homeDirVD, "partition-genesis.json")
+var (
+	port       = "9543"
+	listenAddr = ":" + port // listen is on all devices, so it would work in CI inside docker too.
+	dialAddr   = "localhost:" + port
+)
+
+func TestRunTokensNode(t *testing.T) {
+	homeDir := setupTestHomeDir(t, "tokens")
+	keysFileLocation := path.Join(homeDir, defaultKeysFileName)
+	nodeGenesisFileLocation := path.Join(homeDir, nodeGenesisFileName)
+	partitionGenesisFileLocation := path.Join(homeDir, "partition-genesis.json")
 	testtime.MustRunInTime(t, 5*time.Second, func() {
-		port := "9543"
-		listenAddr := ":" + port // listen is on all devices, so it would work in CI inside docker too.
-		dialAddr := "localhost:" + port
-
-		conf := &vdConfiguration{
-			baseNodeConfiguration: baseNodeConfiguration{
-				Base: &baseConfiguration{
-					HomeDir:    alphabillHomeDir(),
-					CfgFile:    path.Join(alphabillHomeDir(), defaultConfigFile),
-					LogCfgFile: defaultLoggerConfigFile,
-				},
-			},
-			Node: &startNodeConfiguration{},
-			RPCServer: &grpcServerConfiguration{
-				Address:        defaultServerAddr,
-				MaxRecvMsgSize: defaultMaxRecvMsgSize,
-				MaxSendMsgSize: defaultMaxSendMsgSize,
-			},
-		}
-		conf.RPCServer.Address = listenAddr
-
-		appStoppedWg := sync.WaitGroup{}
 		ctx, _ := async.WithWaitGroup(context.Background())
 		ctx, ctxCancel := context.WithCancel(ctx)
-
+		appStoppedWg := sync.WaitGroup{}
+		defer func() {
+			ctxCancel()
+			appStoppedWg.Wait()
+		}()
 		// generate node genesis
 		cmd := New()
-		args := "vd-genesis --home " + homeDirVD + " -o " + nodeGenesisFileLocation + " -g -k " + keysFileLocation
+		args := "tokens-genesis --home " + homeDir + " -o " + nodeGenesisFileLocation + " -g -k " + keysFileLocation
 		cmd.baseCmd.SetArgs(strings.Split(args, " "))
 		err := cmd.addAndExecuteCommand(context.Background())
 		require.NoError(t, err)
@@ -79,9 +70,8 @@ func TestRunVD(t *testing.T) {
 		// start the node in background
 		appStoppedWg.Add(1)
 		go func() {
-
 			cmd = New()
-			args = "vd --home " + homeDirVD + " -g " + partitionGenesisFileLocation + " -k " + keysFileLocation + " --server-address " + listenAddr
+			args = "tokens --home " + homeDir + " -g " + partitionGenesisFileLocation + " -k " + keysFileLocation + " --server-address " + listenAddr
 			cmd.baseCmd.SetArgs(strings.Split(args, " "))
 
 			err = cmd.addAndExecuteCommand(ctx)
@@ -89,7 +79,6 @@ func TestRunVD(t *testing.T) {
 			appStoppedWg.Done()
 		}()
 
-		log.Info("Started vd node and dialing...")
 		// Create the gRPC client
 		conn, err := grpc.DialContext(ctx, dialAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		require.NoError(t, err)
@@ -101,23 +90,26 @@ func TestRunVD(t *testing.T) {
 		id := uint256.NewInt(rand.Uint64()).Bytes32()
 		tx := &txsystem.Transaction{
 			UnitId:                id[:],
-			TransactionAttributes: nil,
+			TransactionAttributes: new(anypb.Any),
 			Timeout:               10,
-			SystemId:              []byte{0, 0, 0, 1},
+			SystemId:              tokens.DefaultTokenTxSystemIdentifier,
 		}
+		require.NoError(t, tx.TransactionAttributes.MarshalFrom(&tokens.CreateNonFungibleTokenTypeAttributes{
+			Symbol:                   "Test",
+			ParentTypeId:             []byte{0},
+			SubTypeCreationPredicate: script.PredicateAlwaysTrue(),
+			TokenCreationPredicate:   script.PredicateAlwaysTrue(),
+			InvariantPredicate:       script.PredicateAlwaysTrue(),
+			DataUpdatePredicate:      script.PredicateAlwaysTrue(),
+		}))
 
 		response, err := rpcClient.ProcessTransaction(ctx, tx, grpc.WaitForReady(true))
 		require.NoError(t, err)
 		require.True(t, response.Ok, "Successful response ok should be true")
 
 		// failing case
-		tx.SystemId = []byte{0, 0, 0, 0} // incorrect system id
+		tx.SystemId = []byte{1, 0, 0, 0} // incorrect system id
 		response, err = rpcClient.ProcessTransaction(ctx, tx, grpc.WaitForReady(true))
-		require.ErrorContains(t, err, "transaction has invalid system identifier")
-
-		// Close the app
-		ctxCancel()
-		// Wait for test asserts to be completed
-		appStoppedWg.Wait()
+		require.ErrorContains(t, err, "system identifier is invalid")
 	})
 }
