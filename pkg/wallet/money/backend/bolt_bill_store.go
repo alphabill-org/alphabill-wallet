@@ -1,4 +1,4 @@
-package money
+package backend
 
 import (
 	"encoding/json"
@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/alphabill-org/alphabill/internal/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/internal/util"
 	bolt "go.etcd.io/bbolt"
 )
@@ -17,6 +18,8 @@ var (
 	predicatesBucket   = []byte("predicatesBucket")   // predicate => bucket[unitID]nil
 	metaBucket         = []byte("metaBucket")         // block_number_key => block_number_val
 	expiredBillsBucket = []byte("expiredBillsBucket") // block_number => list of expired bill ids
+	feeUnitsBucket     = []byte("feeUnitsBucket")     // unitID => unit_bytes (for free credit units)
+	sdrBucket          = []byte("sdrBucket")          // []genesis.SystemDescriptionRecord
 )
 
 var (
@@ -219,6 +222,66 @@ func (s *BoltBillStoreTx) SetBlockNumber(blockNumber uint64) error {
 	}, true)
 }
 
+func (s *BoltBillStoreTx) GetFeeCreditBill(unitID []byte) (*Bill, error) {
+	var b *Bill
+	err := s.withTx(s.tx, func(tx *bolt.Tx) error {
+		fcbBytes := tx.Bucket(feeUnitsBucket).Get(unitID)
+		if fcbBytes == nil {
+			return nil
+		}
+		return json.Unmarshal(fcbBytes, &b)
+	}, false)
+	if err != nil {
+		return nil, err
+	}
+	return b, nil
+}
+
+func (s *BoltBillStoreTx) SetFeeCreditBill(fcb *Bill) error {
+	return s.withTx(s.tx, func(tx *bolt.Tx) error {
+		fcbBytes, err := json.Marshal(fcb)
+		if err != nil {
+			return err
+		}
+		return tx.Bucket(feeUnitsBucket).Put(fcb.Id, fcbBytes)
+	}, true)
+}
+
+func (s *BoltBillStoreTx) GetSystemDescriptionRecords() ([]*genesis.SystemDescriptionRecord, error) {
+	var sdrs []*genesis.SystemDescriptionRecord
+	err := s.withTx(s.tx, func(tx *bolt.Tx) error {
+		return tx.Bucket(sdrBucket).ForEach(func(systemID, sdrBytes []byte) error {
+			var sdr *genesis.SystemDescriptionRecord
+			err := json.Unmarshal(sdrBytes, &sdr)
+			if err != nil {
+				return err
+			}
+			sdrs = append(sdrs, sdr)
+			return nil
+		})
+	}, false)
+	if err != nil {
+		return nil, err
+	}
+	return sdrs, nil
+}
+
+func (s *BoltBillStoreTx) SetSystemDescriptionRecords(sdrs []*genesis.SystemDescriptionRecord) error {
+	return s.withTx(s.tx, func(tx *bolt.Tx) error {
+		for _, sdr := range sdrs {
+			sdrBytes, err := json.Marshal(sdr)
+			if err != nil {
+				return err
+			}
+			err = tx.Bucket(sdrBucket).Put(sdr.SystemIdentifier, sdrBytes)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}, true)
+}
+
 func (s *BoltBillStoreTx) removeUnit(tx *bolt.Tx, unitID []byte) error {
 	unit, err := s.getUnit(tx, unitID)
 	if err != nil {
@@ -290,6 +353,10 @@ func (s *BoltBillStore) createBuckets() error {
 		if err != nil {
 			return err
 		}
+		_, err = tx.CreateBucketIfNotExists(feeUnitsBucket)
+		if err != nil {
+			return err
+		}
 		_, err = tx.CreateBucketIfNotExists(predicatesBucket)
 		if err != nil {
 			return err
@@ -299,6 +366,10 @@ func (s *BoltBillStore) createBuckets() error {
 			return err
 		}
 		_, err = tx.CreateBucketIfNotExists(expiredBillsBucket)
+		if err != nil {
+			return err
+		}
+		_, err = tx.CreateBucketIfNotExists(sdrBucket)
 		if err != nil {
 			return err
 		}

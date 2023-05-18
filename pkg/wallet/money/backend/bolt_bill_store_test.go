@@ -1,10 +1,11 @@
-package money
+package backend
 
 import (
 	"path/filepath"
 	"testing"
 
 	"github.com/alphabill-org/alphabill/internal/hash"
+	"github.com/alphabill-org/alphabill/internal/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/internal/script"
 	"github.com/alphabill-org/alphabill/internal/util"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -176,6 +177,64 @@ func TestBillStore_DeleteExpiredBills(t *testing.T) {
 		return nil
 	})
 	require.NoError(t, err)
+}
+
+func TestBillStore_GetSetFeeCreditBills(t *testing.T) {
+	bs, _ := createTestBillStore(t)
+	ownerPredicate := getOwnerPredicate("0x000000000000000000000000000000000000000000000000000000000000000001")
+	fcbID := []byte{0}
+
+	// verify GetFeeCreditBill for unknown id returns no error
+	fcb, err := bs.Do().GetFeeCreditBill(fcbID)
+	require.NoError(t, err)
+	require.Nil(t, fcb)
+
+	// add fee credit bills
+	fcbs := []*Bill{
+		newBillWithValueAndOwner(1, ownerPredicate),
+		newBillWithValueAndOwner(2, ownerPredicate),
+		newBillWithValueAndOwner(3, ownerPredicate),
+	}
+	for _, b := range fcbs {
+		err = bs.Do().SetFeeCreditBill(b)
+		require.NoError(t, err)
+	}
+
+	// verify GetFeeCreditBill is not nil
+	for _, expectedFCB := range fcbs {
+		actualFCB, err := bs.Do().GetFeeCreditBill(expectedFCB.Id)
+		require.NoError(t, err)
+		require.Equal(t, expectedFCB, actualFCB)
+	}
+}
+
+func TestBillStore_GetSetSystemDescriptionRecordsBills(t *testing.T) {
+	bs, _ := createTestBillStore(t)
+
+	// verify GetSystemDescriptionRecords is empty
+	sdrs, err := bs.Do().GetSystemDescriptionRecords()
+	require.NoError(t, err)
+	require.Nil(t, sdrs)
+
+	// add system description records
+	sdrs = []*genesis.SystemDescriptionRecord{
+		{
+			SystemIdentifier: []byte{0},
+			T2Timeout:        2500,
+			FeeCreditBill:    &genesis.FeeCreditBill{UnitId: []byte{2}, OwnerPredicate: []byte{3}},
+		},
+		{
+			SystemIdentifier: []byte{1},
+			T2Timeout:        2500,
+			FeeCreditBill:    &genesis.FeeCreditBill{UnitId: []byte{2}, OwnerPredicate: []byte{3}},
+		},
+	}
+	err = bs.Do().SetSystemDescriptionRecords(sdrs)
+	require.NoError(t, err)
+
+	actualSDRs, err := bs.Do().GetSystemDescriptionRecords()
+	require.NoError(t, err)
+	require.Equal(t, sdrs, actualSDRs)
 }
 
 func createTestBillStore(t *testing.T) (*BoltBillStore, error) {

@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
@@ -8,8 +9,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alphabill-org/alphabill/pkg/wallet/backend/bp"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 const pubKeyHex = "0x038003e218eea360cbf580ebb90cc8c8caf0ccef4bf660ea9ab4fc06b5c367b038"
@@ -21,7 +24,7 @@ func TestGetBalance(t *testing.T) {
 
 	pubKey, err := hexutil.Decode(pubKeyHex)
 	require.NoError(t, err)
-	restClient, err := NewClient(mockAddress.Host)
+	restClient, err := New(mockAddress.Host)
 	require.NoError(t, err)
 
 	balance, err := restClient.GetBalance(pubKey, true)
@@ -35,10 +38,10 @@ func TestListBills(t *testing.T) {
 
 	pubKey, err := hexutil.Decode(pubKeyHex)
 	require.NoError(t, err)
-	restClient, err := NewClient(mockAddress.Host)
+	restClient, err := New(mockAddress.Host)
 	require.NoError(t, err)
 
-	billsResponse, err := restClient.ListBills(pubKey)
+	billsResponse, err := restClient.ListBills(pubKey, true)
 	require.NoError(t, err)
 	require.Len(t, billsResponse.Bills, 8)
 	require.EqualValues(t, 8, billsResponse.Total)
@@ -52,10 +55,10 @@ func TestListBillsWithPaging(t *testing.T) {
 
 	pubKey, err := hexutil.Decode(pubKeyHex)
 	require.NoError(t, err)
-	restClient, err := NewClient(mockAddress.Host)
+	restClient, err := New(mockAddress.Host)
 	require.NoError(t, err)
 
-	billsResponse, err := restClient.ListBills(pubKey)
+	billsResponse, err := restClient.ListBills(pubKey, true)
 	require.NoError(t, err)
 	require.Len(t, billsResponse.Bills, 13)
 	require.EqualValues(t, 13, billsResponse.Total)
@@ -67,7 +70,7 @@ func TestGetProof(t *testing.T) {
 	mockServer, mockAddress := mockGetProofCall(t)
 	defer mockServer.Close()
 
-	restClient, _ := NewClient(mockAddress.Host)
+	restClient, _ := New(mockAddress.Host)
 	proofResponse, err := restClient.GetProof([]byte(billId))
 
 	require.NoError(t, err)
@@ -80,17 +83,16 @@ func TestBlockHeight(t *testing.T) {
 	mockServer, mockAddress := mockGetBlockHeightCall(t)
 	defer mockServer.Close()
 
-	restClient, _ := NewClient(mockAddress.Host)
-	blockHeight, err := restClient.GetBlockHeight()
+	restClient, _ := New(mockAddress.Host)
+	blockHeight, err := restClient.GetRoundNumber(context.Background())
 
 	require.NoError(t, err)
 	require.EqualValues(t, 1000, blockHeight)
 }
 
 func Test_NewClient(t *testing.T) {
-
 	t.Run("invalid URL", func(t *testing.T) {
-		mbc, err := NewClient("x:y:z")
+		mbc, err := New("x:y:z")
 		require.ErrorContains(t, err, "error parsing Money Backend Client base URL")
 		require.Nil(t, mbc)
 	})
@@ -110,7 +112,7 @@ func Test_NewClient(t *testing.T) {
 		}
 
 		for _, tc := range cases {
-			mbc, err := NewClient(tc.param)
+			mbc, err := New(tc.param)
 			if err != nil {
 				t.Errorf("unexpected error for parameter %q: %v", tc.param, err)
 			}
@@ -119,6 +121,16 @@ func Test_NewClient(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestGetFeeCreditBill(t *testing.T) {
+	serverURL := mockGetFeeCreditBillCall(t)
+	restClient, _ := New(serverURL.Host)
+	response, err := restClient.FetchFeeCreditBill(context.Background(), []byte{})
+	require.NoError(t, err)
+
+	expectedBillID, _ := base64.StdEncoding.DecodeString(billId)
+	require.EqualValues(t, expectedBillID, response.Id)
 }
 
 func mockGetBalanceCall(t *testing.T) (*httptest.Server, *url.URL) {
@@ -172,7 +184,7 @@ func mockGetProofCall(t *testing.T) (*httptest.Server, *url.URL) {
 			t.Errorf("Expected to request '%v', got: %s", ProofPath, r.URL.Path)
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"bills":[{"id":"` + billId + `", "value":"10", "txHash":"MHgwMzgwMDNlMjE4ZWVhMzYwY2JmNTgwZWJiOTBjYzhjOGNhZjBjY2VmNGJmNjYwZWE5YWI0ZmMwNmI1YzM2N2IwMzg=", "isDcBill":false, "txProof":{"blockNumber":1, "tx":{"systemId":"AAAAAA==", "unitId":"Uv38ByGCZU8WP18PmmIdcpVmx00QA3xNe7sEB9Hixkk=", "transactionAttributes":{}, "timeout":10, "ownerProof":"gYVa"}, "proof":{"proofType":"PRIM", "blockHeaderHash":"AA==", "transactionsHash":"", "hashValue":"", "blockTreeHashChain":{"items":[{"val":"AA==", "hash":"AA=="}]}, "secTreeHashChain":null, "unicityCertificate":null}}}]}`))
+		w.Write([]byte(`{"bills":[{"id":"` + billId + `", "value":"10", "txHash":"MHgwMzgwMDNlMjE4ZWVhMzYwY2JmNTgwZWJiOTBjYzhjOGNhZjBjY2VmNGJmNjYwZWE5YWI0ZmMwNmI1YzM2N2IwMzg=", "isDcBill":false, "txProof":{"blockNumber":1, "tx":{"systemId":"AAAAAA==", "unitId":"Uv38ByGCZU8WP18PmmIdcpVmx00QA3xNe7sEB9Hixkk=", "transactionAttributes":{}, "clientMetadata":{"timeout":10}, "ownerProof":"gYVa"}, "proof":{"proofType":"PRIM", "blockHeaderHash":"AA==", "transactionsHash":"", "hashValue":"", "blockTreeHashChain":{"items":[{"val":"AA==", "hash":"AA=="}]}, "secTreeHashChain":null, "unicityCertificate":null}}}]}`))
 	}))
 
 	serverAddress, _ := url.Parse(server.URL)
@@ -181,8 +193,8 @@ func mockGetProofCall(t *testing.T) (*httptest.Server, *url.URL) {
 
 func mockGetBlockHeightCall(t *testing.T) (*httptest.Server, *url.URL) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != ("/" + BlockHeightPath) {
-			t.Errorf("Expected to request '%v', got: %s", BlockHeightPath, r.URL.Path)
+		if r.URL.Path != ("/" + RoundNumberPath) {
+			t.Errorf("Expected to request '%v', got: %s", RoundNumberPath, r.URL.Path)
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"roundNumber": "1000"}`))
@@ -190,4 +202,29 @@ func mockGetBlockHeightCall(t *testing.T) (*httptest.Server, *url.URL) {
 
 	serverAddress, _ := url.Parse(server.URL)
 	return server, serverAddress
+}
+
+func mockGetFeeCreditBillCall(t *testing.T) *url.URL {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.URL.Path, "/"+FeeCreditPath) {
+			t.Errorf("Expected to request '%v', got: %s", ProofPath, r.URL.Path)
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write(getFeeCreditBillJsonBytes())
+	}))
+	t.Cleanup(server.Close)
+	serverURL, _ := url.Parse(server.URL)
+	return serverURL
+}
+
+func getFeeCreditBillJsonBytes() []byte {
+	unitID, _ := base64.StdEncoding.DecodeString(billId)
+	res := &bp.Bill{
+		Id:            unitID,
+		Value:         10,
+		TxHash:        []byte{1},
+		FcBlockNumber: 100,
+	}
+	jsonBytes, _ := protojson.Marshal(res)
+	return jsonBytes
 }

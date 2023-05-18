@@ -1,19 +1,25 @@
-package money
+package backend
 
 import (
 	"context"
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"regexp"
+	"strconv"
 	"syscall"
 	"testing"
 	"time"
 
+	"github.com/ainvaltin/httpsrv"
+	"github.com/alphabill-org/alphabill/pkg/wallet/backend/bp"
 	"github.com/alphabill-org/alphabill/internal/block"
 	testhttp "github.com/alphabill-org/alphabill/internal/testutils/http"
 	"github.com/alphabill-org/alphabill/internal/testutils/net"
 	testtransaction "github.com/alphabill-org/alphabill/internal/testutils/transaction"
-	moneytx "github.com/alphabill-org/alphabill/internal/txsystem/money"
+	"github.com/alphabill-org/alphabill/internal/testutils/transaction/money"
+	"github.com/alphabill-org/alphabill/internal/txsystem"
 	"github.com/alphabill-org/alphabill/pkg/client"
 	"github.com/alphabill-org/alphabill/pkg/client/clientmock"
 	"github.com/alphabill-org/alphabill/pkg/wallet"
@@ -59,6 +65,20 @@ func withABClient(client client.ABClient) option {
 	return func(s *WalletBackend) error {
 		s.genericWallet.AlphabillClient = client
 		return nil
+	}
+}
+
+func withFeeCreditBills(bills ...*Bill) option {
+	return func(s *WalletBackend) error {
+		return s.store.WithTransaction(func(tx BillStoreTx) error {
+			for _, bill := range bills {
+				err := tx.SetFeeCreditBill(bill)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
 	}
 }
 
@@ -131,6 +151,33 @@ func TestListBillsRequest_DCBillsIncluded(t *testing.T) {
 	require.True(t, bill.IsDCBill)
 }
 
+func TestListBillsRequest_DCBillsExcluded(t *testing.T) {
+	walletBackend := newWalletBackend(t, withBills(
+		&Bill{
+			Id:             newUnitID(1),
+			Value:          1,
+			OwnerPredicate: getOwnerPredicate(pubkeyHex),
+		},
+		&Bill{
+			Id:             newUnitID(2),
+			Value:          2,
+			IsDCBill:       true,
+			OwnerPredicate: getOwnerPredicate(pubkeyHex),
+		},
+	))
+	port := startServer(t, walletBackend)
+
+	res := &ListBillsResponse{}
+	httpRes, err := testhttp.DoGet(fmt.Sprintf("http://localhost:%d/api/v1/list-bills?pubkey=%s&includedcbills=false", port, pubkeyHex), res)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, httpRes.StatusCode)
+	require.Equal(t, 1, res.Total)
+	require.Len(t, res.Bills, 1)
+	bill := res.Bills[0]
+	require.EqualValues(t, 1, bill.Value)
+	require.False(t, bill.IsDCBill)
+}
+
 func TestListBillsRequest_Paging(t *testing.T) {
 	// given set of bills
 	var bills []*Bill
@@ -164,6 +211,21 @@ func TestListBillsRequest_Paging(t *testing.T) {
 	require.Len(t, res.Bills, 100)
 	require.EqualValues(t, 100, res.Bills[0].Value)
 	require.EqualValues(t, 199, res.Bills[99].Value)
+
+	// verify Link header of the response
+	var linkHdrMatcher = regexp.MustCompile("<(.*)>")
+	match := linkHdrMatcher.FindStringSubmatch(httpRes.Header.Get("Link"))
+	if len(match) != 2 {
+		t.Errorf("Link header didn't result in expected match\nHeader: %s\nmatches: %v\n", httpRes.Header.Get("Link"), match)
+	} else {
+		u, err := url.Parse(match[1])
+		if err != nil {
+			t.Fatal("failed to parse Link header:", err)
+		}
+		if s := u.Query().Get("offset"); s != strconv.Itoa(200) {
+			t.Errorf("expected %v got %s", 200, s)
+		}
+	}
 
 	// verify limit limits result size
 	res = &ListBillsResponse{}
@@ -202,6 +264,11 @@ func TestListBillsRequest_Paging(t *testing.T) {
 	require.Len(t, res.Bills, 10)
 	require.EqualValues(t, 190, res.Bills[0].Value)
 	require.EqualValues(t, 199, res.Bills[9].Value)
+
+	// verify no Link header in the response
+	if link := httpRes.Header.Get("Link"); link != "" {
+		t.Errorf("unexpectedly the Link header is not empty, got %q", link)
+	}
 }
 
 func TestBalanceRequest_Ok(t *testing.T) {
@@ -283,7 +350,7 @@ func TestProofRequest_Ok(t *testing.T) {
 	walletBackend := newWalletBackend(t, withBills(b))
 	port := startServer(t, walletBackend)
 
-	response := &moneytx.Bills{}
+	response := &bp.Bills{}
 	httpRes, err := testhttp.DoGetProto(fmt.Sprintf("http://localhost:%d/api/v1/proof?bill_id=%s", port, billId), response)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, httpRes.StatusCode)
@@ -375,6 +442,140 @@ func TestInvalidUrl_NotFound(t *testing.T) {
 	require.Equal(t, 404, httpRes.StatusCode)
 }
 
+func TestGetFeeCreditBillRequest_Ok(t *testing.T) {
+	b := &Bill{
+		Id:             newUnitID(1),
+		Value:          1,
+		TxHash:         []byte{0},
+		OwnerPredicate: getOwnerPredicate(pubkeyHex),
+		FCBlockNumber:  1,
+		TxProof: &TxProof{
+			BlockNumber: 1,
+			Tx:          testtransaction.NewTransaction(t),
+			Proof: &block.BlockProof{
+				BlockHeaderHash: []byte{0},
+				BlockTreeHashChain: &block.BlockTreeHashChain{
+					Items: []*block.ChainItem{{Val: []byte{0}, Hash: []byte{0}}},
+				},
+			},
+		},
+	}
+	walletBackend := newWalletBackend(t, withFeeCreditBills(b))
+	port := startServer(t, walletBackend)
+
+	response := &bp.Bill{}
+	httpRes, err := testhttp.DoGetProto(fmt.Sprintf("http://localhost:%d/api/v1/fee-credit-bill?bill_id=%s", port, billId), response)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, httpRes.StatusCode)
+	require.Equal(t, b.Id, response.Id)
+	require.Equal(t, b.Value, response.Value)
+	require.Equal(t, b.TxHash, response.TxHash)
+	require.Equal(t, b.IsDCBill, response.IsDcBill)
+	require.Equal(t, b.FCBlockNumber, response.FcBlockNumber)
+
+	ep := b.TxProof
+	ap := response.TxProof
+	require.Equal(t, ep.BlockNumber, ap.BlockNumber)
+	require.EqualValues(t, ep.Tx.UnitId, ap.Tx.UnitId)
+	require.EqualValues(t, ep.Proof.BlockHeaderHash, ap.Proof.BlockHeaderHash)
+}
+
+func TestGetFeeCreditBillRequest_MissingBillId(t *testing.T) {
+	port := startServer(t, newWalletBackend(t))
+
+	res := &ErrorResponse{}
+	httpRes, err := testhttp.DoGet(fmt.Sprintf("http://localhost:%d/api/v1/fee-credit-bill", port), res)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusBadRequest, httpRes.StatusCode)
+	require.Equal(t, "missing required bill_id query parameter", res.Message)
+}
+
+func TestGetFeeCreditBillRequest_InvalidBillIdLength(t *testing.T) {
+	port := startServer(t, newWalletBackend(t))
+
+	// verify bill id larger than 32 bytes returns error
+	res := &ErrorResponse{}
+	billId := "0x000000000000000000000000000000000000000000000000000000000000000001"
+	httpRes, err := testhttp.DoGet(fmt.Sprintf("http://localhost:%d/api/v1/fee-credit-bill?bill_id=%s", port, billId), res)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusBadRequest, httpRes.StatusCode)
+	require.Equal(t, errInvalidBillIDLength.Error(), res.Message)
+
+	// verify bill id smaller than 32 bytes returns error
+	res = &ErrorResponse{}
+	httpRes, err = testhttp.DoGet(fmt.Sprintf("http://localhost:%d/api/v1/fee-credit-bill?bill_id=0x01", port), res)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusBadRequest, httpRes.StatusCode)
+	require.Equal(t, errInvalidBillIDLength.Error(), res.Message)
+
+	// verify bill id with correct length but missing prefix returns error
+	res = &ErrorResponse{}
+	httpRes, err = testhttp.DoGet(fmt.Sprintf("http://localhost:%d/api/v1/fee-credit-bill?bill_id=%s", port, billId), res)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusBadRequest, httpRes.StatusCode)
+	require.Equal(t, errInvalidBillIDLength.Error(), res.Message)
+}
+
+func TestGetFeeCreditBillRequest_BillDoesNotExist(t *testing.T) {
+	port := startServer(t, newWalletBackend(t))
+
+	res := &ErrorResponse{}
+	httpRes, err := testhttp.DoGet(fmt.Sprintf("http://localhost:%d/api/v1/fee-credit-bill?bill_id=%s", port, billId), res)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNotFound, httpRes.StatusCode)
+	require.Equal(t, "fee credit bill does not exist", res.Message)
+}
+
+func TestPostTransactionsRequest_InvalidPubkey(t *testing.T) {
+	walletBackend := newWalletBackend(t)
+	port := startServer(t, walletBackend)
+
+	res := &ErrorResponse{}
+	httpRes, err := testhttp.DoPostProto(fmt.Sprintf("http://localhost:%d/api/v1/transactions/%s", port, "invalid"), nil, res)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusBadRequest, httpRes.StatusCode)
+	require.Contains(t, res.Message, "failed to parse sender pubkey")
+}
+
+func TestPostTransactionsRequest_EmptyBody(t *testing.T) {
+	walletBackend := newWalletBackend(t)
+	port := startServer(t, walletBackend)
+
+	res := &ErrorResponse{}
+	httpRes, err := testhttp.DoPostProto(fmt.Sprintf("http://localhost:%d/api/v1/transactions/%s", port, pubkeyHex), nil, res)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusBadRequest, httpRes.StatusCode)
+	require.Equal(t, "request body contained no transactions to process", res.Message)
+}
+
+func TestPostTransactionsRequest_InvalidTransactions(t *testing.T) {
+	walletBackend := newWalletBackend(t)
+	port := startServer(t, walletBackend)
+
+	txs := money.RandomBillTransfer(t)
+
+	res := &ErrorResponse{}
+	httpRes, err := testhttp.DoPostProto(fmt.Sprintf("http://localhost:%d/api/v1/transactions/%s", port, pubkeyHex), txs, res)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusBadRequest, httpRes.StatusCode)
+	require.Contains(t, res.Message, "failed to decode request body")
+}
+
+func TestPostTransactionsRequest_Ok(t *testing.T) {
+	walletBackend := newWalletBackend(t)
+	port := startServer(t, walletBackend)
+
+	txs := &txsystem.Transactions{Transactions: []*txsystem.Transaction{
+		money.RandomBillTransfer(t),
+		money.RandomBillTransfer(t),
+		money.RandomBillTransfer(t),
+	}}
+
+	httpRes, err := testhttp.DoPostProto(fmt.Sprintf("http://localhost:%d/api/v1/transactions/%s", port, pubkeyHex), txs, nil)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusAccepted, httpRes.StatusCode)
+}
+
 func startServer(t *testing.T, service WalletBackendService) int {
 	port, err := net.GetFreePort()
 	require.NoError(t, err)
@@ -382,8 +583,17 @@ func startServer(t *testing.T, service WalletBackendService) int {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {
-		server := NewHttpServer(fmt.Sprintf("localhost:%d", port), 100, service)
-		err := server.Run(ctx)
+		handler := &RequestHandler{Service: service, ListBillsPageLimit: 100}
+		server := http.Server{
+			Addr:              fmt.Sprintf("localhost:%d", port),
+			Handler:           handler.Router(),
+			ReadTimeout:       3 * time.Second,
+			ReadHeaderTimeout: time.Second,
+			WriteTimeout:      5 * time.Second,
+			IdleTimeout:       30 * time.Second,
+		}
+
+		err := httpsrv.Run(ctx, server, httpsrv.ShutdownTimeout(5*time.Second))
 		require.ErrorIs(t, err, context.Canceled)
 	}()
 	// stop the server
