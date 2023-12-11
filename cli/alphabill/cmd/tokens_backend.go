@@ -9,7 +9,7 @@ import (
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/spf13/cobra"
 
-	"github.com/alphabill-org/alphabill/wallet/tokens/backend"
+	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/backend"
 )
 
 const defaultTokensBackendApiURL = "localhost:9735"

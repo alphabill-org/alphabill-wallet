@@ -4,23 +4,23 @@ import (
 	"context"
 	"crypto"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/internal/testutils"
-	"github.com/alphabill-org/alphabill/internal/testutils/http"
-	"github.com/alphabill-org/alphabill/internal/testutils/net"
-	testobserve "github.com/alphabill-org/alphabill/internal/testutils/observability"
-	"github.com/alphabill-org/alphabill/internal/testutils/partition"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/http"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/net"
+	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
+	"github.com/alphabill-org/alphabill-wallet/wallet"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	moneytx "github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/stretchr/testify/require"
-
-	"github.com/alphabill-org/alphabill/wallet"
-	"github.com/alphabill-org/alphabill/wallet/money/backend"
 )
 
 func TestMoneyBackendCLI(t *testing.T) {
@@ -90,4 +90,11 @@ func TestMoneyBackendConfig_DbFileParentDirsAreCreated(t *testing.T) {
 	_, err := c.GetDbFile()
 	require.NoError(t, err)
 	require.True(t, util.FileExists(filepath.Dir(expectedFilePath)))
+}
+
+func setupTestHomeDir(t *testing.T, dir string) string {
+	outputDir := filepath.Join(t.TempDir(), dir)
+	err := os.MkdirAll(outputDir, 0700) // -rwx------
+	require.NoError(t, err)
+	return outputDir
 }

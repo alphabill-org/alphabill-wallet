@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/internal/testutils"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	"github.com/stretchr/testify/require"
 )
 

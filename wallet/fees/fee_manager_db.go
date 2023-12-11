@@ -9,7 +9,7 @@ import (
 
 	bolt "go.etcd.io/bbolt"
 
-	"github.com/alphabill-org/alphabill/wallet"
+	"github.com/alphabill-org/alphabill-wallet/wallet"
 )
 
 const (

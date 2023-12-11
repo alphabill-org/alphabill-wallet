@@ -14,14 +14,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alphabill-org/alphabill/internal/testutils"
 	"github.com/alphabill-org/alphabill/rpc/alphabill"
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/stretchr/testify/require"
 
-	sdk "github.com/alphabill-org/alphabill/wallet"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
 )
 
 func decodeResponse(t *testing.T, rsp *http.Response, code int, data any) error {

@@ -12,10 +12,10 @@ import (
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/spf13/cobra"
 
-	sdk "github.com/alphabill-org/alphabill/wallet"
-	"github.com/alphabill-org/alphabill/wallet/account"
-	wallet "github.com/alphabill-org/alphabill/wallet/tokens"
-	"github.com/alphabill-org/alphabill/wallet/tokens/backend"
+	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
+	"github.com/alphabill-org/alphabill-wallet/wallet/account"
+	wallet "github.com/alphabill-org/alphabill-wallet/wallet/tokens"
+	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/backend"
 )
 
 const (

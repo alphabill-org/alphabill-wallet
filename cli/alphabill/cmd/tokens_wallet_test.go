@@ -11,24 +11,24 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alphabill-org/alphabill/internal/testutils"
-	"github.com/alphabill-org/alphabill/internal/testutils/logger"
-	"github.com/alphabill-org/alphabill/internal/testutils/net"
-	"github.com/alphabill-org/alphabill/internal/testutils/observability"
-	"github.com/alphabill-org/alphabill/internal/testutils/partition"
-	"github.com/alphabill-org/alphabill/txsystem/tokens"
-	"github.com/spf13/cobra"
-	"github.com/stretchr/testify/require"
-
 	abcrypto "github.com/alphabill-org/alphabill/crypto"
 	"github.com/alphabill-org/alphabill/state"
 	"github.com/alphabill-org/alphabill/txsystem"
+	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/alphabill-org/alphabill/types"
-	"github.com/alphabill-org/alphabill/wallet/account"
-	"github.com/alphabill-org/alphabill/wallet/fees"
-	tw "github.com/alphabill-org/alphabill/wallet/tokens"
-	"github.com/alphabill-org/alphabill/wallet/tokens/backend"
-	"github.com/alphabill-org/alphabill/wallet/tokens/client"
+	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/require"
+
+	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/net"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
+	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
+	"github.com/alphabill-org/alphabill-wallet/wallet/account"
+	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
+	tw "github.com/alphabill-org/alphabill-wallet/wallet/tokens"
+	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/backend"
+	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/client"
 )
 
 func TestListTokensCommandInputs(t *testing.T) {

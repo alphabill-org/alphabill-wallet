@@ -12,8 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alphabill-org/alphabill/internal/testutils"
 	"github.com/stretchr/testify/require"
+
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 )
 
 func Test_broker_subscribe(t *testing.T) {

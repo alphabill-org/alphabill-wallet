@@ -8,14 +8,14 @@ import (
 	"math"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/internal/testutils"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	ttxs "github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/stretchr/testify/require"
 
-	sdk "github.com/alphabill-org/alphabill/wallet"
-	"github.com/alphabill-org/alphabill/wallet/money/tx_builder"
-	twb "github.com/alphabill-org/alphabill/wallet/tokens/backend"
+	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
+	twb "github.com/alphabill-org/alphabill-wallet/wallet/tokens/backend"
 )
 
 func TestFungibleTokenDC(t *testing.T) {

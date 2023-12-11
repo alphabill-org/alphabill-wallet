@@ -6,14 +6,15 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/internal/testutils"
 	"github.com/alphabill-org/alphabill/txsystem/evm"
 	"github.com/alphabill-org/alphabill/types"
-	"github.com/alphabill-org/alphabill/wallet"
-	"github.com/alphabill-org/alphabill/wallet/account"
-	evmclient "github.com/alphabill-org/alphabill/wallet/evm/client"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/stretchr/testify/require"
+
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	"github.com/alphabill-org/alphabill-wallet/wallet"
+	"github.com/alphabill-org/alphabill-wallet/wallet/account"
+	evmclient "github.com/alphabill-org/alphabill-wallet/wallet/evm/client"
 )
 
 const (

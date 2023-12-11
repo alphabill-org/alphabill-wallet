@@ -11,10 +11,10 @@ import (
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/fxamacker/cbor/v2"
 
-	sdk "github.com/alphabill-org/alphabill/wallet"
-	"github.com/alphabill-org/alphabill/wallet/account"
-	twb "github.com/alphabill-org/alphabill/wallet/tokens/backend"
-	"github.com/alphabill-org/alphabill/wallet/txsubmitter"
+	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
+	"github.com/alphabill-org/alphabill-wallet/wallet/account"
+	twb "github.com/alphabill-org/alphabill-wallet/wallet/tokens/backend"
+	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 )
 
 const maxBurnBatchSize = 100

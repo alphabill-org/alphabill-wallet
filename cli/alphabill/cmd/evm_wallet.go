@@ -11,8 +11,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/spf13/cobra"
 
-	evmwallet "github.com/alphabill-org/alphabill/wallet/evm"
-	evmclient "github.com/alphabill-org/alphabill/wallet/evm/client"
+	evmwallet "github.com/alphabill-org/alphabill-wallet/wallet/evm"
+	evmclient "github.com/alphabill-org/alphabill-wallet/wallet/evm/client"
 )
 
 const (

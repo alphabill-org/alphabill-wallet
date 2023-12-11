@@ -4,8 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/internal/testutils/logger"
 	"github.com/stretchr/testify/require"
+
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
 )
 
 func TestConfirmUnitsTx_canceled(t *testing.T) {

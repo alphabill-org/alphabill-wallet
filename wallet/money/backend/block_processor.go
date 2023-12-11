@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"log/slog"
 
+	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill/logger"
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/txsystem/fc/transactions"
 	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/types"
-	sdk "github.com/alphabill-org/alphabill/wallet"
 )
 
 const (

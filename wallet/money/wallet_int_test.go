@@ -12,30 +12,30 @@ import (
 
 	abcrypto "github.com/alphabill-org/alphabill/crypto"
 	"github.com/alphabill-org/alphabill/hash"
-	"github.com/alphabill-org/alphabill/internal/testutils"
-	"github.com/alphabill-org/alphabill/internal/testutils/logger"
-	"github.com/alphabill-org/alphabill/internal/testutils/observability"
-	"github.com/alphabill-org/alphabill/internal/testutils/partition"
-	"github.com/alphabill-org/alphabill/internal/testutils/server"
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/partition"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/rpc"
 	"github.com/alphabill-org/alphabill/rpc/alphabill"
 	"github.com/alphabill-org/alphabill/txsystem"
-	testfc "github.com/alphabill-org/alphabill/txsystem/fc/testutils"
 	"github.com/alphabill-org/alphabill/txsystem/money"
-	moneytestutils "github.com/alphabill-org/alphabill/txsystem/money/testutils"
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
-	"github.com/alphabill-org/alphabill/wallet/account"
-	"github.com/alphabill-org/alphabill/wallet/fees"
-	"github.com/alphabill-org/alphabill/wallet/money/backend"
-	beclient "github.com/alphabill-org/alphabill/wallet/money/backend/client"
-	"github.com/alphabill-org/alphabill/wallet/txsubmitter"
-	"github.com/alphabill-org/alphabill/wallet/unitlock"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	testfees "github.com/alphabill-org/alphabill-wallet/internal/testutils/fees"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
+	testserver "github.com/alphabill-org/alphabill-wallet/internal/testutils/server"
+	"github.com/alphabill-org/alphabill-wallet/wallet/account"
+	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend"
+	beclient "github.com/alphabill-org/alphabill-wallet/wallet/money/backend/client"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
+	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
+	"github.com/alphabill-org/alphabill-wallet/wallet/unitlock"
 )
 
 var (
@@ -216,12 +216,12 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 	require.NoError(t, err)
 
 	// create fee credit for initial bill transfer
-	transferFC := testfc.CreateFeeCredit(t, initialBill.ID, fcrID, fcrAmount, accKey.PrivKey, accKey.PubKey, network)
+	transferFC := testfees.CreateFeeCredit(t, initialBill.ID, fcrID, fcrAmount, accKey.PrivKey, accKey.PubKey, network)
 	initialBillBacklink := transferFC.Hash(crypto.SHA256)
 	initialBillValue := initialBill.Value - fcrAmount
 
 	// transfer initial bill to wallet 1
-	transferInitialBillTx, err := moneytestutils.CreateInitialBillTransferTx(accKey, initialBill.ID, fcrID, initialBillValue, 10000, initialBillBacklink)
+	transferInitialBillTx, err := testutil.CreateInitialBillTransferTx(accKey, initialBill.ID, fcrID, initialBillValue, 10000, initialBillBacklink)
 	require.NoError(t, err)
 	batch := txsubmitter.NewBatch(accKey.PubKey, w.backend, observe.Logger())
 	batch.Add(&txsubmitter.TxSubmission{
@@ -342,11 +342,11 @@ func TestCollectDustInMultiAccountWalletWithKeyFlag(t *testing.T) {
 	require.NoError(t, err)
 
 	// create fee credit for initial bill transfer
-	transferFC := testfc.CreateFeeCredit(t, initialBill.ID, fcrID, fcrAmount, accKey.PrivKey, accKey.PubKey, network)
+	transferFC := testfees.CreateFeeCredit(t, initialBill.ID, fcrID, fcrAmount, accKey.PrivKey, accKey.PubKey, network)
 	initialBillBacklink := transferFC.Hash(crypto.SHA256)
 	initialBillValue := initialBill.Value - fcrAmount
 
-	transferInitialBillTx, err := moneytestutils.CreateInitialBillTransferTx(accKey, initialBill.ID, fcrID, initialBillValue, 10000, initialBillBacklink)
+	transferInitialBillTx, err := testutil.CreateInitialBillTransferTx(accKey, initialBill.ID, fcrID, initialBillValue, 10000, initialBillBacklink)
 	require.NoError(t, err)
 	batch := txsubmitter.NewBatch(accKey.PubKey, w.backend, observe.Logger())
 	batch.Add(&txsubmitter.TxSubmission{

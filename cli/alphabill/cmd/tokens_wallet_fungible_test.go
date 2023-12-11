@@ -8,24 +8,24 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/stretchr/testify/require"
-
-	"github.com/alphabill-org/alphabill/internal/testutils"
-	testobserve "github.com/alphabill-org/alphabill/internal/testutils/observability"
-	"github.com/alphabill-org/alphabill/internal/testutils/partition"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/alphabill-org/alphabill/util"
-	"github.com/alphabill-org/alphabill/wallet/account"
-	"github.com/alphabill-org/alphabill/wallet/fees"
-	moneywallet "github.com/alphabill-org/alphabill/wallet/money"
-	moneyclient "github.com/alphabill-org/alphabill/wallet/money/backend/client"
-	tokenswallet "github.com/alphabill-org/alphabill/wallet/tokens"
-	"github.com/alphabill-org/alphabill/wallet/tokens/client"
-	"github.com/alphabill-org/alphabill/wallet/unitlock"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/stretchr/testify/require"
+
+	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
+	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
+	"github.com/alphabill-org/alphabill-wallet/wallet/account"
+	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
+	moneywallet "github.com/alphabill-org/alphabill-wallet/wallet/money"
+	moneyclient "github.com/alphabill-org/alphabill-wallet/wallet/money/backend/client"
+	tokenswallet "github.com/alphabill-org/alphabill-wallet/wallet/tokens"
+	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/client"
+	"github.com/alphabill-org/alphabill-wallet/wallet/unitlock"
 )
 
 func TestFungibleToken_Subtyping_Integration(t *testing.T) {

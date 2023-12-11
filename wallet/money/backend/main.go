@@ -13,7 +13,6 @@ import (
 
 	"github.com/ainvaltin/httpsrv"
 	"github.com/alphabill-org/alphabill/client"
-	"github.com/alphabill-org/alphabill/internal/debug"
 	"github.com/alphabill-org/alphabill/logger"
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/predicates/templates"
@@ -24,9 +23,10 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 
-	sdk "github.com/alphabill-org/alphabill/wallet"
-	"github.com/alphabill-org/alphabill/wallet/account"
-	"github.com/alphabill-org/alphabill/wallet/blocksync"
+	"github.com/alphabill-org/alphabill-wallet/internal/debug"
+	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
+	"github.com/alphabill-org/alphabill-wallet/wallet/account"
+	"github.com/alphabill-org/alphabill-wallet/wallet/blocksync"
 )
 
 type (

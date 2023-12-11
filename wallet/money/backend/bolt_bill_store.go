@@ -13,7 +13,7 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	bolt "go.etcd.io/bbolt"
 
-	sdk "github.com/alphabill-org/alphabill/wallet"
+	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
 )
 
 const BoltBillStoreFileName = "bills.db"

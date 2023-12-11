@@ -1,0 +1,32 @@
+# We are not using golang.org/x/crypto actually
+CVE-2020-29652
+CVE-2020-9283
+
+# We are not using github.com/dgrijalva/jwt-go, it's transitive from go-ethereum
+CVE-2020-26160
+
+# We are not using gogo/protobuf, it's transitive from go-ethereum
+CVE-2021-3121
+
+# We are not using github.com/docker/docker, it's transitive from go-ethereum
+CVE-2015-3627
+
+# We are not using github.com/nats-io/nats-server
+CVE-2022-24450
+
+# We are not using github.com/nats-io/nats-server/v2
+CVE-2020-26892
+CVE-2020-26521
+
+# We are not using github.com/nats-io/jwt
+CVE-2020-26892
+CVE-2020-26521
+
+# We are using go-ethereum, but not for sending transactions
+CVE-2022-23328
+
+# We are not using go.etcd.io/etcd
+CVE-2018-1098
+
+# We do not use go-ethereum GraphQL endpoint
+CVE-2023-42319

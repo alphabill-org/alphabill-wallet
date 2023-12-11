@@ -10,18 +10,18 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/fxamacker/cbor/v2"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/alphabill-org/alphabill/wallet"
-	"github.com/alphabill-org/alphabill/wallet/account"
-	"github.com/alphabill-org/alphabill/wallet/fees"
-	"github.com/alphabill-org/alphabill/wallet/money/tx_builder"
-	"github.com/alphabill-org/alphabill/wallet/tokens/backend"
-	"github.com/alphabill-org/alphabill/wallet/tokens/client"
+	"github.com/alphabill-org/alphabill-wallet/wallet/account"
+	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
+	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/backend"
+	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/client"
 )
 
 const (

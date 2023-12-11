@@ -12,10 +12,11 @@ import (
 
 	"github.com/alphabill-org/alphabill/txsystem/fc/transactions"
 	"github.com/alphabill-org/alphabill/types"
-	"github.com/alphabill-org/alphabill/wallet"
-	"github.com/alphabill-org/alphabill/wallet/account"
-	txbuilder "github.com/alphabill-org/alphabill/wallet/money/tx_builder"
-	"github.com/alphabill-org/alphabill/wallet/unitlock"
+
+	"github.com/alphabill-org/alphabill-wallet/wallet"
+	"github.com/alphabill-org/alphabill-wallet/wallet/account"
+	txbuilder "github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
+	"github.com/alphabill-org/alphabill-wallet/wallet/unitlock"
 )
 
 const (

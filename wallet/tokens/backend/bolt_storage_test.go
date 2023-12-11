@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alphabill-org/alphabill/internal/testutils"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/stretchr/testify/require"
 
-	sdk "github.com/alphabill-org/alphabill/wallet"
+	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
 )
 
 func Test_storage(t *testing.T) {

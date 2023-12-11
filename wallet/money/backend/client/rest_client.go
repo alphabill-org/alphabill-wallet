@@ -18,8 +18,8 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/trace"
 
-	sdk "github.com/alphabill-org/alphabill/wallet"
-	"github.com/alphabill-org/alphabill/wallet/money/backend"
+	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend"
 )
 
 const (

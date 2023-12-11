@@ -4,10 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/internal/testutils/transaction"
+	testtransaction "github.com/alphabill-org/alphabill/txsystem/testutils/transaction"
 	"github.com/alphabill-org/alphabill/types"
-	"github.com/alphabill-org/alphabill/wallet"
 	"github.com/stretchr/testify/require"
+
+	"github.com/alphabill-org/alphabill-wallet/wallet"
 )
 
 type MockClient struct {

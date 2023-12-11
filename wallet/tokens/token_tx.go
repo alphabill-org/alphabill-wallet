@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/alphabill-org/alphabill-wallet/wallet"
 	abcrypto "github.com/alphabill-org/alphabill/crypto"
 	"github.com/alphabill-org/alphabill/hash"
 	"github.com/alphabill-org/alphabill/predicates/templates"
@@ -13,11 +14,10 @@ import (
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/fxamacker/cbor/v2"
 
-	"github.com/alphabill-org/alphabill/wallet"
-	"github.com/alphabill-org/alphabill/wallet/account"
-	"github.com/alphabill-org/alphabill/wallet/money/tx_builder"
-	"github.com/alphabill-org/alphabill/wallet/tokens/backend"
-	"github.com/alphabill-org/alphabill/wallet/txsubmitter"
+	"github.com/alphabill-org/alphabill-wallet/wallet/account"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
+	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/backend"
+	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 )
 
 type (

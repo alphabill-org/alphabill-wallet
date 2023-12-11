@@ -5,10 +5,10 @@ import (
 	"crypto"
 	"log/slog"
 
+	"github.com/alphabill-org/alphabill-wallet/wallet"
+	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/client"
+	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 	"github.com/alphabill-org/alphabill/types"
-	"github.com/alphabill-org/alphabill/wallet"
-	"github.com/alphabill-org/alphabill/wallet/tokens/client"
-	"github.com/alphabill-org/alphabill/wallet/txsubmitter"
 )
 
 type (

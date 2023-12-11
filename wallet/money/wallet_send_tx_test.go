@@ -8,22 +8,22 @@ import (
 	"testing"
 
 	"github.com/alphabill-org/alphabill/hash"
-	"github.com/alphabill-org/alphabill/internal/testutils/logger"
-	"github.com/alphabill-org/alphabill/internal/testutils/observability"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alphabill-org/alphabill/wallet"
-	"github.com/alphabill-org/alphabill/wallet/account"
-	"github.com/alphabill-org/alphabill/wallet/fees"
-	"github.com/alphabill-org/alphabill/wallet/money/backend"
-	beclient "github.com/alphabill-org/alphabill/wallet/money/backend/client"
-	"github.com/alphabill-org/alphabill/wallet/money/testutil"
-	txbuilder "github.com/alphabill-org/alphabill/wallet/money/tx_builder"
-	"github.com/alphabill-org/alphabill/wallet/unitlock"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
+	"github.com/alphabill-org/alphabill-wallet/wallet"
+	"github.com/alphabill-org/alphabill-wallet/wallet/account"
+	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend"
+	beclient "github.com/alphabill-org/alphabill-wallet/wallet/money/backend/client"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
+	txbuilder "github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
+	"github.com/alphabill-org/alphabill-wallet/wallet/unitlock"
 )
 
 func TestWalletSendFunction_Ok(t *testing.T) {

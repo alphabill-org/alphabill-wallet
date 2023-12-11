@@ -6,17 +6,17 @@ import (
 	"strings"
 	"testing"
 
-	testobserve "github.com/alphabill-org/alphabill/internal/testutils/observability"
-	"github.com/alphabill-org/alphabill/internal/testutils/partition"
-	"github.com/fxamacker/cbor/v2"
-	"github.com/stretchr/testify/require"
-
 	"github.com/alphabill-org/alphabill/hash"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/txsystem/fc/transactions"
 	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/types"
-	"github.com/alphabill-org/alphabill/wallet/money/backend/client"
+	"github.com/fxamacker/cbor/v2"
+	"github.com/stretchr/testify/require"
+
+	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
+	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend/client"
 )
 
 func TestWalletBillsListCmd_EmptyWallet(t *testing.T) {

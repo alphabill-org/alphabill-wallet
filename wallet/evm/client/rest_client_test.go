@@ -12,11 +12,12 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/internal/testutils"
-	"github.com/alphabill-org/alphabill/internal/testutils/transaction"
+	testtransaction "github.com/alphabill-org/alphabill/txsystem/testutils/transaction"
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/stretchr/testify/require"
+
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 )
 
 // writeCBORResponse replies to the request with the given response and HTTP code.

@@ -12,7 +12,6 @@ import (
 	"github.com/ainvaltin/httpsrv"
 	"github.com/alphabill-org/alphabill/client"
 	"github.com/alphabill-org/alphabill/crypto"
-	"github.com/alphabill-org/alphabill/internal/debug"
 	"github.com/alphabill-org/alphabill/logger"
 	"github.com/alphabill-org/alphabill/rpc/alphabill"
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
@@ -21,9 +20,10 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 
-	sdk "github.com/alphabill-org/alphabill/wallet"
-	"github.com/alphabill-org/alphabill/wallet/blocksync"
-	"github.com/alphabill-org/alphabill/wallet/broker"
+	"github.com/alphabill-org/alphabill-wallet/internal/debug"
+	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
+	"github.com/alphabill-org/alphabill-wallet/wallet/blocksync"
+	"github.com/alphabill-org/alphabill-wallet/wallet/broker"
 )
 
 type Configuration interface {

@@ -23,7 +23,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 
-	sdk "github.com/alphabill-org/alphabill/wallet"
+	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
 )
 
 const (

@@ -14,10 +14,11 @@ import (
 	"time"
 
 	"github.com/alphabill-org/alphabill/types"
-	sdk "github.com/alphabill-org/alphabill/wallet"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/shopspring/decimal"
+
+	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
 )
 
 var (

@@ -46,27 +46,17 @@ func (a *alphabillApp) Execute(ctx context.Context) (err error) {
 }
 
 func (a *alphabillApp) addSubcommands(obsF Factory, opts []interface{}) {
-	a.baseCmd.AddCommand(newMoneyNodeCmd(a.baseConfig, convertOptsToRunnable(opts)))
-	a.baseCmd.AddCommand(newMoneyGenesisCmd(a.baseConfig))
 	a.baseCmd.AddCommand(newWalletCmd(a.baseConfig, obsF))
-	a.baseCmd.AddCommand(newRootGenesisCmd(a.baseConfig))
-	a.baseCmd.AddCommand(newRootNodeCmd(a.baseConfig))
-	a.baseCmd.AddCommand(newNodeIdentifierCmd())
-	a.baseCmd.AddCommand(newTokensNodeCmd(a.baseConfig))
-	a.baseCmd.AddCommand(newUserTokenGenesisCmd(a.baseConfig))
 	a.baseCmd.AddCommand(newMoneyBackendCmd(a.baseConfig))
 	a.baseCmd.AddCommand(newTokensBackendCmd(a.baseConfig))
-	a.baseCmd.AddCommand(newEvmNodeCmd(a.baseConfig))
-	a.baseCmd.AddCommand(newEvmGenesisCmd(a.baseConfig))
 }
 
 func newBaseCmd(obsF Factory) (*cobra.Command, *baseConfiguration) {
 	config := &baseConfiguration{}
 	// baseCmd represents the base command when called without any subcommands
 	var baseCmd = &cobra.Command{
-		Use:           "alphabill",
-		Short:         "The alphabill CLI",
-		Long:          `The alphabill CLI includes commands for all different parts of the system: shard, core, wallet etc.`,
+		Use:           "abwallet",
+		Short:         "The alphabill wallet CLI",
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {

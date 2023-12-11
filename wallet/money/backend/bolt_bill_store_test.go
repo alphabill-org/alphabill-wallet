@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/alphabill-org/alphabill/hash"
-	"github.com/alphabill-org/alphabill/internal/testutils"
-	"github.com/alphabill-org/alphabill/internal/testutils/transaction"
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/types"
@@ -15,7 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 	bolt "go.etcd.io/bbolt"
 
-	sdk "github.com/alphabill-org/alphabill/wallet"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
+	testtransaction "github.com/alphabill-org/alphabill/txsystem/testutils/transaction"
 )
 
 func TestBillStore_CanBeCreated(t *testing.T) {

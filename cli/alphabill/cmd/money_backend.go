@@ -12,7 +12,7 @@ import (
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/spf13/cobra"
 
-	"github.com/alphabill-org/alphabill/wallet/money/backend"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend"
 )
 
 const (
@@ -22,7 +22,20 @@ const (
 	dbFileCmdName           = "db"
 	listBillsPageLimit      = "list-bills-page-limit"
 	systemIdentifierCmdName = "system-identifier"
+
+	defaultT2Timeout = 2500
 )
+
+var defaultMoneySDR = &genesis.SystemDescriptionRecord{
+	SystemIdentifier: money.DefaultSystemIdentifier,
+	T2Timeout:        defaultT2Timeout,
+	FeeCreditBill: &genesis.FeeCreditBill{
+		UnitId:         money.NewBillID(nil, []byte{2}),
+		OwnerPredicate: templates.AlwaysTrueBytes(),
+	},
+}
+
+var defaultInitialBillID = money.NewBillID(nil, []byte{1})
 
 type moneyBackendConfig struct {
 	Base               *baseConfiguration

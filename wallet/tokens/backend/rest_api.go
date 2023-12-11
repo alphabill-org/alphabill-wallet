@@ -18,8 +18,8 @@ import (
 	"github.com/gorilla/mux"
 	"golang.org/x/sync/semaphore"
 
-	sdk "github.com/alphabill-org/alphabill/wallet"
-	"github.com/alphabill-org/alphabill/wallet/broker"
+	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
+	"github.com/alphabill-org/alphabill-wallet/wallet/broker"
 )
 
 type dataSource interface {

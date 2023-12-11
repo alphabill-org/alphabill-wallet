@@ -11,10 +11,11 @@ import (
 	"github.com/alphabill-org/alphabill/crypto"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/types"
-	sdk "github.com/alphabill-org/alphabill/wallet"
-	"github.com/alphabill-org/alphabill/wallet/account"
-	evmclient "github.com/alphabill-org/alphabill/wallet/evm/client"
 	"github.com/fxamacker/cbor/v2"
+
+	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
+	"github.com/alphabill-org/alphabill-wallet/wallet/account"
+	evmclient "github.com/alphabill-org/alphabill-wallet/wallet/evm/client"
 )
 
 const txTimeoutBlockCount = 10

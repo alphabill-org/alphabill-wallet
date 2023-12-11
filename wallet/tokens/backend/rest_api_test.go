@@ -17,10 +17,8 @@ import (
 	"testing"
 
 	"github.com/alphabill-org/alphabill/hash"
-	"github.com/alphabill-org/alphabill/internal/testutils"
-	"github.com/alphabill-org/alphabill/internal/testutils/sig"
-	"github.com/alphabill-org/alphabill/internal/testutils/transaction"
 	"github.com/alphabill-org/alphabill/predicates/templates"
+	testtransaction "github.com/alphabill-org/alphabill/txsystem/testutils/transaction"
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -28,7 +26,9 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
 
-	sdk "github.com/alphabill-org/alphabill/wallet"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	testsig "github.com/alphabill-org/alphabill-wallet/internal/testutils/sig"
+	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
 )
 
 func Test_restAPI_endpoints(t *testing.T) {

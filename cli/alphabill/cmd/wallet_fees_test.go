@@ -7,9 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/internal/testutils"
-	"github.com/alphabill-org/alphabill/internal/testutils/observability"
-	"github.com/alphabill-org/alphabill/internal/testutils/partition"
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/txsystem/money"
@@ -17,9 +14,12 @@ import (
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alphabill-org/alphabill/wallet/fees"
-	"github.com/alphabill-org/alphabill/wallet/money/backend"
-	moneyclient "github.com/alphabill-org/alphabill/wallet/money/backend/client"
+	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
+	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
+	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend"
+	moneyclient "github.com/alphabill-org/alphabill-wallet/wallet/money/backend/client"
 )
 
 var defaultTokenSDR = &genesis.SystemDescriptionRecord{

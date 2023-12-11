@@ -11,12 +11,12 @@ import (
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/spf13/cobra"
 
-	"github.com/alphabill-org/alphabill/wallet"
-	"github.com/alphabill-org/alphabill/wallet/account"
-	"github.com/alphabill-org/alphabill/wallet/money"
-	"github.com/alphabill-org/alphabill/wallet/money/backend"
-	"github.com/alphabill-org/alphabill/wallet/money/backend/client"
-	txbuilder "github.com/alphabill-org/alphabill/wallet/money/tx_builder"
+	"github.com/alphabill-org/alphabill-wallet/wallet"
+	"github.com/alphabill-org/alphabill-wallet/wallet/account"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend/client"
+	txbuilder "github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
 )
 
 type (

@@ -14,8 +14,8 @@ import (
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/fxamacker/cbor/v2"
 
-	"github.com/alphabill-org/alphabill/wallet"
-	"github.com/alphabill-org/alphabill/wallet/account"
+	"github.com/alphabill-org/alphabill-wallet/wallet"
+	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 )
 
 const MaxFee = uint64(1)

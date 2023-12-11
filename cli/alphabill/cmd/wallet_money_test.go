@@ -15,21 +15,27 @@ import (
 	"testing"
 
 	abcrypto "github.com/alphabill-org/alphabill/crypto"
-	"github.com/alphabill-org/alphabill/internal/testutils/logger"
-	"github.com/alphabill-org/alphabill/internal/testutils/observability"
-	"github.com/alphabill-org/alphabill/internal/testutils/partition"
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/partition"
 	"github.com/alphabill-org/alphabill/predicates/templates"
+	"github.com/alphabill-org/alphabill/rpc"
+	"github.com/alphabill-org/alphabill/rpc/alphabill"
 	"github.com/alphabill-org/alphabill/txsystem"
 	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
+	"google.golang.org/grpc/health/grpc_health_v1"
 
-	"github.com/alphabill-org/alphabill/wallet/account"
-	"github.com/alphabill-org/alphabill/wallet/money/backend/client"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
+	"github.com/alphabill-org/alphabill-wallet/wallet/account"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend/client"
 )
 
 const walletBaseDir = "wallet"
@@ -256,6 +262,25 @@ func startRPCServer(t *testing.T, node *partition.Node, log *slog.Logger) string
 	}()
 
 	return listener.Addr().String()
+}
+
+func initRPCServer(node *partition.Node, cfg *grpcServerConfiguration, obs partition.Observability, log *slog.Logger) (*grpc.Server, error) {
+	grpcServer := grpc.NewServer(
+		grpc.MaxSendMsgSize(cfg.MaxSendMsgSize),
+		grpc.MaxRecvMsgSize(cfg.MaxRecvMsgSize),
+		grpc.KeepaliveParams(cfg.GrpcKeepAliveServerParameters()),
+		grpc.UnaryInterceptor(rpc.InstrumentMetricsUnaryServerInterceptor(obs.Meter(rpc.MetricsScopeGRPCAPI), log)),
+		grpc.StatsHandler(otelgrpc.NewServerHandler(otelgrpc.WithTracerProvider(obs.TracerProvider()))),
+	)
+	grpc_health_v1.RegisterHealthServer(grpcServer, health.NewServer())
+
+	rpcServer, err := rpc.NewGRPCServer(node, obs, rpc.WithMaxGetBlocksBatchSize(cfg.MaxGetBlocksBatchSize))
+	if err != nil {
+		return nil, err
+	}
+
+	alphabill.RegisterAlphabillServiceServer(grpcServer, rpcServer)
+	return grpcServer, nil
 }
 
 // addAccount calls "add-key" cli function on given wallet and returns the added pubkey hex

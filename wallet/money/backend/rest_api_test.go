@@ -15,17 +15,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/http"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/net"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
+	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	abcrypto "github.com/alphabill-org/alphabill/crypto"
-	"github.com/alphabill-org/alphabill/internal/testutils"
-	"github.com/alphabill-org/alphabill/internal/testutils/http"
-	"github.com/alphabill-org/alphabill/internal/testutils/net"
-	"github.com/alphabill-org/alphabill/internal/testutils/observability"
-	"github.com/alphabill-org/alphabill/internal/testutils/transaction"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/txsystem/money"
+	testtransaction "github.com/alphabill-org/alphabill/txsystem/testutils/transaction"
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/alphabill-org/alphabill/util"
-	"github.com/alphabill-org/alphabill/wallet/account"
 
 	"github.com/ainvaltin/httpsrv"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -33,7 +33,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
 
-	sdk "github.com/alphabill-org/alphabill/wallet"
+	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
 )
 
 const (

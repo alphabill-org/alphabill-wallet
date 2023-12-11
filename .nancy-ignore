@@ -1,0 +1,16 @@
+# We are not using HashiCorp Consul API
+CVE-2022-29153
+CVE-2022-24687
+
+# We are using go-ethereum, but not for sending transactions
+CVE-2022-23328
+sonatype-2021-0076
+
+# We are not using influxdata, it's transitive from go-ethereum
+sonatype-2019-0772
+
+# We are not using quic-go, it's transitive from libp2p
+CVE-2022-30591
+
+# We are not using libp2p/go-buffer-pool, it's transitive from libp2p
+sonatype-2022-3945

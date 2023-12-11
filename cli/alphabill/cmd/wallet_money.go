@@ -19,11 +19,11 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/term"
 
-	"github.com/alphabill-org/alphabill/wallet/account"
-	"github.com/alphabill-org/alphabill/wallet/fees"
-	"github.com/alphabill-org/alphabill/wallet/money"
-	moneyclient "github.com/alphabill-org/alphabill/wallet/money/backend/client"
-	"github.com/alphabill-org/alphabill/wallet/unitlock"
+	"github.com/alphabill-org/alphabill-wallet/wallet/account"
+	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money"
+	moneyclient "github.com/alphabill-org/alphabill-wallet/wallet/money/backend/client"
+	"github.com/alphabill-org/alphabill-wallet/wallet/unitlock"
 )
 
 type walletConfig struct {

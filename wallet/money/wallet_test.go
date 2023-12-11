@@ -11,16 +11,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/internal/testutils/logger"
-	"github.com/alphabill-org/alphabill/internal/testutils/observability"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alphabill-org/alphabill/wallet/account"
-	"github.com/alphabill-org/alphabill/wallet/fees"
-	beclient "github.com/alphabill-org/alphabill/wallet/money/backend/client"
-	"github.com/alphabill-org/alphabill/wallet/money/testutil"
-	"github.com/alphabill-org/alphabill/wallet/unitlock"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
+	"github.com/alphabill-org/alphabill-wallet/wallet/account"
+	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
+	beclient "github.com/alphabill-org/alphabill-wallet/wallet/money/backend/client"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
+	"github.com/alphabill-org/alphabill-wallet/wallet/unitlock"
 )
 
 const (

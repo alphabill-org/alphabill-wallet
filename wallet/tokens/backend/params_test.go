@@ -5,8 +5,9 @@ import (
 	"testing"
 
 	"github.com/alphabill-org/alphabill/types"
-	sdk "github.com/alphabill-org/alphabill/wallet"
 	"github.com/stretchr/testify/require"
+
+	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
 )
 
 func Test_parseTokenTypeID(t *testing.T) {

@@ -13,8 +13,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/internal/testutils"
-	testobserve "github.com/alphabill-org/alphabill/internal/testutils/observability"
 	"github.com/alphabill-org/alphabill/logger"
 	"github.com/alphabill-org/alphabill/txsystem/evm"
 	"github.com/alphabill-org/alphabill/txsystem/evm/api"
@@ -22,6 +20,9 @@ import (
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/stretchr/testify/require"
+
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
 )
 
 func Test_evmCmdDeploy_error_cases(t *testing.T) {
