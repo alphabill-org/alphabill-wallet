@@ -455,6 +455,55 @@ func TestAddFeeCredit_FeeCreditRecordIsLocked(t *testing.T) {
 	require.Nil(t, recRes)
 }
 
+func TestAddFeeCredit_LockingDisabled(t *testing.T) {
+	// create fee manager
+	am := newAccountManager(t)
+	moneyTxPublisher := &mockMoneyTxPublisher{}
+	moneyBackendClient := &mockMoneyClient{
+		bills: []*wallet.Bill{
+			{Id: []byte{1}, Value: 100, TxHash: []byte{2}},
+		},
+		fcb: &wallet.Bill{Id: []byte{1}, Value: 100},
+	}
+	feeManagerDB := createFeeManagerDB(t)
+	feeManager := newMoneyPartitionFeeManager(am, feeManagerDB, moneyTxPublisher, moneyBackendClient, logger.New(t))
+
+	// add fees
+	res, err := feeManager.AddFeeCredit(context.Background(), AddFeeCmd{Amount: 10, DisableLocking: true})
+	require.NoError(t, err, "fee credit bill is locked")
+	require.NotNil(t, res)
+	require.Len(t, res.Proofs, 1)
+	require.Nil(t, res.Proofs[0].LockFC)
+	require.NotNil(t, res.Proofs[0].TransferFC)
+	require.NotNil(t, res.Proofs[0].AddFC)
+}
+
+func TestReclaimFeeCredit_LockingDisabled(t *testing.T) {
+	// create fee manager
+	am := newAccountManager(t)
+	moneyTxPublisher := &mockMoneyTxPublisher{}
+	moneyBackendClient := &mockMoneyClient{
+		fcb: &wallet.Bill{Value: 100, Id: []byte{111}},
+		bills: []*wallet.Bill{
+			{
+				Id:     []byte{1},
+				Value:  100000001,
+				TxHash: []byte{1},
+			},
+		}}
+	feeManagerDB := createFeeManagerDB(t)
+	feeManager := newMoneyPartitionFeeManager(am, feeManagerDB, moneyTxPublisher, moneyBackendClient, logger.New(t))
+
+	// verify that lock tx is not send
+	res, err := feeManager.ReclaimFeeCredit(context.Background(), ReclaimFeeCmd{DisableLocking: true})
+	require.NoError(t, err)
+	require.NotNil(t, res)
+	require.NotNil(t, res.Proofs)
+	require.Nil(t, res.Proofs.Lock)
+	require.NotNil(t, res.Proofs.CloseFC)
+	require.NotNil(t, res.Proofs.ReclaimFC)
+}
+
 /*
 Fee manager contains LockFC ctx, test that fee manager:
 1. waits for confirmation

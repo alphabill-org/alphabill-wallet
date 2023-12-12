@@ -84,12 +84,14 @@ type (
 	}
 
 	AddFeeCmd struct {
-		AccountIndex uint64
-		Amount       uint64
+		AccountIndex   uint64
+		Amount         uint64
+		DisableLocking bool // if true then lockFC transaction is not send before adding fee credit
 	}
 
 	ReclaimFeeCmd struct {
-		AccountIndex uint64
+		AccountIndex   uint64
+		DisableLocking bool // if true then lock transaction is not send before reclaiming fee credit
 	}
 
 	LockFeeCreditCmd struct {
@@ -126,6 +128,7 @@ type (
 		TargetBillID       []byte                  `json:"targetBillId"`       // transferFC target bill id
 		TargetBillBacklink []byte                  `json:"targetBillBacklink"` // transferFC target bill backlink
 		TargetAmount       uint64                  `json:"targetAmount"`       // the amount to add to the fee credit bill
+		DisableLocking     bool                    `json:"disableLocking"`     // user defined flag if we should lock fee credit record when adding fees
 		LockFCTx           *types.TransactionOrder `json:"lockFCTx,omitempty"`
 		LockFCProof        *wallet.Proof           `json:"lockFCProof,omitempty"`
 		TransferFCTx       *types.TransactionOrder `json:"transferFCTx,omitempty"`
@@ -138,6 +141,7 @@ type (
 		TargetPartitionID  []byte                  `json:"targetPartitionId"`  // target partition id where the fee credit is being reclaimed from
 		TargetBillID       []byte                  `json:"targetBillId"`       // closeFC target bill id
 		TargetBillBacklink []byte                  `json:"targetBillBacklink"` // closeFC target bill backlink
+		DisableLocking     bool                    `json:"disableLocking,omitempty"`
 		LockTx             *types.TransactionOrder `json:"lockTx,omitempty"`
 		LockTxProof        *wallet.Proof           `json:"lockTxProof,omitempty"`
 		CloseFCTx          *types.TransactionOrder `json:"closeFCTx,omitempty"`
@@ -234,7 +238,7 @@ func (w *FeeManager) AddFeeCredit(ctx context.Context, cmd AddFeeCmd) (*AddFeeCm
 	}
 
 	// if no fee context found, run normal fee process
-	fees, err := w.addFees(ctx, accountKey, cmd.Amount)
+	fees, err := w.addFees(ctx, accountKey, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to complete fee credit addition process: %w", err)
 	}
@@ -282,7 +286,7 @@ func (w *FeeManager) ReclaimFeeCredit(ctx context.Context, cmd ReclaimFeeCmd) (*
 	}
 
 	// if no locked bill found, run normal reclaim process, selecting the largest bill as target
-	fees, err := w.reclaimFees(ctx, accountKey)
+	fees, err := w.reclaimFees(ctx, accountKey, cmd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to complete fee credit reclaim process: %w", err)
 	}
@@ -370,7 +374,7 @@ func (w *FeeManager) Close() {
 }
 
 // addFees runs normal fee credit creation process for multiple bills
-func (w *FeeManager) addFees(ctx context.Context, accountKey *account.AccountKey, targetAmount uint64) (*AddFeeCmdResponse, error) {
+func (w *FeeManager) addFees(ctx context.Context, accountKey *account.AccountKey, cmd AddFeeCmd) (*AddFeeCmdResponse, error) {
 	fcb, err := w.fetchTargetPartitionFCB(ctx, accountKey)
 	if err != nil {
 		return nil, err
@@ -404,6 +408,7 @@ func (w *FeeManager) addFees(ctx context.Context, accountKey *account.AccountKey
 	balance := w.sumValues(bills)
 
 	// verify enough balance for all transactions
+	var targetAmount = cmd.Amount
 	if balance < targetAmount {
 		return nil, ErrInsufficientBalance
 	}
@@ -424,6 +429,7 @@ func (w *FeeManager) addFees(ctx context.Context, accountKey *account.AccountKey
 			TargetBillID:       targetBill.Id,
 			TargetBillBacklink: targetBill.TxHash,
 			TargetAmount:       amount,
+			DisableLocking:     cmd.DisableLocking,
 		}
 		if err := w.db.SetAddFeeContext(accountKey.PubKey, feeCtx); err != nil {
 			return nil, fmt.Errorf("failed to initialise fee context: %w", err)
@@ -460,6 +466,9 @@ func (w *FeeManager) addFeeCredit(ctx context.Context, accountKey *account.Accou
 }
 
 func (w *FeeManager) sendLockFCTx(ctx context.Context, accountKey *account.AccountKey, feeCtx *AddFeeCreditCtx) error {
+	if feeCtx.DisableLocking {
+		return nil
+	}
 	// fee credit already locked
 	if feeCtx.LockFCProof != nil {
 		return nil
@@ -718,7 +727,7 @@ func (w *FeeManager) sendAddFCTx(ctx context.Context, accountKey *account.Accoun
 
 // reclaimFees closes and reclaims entire fee credit bill balance back to the main balance, largest bill is used as the
 // target bill, stores status in WriteAheadLog which can be used to continue the process later, in case of any errors.
-func (w *FeeManager) reclaimFees(ctx context.Context, accountKey *account.AccountKey) (*ReclaimFeeCmdResponse, error) {
+func (w *FeeManager) reclaimFees(ctx context.Context, accountKey *account.AccountKey, cmd ReclaimFeeCmd) (*ReclaimFeeCmdResponse, error) {
 	// fetch fee credit bill
 	fcb, err := w.fetchTargetPartitionFCB(ctx, accountKey)
 	if err != nil {
@@ -749,6 +758,7 @@ func (w *FeeManager) reclaimFees(ctx context.Context, accountKey *account.Accoun
 		TargetPartitionID:  w.targetPartitionSystemID,
 		TargetBillID:       targetBill.Id,
 		TargetBillBacklink: targetBill.TxHash,
+		DisableLocking:     cmd.DisableLocking,
 	}
 	if err := w.db.SetReclaimFeeContext(accountKey.PubKey, feeCtx); err != nil {
 		return nil, fmt.Errorf("failed to store reclaim fee context: %w", err)
@@ -783,6 +793,9 @@ func (w *FeeManager) reclaimFeeCredit(ctx context.Context, accountKey *account.A
 }
 
 func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.AccountKey, feeCtx *ReclaimFeeCreditCtx) error {
+	if feeCtx.DisableLocking {
+		return nil
+	}
 	// target bill already locked
 	if feeCtx.LockTxProof != nil {
 		return nil
