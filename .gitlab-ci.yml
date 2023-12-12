@@ -6,6 +6,22 @@ stages:
 
 image: $CI_REGISTRY/alphabill/gitlab-ci-image:main
 
+before_script:
+  # Configure SSH agent
+  - eval "$(ssh-agent -s)"
+  - chmod 600 ${ALPHABILL_WALLET_PRIVATE_KEY}
+  - ssh-add ${ALPHABILL_WALLET_PRIVATE_KEY}
+
+  # Add SSH keys
+  - ssh-keyscan ${CI_SERVER_SHELL_SSH_HOST} > ci/known_hosts
+  - mkdir -p ~/.ssh
+  - chmod 600 ~/.ssh
+  - cp ci/known_hosts ~/.ssh/known_hosts
+
+  # Configure SSH mirror repository
+  - printf "[url \"ssh://git@${CI_SERVER_SHELL_SSH_HOST}/${CI_PROJECT_NAMESPACE}/\"]\n    insteadOf = https://github.com/alphabill-org/\n" > ci/.gitconfig
+  - cp ci/.gitconfig ~/.gitconfig
+
 # Debugging info and initialization goes here
 init:
   stage: init
@@ -38,8 +54,19 @@ test:
       - test-coverage.out
     when: always
 
+build-docker:
+  stage: build
+  image: docker:latest
+  variables:
+    IMAGE_TAG: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+  script:
+    - docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD} ${CI_REGISTRY}
+    - docker build --ssh default --push --tag ${IMAGE_TAG} --file cli/alphabill/Dockerfile .
+
 build:
   stage: build
+  script:
+    - make build
   artifacts:
     expire_in: 1 month
     paths:
