@@ -32,11 +32,13 @@ Test scenario 3: wallet-1 sends tx without confirming
 func TestSendingMoneyUsingWallets_integration(t *testing.T) {
 	// create 2 wallets
 	am1, homedir1 := createNewWallet(t)
-	w1AccKey, _ := am1.GetAccountKey(0)
+	w1AccKey, err := am1.GetAccountKey(0)
+	require.NoError(t, err)
 	am1.Close()
 
 	am2, homedir2 := createNewWallet(t)
-	w2PubKey, _ := am2.GetPublicKey(0)
+	w2PubKey, err := am2.GetPublicKey(0)
+	require.NoError(t, err)
 	am2.Close()
 
 	initialBill := &money.InitialBill{
