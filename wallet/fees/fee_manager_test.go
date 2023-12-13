@@ -1154,10 +1154,10 @@ func TestLockFeeCredit(t *testing.T) {
 		ServerMetadata:   &types.ServerMetadata{ActualFee: 1},
 	}
 
-	t.Run("lockFC => ok", func(t *testing.T) {
+	t.Run("ok", func(t *testing.T) {
 		// fcb exists
 		*moneyBackendClient = mockMoneyClient{
-			fcb: &wallet.Bill{Id: lockFCRecord.TransactionOrder.UnitID()},
+			fcb: &wallet.Bill{Id: lockFCRecord.TransactionOrder.UnitID(), Value: 2},
 		}
 
 		// when fee credit is successfully locked then lockFC proof should be returned
@@ -1168,16 +1168,38 @@ func TestLockFeeCredit(t *testing.T) {
 		require.Equal(t, transactions.PayloadTypeLockFeeCredit, res.TxRecord.TransactionOrder.PayloadType())
 	})
 
-	t.Run("lockFC => fcb already locked", func(t *testing.T) {
+	t.Run("fcb already locked", func(t *testing.T) {
 		// fcb already locked
 		*moneyBackendClient = mockMoneyClient{
-			fcb: &wallet.Bill{Id: lockFCRecord.TransactionOrder.UnitID(), Locked: wallet.LockReasonManual},
+			fcb: &wallet.Bill{Id: lockFCRecord.TransactionOrder.UnitID(), Locked: wallet.LockReasonManual, Value: 2},
 		}
 
 		// when fees are added
 		feeManager := newMoneyPartitionFeeManager(am, feeManagerDB, moneyTxPublisher, moneyBackendClient, logger.New(t))
 		res, err := feeManager.LockFeeCredit(context.Background(), LockFeeCreditCmd{LockStatus: wallet.LockReasonManual})
 		require.ErrorContains(t, err, "fee credit bill is already locked")
+		require.Nil(t, res)
+	})
+
+	t.Run("no fee credit", func(t *testing.T) {
+		// no fcb in wallet
+		*moneyBackendClient = mockMoneyClient{fcb: nil}
+
+		// when fees are added
+		feeManager := newMoneyPartitionFeeManager(am, feeManagerDB, moneyTxPublisher, moneyBackendClient, logger.New(t))
+		res, err := feeManager.LockFeeCredit(context.Background(), LockFeeCreditCmd{LockStatus: wallet.LockReasonManual})
+		require.ErrorContains(t, err, "fee credit bill does not exist")
+		require.Nil(t, res)
+	})
+
+	t.Run("not enough fee credit", func(t *testing.T) {
+		// no fcb in wallet
+		*moneyBackendClient = mockMoneyClient{fcb: &wallet.Bill{Id: lockFCRecord.TransactionOrder.UnitID(), Value: 1}}
+
+		// when fees are added
+		feeManager := newMoneyPartitionFeeManager(am, feeManagerDB, moneyTxPublisher, moneyBackendClient, logger.New(t))
+		res, err := feeManager.LockFeeCredit(context.Background(), LockFeeCreditCmd{LockStatus: wallet.LockReasonManual})
+		require.ErrorContains(t, err, "not enough fee credit in wallet")
 		require.Nil(t, res)
 	})
 }
@@ -1194,10 +1216,10 @@ func TestUnlockFeeCredit(t *testing.T) {
 		ServerMetadata:   &types.ServerMetadata{ActualFee: 1},
 	}
 
-	t.Run("unlockFC => ok", func(t *testing.T) {
+	t.Run("ok", func(t *testing.T) {
 		// locked fcb exists
 		*moneyBackendClient = mockMoneyClient{
-			fcb: &wallet.Bill{Id: unlockFCRecord.TransactionOrder.UnitID(), Locked: wallet.LockReasonManual},
+			fcb: &wallet.Bill{Id: unlockFCRecord.TransactionOrder.UnitID(), Locked: wallet.LockReasonManual, Value: 1},
 		}
 
 		// when fee credit is successfully unlocked then unlockFC proof should be returned
@@ -1208,16 +1230,29 @@ func TestUnlockFeeCredit(t *testing.T) {
 		require.Equal(t, transactions.PayloadTypeUnlockFeeCredit, res.TxRecord.TransactionOrder.PayloadType())
 	})
 
-	t.Run("unlockFC => fcb already unlocked", func(t *testing.T) {
+	t.Run("fcb already unlocked", func(t *testing.T) {
 		// mock fcb already locked
 		*moneyBackendClient = mockMoneyClient{
-			fcb: &wallet.Bill{Id: unlockFCRecord.TransactionOrder.UnitID()},
+			fcb: &wallet.Bill{Id: unlockFCRecord.TransactionOrder.UnitID(), Value: 1},
 		}
 
 		// when fees are added
 		feeManager := newMoneyPartitionFeeManager(am, feeManagerDB, moneyTxPublisher, moneyBackendClient, logger.New(t))
 		res, err := feeManager.UnlockFeeCredit(context.Background(), UnlockFeeCreditCmd{})
 		require.ErrorContains(t, err, "fee credit bill is already unlocked")
+		require.Nil(t, res)
+	})
+
+	t.Run("no fee credit in wallet", func(t *testing.T) {
+		// mock fcb already locked
+		*moneyBackendClient = mockMoneyClient{
+			fcb: &wallet.Bill{Id: unlockFCRecord.TransactionOrder.UnitID(), Value: 0},
+		}
+
+		// when fees are added
+		feeManager := newMoneyPartitionFeeManager(am, feeManagerDB, moneyTxPublisher, moneyBackendClient, logger.New(t))
+		res, err := feeManager.UnlockFeeCredit(context.Background(), UnlockFeeCreditCmd{})
+		require.ErrorContains(t, err, "no fee credit in wallet")
 		require.Nil(t, res)
 	})
 }

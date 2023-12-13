@@ -314,7 +314,10 @@ func (w *FeeManager) LockFeeCredit(ctx context.Context, cmd LockFeeCreditCmd) (*
 		return nil, fmt.Errorf("failed to fetch fee credit: %w", err)
 	}
 	if fcb == nil {
-		return nil, fmt.Errorf("fee credit bill does not exist")
+		return nil, errors.New("fee credit bill does not exist")
+	}
+	if fcb.GetValue() < 2*txbuilder.MaxFee {
+		return nil, errors.New("not enough fee credit in wallet")
 	}
 	if fcb.IsLocked() {
 		return nil, fmt.Errorf("fee credit bill is already locked")
@@ -345,8 +348,8 @@ func (w *FeeManager) UnlockFeeCredit(ctx context.Context, cmd UnlockFeeCreditCmd
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch fee credit: %w", err)
 	}
-	if fcb == nil {
-		return nil, fmt.Errorf("fee credit bill does not exist")
+	if fcb.GetValue() == 0 {
+		return nil, errors.New("no fee credit in wallet")
 	}
 	if !fcb.IsLocked() {
 		return nil, fmt.Errorf("fee credit bill is already unlocked")
