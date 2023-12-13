@@ -148,7 +148,8 @@ func MockBackendCalls(br *testutil.BackendMockReturnConf) (*httptest.Server, *ur
 				if br.CustomBillList != "" {
 					w.Write([]byte(br.CustomBillList))
 				} else {
-					w.Write([]byte(fmt.Sprintf(`{"bills": [{"id":"%s","value":"%d","txHash":"%s","isDcBill":false}]}`, toBase64(br.BillID), br.BillValue, br.BillTxHash)))
+					b, _ := json.Marshal(br.TargetBill)
+					w.Write([]byte(fmt.Sprintf(`{"bills": [%s]}`, b)))
 				}
 			case strings.Contains(path, beclient.FeeCreditPath):
 				w.WriteHeader(http.StatusOK)

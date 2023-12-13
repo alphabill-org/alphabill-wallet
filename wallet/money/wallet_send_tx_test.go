@@ -28,9 +28,11 @@ import (
 
 func TestWalletSendFunction_Ok(t *testing.T) {
 	w := createTestWallet(t, withBackendMock(t, &testutil.BackendMockReturnConf{
-		Balance:   70,
-		BillID:    money.NewBillID(nil, []byte{0}),
-		BillValue: 50,
+		Balance: 70,
+		TargetBill: &wallet.Bill{
+			Id:    money.NewBillID(nil, []byte{0}),
+			Value: 50,
+		},
 		FeeCreditBill: &wallet.Bill{
 			Id:    []byte{},
 			Value: 100 * 1e8,
@@ -57,7 +59,10 @@ func TestWalletSendFunction_InvalidPubKey(t *testing.T) {
 }
 
 func TestWalletSendFunction_InsufficientBalance(t *testing.T) {
-	w := createTestWallet(t, withBackendMock(t, &testutil.BackendMockReturnConf{Balance: 10}))
+	w := createTestWallet(t, withBackendMock(t, &testutil.BackendMockReturnConf{
+		TargetBill:    createBill(49),
+		FeeCreditBill: createBill(100),
+	}))
 	validPubKey := make([]byte, 33)
 	amount := uint64(50)
 	ctx := context.Background()
@@ -69,9 +74,11 @@ func TestWalletSendFunction_InsufficientBalance(t *testing.T) {
 
 func TestWalletSendFunction_ClientError(t *testing.T) {
 	w := createTestWallet(t, withBackendMock(t, &testutil.BackendMockReturnConf{
-		Balance:   70,
-		BillID:    money.NewBillID(nil, []byte{0}),
-		BillValue: 50,
+		Balance: 70,
+		TargetBill: &wallet.Bill{
+			Id:    money.NewBillID(nil, []byte{0}),
+			Value: 50,
+		},
 		FeeCreditBill: &wallet.Bill{
 			Id:    []byte{},
 			Value: 100 * 1e8,
@@ -358,22 +365,15 @@ func TestWholeBalanceIsSentUsingBillTransferOrder(t *testing.T) {
 func TestWalletSendFunction_LockedBillIsNotUsed(t *testing.T) {
 	unitID := money.NewBillID(nil, []byte{123})
 	w := createTestWallet(t, withBackendMock(t, &testutil.BackendMockReturnConf{
-		Balance:       70,
-		BillID:        unitID,
-		BillValue:     50,
+		Balance: 70,
+		TargetBill: &wallet.Bill{
+			Id:     unitID,
+			Value:  50,
+			Locked: 1,
+		},
 		FeeCreditBill: &wallet.Bill{Value: 1e8},
 	}))
 	pubKey, err := w.am.GetPublicKey(0)
-	require.NoError(t, err)
-
-	// lock the only bill in wallet
-	err = w.unitLocker.LockUnit(unitlock.NewLockedUnit(
-		pubKey,
-		unitID,
-		[]byte{1},
-		money.DefaultSystemIdentifier,
-		unitlock.LockReasonCollectDust,
-	))
 	require.NoError(t, err)
 
 	// test send returns error
