@@ -67,6 +67,16 @@ some parameters are already "hardcoded":
 - the `otlptracehttp` and `otlptracegrpc` exporters are created with "insecure client transport"
   (`OTEL_EXPORTER_OTLP_INSECURE`);
 
+## Tracing wallet commands
+
+It is possible to collect traces from wallet command by setting the `AB_TRACING` and `OTEL_EXPORTER_OTLP_ENDPOINT`
+environment variables, ie:
+
+```sh
+AB_TRACING=otlptracehttp OTEL_EXPORTER_OTLP_ENDPOINT=https://apmserver.abdev1.guardtime.com alphabill wallet ...
+```
+will send the traces into the devnet APM backend.
+
 
 # CI setup
 

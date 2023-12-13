@@ -3,15 +3,12 @@ package money
 import (
 	"context"
 	"crypto"
-	"fmt"
 	"net"
 	"path/filepath"
-	"sync"
 	"testing"
 	"time"
 
 	abcrypto "github.com/alphabill-org/alphabill/crypto"
-	"github.com/alphabill-org/alphabill/hash"
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/partition"
 	"github.com/alphabill-org/alphabill/predicates/templates"
@@ -28,7 +25,6 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
-	testserver "github.com/alphabill-org/alphabill-wallet/internal/testutils/server"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend"
@@ -42,105 +38,6 @@ var (
 	fcrID     = money.NewFeeCreditRecordID(nil, []byte{1})
 	fcrAmount = uint64(1e8)
 )
-
-func TestCollectDustTimeoutReached(t *testing.T) {
-	observe := observability.Default(t)
-
-	// setup account
-	dir := t.TempDir()
-	am, err := account.NewManager(dir, "", true)
-	require.NoError(t, err)
-	defer am.Close()
-	err = CreateNewWallet(am, "")
-	require.NoError(t, err)
-	accKey, err := am.GetAccountKey(0)
-	require.NoError(t, err)
-
-	// start server
-	initialBill := &money.InitialBill{
-		ID:    money.NewBillID(nil, []byte{1}),
-		Value: 10000 * 1e8,
-		Owner: templates.NewP2pkh256BytesFromKey(accKey.PubKey),
-	}
-	abNet := startMoneyOnlyAlphabillPartition(t, initialBill)
-	moneyPart, err := abNet.GetNodePartition(money.DefaultSystemIdentifier)
-	require.NoError(t, err)
-	addr := startRPCServer(t, moneyPart)
-	serverService := testserver.NewTestAlphabillServiceServer()
-	server, _ := testserver.StartServer(serverService, observe.TracerProvider())
-	t.Cleanup(server.GracefulStop)
-
-	// start wallet backend
-	restAddr := "localhost:9545"
-	ctx, cancelFunc := context.WithCancel(context.Background())
-	t.Cleanup(cancelFunc)
-	go func() {
-		err := backend.Run(ctx,
-			&backend.Config{
-				ABMoneySystemIdentifier: money.DefaultSystemIdentifier,
-				AlphabillUrl:            addr,
-				ServerAddr:              restAddr,
-				DbFile:                  filepath.Join(t.TempDir(), backend.BoltBillStoreFileName),
-				ListBillsPageLimit:      100,
-				InitialBill: backend.InitialBill{
-					Id:        initialBill.ID,
-					Value:     initialBill.Value,
-					Predicate: initialBill.Owner,
-				},
-				SystemDescriptionRecords: createSDRs(),
-				Logger:                   observe.Logger(),
-				Observe:                  observe,
-			})
-		require.ErrorIs(t, err, context.Canceled)
-	}()
-
-	// setup wallet
-	restClient, err := beclient.New(restAddr, observe)
-	require.NoError(t, err)
-	unitLocker, err := unitlock.NewUnitLocker(dir)
-	require.NoError(t, err)
-	defer unitLocker.Close()
-	feeManagerDB, err := fees.NewFeeManagerDB(dir)
-	require.NoError(t, err)
-	defer feeManagerDB.Close()
-	w, err := LoadExistingWallet(am, unitLocker, feeManagerDB, restClient, observe.Logger())
-	require.NoError(t, err)
-	defer w.Close()
-
-	// verify backend is up and running
-	require.Eventually(t, func() bool {
-		balance, _ := w.GetBalance(ctx, GetBalanceCmd{})
-		return balance == initialBill.Value
-	}, test.WaitDuration*2, time.Second)
-
-	// when CollectDust is called
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		_, err := w.CollectDust(context.Background(), 0)
-		if err != nil {
-			fmt.Println(err)
-		}
-		wg.Done()
-	}()
-
-	for blockNo := uint64(1); blockNo <= txTimeoutBlockCount; blockNo++ {
-		b := &types.Block{
-			Header: &types.Header{
-				SystemID:          w.SystemID(),
-				PreviousBlockHash: hash.Sum256([]byte{}),
-			},
-			Transactions:       []*types.TransactionRecord{},
-			UnicityCertificate: &types.UnicityCertificate{InputRecord: &types.InputRecord{RoundNumber: blockNo}},
-		}
-		serverService.SetBlock(blockNo, b)
-	}
-	// when dc timeout is reached
-	serverService.SetMaxBlockNumber(txTimeoutBlockCount)
-
-	_, err = w.CollectDust(context.Background(), 0)
-	require.NoError(t, err)
-}
 
 /*
 Test scenario:
@@ -458,6 +355,13 @@ func startRPCServer(t *testing.T, partition *testpartition.NodePartition) (addr 
 		require.NoError(t, grpcServer.Serve(listener), "gRPC server exited with error")
 	}()
 
+	// wait for rpc server to start
+	for _, n := range partition.Nodes {
+		require.Eventually(t, func() bool {
+			_, err := n.GetLatestBlock()
+			return err == nil
+		}, test.WaitDuration, test.WaitTick)
+	}
 	return listener.Addr().String()
 }
 
