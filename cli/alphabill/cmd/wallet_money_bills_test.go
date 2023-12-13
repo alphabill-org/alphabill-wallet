@@ -152,7 +152,8 @@ func TestWalletBillsListCmd_ShowLockedBills(t *testing.T) {
 func TestWalletBillsLockUnlockCmd_Ok(t *testing.T) {
 	// create wallet
 	am, homedir := createNewWallet(t)
-	pubkey, _ := am.GetPublicKey(0)
+	pubkey, err := am.GetPublicKey(0)
+	require.NoError(t, err)
 	am.Close()
 
 	// start money partition

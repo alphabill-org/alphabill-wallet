@@ -480,12 +480,10 @@ func createTokensPartition(t *testing.T) *testpartition.NodePartition {
 		}, tokens.DefaultSystemIdentifier,
 	)
 	require.NoError(t, err)
-
-	//	dialAddr := startRPCServer(t, network.Nodes[0].Node)
-	return network //dialAddr
+	return network
 }
 
-func startTokensBackend(t *testing.T, nodeAddr string) (srvUri string, restApi *client.TokenBackend, ctx context.Context) {
+func startTokensBackend(t *testing.T, nodeAddr string) (srvUri string, restApi *client.TokenBackend) {
 	port, err := net.GetFreePort()
 	require.NoError(t, err)
 	host := fmt.Sprintf("localhost:%v", port)
