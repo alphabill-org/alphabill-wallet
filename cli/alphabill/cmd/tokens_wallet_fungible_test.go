@@ -362,12 +362,28 @@ type AlphabillNetwork struct {
 // sends initial bill to money wallet
 // creates fee credit on money wallet and token wallet
 func NewAlphabillNetwork(t *testing.T) *AlphabillNetwork {
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	t.Cleanup(cancelFunc)
 	observe := testobserve.NewFactory(t)
 	log := observe.DefaultLogger()
+
+	homedirW1 := t.TempDir()
+	walletDir := filepath.Join(homedirW1, "wallet")
+	am, err := account.NewManager(walletDir, "", true)
+	require.NoError(t, err)
+	defer am.Close()
+	require.NoError(t, am.CreateKeys(""))
+	w1key, err := am.GetAccountKey(0)
+	require.NoError(t, err)
+	_, _, err = am.AddAccount()
+	require.NoError(t, err)
+	w1key2, err := am.GetAccountKey(1)
+	require.NoError(t, err)
+
 	initialBill := &money.InitialBill{
 		ID:    defaultInitialBillID,
 		Value: 1e18,
-		Owner: templates.AlwaysTrueBytes(),
+		Owner: templates.NewP2pkh256BytesFromKey(w1key.PubKey),
 	}
 	moneyPartition := createMoneyPartition(t, initialBill, 1)
 	tokensPartition := createTokensPartition(t)
@@ -376,14 +392,7 @@ func NewAlphabillNetwork(t *testing.T) *AlphabillNetwork {
 	startPartitionRPCServers(t, tokensPartition)
 
 	moneyBackendURL, moneyBackendClient := startMoneyBackend(t, moneyPartition, initialBill)
-
-	tokenBackendURL, tokenBackendClient, ctx := startTokensBackend(t, tokensPartition.Nodes[0].AddrGRPC)
-
-	homedirW1 := t.TempDir()
-	walletDir := filepath.Join(homedirW1, "wallet")
-	am, err := account.NewManager(walletDir, "", true)
-	require.NoError(t, err)
-	require.NoError(t, am.CreateKeys(""))
+	tokenBackendURL, tokenBackendClient := startTokensBackend(t, tokensPartition.Nodes[0].AddrGRPC)
 
 	unitLocker, err := unitlock.NewUnitLocker(walletDir)
 	require.NoError(t, err)
@@ -401,33 +410,18 @@ func NewAlphabillNetwork(t *testing.T) *AlphabillNetwork {
 	tokenFeeManager := fees.NewFeeManager(am, feeManagerDB, money.DefaultSystemIdentifier, moneyWallet, moneyBackendClient, moneywallet.FeeCreditRecordIDFormPublicKey, tokens.DefaultSystemIdentifier, tokenTxPublisher, tokenBackendClient, tokenswallet.FeeCreditRecordIDFromPublicKey, log)
 	defer tokenFeeManager.Close()
 
-	w1, err := tokenswallet.New(tokens.DefaultSystemIdentifier, tokenBackendURL, am, true, tokenFeeManager, observe.DefaultObserver(), log)
+	tokensWallet, err := tokenswallet.New(tokens.DefaultSystemIdentifier, tokenBackendURL, am, true, tokenFeeManager, observe.DefaultObserver(), log)
 	require.NoError(t, err)
-	require.NotNil(t, w1)
-	defer w1.Shutdown()
-
-	w1key, err := w1.GetAccountManager().GetAccountKey(0)
-	require.NoError(t, err)
-	_, _, err = am.AddAccount()
-	require.NoError(t, err)
-	w1key2, err := w1.GetAccountManager().GetAccountKey(1)
-	require.NoError(t, err)
-
-	expectedBalance := spendInitialBillWithFeeCredits(t, abNet, initialBill, w1key.PubKey)
-	require.Eventually(t, func() bool {
-		balance, err := moneyWallet.GetBalance(ctx, moneywallet.GetBalanceCmd{})
-		require.NoError(t, err)
-		return expectedBalance == balance
-	}, test.WaitDuration, test.WaitTick)
+	require.NotNil(t, tokensWallet)
+	defer tokensWallet.Shutdown()
 
 	// create fees on money partition
 	_, err = moneyWallet.AddFeeCredit(ctx, fees.AddFeeCmd{Amount: 1000})
 	require.NoError(t, err)
 
 	// create fees on token partition
-	_, err = w1.AddFeeCredit(ctx, fees.AddFeeCmd{Amount: 1000})
+	_, err = tokensWallet.AddFeeCredit(ctx, fees.AddFeeCmd{Amount: 1000})
 	require.NoError(t, err)
-	w1.Shutdown()
 
 	return &AlphabillNetwork{
 		abNetwork:          abNet,

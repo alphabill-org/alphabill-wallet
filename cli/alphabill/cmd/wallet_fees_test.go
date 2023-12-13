@@ -105,7 +105,7 @@ func TestWalletFeesCmds_TokenPartition(t *testing.T) {
 	// start token partition
 	startPartitionRPCServers(t, tokensPartition)
 
-	tokenBackendURL, _, _ := startTokensBackend(t, tokensPartition.Nodes[0].AddrGRPC)
+	tokenBackendURL, _ := startTokensBackend(t, tokensPartition.Nodes[0].AddrGRPC)
 	args := fmt.Sprintf("--partition=tokens -r %s -m %s", defaultAlphabillApiURL, tokenBackendURL)
 
 	// list fees on token partition

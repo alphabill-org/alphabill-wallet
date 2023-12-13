@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	abcrypto "github.com/alphabill-org/alphabill/crypto"
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/partition"
@@ -181,21 +182,24 @@ func TestWalletGetBalanceCmdQuietFlag(t *testing.T) {
 
 func TestPubKeysCmd(t *testing.T) {
 	am, homedir := createNewWallet(t)
-	pk, _ := am.GetPublicKey(0)
+	pk, err := am.GetPublicKey(0)
+	require.NoError(t, err)
 	am.Close()
-	stdout, _ := execCommand(observability.NewFactory(t), homedir, "get-pubkeys")
+	stdout, err := execCommand(observability.NewFactory(t), homedir, "get-pubkeys")
+	require.NoError(t, err)
 	verifyStdout(t, stdout, "#1 "+hexutil.Encode(pk))
 }
 
 func TestSendingFailsWithInsufficientBalance(t *testing.T) {
 	am, homedir := createNewWallet(t)
-	pubKey, _ := am.GetPublicKey(0)
+	pubKey, err := am.GetPublicKey(0)
+	require.NoError(t, err)
 	am.Close()
 
 	mockServer, addr := mockBackendCalls(&backendMockReturnConf{balance: 5e8})
 	defer mockServer.Close()
 
-	_, err := execCommand(observability.NewFactory(t), homedir, "send --amount 10 --address "+hexutil.Encode(pubKey)+" --alphabill-api-uri "+addr.Host)
+	_, err = execCommand(observability.NewFactory(t), homedir, "send --amount 10 --address "+hexutil.Encode(pubKey)+" --alphabill-api-uri "+addr.Host)
 	require.ErrorContains(t, err, "insufficient balance for transaction")
 }
 
@@ -238,6 +242,13 @@ func startAlphabill(t *testing.T, partitions []*testpartition.NodePartition) *te
 func startPartitionRPCServers(t *testing.T, partition *testpartition.NodePartition) {
 	for _, n := range partition.Nodes {
 		n.AddrGRPC = startRPCServer(t, n.Node, logger.NOP())
+	}
+	// wait for partition servers to start
+	for _, n := range partition.Nodes {
+		require.Eventually(t, func() bool {
+			_, err := n.GetLatestBlock()
+			return err == nil
+		}, test.WaitDuration, test.WaitTick)
 	}
 }
 
@@ -299,6 +310,7 @@ func createNewWallet(t *testing.T) (account.Manager, string) {
 	walletDir := filepath.Join(homeDir, walletBaseDir)
 	am, err := account.NewManager(walletDir, "", true)
 	require.NoError(t, err)
+	t.Cleanup(am.Close)
 	err = am.CreateKeys("")
 	require.NoError(t, err)
 	return am, homeDir
