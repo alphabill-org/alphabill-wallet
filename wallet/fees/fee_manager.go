@@ -124,11 +124,11 @@ type (
 	}
 
 	AddFeeCreditCtx struct {
-		TargetPartitionID  []byte                  `json:"targetPartitionId"`  // target partition id where the fee is being added to
-		TargetBillID       []byte                  `json:"targetBillId"`       // transferFC target bill id
-		TargetBillBacklink []byte                  `json:"targetBillBacklink"` // transferFC target bill backlink
-		TargetAmount       uint64                  `json:"targetAmount"`       // the amount to add to the fee credit bill
-		DisableLocking     bool                    `json:"disableLocking"`     // user defined flag if we should lock fee credit record when adding fees
+		TargetPartitionID  []byte                  `json:"targetPartitionId"`        // target partition id where the fee is being added to
+		TargetBillID       []byte                  `json:"targetBillId"`             // transferFC target bill id
+		TargetBillBacklink []byte                  `json:"targetBillBacklink"`       // transferFC target bill backlink
+		TargetAmount       uint64                  `json:"targetAmount"`             // the amount to add to the fee credit bill
+		LockingDisabled    bool                    `json:"disableLocking,omitempty"` // user defined flag if we should lock fee credit record when adding fees
 		LockFCTx           *types.TransactionOrder `json:"lockFCTx,omitempty"`
 		LockFCProof        *wallet.Proof           `json:"lockFCProof,omitempty"`
 		TransferFCTx       *types.TransactionOrder `json:"transferFCTx,omitempty"`
@@ -141,7 +141,7 @@ type (
 		TargetPartitionID  []byte                  `json:"targetPartitionId"`  // target partition id where the fee credit is being reclaimed from
 		TargetBillID       []byte                  `json:"targetBillId"`       // closeFC target bill id
 		TargetBillBacklink []byte                  `json:"targetBillBacklink"` // closeFC target bill backlink
-		DisableLocking     bool                    `json:"disableLocking,omitempty"`
+		LockingDisabled    bool                    `json:"lockingDisabled,omitempty"`
 		LockTx             *types.TransactionOrder `json:"lockTx,omitempty"`
 		LockTxProof        *wallet.Proof           `json:"lockTxProof,omitempty"`
 		CloseFCTx          *types.TransactionOrder `json:"closeFCTx,omitempty"`
@@ -432,7 +432,7 @@ func (w *FeeManager) addFees(ctx context.Context, accountKey *account.AccountKey
 			TargetBillID:       targetBill.Id,
 			TargetBillBacklink: targetBill.TxHash,
 			TargetAmount:       amount,
-			DisableLocking:     cmd.DisableLocking,
+			LockingDisabled:    cmd.DisableLocking,
 		}
 		if err := w.db.SetAddFeeContext(accountKey.PubKey, feeCtx); err != nil {
 			return nil, fmt.Errorf("failed to initialise fee context: %w", err)
@@ -469,7 +469,7 @@ func (w *FeeManager) addFeeCredit(ctx context.Context, accountKey *account.Accou
 }
 
 func (w *FeeManager) sendLockFCTx(ctx context.Context, accountKey *account.AccountKey, feeCtx *AddFeeCreditCtx) error {
-	if feeCtx.DisableLocking {
+	if feeCtx.LockingDisabled {
 		return nil
 	}
 	// fee credit already locked
@@ -485,6 +485,7 @@ func (w *FeeManager) sendLockFCTx(ctx context.Context, accountKey *account.Accou
 			return fmt.Errorf("failed to wait for confirmation: %w", err)
 		}
 		if proof != nil {
+			w.log.InfoContext(ctx, fmt.Sprintf("lockFC tx '%s' confirmed", feeCtx.LockFCTx.Hash(crypto.SHA256)))
 			feeCtx.LockFCProof = proof
 			if err := w.db.SetAddFeeContext(accountKey.PubKey, feeCtx); err != nil {
 				return fmt.Errorf("failed to store lockFC proof: %w", err)
@@ -761,7 +762,7 @@ func (w *FeeManager) reclaimFees(ctx context.Context, accountKey *account.Accoun
 		TargetPartitionID:  w.targetPartitionSystemID,
 		TargetBillID:       targetBill.Id,
 		TargetBillBacklink: targetBill.TxHash,
-		DisableLocking:     cmd.DisableLocking,
+		LockingDisabled:    cmd.DisableLocking,
 	}
 	if err := w.db.SetReclaimFeeContext(accountKey.PubKey, feeCtx); err != nil {
 		return nil, fmt.Errorf("failed to store reclaim fee context: %w", err)
@@ -796,7 +797,7 @@ func (w *FeeManager) reclaimFeeCredit(ctx context.Context, accountKey *account.A
 }
 
 func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.AccountKey, feeCtx *ReclaimFeeCreditCtx) error {
-	if feeCtx.DisableLocking {
+	if feeCtx.LockingDisabled {
 		return nil
 	}
 	// target bill already locked
@@ -810,7 +811,9 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 			return fmt.Errorf("failed to wait for confirmation: %w", err)
 		}
 		if proof != nil {
+			w.log.InfoContext(ctx, fmt.Sprintf("lock tx '%s' confirmed", feeCtx.LockTx.Hash(crypto.SHA256)))
 			feeCtx.LockTxProof = proof
+			feeCtx.TargetBillBacklink = proof.TxRecord.TransactionOrder.Hash(crypto.SHA256)
 			if err := w.db.SetReclaimFeeContext(accountKey.PubKey, feeCtx); err != nil {
 				return fmt.Errorf("failed to store lock tx proof: %w", err)
 			}

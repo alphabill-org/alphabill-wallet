@@ -2,6 +2,7 @@ package fees
 
 import (
 	"context"
+	"crypto"
 	"log/slog"
 	"testing"
 
@@ -853,26 +854,27 @@ func TestReclaimFeeCredit_ExistingLock(t *testing.T) {
 	moneyBackendClient := &mockMoneyClient{}
 	feeManagerDB := createFeeManagerDB(t)
 
-	lockRecord := &types.TransactionRecord{
+	lockTxRecord := &types.TransactionRecord{
 		TransactionOrder: testtransaction.NewTransactionOrder(t, testtransaction.WithPayloadType(money.PayloadTypeLock)),
 		ServerMetadata:   &types.ServerMetadata{ActualFee: 1},
 	}
-	lockProof := &wallet.Proof{TxRecord: lockRecord, TxProof: &types.TxProof{}}
+	lockTxProof := &wallet.Proof{TxRecord: lockTxRecord, TxProof: &types.TxProof{}}
+	lockTxHash := lockTxRecord.TransactionOrder.Hash(crypto.SHA256)
 
-	t.Run("lock tx confirmed => send follow-up transactions", func(t *testing.T) {
+	t.Run("lock tx confirmed => update target bill hash and send follow-up transactions", func(t *testing.T) {
 		// create fee context
 		err = feeManagerDB.SetReclaimFeeContext(accountKey.PubKey, &ReclaimFeeCreditCtx{
 			TargetPartitionID:  moneySystemID,
 			TargetBillID:       []byte{1},
 			TargetBillBacklink: []byte{200},
-			LockTx:             lockRecord.TransactionOrder,
-			LockTxProof:        lockProof,
+			LockTx:             lockTxRecord.TransactionOrder,
 		})
 		require.NoError(t, err)
 
 		// mock locked fee credit bill
 		*moneyBackendClient = mockMoneyClient{
-			fcb: &wallet.Bill{Id: []byte{1}, Value: 100, TxHash: []byte{200}, Locked: unitlock.LockReasonReclaimFees},
+			fcb:    &wallet.Bill{Id: []byte{1}, Value: 100, TxHash: lockTxHash, Locked: unitlock.LockReasonReclaimFees},
+			proofs: map[string]*wallet.Proof{(string)(lockTxRecord.TransactionOrder.UnitID()): lockTxProof},
 		}
 
 		// when fees are reclaimed
@@ -882,10 +884,16 @@ func TestReclaimFeeCredit_ExistingLock(t *testing.T) {
 
 		// then follow-up transactions are sent
 		require.NotNil(t, res)
-		require.NotNil(t, res.Proofs, 1)
+		require.NotNil(t, res.Proofs)
 		require.NotNil(t, res.Proofs.Lock)
 		require.NotNil(t, res.Proofs.CloseFC)
 		require.NotNil(t, res.Proofs.ReclaimFC)
+
+		// with updated target backlink
+		var attr *transactions.CloseFeeCreditAttributes
+		err = res.Proofs.CloseFC.TxRecord.TransactionOrder.UnmarshalAttributes(&attr)
+		require.NoError(t, err)
+		require.Equal(t, attr.TargetUnitBacklink, lockTxHash)
 
 		// and fee context must be cleared
 		feeCtx, err := feeManagerDB.GetAddFeeContext(accountKey.PubKey)
@@ -899,13 +907,13 @@ func TestReclaimFeeCredit_ExistingLock(t *testing.T) {
 			TargetPartitionID:  moneySystemID,
 			TargetBillID:       []byte{1},
 			TargetBillBacklink: []byte{200},
-			LockTx:             lockRecord.TransactionOrder,
+			LockTx:             lockTxRecord.TransactionOrder,
 		})
 		require.NoError(t, err)
 
 		// mock tx timed out
 		*moneyBackendClient = mockMoneyClient{
-			roundNumber: lockRecord.TransactionOrder.Timeout() + 10,
+			roundNumber: lockTxRecord.TransactionOrder.Timeout() + 10,
 			fcb:         &wallet.Bill{Id: []byte{1}, Value: 100, TxHash: []byte{200}},
 		}
 
