@@ -124,11 +124,11 @@ type (
 	}
 
 	AddFeeCreditCtx struct {
-		TargetPartitionID  []byte                  `json:"targetPartitionId"`        // target partition id where the fee is being added to
-		TargetBillID       []byte                  `json:"targetBillId"`             // transferFC target bill id
-		TargetBillBacklink []byte                  `json:"targetBillBacklink"`       // transferFC target bill backlink
-		TargetAmount       uint64                  `json:"targetAmount"`             // the amount to add to the fee credit bill
-		LockingDisabled    bool                    `json:"disableLocking,omitempty"` // user defined flag if we should lock fee credit record when adding fees
+		TargetPartitionID  []byte                  `json:"targetPartitionId"`         // target partition id where the fee is being added to
+		TargetBillID       []byte                  `json:"targetBillId"`              // transferFC target bill id
+		TargetBillBacklink []byte                  `json:"targetBillBacklink"`        // transferFC target bill backlink
+		TargetAmount       uint64                  `json:"targetAmount"`              // the amount to add to the fee credit bill
+		LockingDisabled    bool                    `json:"lockingDisabled,omitempty"` // user defined flag if we should lock fee credit record when adding fees
 		LockFCTx           *types.TransactionOrder `json:"lockFCTx,omitempty"`
 		LockFCProof        *wallet.Proof           `json:"lockFCProof,omitempty"`
 		TransferFCTx       *types.TransactionOrder `json:"transferFCTx,omitempty"`
