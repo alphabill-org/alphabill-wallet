@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	moneytx "github.com/alphabill-org/alphabill/txsystem/money"
@@ -166,6 +167,14 @@ func execLockCmd(cmd *cobra.Command, config *walletConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to load account key: %w", err)
 	}
+	infoResponse, err := restClient.GetInfo(cmd.Context())
+	if err != nil {
+		return err
+	}
+	moneyTypeVar := moneyType
+	if !strings.HasPrefix(infoResponse.Name, moneyTypeVar.String()) {
+		return errors.New("invalid wallet backend API URL provided for money partition")
+	}
 	bill, err := fetchBillByID(cmd.Context(), billID, restClient, accountKey)
 	if err != nil {
 		return fmt.Errorf("failed to fetch bill by id: %w", err)
@@ -232,6 +241,14 @@ func execUnlockCmd(cmd *cobra.Command, config *walletConfig) error {
 	}
 	defer am.Close()
 
+	infoResponse, err := restClient.GetInfo(cmd.Context())
+	if err != nil {
+		return err
+	}
+	moneyTypeVar := moneyType
+	if !strings.HasPrefix(infoResponse.Name, moneyTypeVar.String()) {
+		return errors.New("invalid wallet backend API URL provided for money partition")
+	}
 	accountKey, err := am.GetAccountKey(accountNumber - 1)
 	if err != nil {
 		return fmt.Errorf("failed to load account key: %w", err)
