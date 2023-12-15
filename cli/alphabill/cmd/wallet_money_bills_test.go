@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill/hash"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/txsystem/fc/transactions"
@@ -30,7 +31,11 @@ func TestWalletBillsListCmd_EmptyWallet(t *testing.T) {
 
 func TestWalletBillsListCmd_Single(t *testing.T) {
 	homedir := createNewTestWallet(t)
-	mockServer, addr := mockBackendCalls(&backendMockReturnConf{billID: money.NewBillID(nil, []byte{1}), billValue: 1e8})
+	mockServer, addr := mockBackendCalls(&backendMockReturnConf{
+		targetBill: &wallet.Bill{
+			Id:    money.NewBillID(nil, []byte{1}),
+			Value: 1e8,
+		}})
 	defer mockServer.Close()
 
 	// verify bill in list command
@@ -63,7 +68,11 @@ func TestWalletBillsListCmd_Multiple(t *testing.T) {
 func TestWalletBillsListCmd_ExtraAccount(t *testing.T) {
 	homedir := createNewTestWallet(t)
 	logF := testobserve.NewFactory(t)
-	mockServer, addr := mockBackendCalls(&backendMockReturnConf{billID: money.NewBillID(nil, []byte{1}), billValue: 1})
+	mockServer, addr := mockBackendCalls(&backendMockReturnConf{
+		targetBill: &wallet.Bill{
+			Id:    money.NewBillID(nil, []byte{1}),
+			Value: 1,
+		}})
 	defer mockServer.Close()
 
 	// add new key
@@ -89,8 +98,10 @@ func TestWalletBillsListCmd_ExtraAccountTotal(t *testing.T) {
 	pubKey2 := strings.Split(stdout.lines[0], " ")[3]
 
 	mockServer, addr := mockBackendCalls(&backendMockReturnConf{
-		billID:         money.NewBillID(nil, []byte{1}),
-		billValue:      1e9,
+		targetBill: &wallet.Bill{
+			Id:    money.NewBillID(nil, []byte{1}),
+			Value: 1e9,
+		},
 		customFullPath: "/" + client.ListBillsPath + "?includeDcBills=false&limit=100&pubkey=" + pubKey2,
 		customResponse: `{"bills": []}`})
 	defer mockServer.Close()

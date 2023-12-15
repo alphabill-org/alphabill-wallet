@@ -221,6 +221,7 @@ func (p *blockProcessor) processTx(tr *types.TransactionRecord, proof *wallet.Tx
 		}
 		joinedToken.Amount += burnedValue
 		joinedToken.TxHash = txHash
+		joinedToken.Locked = 0
 		if err = p.saveToken(joinedToken, txProof); err != nil {
 			return fmt.Errorf("failed to save joined token: %w", err)
 		}

@@ -13,9 +13,7 @@ type (
 	BackendMockReturnConf struct {
 		Balance                  uint64
 		RoundNumber              uint64
-		BillID                   types.UnitID
-		BillValue                uint64
-		BillTxHash               string
+		TargetBill               *wallet.Bill
 		ProofList                []string
 		CustomBillList           string
 		CustomPath               string

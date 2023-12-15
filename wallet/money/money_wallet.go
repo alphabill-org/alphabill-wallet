@@ -36,7 +36,6 @@ type (
 		backend       BackendAPI
 		feeManager    *fees.FeeManager
 		TxPublisher   *TxPublisher
-		unitLocker    UnitLocker
 		dustCollector *dc.DustCollector
 		log           *slog.Logger
 	}
@@ -98,7 +97,6 @@ func LoadExistingWallet(am account.Manager, unitLocker UnitLocker, feeManagerDB 
 		backend:       backend,
 		TxPublisher:   moneyTxPublisher,
 		feeManager:    feeManager,
-		unitLocker:    unitLocker,
 		dustCollector: dustCollector,
 		log:           log,
 	}, nil
@@ -166,14 +164,6 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*wallet.Proof, error)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load public key: %w", err)
 	}
-	balance, err := w.backend.GetBalance(ctx, pubKey, true)
-	if err != nil {
-		return nil, err
-	}
-	totalAmount := cmd.totalAmount()
-	if totalAmount > balance {
-		return nil, errors.New("insufficient balance for transaction")
-	}
 
 	rnr, err := w.backend.GetRoundNumber(ctx)
 	if err != nil {
@@ -196,6 +186,14 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*wallet.Proof, error)
 	bills, err := w.getUnlockedBills(ctx, pubKey)
 	if err != nil {
 		return nil, err
+	}
+	var balance uint64
+	for _, b := range bills {
+		balance += b.Value
+	}
+	totalAmount := cmd.totalAmount()
+	if totalAmount > balance {
+		return nil, errors.New("insufficient balance for transaction")
 	}
 	timeout := rnr.RoundNumber + txTimeoutBlockCount
 	batch := txsubmitter.NewBatch(k.PubKey, w.backend, w.log)
@@ -344,11 +342,7 @@ func (w *Wallet) getUnlockedBills(ctx context.Context, pubKey []byte) ([]*wallet
 	})
 	// filter locked bills
 	for _, b := range bills {
-		lockedUnit, err := w.unitLocker.GetUnit(pubKey, b.GetID())
-		if err != nil {
-			return nil, fmt.Errorf("failed to get locked bill: %w", err)
-		}
-		if lockedUnit == nil {
+		if !b.IsLocked() {
 			unlockedBills = append(unlockedBills, b)
 		}
 	}

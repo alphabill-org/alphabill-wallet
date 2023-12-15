@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	moneytx "github.com/alphabill-org/alphabill/txsystem/money"
@@ -122,21 +123,22 @@ func execListCmd(cmd *cobra.Command, config *walletConfig) error {
 }
 
 func lockCmd(config *walletConfig) *cobra.Command {
+	var billID bytesHex
 	cmd := &cobra.Command{
 		Use:   "lock",
 		Short: "locks specific bill",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return execLockCmd(cmd, config)
+			return execLockCmd(cmd, config, billID)
 		},
 	}
 	cmd.Flags().StringP(alphabillApiURLCmdName, "r", defaultAlphabillApiURL, "alphabill API uri to connect to")
 	cmd.Flags().Uint64P(keyCmdName, "k", 1, "account number of the bill to lock")
-	cmd.Flags().BytesHex(billIdCmdName, nil, "id of the bill to lock")
+	cmd.Flags().Var(&billID, billIdCmdName, "id of the bill to lock")
 	cmd.Flags().BytesHex(systemIdentifierCmdName, moneytx.DefaultSystemIdentifier, "system identifier")
 	return cmd
 }
 
-func execLockCmd(cmd *cobra.Command, config *walletConfig) error {
+func execLockCmd(cmd *cobra.Command, config *walletConfig, billID []byte) error {
 	uri, err := cmd.Flags().GetString(alphabillApiURLCmdName)
 	if err != nil {
 		return err
@@ -146,10 +148,6 @@ func execLockCmd(cmd *cobra.Command, config *walletConfig) error {
 		return err
 	}
 	accountNumber, err := cmd.Flags().GetUint64(keyCmdName)
-	if err != nil {
-		return err
-	}
-	billID, err := cmd.Flags().GetBytesHex(billIdCmdName)
 	if err != nil {
 		return err
 	}
@@ -165,6 +163,14 @@ func execLockCmd(cmd *cobra.Command, config *walletConfig) error {
 	accountKey, err := am.GetAccountKey(accountNumber - 1)
 	if err != nil {
 		return fmt.Errorf("failed to load account key: %w", err)
+	}
+	infoResponse, err := restClient.GetInfo(cmd.Context())
+	if err != nil {
+		return err
+	}
+	moneyTypeVar := moneyType
+	if !strings.HasPrefix(infoResponse.Name, moneyTypeVar.String()) {
+		return errors.New("invalid wallet backend API URL provided for money partition")
 	}
 	bill, err := fetchBillByID(cmd.Context(), billID, restClient, accountKey)
 	if err != nil {
@@ -191,21 +197,22 @@ func execLockCmd(cmd *cobra.Command, config *walletConfig) error {
 }
 
 func unlockCmd(config *walletConfig) *cobra.Command {
+	var billID bytesHex
 	cmd := &cobra.Command{
 		Use:   "unlock",
 		Short: "unlocks specific bill",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return execUnlockCmd(cmd, config)
+			return execUnlockCmd(cmd, config, billID)
 		},
 	}
 	cmd.Flags().StringP(alphabillApiURLCmdName, "r", defaultAlphabillApiURL, "alphabill API uri to connect to")
 	cmd.Flags().Uint64P(keyCmdName, "k", 1, "account number of the bill to unlock")
-	cmd.Flags().BytesHex(billIdCmdName, nil, "id of the bill to unlock")
+	cmd.Flags().Var(&billID, billIdCmdName, "id of the bill to unlock")
 	cmd.Flags().BytesHex(systemIdentifierCmdName, moneytx.DefaultSystemIdentifier, "system identifier")
 	return cmd
 }
 
-func execUnlockCmd(cmd *cobra.Command, config *walletConfig) error {
+func execUnlockCmd(cmd *cobra.Command, config *walletConfig, billID []byte) error {
 	uri, err := cmd.Flags().GetString(alphabillApiURLCmdName)
 	if err != nil {
 		return err
@@ -215,10 +222,6 @@ func execUnlockCmd(cmd *cobra.Command, config *walletConfig) error {
 		return err
 	}
 	accountNumber, err := cmd.Flags().GetUint64(keyCmdName)
-	if err != nil {
-		return err
-	}
-	billID, err := cmd.Flags().GetBytesHex(billIdCmdName)
 	if err != nil {
 		return err
 	}
@@ -232,6 +235,14 @@ func execUnlockCmd(cmd *cobra.Command, config *walletConfig) error {
 	}
 	defer am.Close()
 
+	infoResponse, err := restClient.GetInfo(cmd.Context())
+	if err != nil {
+		return err
+	}
+	moneyTypeVar := moneyType
+	if !strings.HasPrefix(infoResponse.Name, moneyTypeVar.String()) {
+		return errors.New("invalid wallet backend API URL provided for money partition")
+	}
 	accountKey, err := am.GetAccountKey(accountNumber - 1)
 	if err != nil {
 		return fmt.Errorf("failed to load account key: %w", err)

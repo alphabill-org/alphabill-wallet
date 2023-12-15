@@ -202,6 +202,9 @@ func lockFeeCreditCmd(walletConfig *walletConfig, cliConfig *cliConf) *cobra.Com
 }
 
 func lockFeeCreditCmdExec(cmd *cobra.Command, walletConfig *walletConfig, cliConfig *cliConf) error {
+	if cliConfig.partitionType == evmType {
+		return errors.New("locking fee credit is not supported for EVM partition")
+	}
 	accountNumber, err := cmd.Flags().GetUint64(keyCmdName)
 	if err != nil {
 		return err
@@ -254,6 +257,9 @@ func unlockFeeCreditCmd(walletConfig *walletConfig, cliConfig *cliConf) *cobra.C
 }
 
 func unlockFeeCreditCmdExec(cmd *cobra.Command, walletConfig *walletConfig, cliConfig *cliConf) error {
+	if cliConfig.partitionType == evmType {
+		return errors.New("locking fee credit is not supported for EVM partition")
+	}
 	accountNumber, err := cmd.Flags().GetUint64(keyCmdName)
 	if err != nil {
 		return err
@@ -336,8 +342,9 @@ func addFees(ctx context.Context, accountNumber uint64, amountString string, c *
 		return err
 	}
 	rsp, err := w.AddFeeCredit(ctx, fees.AddFeeCmd{
-		Amount:       amount,
-		AccountIndex: accountNumber - 1,
+		Amount:         amount,
+		AccountIndex:   accountNumber - 1,
+		DisableLocking: c.partitionType == evmType,
 	})
 	if err != nil {
 		if errors.Is(err, fees.ErrMinimumFeeAmount) {

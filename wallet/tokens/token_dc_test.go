@@ -192,6 +192,7 @@ func TestGetTokensForDC(t *testing.T) {
 	typeID1 := test.RandomBytes(32)
 	typeID2 := test.RandomBytes(32)
 	typeID3 := test.RandomBytes(32)
+	typeID4 := test.RandomBytes(32)
 
 	allTokens := []*twb.TokenUnit{
 		{ID: test.RandomBytes(32), Kind: twb.Fungible, Symbol: "AB1", TypeID: typeID1, Amount: 100},
@@ -199,6 +200,7 @@ func TestGetTokensForDC(t *testing.T) {
 		{ID: test.RandomBytes(32), Kind: twb.Fungible, Symbol: "AB2", TypeID: typeID2, Amount: 100},
 		{ID: test.RandomBytes(32), Kind: twb.Fungible, Symbol: "AB2", TypeID: typeID2, Amount: 100},
 		{ID: test.RandomBytes(32), Kind: twb.NonFungible, Symbol: "AB3", TypeID: typeID3},
+		{ID: test.RandomBytes(32), Kind: twb.Fungible, Symbol: "AB4", TypeID: typeID4, Locked: 1},
 	}
 
 	be := &mockTokenBackend{
@@ -250,13 +252,17 @@ func TestGetTokensForDC(t *testing.T) {
 			allowedTypes: []twb.TokenTypeID{typeID1, typeID2},
 			expected:     map[string][]*twb.TokenUnit{string(typeID1): allTokens[:2], string(typeID2): allTokens[2:4]},
 		},
+		{
+			allowedTypes: []twb.TokenTypeID{typeID4},
+			expected:     map[string][]*twb.TokenUnit{},
+		},
 	}
 
-	for _, test := range tests {
-		t.Run(fmt.Sprintf("%v", test.allowedTypes), func(t *testing.T) {
-			tokens, err := tw.getTokensForDC(context.Background(), key, test.allowedTypes)
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%v", tt.allowedTypes), func(t *testing.T) {
+			tokens, err := tw.getTokensForDC(context.Background(), key, tt.allowedTypes)
 			require.NoError(t, err)
-			require.EqualValues(t, test.expected, tokens)
+			require.EqualValues(t, tt.expected, tokens)
 		})
 	}
 }
