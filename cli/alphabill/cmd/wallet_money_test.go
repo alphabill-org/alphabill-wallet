@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
@@ -15,6 +16,7 @@ import (
 	"testing"
 
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	"github.com/alphabill-org/alphabill-wallet/wallet"
 	abcrypto "github.com/alphabill-org/alphabill/crypto"
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/partition"
@@ -23,7 +25,6 @@ import (
 	"github.com/alphabill-org/alphabill/rpc/alphabill"
 	"github.com/alphabill-org/alphabill/txsystem"
 	"github.com/alphabill-org/alphabill/txsystem/money"
-	"github.com/alphabill-org/alphabill/types"
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
@@ -45,9 +46,8 @@ type (
 	backendMockReturnConf struct {
 		balance        uint64
 		blockHeight    uint64
-		billID         types.UnitID
-		billValue      uint64
-		billTxHash     string
+		targetBill     *wallet.Bill
+		feeCreditBill  *wallet.Bill
 		proofList      string
 		customBillList string
 		customPath     string
@@ -196,7 +196,10 @@ func TestSendingFailsWithInsufficientBalance(t *testing.T) {
 	require.NoError(t, err)
 	am.Close()
 
-	mockServer, addr := mockBackendCalls(&backendMockReturnConf{balance: 5e8})
+	mockServer, addr := mockBackendCalls(&backendMockReturnConf{
+		targetBill:    &wallet.Bill{Id: []byte{8}, Value: 5e8},
+		feeCreditBill: &wallet.Bill{Id: []byte{9}},
+	})
 	defer mockServer.Close()
 
 	_, err = execCommand(observability.NewFactory(t), homedir, "send --amount 10 --address "+hexutil.Encode(pubKey)+" --alphabill-api-uri "+addr.Host)
@@ -388,27 +391,33 @@ func mockBackendCalls(br *backendMockReturnConf) (*httptest.Server, *url.URL) {
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(br.customResponse))
 		} else {
-			switch r.URL.Path {
-			case "/" + client.BalancePath:
+			path := r.URL.Path
+			switch {
+			case path == "/"+client.BalancePath:
 				w.WriteHeader(http.StatusOK)
 				w.Write([]byte(fmt.Sprintf(`{"balance": "%d"}`, br.balance)))
-			case "/" + client.RoundNumberPath:
+			case path == "/"+client.RoundNumberPath:
 				w.WriteHeader(http.StatusOK)
 				w.Write([]byte(fmt.Sprintf(`{"blockHeight": "%d"}`, br.blockHeight)))
-			case "/api/v1/units/":
+			case path == "/api/v1/units/":
 				if br.proofList != "" {
 					w.WriteHeader(http.StatusOK)
 					w.Write([]byte(br.proofList))
 				} else {
 					w.WriteHeader(http.StatusNotFound)
 				}
-			case "/" + client.ListBillsPath:
+			case path == "/"+client.ListBillsPath:
 				w.WriteHeader(http.StatusOK)
 				if br.customBillList != "" {
 					w.Write([]byte(br.customBillList))
 				} else {
-					w.Write([]byte(fmt.Sprintf(`{"bills": [{"id":"%s","value":"%d","txHash":"%s","isDcBill":false}]}`, toBase64(br.billID), br.billValue, br.billTxHash)))
+					b, _ := json.Marshal(br.targetBill)
+					w.Write([]byte(fmt.Sprintf(`{"bills": [%s]}`, b)))
 				}
+			case strings.Contains(path, client.FeeCreditPath):
+				w.WriteHeader(http.StatusOK)
+				fcb, _ := json.Marshal(br.feeCreditBill)
+				w.Write(fcb)
 			default:
 				w.WriteHeader(http.StatusNotFound)
 			}

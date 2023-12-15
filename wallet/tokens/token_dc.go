@@ -197,6 +197,9 @@ func (w *Wallet) getTokensForDC(ctx context.Context, key sdk.PubKey, allowedToke
 			// if filter is set, skip tokens of other types
 			continue
 		}
+		if tok.IsLocked() {
+			continue
+		}
 		tokensByTypes[typeID] = append(tokenz, tok)
 	}
 	for k, v := range tokensByTypes {

@@ -432,6 +432,7 @@ func Test_blockProcessor_processTx(t *testing.T) {
 	t.Run("LockToken", func(t *testing.T) {
 		txAttr := &tokens.LockTokenAttributes{LockStatus: 1}
 		tx := randomTx(t, txAttr)
+		tx.Payload.Type = tokens.PayloadTypeLockToken
 		bp := &blockProcessor{
 			log: logger,
 			txs: txs,
@@ -450,6 +451,7 @@ func Test_blockProcessor_processTx(t *testing.T) {
 					return nil
 				},
 			},
+			notify: func(bearerPredicate []byte, msg broker.Message) {},
 		}
 		err = bp.ProcessBlock(context.Background(), &types.Block{
 			UnicityCertificate: &types.UnicityCertificate{InputRecord: &types.InputRecord{RoundNumber: 4}},
@@ -461,6 +463,7 @@ func Test_blockProcessor_processTx(t *testing.T) {
 	t.Run("UnlockToken", func(t *testing.T) {
 		txAttr := &tokens.UnlockTokenAttributes{}
 		tx := randomTx(t, txAttr)
+		tx.Payload.Type = tokens.PayloadTypeUnlockToken
 		bp := &blockProcessor{
 			log: logger,
 			txs: txs,
@@ -479,6 +482,7 @@ func Test_blockProcessor_processTx(t *testing.T) {
 					return nil
 				},
 			},
+			notify: func(bearerPredicate []byte, msg broker.Message) {},
 		}
 		err = bp.ProcessBlock(context.Background(), &types.Block{
 			UnicityCertificate: &types.UnicityCertificate{InputRecord: &types.InputRecord{RoundNumber: 4}},
