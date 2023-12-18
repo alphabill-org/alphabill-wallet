@@ -172,6 +172,14 @@ func execLockCmd(cmd *cobra.Command, config *walletConfig, billID []byte) error 
 	if !strings.HasPrefix(infoResponse.Name, moneyTypeVar.String()) {
 		return errors.New("invalid wallet backend API URL provided for money partition")
 	}
+	fcrID := money.FeeCreditRecordIDFormPublicKey(nil, accountKey.PubKey)
+	fcb, err := restClient.GetFeeCreditBill(cmd.Context(), fcrID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
+	}
+	if fcb.GetValue() < txbuilder.MaxFee {
+		return errors.New("not enough fee credit in wallet")
+	}
 	bill, err := fetchBillByID(cmd.Context(), billID, restClient, accountKey)
 	if err != nil {
 		return fmt.Errorf("failed to fetch bill by id: %w", err)
@@ -246,6 +254,14 @@ func execUnlockCmd(cmd *cobra.Command, config *walletConfig, billID []byte) erro
 	accountKey, err := am.GetAccountKey(accountNumber - 1)
 	if err != nil {
 		return fmt.Errorf("failed to load account key: %w", err)
+	}
+	fcrID := money.FeeCreditRecordIDFormPublicKey(nil, accountKey.PubKey)
+	fcb, err := restClient.GetFeeCreditBill(cmd.Context(), fcrID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
+	}
+	if fcb.GetValue() < txbuilder.MaxFee {
+		return errors.New("not enough fee credit in wallet")
 	}
 	bill, err := fetchBillByID(cmd.Context(), billID, restClient, accountKey)
 	if err != nil {

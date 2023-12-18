@@ -206,6 +206,37 @@ func TestWalletBillsLockUnlockCmd_Ok(t *testing.T) {
 	verifyStdout(t, stdout, "#1 0x000000000000000000000000000000000000000000000000000000000000000100 1.000'000'00")
 }
 
+func TestWalletBillsLockUnlockCmd_Nok(t *testing.T) {
+	// TODO convert to unit test, no need to start entire network
+	// create wallet
+	am, homedir := createNewWallet(t)
+	pubkey, err := am.GetPublicKey(0)
+	require.NoError(t, err)
+	am.Close()
+
+	// start money partition
+	initialBill := &money.InitialBill{
+		ID:    defaultInitialBillID,
+		Value: 2e8,
+		Owner: templates.NewP2pkh256BytesFromKey(pubkey),
+	}
+	moneyPartition := createMoneyPartition(t, initialBill, 1)
+	logF := testobserve.NewFactory(t)
+	_ = startAlphabill(t, []*testpartition.NodePartition{moneyPartition})
+	startPartitionRPCServers(t, moneyPartition)
+
+	// start wallet backend
+	addr, _ := startMoneyBackend(t, moneyPartition, initialBill)
+
+	// lock bill
+	_, err = execBillsCommand(logF, homedir, fmt.Sprintf("lock --alphabill-api-uri %s --bill-id %s", addr, defaultInitialBillID))
+	require.ErrorContains(t, err, "not enough fee credit in wallet")
+
+	// unlock bill
+	_, err = execBillsCommand(logF, homedir, fmt.Sprintf("unlock --alphabill-api-uri %s --bill-id %s", addr, defaultInitialBillID))
+	require.ErrorContains(t, err, "not enough fee credit in wallet")
+}
+
 func spendInitialBillWithFeeCredits(t *testing.T, abNet *testpartition.AlphabillNetwork, initialBill *money.InitialBill, pk []byte) uint64 {
 	absoluteTimeout := uint64(10000)
 	initialValue := initialBill.Value
