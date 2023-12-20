@@ -1,12 +1,15 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"mime"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/alphabill-org/alphabill/util"
@@ -16,6 +19,7 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	wallet "github.com/alphabill-org/alphabill-wallet/wallet/tokens"
 	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/backend"
+	tokensclient "github.com/alphabill-org/alphabill-wallet/wallet/tokens/client"
 )
 
 const (
@@ -135,12 +139,6 @@ func execTokenCmdNewTypeFungible(cmd *cobra.Command, config *walletConfig) error
 	if err != nil {
 		return err
 	}
-	tw, err := initTokensWallet(cmd, config)
-	if err != nil {
-		return err
-	}
-	defer tw.Shutdown()
-
 	typeId, err := getHexFlag(cmd, cmdFlagType)
 	if err != nil {
 		return err
@@ -168,6 +166,11 @@ func execTokenCmdNewTypeFungible(cmd *cobra.Command, config *walletConfig) error
 	if decimals > maxDecimalPlaces {
 		return fmt.Errorf("argument \"%v\" for \"--decimals\" flag is out of range, max value %v", decimals, maxDecimalPlaces)
 	}
+	tw, err := initTokensWallet(cmd, config)
+	if err != nil {
+		return err
+	}
+	defer tw.Shutdown()
 	am := tw.GetAccountManager()
 	parentType, creationInputs, err := readParentTypeInfo(cmd, accountNumber, am)
 	if err != nil {
@@ -225,12 +228,6 @@ func execTokenCmdNewTypeNonFungible(cmd *cobra.Command, config *walletConfig) er
 	if err != nil {
 		return err
 	}
-	tw, err := initTokensWallet(cmd, config)
-	if err != nil {
-		return err
-	}
-	defer tw.Shutdown()
-
 	typeId, err := getHexFlag(cmd, cmdFlagType)
 	if err != nil {
 		return err
@@ -251,6 +248,11 @@ func execTokenCmdNewTypeNonFungible(cmd *cobra.Command, config *walletConfig) er
 	if err != nil {
 		return err
 	}
+	tw, err := initTokensWallet(cmd, config)
+	if err != nil {
+		return err
+	}
+	defer tw.Shutdown()
 	am := tw.GetAccountManager()
 	parentType, creationInputs, err := readParentTypeInfo(cmd, accountNumber, am)
 	if err != nil {
@@ -407,12 +409,6 @@ func execTokenCmdNewTokenNonFungible(cmd *cobra.Command, config *walletConfig) e
 	if err != nil {
 		return err
 	}
-	tw, err := initTokensWallet(cmd, config)
-	if err != nil {
-		return err
-	}
-	defer tw.Shutdown()
-
 	typeId, err := getHexFlag(cmd, cmdFlagType)
 	if err != nil {
 		return err
@@ -433,6 +429,11 @@ func execTokenCmdNewTokenNonFungible(cmd *cobra.Command, config *walletConfig) e
 	if err != nil {
 		return err
 	}
+	tw, err := initTokensWallet(cmd, config)
+	if err != nil {
+		return err
+	}
+	defer tw.Shutdown()
 	am := tw.GetAccountManager()
 	ci, err := readPredicateInput(cmd, cmdFlagMintClauseInput, accountNumber, am)
 	if err != nil {
@@ -714,12 +715,6 @@ func execTokenCmdUpdateNFTData(cmd *cobra.Command, config *walletConfig) error {
 		return err
 	}
 
-	tw, err := initTokensWallet(cmd, config)
-	if err != nil {
-		return err
-	}
-	defer tw.Shutdown()
-
 	tokenId, err := getHexFlag(cmd, cmdFlagTokenId)
 	if err != nil {
 		return err
@@ -729,6 +724,12 @@ func execTokenCmdUpdateNFTData(cmd *cobra.Command, config *walletConfig) error {
 	if err != nil {
 		return err
 	}
+
+	tw, err := initTokensWallet(cmd, config)
+	if err != nil {
+		return err
+	}
+	defer tw.Shutdown()
 
 	du, err := readPredicateInput(cmd, cmdFlagTokenDataUpdateClauseInput, accountNumber, tw.GetAccountManager())
 	if err != nil {
@@ -986,7 +987,7 @@ func execTokenCmdLock(cmd *cobra.Command, config *walletConfig) error {
 	if result.FeeSum > 0 {
 		consoleWriter.Println(fmt.Sprintf("Paid %s fees for transaction(s).", util.AmountToString(result.FeeSum, 8)))
 	}
-	return err
+	return nil
 }
 
 func tokenCmdUnlock(config *walletConfig) *cobra.Command {
@@ -1037,7 +1038,7 @@ func execTokenCmdUnlock(cmd *cobra.Command, config *walletConfig) error {
 }
 
 func initTokensWallet(cmd *cobra.Command, config *walletConfig) (*wallet.Wallet, error) {
-	uri, err := cmd.Flags().GetString(alphabillApiURLCmdName)
+	backendURL, err := cmd.Flags().GetString(alphabillApiURLCmdName)
 	if err != nil {
 		return nil, err
 	}
@@ -1053,11 +1054,23 @@ func initTokensWallet(cmd *cobra.Command, config *walletConfig) (*wallet.Wallet,
 	if err != nil {
 		return nil, err
 	}
-	tw, err := wallet.New(tokens.DefaultSystemIdentifier, uri, am, confirmTx, nil, config.Base.observe, config.Base.observe.Logger())
+	if !strings.HasPrefix(backendURL, "http://") && !strings.HasPrefix(backendURL, "https://") {
+		backendURL = "http://" + backendURL
+	}
+	addr, err := url.Parse(backendURL)
 	if err != nil {
 		return nil, err
 	}
-	return tw, nil
+	backendClient := tokensclient.New(*addr, config.Base.observe)
+	infoResponse, err := backendClient.GetInfo(cmd.Context())
+	if err != nil {
+		return nil, err
+	}
+	tokensTypeVar := tokensType
+	if !strings.HasPrefix(infoResponse.Name, tokensTypeVar.String()) {
+		return nil, errors.New("invalid wallet backend API URL provided for tokens partition")
+	}
+	return wallet.New(tokens.DefaultSystemIdentifier, backendClient, am, confirmTx, nil, config.Base.observe.Logger())
 }
 
 func readParentTypeInfo(cmd *cobra.Command, keyNr uint64, am account.Manager) (backend.TokenTypeID, []*wallet.PredicateInput, error) {

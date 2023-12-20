@@ -7,21 +7,18 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
-	"net/url"
-	"strings"
 
-	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/fxamacker/cbor/v2"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
 	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/backend"
-	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/client"
 )
 
 const (
@@ -65,6 +62,7 @@ type (
 		PostTransactions(ctx context.Context, pubKey wallet.PubKey, txs *wallet.Transactions) error
 		GetTxProof(ctx context.Context, unitID types.UnitID, txHash wallet.TxHash) (*wallet.Proof, error)
 		GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*wallet.Bill, error)
+		GetInfo(ctx context.Context) (*wallet.InfoResponse, error)
 	}
 
 	MoneyDataProvider interface {
@@ -77,18 +75,11 @@ type (
 	}
 )
 
-func New(systemID []byte, backendUrl string, am account.Manager, confirmTx bool, feeManager *fees.FeeManager, observe Observability, log *slog.Logger) (*Wallet, error) {
-	if !strings.HasPrefix(backendUrl, "http://") && !strings.HasPrefix(backendUrl, "https://") {
-		backendUrl = "http://" + backendUrl
-	}
-	addr, err := url.Parse(backendUrl)
-	if err != nil {
-		return nil, err
-	}
+func New(systemID []byte, backendClient TokenBackend, am account.Manager, confirmTx bool, feeManager *fees.FeeManager, log *slog.Logger) (*Wallet, error) {
 	return &Wallet{
 		systemID:   systemID,
 		am:         am,
-		backend:    client.New(*addr, observe),
+		backend:    backendClient,
 		confirmTx:  confirmTx,
 		feeManager: feeManager,
 		log:        log,

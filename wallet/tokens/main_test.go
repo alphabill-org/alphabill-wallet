@@ -7,9 +7,11 @@ import (
 	"math"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"testing"
 
+	tokensclient "github.com/alphabill-org/alphabill-wallet/wallet/tokens/client"
 	"github.com/alphabill-org/alphabill/hash"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
@@ -37,7 +39,10 @@ func Test_Load(t *testing.T) {
 	defer srv.Close()
 
 	observe := observability.NewFactory(t)
-	w, err := New(tokens.DefaultSystemIdentifier, srv.URL, nil, false, nil, observe.DefaultObserver(), observe.DefaultLogger())
+	backendURL, errr := url.Parse(srv.URL)
+	require.NoError(t, errr)
+	backendClient := tokensclient.New(*backendURL, observe.DefaultObserver())
+	w, err := New(tokens.DefaultSystemIdentifier, backendClient, nil, false, nil, observe.DefaultLogger())
 	require.NoError(t, err)
 
 	rnr, err := w.GetRoundNumber(context.Background())
@@ -969,6 +974,7 @@ type mockTokenBackend struct {
 	getTypeHierarchy func(ctx context.Context, id backend.TokenTypeID) ([]*backend.TokenUnitType, error)
 	getTxProof       func(ctx context.Context, unitID types.UnitID, txHash wallet.TxHash) (*wallet.Proof, error)
 	getFeeCreditBill func(ctx context.Context, unitID types.UnitID) (*wallet.Bill, error)
+	getInfo          func(ctx context.Context) (*wallet.InfoResponse, error)
 }
 
 func (m *mockTokenBackend) GetToken(ctx context.Context, id backend.TokenID) (*backend.TokenUnit, error) {
@@ -1025,6 +1031,13 @@ func (m *mockTokenBackend) GetFeeCreditBill(ctx context.Context, unitID types.Un
 		return m.getFeeCreditBill(ctx, unitID)
 	}
 	return nil, fmt.Errorf("GetFeeCreditBill not implemented")
+}
+
+func (m *mockTokenBackend) GetInfo(ctx context.Context) (*wallet.InfoResponse, error) {
+	if m.getInfo != nil {
+		return m.getInfo(ctx)
+	}
+	return nil, fmt.Errorf("GetInfo not implemented")
 }
 
 func getSubarray[T interface{}](array []T, offsetKey string) ([]T, string, error) {
