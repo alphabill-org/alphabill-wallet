@@ -349,6 +349,9 @@ func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenId 
 	if err != nil {
 		return nil, err
 	}
+	if token.IsLocked() {
+		return nil, errors.New("token is locked")
+	}
 	attrs := newNonFungibleTransferTxAttrs(token, receiverPubKey)
 	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeTransferNFT, attrs, tokenId, key, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.am, invariantPredicateArgs, tx, attrs)
@@ -388,7 +391,7 @@ func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId 
 	if err != nil {
 		return nil, err
 	}
-	tokens, found := tokensByAcc[accountNumber]
+	tokenz, found := tokensByAcc[accountNumber]
 	if !found {
 		return nil, fmt.Errorf("account %d has no tokens", accountNumber)
 	}
@@ -396,11 +399,14 @@ func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId 
 	var totalBalance uint64
 	// find the best unit candidate for transfer or split, value must be equal or larger than the target amount
 	var closestMatch *backend.TokenUnit
-	for _, token := range tokens {
+	for _, token := range tokenz {
 		if token.Kind != backend.Fungible {
 			return nil, fmt.Errorf("expected fungible token, got %v, token %X", token.Kind.String(), token.ID)
 		}
 		if typeId.Eq(token.TypeID) {
+			if token.IsLocked() {
+				continue
+			}
 			matchingTokens = append(matchingTokens, token)
 			var overflow bool
 			totalBalance, overflow, _ = util.AddUint64(totalBalance, token.Amount)
@@ -457,6 +463,9 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 	}
 	if t == nil {
 		return nil, fmt.Errorf("token with id=%X not found under account #%v", tokenId, accountNumber)
+	}
+	if t.IsLocked() {
+		return nil, errors.New("token is locked")
 	}
 
 	attrs := &tokens.UpdateNonFungibleTokenAttributes{

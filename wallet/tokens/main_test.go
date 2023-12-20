@@ -440,6 +440,7 @@ func TestMintFungibleToken(t *testing.T) {
 func TestSendFungible(t *testing.T) {
 	recTxs := make([]*types.TransactionOrder, 0)
 	typeId := test.RandomBytes(32)
+	typeId2 := test.RandomBytes(32)
 	typeIdForOverflow := test.RandomBytes(32)
 	be := &mockTokenBackend{
 		getTokens: func(ctx context.Context, kind backend.Kind, owner wallet.PubKey, offset string, limit int) ([]*backend.TokenUnit, string, error) {
@@ -450,6 +451,7 @@ func TestSendFungible(t *testing.T) {
 				{ID: test.RandomBytes(32), Kind: backend.Fungible, Symbol: "AB", TypeID: typeId, Amount: 18},
 				{ID: test.RandomBytes(32), Kind: backend.Fungible, Symbol: "AB2", TypeID: typeIdForOverflow, Amount: math.MaxUint64},
 				{ID: test.RandomBytes(32), Kind: backend.Fungible, Symbol: "AB2", TypeID: typeIdForOverflow, Amount: 1},
+				{ID: test.RandomBytes(32), Kind: backend.Fungible, Symbol: "AB3", TypeID: typeId2, Amount: 1, Locked: 1},
 			}, "", nil
 		},
 		getFeeCreditBill: func(ctx context.Context, unitID types.UnitID) (*wallet.Bill, error) {
@@ -573,6 +575,12 @@ func TestSendFungible(t *testing.T) {
 				require.Equal(t, uint64(2), newSplit.TargetValue)
 				require.Equal(t, uint64(math.MaxUint64-2), newSplit.RemainingValue)
 			},
+		},
+		{
+			name:             "locked tokens are ignored",
+			tokenTypeID:      typeId2,
+			targetAmount:     1,
+			expectedErrorMsg: "insufficient value",
 		},
 	}
 
@@ -763,6 +771,7 @@ func TestTransferNFT(t *testing.T) {
 		token         *backend.TokenUnit
 		key           wallet.PubKey
 		validateOwner func(t *testing.T, accNr uint64, key wallet.PubKey, tok *tokens.TransferNonFungibleTokenAttributes)
+		wantErr       string
 	}{
 		{
 			name:  "to 'always true' predicate",
@@ -780,19 +789,23 @@ func TestTransferNFT(t *testing.T) {
 				require.EqualValues(t, templates.NewP2pkh256BytesFromKeyHash(hash.Sum256(key)), tok.NewBearer)
 			},
 		},
+		{
+			name:    "locked token is not sent",
+			token:   &backend.TokenUnit{ID: test.RandomBytes(32), Kind: backend.NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32), Locked: 1},
+			wantErr: "token is locked",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tokenz[string(tt.token.ID)] = tt.token
 			result, err := tw.TransferNFT(context.Background(), 1, tt.token.ID, tt.key, nil)
-			require.NoError(t, err)
-			require.NotNil(t, result)
-			tx, found := recTxs[string(tt.token.ID)]
-			require.True(t, found)
-			require.EqualValues(t, tt.token.ID, tx.UnitID())
-			newTransfer := &tokens.TransferNonFungibleTokenAttributes{}
-			require.NoError(t, tx.UnmarshalAttributes(newTransfer))
-			tt.validateOwner(t, 1, tt.key, newTransfer)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				require.NotNil(t, result)
+			} else {
+				require.ErrorContains(t, err, tt.wantErr)
+				require.Nil(t, result)
+			}
 		})
 	}
 }
@@ -860,6 +873,13 @@ func TestUpdateNFTData(t *testing.T) {
 	require.Len(t, dataUpdate.DataUpdateSignatures, 2)
 	require.Equal(t, []byte(nil), dataUpdate.DataUpdateSignatures[0])
 	require.Len(t, dataUpdate.DataUpdateSignatures[1], 103)
+
+	// test that locked token tx is not sent
+	lockedToken := &backend.TokenUnit{ID: test.RandomBytes(32), Kind: backend.NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32), TxHash: test.RandomBytes(32), Locked: 1}
+	tokenz[string(tok.ID)] = lockedToken
+	result, err = tw.UpdateNFTData(context.Background(), 1, tok.ID, data2, []*PredicateInput{{Argument: nil}, {AccountNumber: 1}})
+	require.ErrorContains(t, err, "token is locked")
+	require.Nil(t, result)
 }
 
 func TestLockToken(t *testing.T) {
