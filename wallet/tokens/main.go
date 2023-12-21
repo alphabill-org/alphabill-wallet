@@ -7,21 +7,18 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
-	"net/url"
-	"strings"
 
-	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/fxamacker/cbor/v2"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
 	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/backend"
-	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/client"
 )
 
 const (
@@ -65,6 +62,7 @@ type (
 		PostTransactions(ctx context.Context, pubKey wallet.PubKey, txs *wallet.Transactions) error
 		GetTxProof(ctx context.Context, unitID types.UnitID, txHash wallet.TxHash) (*wallet.Proof, error)
 		GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*wallet.Bill, error)
+		GetInfo(ctx context.Context) (*wallet.InfoResponse, error)
 	}
 
 	MoneyDataProvider interface {
@@ -77,18 +75,11 @@ type (
 	}
 )
 
-func New(systemID []byte, backendUrl string, am account.Manager, confirmTx bool, feeManager *fees.FeeManager, observe Observability, log *slog.Logger) (*Wallet, error) {
-	if !strings.HasPrefix(backendUrl, "http://") && !strings.HasPrefix(backendUrl, "https://") {
-		backendUrl = "http://" + backendUrl
-	}
-	addr, err := url.Parse(backendUrl)
-	if err != nil {
-		return nil, err
-	}
+func New(systemID []byte, backendClient TokenBackend, am account.Manager, confirmTx bool, feeManager *fees.FeeManager, log *slog.Logger) (*Wallet, error) {
 	return &Wallet{
 		systemID:   systemID,
 		am:         am,
-		backend:    client.New(*addr, observe),
+		backend:    backendClient,
 		confirmTx:  confirmTx,
 		feeManager: feeManager,
 		log:        log,
@@ -358,6 +349,9 @@ func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenId 
 	if err != nil {
 		return nil, err
 	}
+	if token.IsLocked() {
+		return nil, errors.New("token is locked")
+	}
 	attrs := newNonFungibleTransferTxAttrs(token, receiverPubKey)
 	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeTransferNFT, attrs, tokenId, key, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.am, invariantPredicateArgs, tx, attrs)
@@ -397,7 +391,7 @@ func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId 
 	if err != nil {
 		return nil, err
 	}
-	tokens, found := tokensByAcc[accountNumber]
+	tokenz, found := tokensByAcc[accountNumber]
 	if !found {
 		return nil, fmt.Errorf("account %d has no tokens", accountNumber)
 	}
@@ -405,11 +399,14 @@ func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId 
 	var totalBalance uint64
 	// find the best unit candidate for transfer or split, value must be equal or larger than the target amount
 	var closestMatch *backend.TokenUnit
-	for _, token := range tokens {
+	for _, token := range tokenz {
 		if token.Kind != backend.Fungible {
 			return nil, fmt.Errorf("expected fungible token, got %v, token %X", token.Kind.String(), token.ID)
 		}
 		if typeId.Eq(token.TypeID) {
+			if token.IsLocked() {
+				continue
+			}
 			matchingTokens = append(matchingTokens, token)
 			var overflow bool
 			totalBalance, overflow, _ = util.AddUint64(totalBalance, token.Amount)
@@ -466,6 +463,9 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 	}
 	if t == nil {
 		return nil, fmt.Errorf("token with id=%X not found under account #%v", tokenId, accountNumber)
+	}
+	if t.IsLocked() {
+		return nil, errors.New("token is locked")
 	}
 
 	attrs := &tokens.UpdateNonFungibleTokenAttributes{

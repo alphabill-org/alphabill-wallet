@@ -25,20 +25,21 @@ func newTokensBackendCmd(baseConfig *baseConfiguration) *cobra.Command {
 }
 
 func buildCmdStartTokensBackend(config *baseConfiguration) *cobra.Command {
+	var systemID bytesHex = tokens.DefaultSystemIdentifier
 	cmd := &cobra.Command{
 		Use: "start",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return execTokensBackendStartCmd(cmd.Context(), cmd, config)
+			return execTokensBackendStartCmd(cmd.Context(), cmd, config, systemID)
 		},
 	}
 	cmd.Flags().StringP(alphabillNodeURLCmdName, "u", defaultAlphabillNodeURL, "alphabill node url")
 	cmd.Flags().StringP(serverAddrCmdName, "s", defaultTokensBackendApiURL, "server address")
 	cmd.Flags().StringP(dbFileCmdName, "f", "", "path to the database file")
-	cmd.Flags().BytesHex(systemIdentifierCmdName, tokens.DefaultSystemIdentifier, "system identifier in hex format")
+	cmd.Flags().Var(&systemID, systemIdentifierCmdName, "system identifier in hex format")
 	return cmd
 }
 
-func execTokensBackendStartCmd(ctx context.Context, cmd *cobra.Command, config *baseConfiguration) error {
+func execTokensBackendStartCmd(ctx context.Context, cmd *cobra.Command, config *baseConfiguration, systemID []byte) error {
 	abURL, err := cmd.Flags().GetString(alphabillNodeURLCmdName)
 	if err != nil {
 		return fmt.Errorf("failed to get %q flag value: %w", alphabillNodeURLCmdName, err)
@@ -50,10 +51,6 @@ func execTokensBackendStartCmd(ctx context.Context, cmd *cobra.Command, config *
 	dbFile, err := filenameEnsureDir(dbFileCmdName, cmd, config.HomeDir, "tokens-backend", "tokens.db")
 	if err != nil {
 		return fmt.Errorf("failed to get path for database: %w", err)
-	}
-	systemID, err := cmd.Flags().GetBytesHex(systemIdentifierCmdName)
-	if err != nil {
-		return fmt.Errorf("failed to read %s flag value: %w", systemIdentifierCmdName, err)
 	}
 	return backend.Run(ctx, backend.NewConfig(systemID, srvAddr, abURL, dbFile, config.observe))
 }

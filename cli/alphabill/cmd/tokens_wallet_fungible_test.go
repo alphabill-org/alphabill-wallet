@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/url"
 	"path/filepath"
 	"regexp"
 	"testing"
@@ -413,7 +414,11 @@ func NewAlphabillNetwork(t *testing.T) *AlphabillNetwork {
 	tokenFeeManager := fees.NewFeeManager(am, feeManagerDB, money.DefaultSystemIdentifier, moneyWallet, moneyBackendClient, moneywallet.FeeCreditRecordIDFormPublicKey, tokens.DefaultSystemIdentifier, tokenTxPublisher, tokenBackendClient, tokenswallet.FeeCreditRecordIDFromPublicKey, log)
 	defer tokenFeeManager.Close()
 
-	tokensWallet, err := tokenswallet.New(tokens.DefaultSystemIdentifier, tokenBackendURL, am, true, tokenFeeManager, observe.DefaultObserver(), log)
+	backendURL, err := url.Parse(tokenBackendURL)
+	require.NoError(t, err)
+	backendClient := client.New(*backendURL, observe.DefaultObserver())
+
+	tokensWallet, err := tokenswallet.New(tokens.DefaultSystemIdentifier, backendClient, am, true, tokenFeeManager, log)
 	require.NoError(t, err)
 	require.NotNil(t, tokensWallet)
 	defer tokensWallet.Shutdown()
