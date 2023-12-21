@@ -48,7 +48,7 @@ type moneyBackendConfig struct {
 	InitialBillID      uint64
 	InitialBillValue   uint64
 	SDRFiles           []string // system description record files
-	SystemID           []byte   // hex encoded money system identifier
+	SystemID           bytesHex // hex encoded money system identifier
 }
 
 func (c *moneyBackendConfig) GetDbFile() (string, error) {
@@ -81,7 +81,7 @@ func (c *moneyBackendConfig) getSDRFiles() ([]*genesis.SystemDescriptionRecord, 
 
 // newMoneyBackendCmd creates a new cobra command for the money-backend component.
 func newMoneyBackendCmd(baseConfig *baseConfiguration) *cobra.Command {
-	config := &moneyBackendConfig{Base: baseConfig}
+	config := &moneyBackendConfig{Base: baseConfig, SystemID: money.DefaultSystemIdentifier}
 	var walletCmd = &cobra.Command{
 		Use:   "money-backend",
 		Short: "Starts money backend service",
@@ -105,7 +105,7 @@ func startMoneyBackendCmd(config *moneyBackendConfig) *cobra.Command {
 	cmd.Flags().Uint64Var(&config.InitialBillValue, "initial-bill-value", 100000000, "initial bill value (needed for initial startup only)")
 	cmd.Flags().Uint64Var(&config.InitialBillID, "initial-bill-id", 1, "initial bill id hex string with 0x prefix (needed for initial startup only)")
 	cmd.Flags().StringSliceVarP(&config.SDRFiles, "system-description-record-files", "c", nil, "path to SDR files (one for each partition, including money partition itself; defaults to single money partition only SDR; needed for initial startup only)")
-	cmd.Flags().BytesHexVar(&config.SystemID, systemIdentifierCmdName, money.DefaultSystemIdentifier, "system identifier in hex format")
+	cmd.Flags().Var(&config.SystemID, systemIdentifierCmdName, "system identifier")
 	return cmd
 }
 
