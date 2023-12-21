@@ -31,23 +31,20 @@ func MoneyGenesisState(t *testing.T, initialBill *InitialBill, dustCollectorMone
 
 	// initial bill
 	require.NoError(t, s.Apply(state.AddUnit(initialBill.ID, initialBill.Owner, &money.BillData{V: initialBill.Value})))
-	_, err := s.AddUnitLog(initialBill.ID, zeroHash)
-	require.NoError(t, err)
+	require.NoError(t, s.AddUnitLog(initialBill.ID, zeroHash))
 
 	// dust collector money supply
 	require.NoError(t, s.Apply(state.AddUnit(money.DustCollectorMoneySupplyID, money.DustCollectorPredicate, &money.BillData{V: dustCollectorMoneySupply})))
-	_, err = s.AddUnitLog(money.DustCollectorMoneySupplyID, zeroHash)
-	require.NoError(t, err)
+	require.NoError(t, s.AddUnitLog(money.DustCollectorMoneySupplyID, zeroHash))
 
 	// fee credit bills
 	for _, sdr := range sdrs {
 		fcb := sdr.FeeCreditBill
 		require.NoError(t, s.Apply(state.AddUnit(fcb.UnitId, fcb.OwnerPredicate, &money.BillData{})))
-		_, err = s.AddUnitLog(fcb.UnitId, zeroHash)
-		require.NoError(t, err)
+		require.NoError(t, s.AddUnitLog(fcb.UnitId, zeroHash))
 	}
 
-	_, _, err = s.CalculateRoot()
+	_, _, err := s.CalculateRoot()
 	require.NoError(t, err)
 
 	return s
