@@ -98,7 +98,7 @@ func addCommonAccountFlags(cmd *cobra.Command) *cobra.Command {
 
 func addDataFlags(cmd *cobra.Command) {
 	altMsg := ". Alternatively flag %q can be used to add data."
-	cmd.Flags().BytesHex(cmdFlagTokenData, nil, "custom data (hex)"+fmt.Sprintf(altMsg, cmdFlagTokenDataFile))
+	setHexFlag(cmd, cmdFlagTokenData, nil, "custom data (hex)"+fmt.Sprintf(altMsg, cmdFlagTokenDataFile))
 	cmd.Flags().String(cmdFlagTokenDataFile, "", "data file (max 64Kb) path"+fmt.Sprintf(altMsg, cmdFlagTokenData))
 	cmd.MarkFlagsMutuallyExclusive(cmdFlagTokenData, cmdFlagTokenDataFile)
 }
@@ -111,7 +111,7 @@ func addCommonTypeFlags(cmd *cobra.Command) *cobra.Command {
 		panic(err)
 	}
 
-	cmd.Flags().BytesHex(cmdFlagParentType, nil, "unit identifier of a parent type in hexadecimal format")
+	setHexFlag(cmd, cmdFlagParentType, nil, "unit identifier of a parent type in hexadecimal format")
 	cmd.Flags().StringSlice(cmdFlagSybTypeClauseInput, nil, "input to satisfy the parent type creation clause (mandatory with --parent-type)")
 	cmd.MarkFlagsRequiredTogether(cmdFlagParentType, cmdFlagSybTypeClauseInput)
 	cmd.Flags().String(cmdFlagSybTypeClause, predicateTrue, "predicate to control sub typing, values <true|false|ptpkh>")
@@ -129,7 +129,7 @@ func tokenCmdNewTypeFungible(config *walletConfig) *cobra.Command {
 		},
 	}
 	cmd.Flags().Uint32(cmdFlagDecimals, 8, "token decimal")
-	cmd.Flags().BytesHex(cmdFlagType, nil, "type unit identifier (hex)")
+	setHexFlag(cmd, cmdFlagType, nil, "type unit identifier")
 	_ = cmd.Flags().MarkHidden(cmdFlagType)
 	return cmd
 }
@@ -217,7 +217,7 @@ func tokenCmdNewTypeNonFungible(config *walletConfig) *cobra.Command {
 			return execTokenCmdNewTypeNonFungible(cmd, config)
 		},
 	}
-	cmd.Flags().BytesHex(cmdFlagType, nil, "type unit identifier (hex)")
+	setHexFlag(cmd, cmdFlagType, nil, "type unit identifier")
 	_ = cmd.Flags().MarkHidden(cmdFlagType)
 	cmd.Flags().String(cmdFlagTokenDataUpdateClause, predicateTrue, "data update predicate, values <true|false|ptpkh>")
 	return cmd
@@ -319,7 +319,7 @@ func tokenCmdNewTokenFungible(config *walletConfig) *cobra.Command {
 	if err != nil {
 		return nil
 	}
-	cmd.Flags().BytesHex(cmdFlagType, nil, "type unit identifier (hex)")
+	setHexFlag(cmd, cmdFlagType, nil, "type unit identifier")
 	err = cmd.MarkFlagRequired(cmdFlagType)
 	if err != nil {
 		return nil
@@ -390,7 +390,7 @@ func tokenCmdNewTokenNonFungible(config *walletConfig) *cobra.Command {
 	}
 	addDataFlags(cmd)
 	cmd.Flags().String(cmdFlagBearerClause, predicatePtpkh, "predicate that defines the ownership of this non-fungible token, values <true|false|ptpkh>")
-	cmd.Flags().BytesHex(cmdFlagType, nil, "type unit identifier (hex)")
+	setHexFlag(cmd, cmdFlagType, nil, "type unit identifier")
 	err := cmd.MarkFlagRequired(cmdFlagType)
 	if err != nil {
 		return nil
@@ -399,7 +399,7 @@ func tokenCmdNewTokenNonFungible(config *walletConfig) *cobra.Command {
 	cmd.Flags().String(cmdFlagTokenURI, "", "URI to associated resource, ie. jpg file on IPFS")
 	cmd.Flags().String(cmdFlagTokenDataUpdateClause, predicateTrue, "data update predicate, values <true|false|ptpkh>")
 	cmd.Flags().StringSlice(cmdFlagMintClauseInput, []string{predicatePtpkh}, "input to satisfy the type's minting clause")
-	cmd.Flags().BytesHex(cmdFlagTokenId, nil, "unit identifier of token (hex)")
+	setHexFlag(cmd, cmdFlagTokenId, nil, "token identifier")
 	_ = cmd.Flags().MarkHidden(cmdFlagTokenId)
 	return cmd
 }
@@ -491,7 +491,7 @@ func tokenCmdSendFungible(config *walletConfig) *cobra.Command {
 	if err != nil {
 		return nil
 	}
-	cmd.Flags().BytesHex(cmdFlagType, nil, "type unit identifier (hex)")
+	setHexFlag(cmd, cmdFlagType, nil, "type unit identifier")
 	err = cmd.MarkFlagRequired(cmdFlagType)
 	if err != nil {
 		return nil
@@ -586,7 +586,7 @@ func tokenCmdSendNonFungible(config *walletConfig) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringSlice(cmdFlagInheritBearerClauseInput, []string{predicateTrue}, "input to satisfy the type's invariant clause")
-	cmd.Flags().BytesHex(cmdFlagTokenId, nil, "unit identifier of token (hex)")
+	setHexFlag(cmd, cmdFlagTokenId, nil, "token identifier")
 	err := cmd.MarkFlagRequired(cmdFlagTokenId)
 	if err != nil {
 		return nil
@@ -699,7 +699,7 @@ func tokenCmdUpdateNFTData(config *walletConfig) *cobra.Command {
 			return execTokenCmdUpdateNFTData(cmd, config)
 		},
 	}
-	cmd.Flags().BytesHex(cmdFlagTokenId, nil, "token identifier (hex)")
+	setHexFlag(cmd, cmdFlagTokenId, nil, "token identifier")
 	if err := cmd.MarkFlagRequired(cmdFlagTokenId); err != nil {
 		panic(err)
 	}
@@ -951,7 +951,7 @@ func tokenCmdLock(config *walletConfig) *cobra.Command {
 			return execTokenCmdLock(cmd, config)
 		},
 	}
-	cmd.Flags().BytesHex(cmdFlagTokenId, nil, "token identifier (hex)")
+	setHexFlag(cmd, cmdFlagTokenId, nil, "token identifier")
 	if err := cmd.MarkFlagRequired(cmdFlagTokenId); err != nil {
 		panic(err)
 	}
@@ -998,7 +998,7 @@ func tokenCmdUnlock(config *walletConfig) *cobra.Command {
 			return execTokenCmdUnlock(cmd, config)
 		},
 	}
-	cmd.Flags().BytesHex(cmdFlagTokenId, nil, "token identifier (hex)")
+	setHexFlag(cmd, cmdFlagTokenId, nil, "token identifier")
 	if err := cmd.MarkFlagRequired(cmdFlagTokenId); err != nil {
 		panic(err)
 	}
@@ -1142,16 +1142,15 @@ func readNFTData(cmd *cobra.Command, required bool) ([]byte, error) {
 	return data, nil
 }
 
-// getHexFlag returns nil in case array is empty (weird behaviour by cobra)
-func getHexFlag(cmd *cobra.Command, flag string) ([]byte, error) {
-	res, err := cmd.Flags().GetBytesHex(flag)
-	if err != nil {
-		return nil, err
-	}
-	if len(res) == 0 {
-		return nil, err
-	}
-	return res, err
+// getHexFlag returns the custom flag value that was set by setHexFlag
+func getHexFlag(cmd *cobra.Command, name string) ([]byte, error) {
+	return *cmd.Flag(name).Value.(*bytesHex), nil
+}
+
+// setHexFlag adds custom hex value flag (allows 0x prefix) to command flagset
+func setHexFlag(cmd *cobra.Command, name string, value []byte, usage string) {
+	var hexFlag bytesHex = value
+	cmd.Flags().Var(&hexFlag, name, usage)
 }
 
 func readIconFile(iconFilePath string) (*wallet.Icon, error) {
