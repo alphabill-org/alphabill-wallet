@@ -520,8 +520,11 @@ func createNewTokenWalletWithFeeManager(t *testing.T, addr string, feeManager *f
 	require.NoError(t, err)
 	require.NoError(t, am.CreateKeys(""))
 
-	observe := observability.NewFactory(t)
-	w, err := tw.New(tokens.DefaultSystemIdentifier, addr, am, false, feeManager, observe.DefaultObserver(), observe.DefaultLogger())
+	o := observability.NewFactory(t)
+	clientURL, err := url.Parse(addr)
+	require.NoError(t, err)
+	backendClient := client.New(*clientURL, o.DefaultObserver())
+	w, err := tw.New(tokens.DefaultSystemIdentifier, backendClient, am, false, feeManager, o.DefaultLogger())
 	require.NoError(t, err)
 	require.NotNil(t, w)
 

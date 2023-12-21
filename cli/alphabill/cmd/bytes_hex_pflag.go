@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"encoding/hex"
-	"fmt"
 	"strings"
 )
 
@@ -22,7 +21,7 @@ func (h *bytesHex) Set(v string) error {
 	}
 	b, err := hex.DecodeString(v)
 	if err != nil {
-		return fmt.Errorf("failed to decode hex value: %w", err)
+		return err
 	}
 	*h = b
 	return nil
