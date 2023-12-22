@@ -358,7 +358,7 @@ func startRPCServer(t *testing.T, partition *testpartition.NodePartition) (addr 
 	// wait for rpc server to start
 	for _, n := range partition.Nodes {
 		require.Eventually(t, func() bool {
-			_, err := n.GetLatestBlock()
+			_, err := n.LatestBlockNumber()
 			return err == nil
 		}, test.WaitDuration, test.WaitTick)
 	}
