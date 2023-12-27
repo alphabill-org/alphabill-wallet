@@ -24,6 +24,7 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	moneywallet "github.com/alphabill-org/alphabill-wallet/wallet/money"
 	moneyclient "github.com/alphabill-org/alphabill-wallet/wallet/money/backend/client"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 	tokenswallet "github.com/alphabill-org/alphabill-wallet/wallet/tokens"
 	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/client"
 	"github.com/alphabill-org/alphabill-wallet/wallet/unitlock"
@@ -381,18 +382,20 @@ func NewAlphabillNetwork(t *testing.T) *AlphabillNetwork {
 	w1key2, err := am.GetAccountKey(1)
 	require.NoError(t, err)
 
-	initialBill := &money.InitialBill{
-		ID:    defaultInitialBillID,
-		Value: 1e18,
-		Owner: templates.NewP2pkh256BytesFromKey(w1key.PubKey),
+	genesisConfig := &testutil.MoneyGenesisConfig{
+		InitialBillID:      defaultInitialBillID,
+		InitialBillValue:   1e18,
+		InitialBillOwner:   templates.NewP2pkh256BytesFromKey(w1key.PubKey),
+		DCMoneySupplyValue: 10000,
 	}
-	moneyPartition := createMoneyPartition(t, initialBill, 1)
+	moneyPartition := createMoneyPartition(t, genesisConfig, 1)
 	tokensPartition := createTokensPartition(t)
 	abNet := startAlphabill(t, []*testpartition.NodePartition{moneyPartition, tokensPartition})
 	startPartitionRPCServers(t, moneyPartition)
 	startPartitionRPCServers(t, tokensPartition)
 
-	moneyBackendURL, moneyBackendClient := startMoneyBackend(t, moneyPartition, initialBill)
+	moneyBackendURL, moneyBackendClient := startMoneyBackend(t, moneyPartition, genesisConfig)
+
 	tokenBackendURL, tokenBackendClient := startTokensBackend(t, tokensPartition.Nodes[0].AddrGRPC)
 
 	unitLocker, err := unitlock.NewUnitLocker(walletDir)
