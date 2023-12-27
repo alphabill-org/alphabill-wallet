@@ -59,12 +59,12 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 	require.NoError(t, err)
 
 	// start server
-	initialBill := &money.InitialBill{
-		ID:    money.NewBillID(nil, []byte{1}),
-		Value: 10000 * 1e8,
-		Owner: templates.NewP2pkh256BytesFromKey(accKey.PubKey),
+	genesisConfig := &testutil.MoneyGenesisConfig{
+		InitialBillID:    money.NewBillID(nil, []byte{1}),
+		InitialBillValue: 10000 * 1e8,
+		InitialBillOwner: templates.NewP2pkh256BytesFromKey(accKey.PubKey),
 	}
-	network := startMoneyOnlyAlphabillPartition(t, initialBill)
+	network := startMoneyOnlyAlphabillPartition(t, genesisConfig)
 	moneyPart, err := network.GetNodePartition(money.DefaultSystemIdentifier)
 	require.NoError(t, err)
 	addr := startRPCServer(t, moneyPart)
@@ -82,8 +82,8 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 				DbFile:                  filepath.Join(t.TempDir(), backend.BoltBillStoreFileName),
 				ListBillsPageLimit:      100,
 				InitialBill: backend.InitialBill{
-					Id:        initialBill.ID,
-					Value:     initialBill.Value,
+					Id:        genesisConfig.InitialBillID,
+					Value:     genesisConfig.InitialBillValue,
 					Predicate: templates.AlwaysTrueBytes(),
 				},
 				SystemDescriptionRecords: createSDRs(),
@@ -113,12 +113,12 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 	require.NoError(t, err)
 
 	// create fee credit for initial bill transfer
-	transferFC := testfees.CreateFeeCredit(t, initialBill.ID, fcrID, fcrAmount, accKey.PrivKey, accKey.PubKey, network)
+	transferFC := testfees.CreateFeeCredit(t, genesisConfig.InitialBillID, fcrID, fcrAmount, accKey.PrivKey, accKey.PubKey, network)
 	initialBillBacklink := transferFC.Hash(crypto.SHA256)
-	initialBillValue := initialBill.Value - fcrAmount
+	initialBillValue := genesisConfig.InitialBillValue - fcrAmount
 
 	// transfer initial bill to wallet 1
-	transferInitialBillTx, err := testutil.CreateInitialBillTransferTx(accKey, initialBill.ID, fcrID, initialBillValue, 10000, initialBillBacklink)
+	transferInitialBillTx, err := testutil.CreateInitialBillTransferTx(accKey, genesisConfig.InitialBillID, fcrID, initialBillValue, 10000, initialBillBacklink)
 	require.NoError(t, err)
 	batch := txsubmitter.NewBatch(accKey.PubKey, w.backend, observe.Logger())
 	batch.Add(&txsubmitter.TxSubmission{
@@ -184,12 +184,12 @@ func TestCollectDustInMultiAccountWalletWithKeyFlag(t *testing.T) {
 	require.NoError(t, err)
 
 	// start server
-	initialBill := &money.InitialBill{
-		ID:    money.NewBillID(nil, []byte{1}),
-		Value: 10000 * 1e8,
-		Owner: templates.NewP2pkh256BytesFromKey(accKey.PubKey),
+	genesisConfig := &testutil.MoneyGenesisConfig{
+		InitialBillID:    money.NewBillID(nil, []byte{1}),
+		InitialBillValue: 10000 * 1e8,
+		InitialBillOwner: templates.NewP2pkh256BytesFromKey(accKey.PubKey),
 	}
-	network := startMoneyOnlyAlphabillPartition(t, initialBill)
+	network := startMoneyOnlyAlphabillPartition(t, genesisConfig)
 	moneyPart, err := network.GetNodePartition(money.DefaultSystemIdentifier)
 	require.NoError(t, err)
 	addr := startRPCServer(t, moneyPart)
@@ -207,8 +207,8 @@ func TestCollectDustInMultiAccountWalletWithKeyFlag(t *testing.T) {
 				DbFile:                  filepath.Join(t.TempDir(), backend.BoltBillStoreFileName),
 				ListBillsPageLimit:      100,
 				InitialBill: backend.InitialBill{
-					Id:        initialBill.ID,
-					Value:     initialBill.Value,
+					Id:        genesisConfig.InitialBillID,
+					Value:     genesisConfig.InitialBillValue,
 					Predicate: templates.AlwaysTrueBytes(),
 				},
 				SystemDescriptionRecords: createSDRs(),
@@ -239,11 +239,11 @@ func TestCollectDustInMultiAccountWalletWithKeyFlag(t *testing.T) {
 	require.NoError(t, err)
 
 	// create fee credit for initial bill transfer
-	transferFC := testfees.CreateFeeCredit(t, initialBill.ID, fcrID, fcrAmount, accKey.PrivKey, accKey.PubKey, network)
+	transferFC := testfees.CreateFeeCredit(t, genesisConfig.InitialBillID, fcrID, fcrAmount, accKey.PrivKey, accKey.PubKey, network)
 	initialBillBacklink := transferFC.Hash(crypto.SHA256)
-	initialBillValue := initialBill.Value - fcrAmount
+	initialBillValue := genesisConfig.InitialBillValue - fcrAmount
 
-	transferInitialBillTx, err := testutil.CreateInitialBillTransferTx(accKey, initialBill.ID, fcrID, initialBillValue, 10000, initialBillBacklink)
+	transferInitialBillTx, err := testutil.CreateInitialBillTransferTx(accKey, genesisConfig.InitialBillID, fcrID, initialBillValue, 10000, initialBillBacklink)
 	require.NoError(t, err)
 	batch := txsubmitter.NewBatch(accKey.PubKey, w.backend, observe.Logger())
 	batch.Add(&txsubmitter.TxSubmission{
@@ -318,19 +318,21 @@ func sendTo(t *testing.T, w *Wallet, receivers []ReceiverData, fromAccount uint6
 	require.NotNil(t, proof)
 }
 
-func startMoneyOnlyAlphabillPartition(t *testing.T, initialBill *money.InitialBill) *testpartition.AlphabillNetwork {
+func startMoneyOnlyAlphabillPartition(t *testing.T, genesisConfig *testutil.MoneyGenesisConfig) *testpartition.AlphabillNetwork {
+	genesisConfig.DCMoneySupplyValue = 10000*1e8
+	genesisConfig.SDRs = createSDRs()
+	genesisState := testutil.MoneyGenesisState(t, genesisConfig)
 	mPart, err := testpartition.NewPartition(t, 1, func(tb map[string]abcrypto.Verifier) txsystem.TransactionSystem {
 		system, err := money.NewTxSystem(
 			logger.New(t),
 			money.WithSystemIdentifier(money.DefaultSystemIdentifier),
-			money.WithInitialBill(initialBill),
 			money.WithSystemDescriptionRecords(createSDRs()),
-			money.WithDCMoneyAmount(10000*1e8),
 			money.WithTrustBase(tb),
+			money.WithState(genesisState),
 		)
 		require.NoError(t, err)
 		return system
-	}, money.DefaultSystemIdentifier)
+	}, money.DefaultSystemIdentifier, genesisState)
 	require.NoError(t, err)
 	abNet, err := testpartition.NewAlphabillPartition([]*testpartition.NodePartition{mPart})
 	require.NoError(t, err)
@@ -358,7 +360,7 @@ func startRPCServer(t *testing.T, partition *testpartition.NodePartition) (addr 
 	// wait for rpc server to start
 	for _, n := range partition.Nodes {
 		require.Eventually(t, func() bool {
-			_, err := n.GetLatestBlock()
+			_, err := n.LatestBlockNumber()
 			return err == nil
 		}, test.WaitDuration, test.WaitTick)
 	}
