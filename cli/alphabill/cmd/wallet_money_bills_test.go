@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	abcmd "github.com/alphabill-org/alphabill/cli/alphabill/cmd"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill/hash"
 	"github.com/alphabill-org/alphabill/predicates/templates"
@@ -19,6 +18,7 @@ import (
 	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
 	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend/client"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 )
 
 func TestWalletBillsListCmd_EmptyWallet(t *testing.T) {
@@ -169,7 +169,7 @@ func TestWalletBillsLockUnlockCmd_Ok(t *testing.T) {
 	am.Close()
 
 	// start money partition
-	genesisConfig := &abcmd.MoneyGenesisConfig{
+	genesisConfig := &testutil.MoneyGenesisConfig{
 		InitialBillID:      defaultInitialBillID,
 		InitialBillValue:   2e8,
 		InitialBillOwner:   templates.NewP2pkh256BytesFromKey(pubkey),
@@ -217,7 +217,7 @@ func TestWalletBillsLockUnlockCmd_Nok(t *testing.T) {
 	am.Close()
 
 	// start money partition
-	genesisConfig := &abcmd.MoneyGenesisConfig{
+	genesisConfig := &testutil.MoneyGenesisConfig{
 		InitialBillID:      defaultInitialBillID,
 		InitialBillValue:   2e8,
 		InitialBillOwner:   templates.NewP2pkh256BytesFromKey(pubkey),

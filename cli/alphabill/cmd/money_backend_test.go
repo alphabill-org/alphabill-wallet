@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	abcmd "github.com/alphabill-org/alphabill/cli/alphabill/cmd"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/http"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/net"
@@ -17,13 +16,14 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/stretchr/testify/require"
 )
 
 func TestMoneyBackendCLI(t *testing.T) {
-	genesisConfig := &abcmd.MoneyGenesisConfig{
+	genesisConfig := &testutil.MoneyGenesisConfig{
 		InitialBillID:      defaultInitialBillID,
 		InitialBillValue:   1e18,
 		InitialBillOwner:   templates.AlwaysTrueBytes(),

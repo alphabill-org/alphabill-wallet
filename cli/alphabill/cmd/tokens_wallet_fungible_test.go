@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"testing"
 
-	abcmd "github.com/alphabill-org/alphabill/cli/alphabill/cmd"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
@@ -25,6 +24,7 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	moneywallet "github.com/alphabill-org/alphabill-wallet/wallet/money"
 	moneyclient "github.com/alphabill-org/alphabill-wallet/wallet/money/backend/client"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 	tokenswallet "github.com/alphabill-org/alphabill-wallet/wallet/tokens"
 	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/client"
 	"github.com/alphabill-org/alphabill-wallet/wallet/unitlock"
@@ -382,7 +382,7 @@ func NewAlphabillNetwork(t *testing.T) *AlphabillNetwork {
 	w1key2, err := am.GetAccountKey(1)
 	require.NoError(t, err)
 
-	genesisConfig := &abcmd.MoneyGenesisConfig{
+	genesisConfig := &testutil.MoneyGenesisConfig{
 		InitialBillID:      defaultInitialBillID,
 		InitialBillValue:   1e18,
 		InitialBillOwner:   templates.NewP2pkh256BytesFromKey(w1key.PubKey),

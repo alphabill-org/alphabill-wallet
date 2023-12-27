@@ -18,7 +18,6 @@ import (
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	abcrypto "github.com/alphabill-org/alphabill/crypto"
-	abcmd "github.com/alphabill-org/alphabill/cli/alphabill/cmd"
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/partition"
 	"github.com/alphabill-org/alphabill/predicates/templates"
@@ -39,6 +38,7 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend/client"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 )
 
 const walletBaseDir = "wallet"
@@ -207,10 +207,8 @@ func TestSendingFailsWithInsufficientBalance(t *testing.T) {
 	require.ErrorContains(t, err, "insufficient balance for transaction")
 }
 
-func createMoneyPartition(t *testing.T, genesisConfig *abcmd.MoneyGenesisConfig, nodeCount uint8) *testpartition.NodePartition {
-	genesisState, err := abcmd.NewGenesisState(genesisConfig)
-	require.NoError(t, err)
-
+func createMoneyPartition(t *testing.T, genesisConfig *testutil.MoneyGenesisConfig, nodeCount uint8) *testpartition.NodePartition {
+	genesisState := testutil.MoneyGenesisState(t, genesisConfig)
 	moneyPart, err := testpartition.NewPartition(t, nodeCount, func(tb map[string]abcrypto.Verifier) txsystem.TransactionSystem {
 		genesisState = genesisState.Clone()
 		system, err := money.NewTxSystem(

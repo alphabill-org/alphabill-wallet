@@ -19,26 +19,41 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 )
 
-type InitialBill struct{
-	ID    types.UnitID
-	Value uint64
-	Owner predicates.PredicateBytes
+type MoneyGenesisConfig struct {
+	InitialBillID      types.UnitID
+	InitialBillValue   uint64
+	InitialBillOwner   predicates.PredicateBytes
+	DCMoneySupplyValue uint64
+	SDRs               []*genesis.SystemDescriptionRecord
 }
 
-func MoneyGenesisState(t *testing.T, initialBill *InitialBill, dustCollectorMoneySupply uint64, sdrs []*genesis.SystemDescriptionRecord) *state.State {
+var defaultMoneySDR = &genesis.SystemDescriptionRecord{
+		SystemIdentifier: money.DefaultSystemIdentifier,
+		T2Timeout:        2500,
+		FeeCreditBill: &genesis.FeeCreditBill{
+			UnitId:         money.NewBillID(nil, []byte{2}),
+			OwnerPredicate: templates.AlwaysTrueBytes(),
+		},
+	}
+
+func MoneyGenesisState(t *testing.T, config *MoneyGenesisConfig) *state.State {
+	if len(config.SDRs) == 0 {
+		config.SDRs = append(config.SDRs, defaultMoneySDR)
+	}
+
 	s := state.NewEmptyState()
 	zeroHash := make([]byte, crypto.SHA256.Size())
 
 	// initial bill
-	require.NoError(t, s.Apply(state.AddUnit(initialBill.ID, initialBill.Owner, &money.BillData{V: initialBill.Value})))
-	require.NoError(t, s.AddUnitLog(initialBill.ID, zeroHash))
+	require.NoError(t, s.Apply(state.AddUnit(config.InitialBillID, config.InitialBillOwner, &money.BillData{V: config.InitialBillValue})))
+	require.NoError(t, s.AddUnitLog(config.InitialBillID, zeroHash))
 
 	// dust collector money supply
-	require.NoError(t, s.Apply(state.AddUnit(money.DustCollectorMoneySupplyID, money.DustCollectorPredicate, &money.BillData{V: dustCollectorMoneySupply})))
+	require.NoError(t, s.Apply(state.AddUnit(money.DustCollectorMoneySupplyID, money.DustCollectorPredicate, &money.BillData{V: config.DCMoneySupplyValue})))
 	require.NoError(t, s.AddUnitLog(money.DustCollectorMoneySupplyID, zeroHash))
 
 	// fee credit bills
-	for _, sdr := range sdrs {
+	for _, sdr := range config.SDRs {
 		fcb := sdr.FeeCreditBill
 		require.NoError(t, s.Apply(state.AddUnit(fcb.UnitId, fcb.OwnerPredicate, &money.BillData{})))
 		require.NoError(t, s.AddUnitLog(fcb.UnitId, zeroHash))

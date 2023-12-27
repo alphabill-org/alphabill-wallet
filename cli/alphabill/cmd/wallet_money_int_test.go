@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	abcmd "github.com/alphabill-org/alphabill/cli/alphabill/cmd"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/util"
@@ -15,6 +14,7 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 )
 
 var (
@@ -42,7 +42,7 @@ func TestSendingMoneyUsingWallets_integration(t *testing.T) {
 	require.NoError(t, err)
 	am2.Close()
 
-	genesisConfig := &abcmd.MoneyGenesisConfig{
+	genesisConfig := &testutil.MoneyGenesisConfig{
 		InitialBillID:      defaultInitialBillID,
 		InitialBillValue:   1e18,
 		InitialBillOwner:   templates.NewP2pkh256BytesFromKey(w1AccKey.PubKey),

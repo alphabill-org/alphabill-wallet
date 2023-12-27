@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	abcmd "github.com/alphabill-org/alphabill/cli/alphabill/cmd"
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/txsystem/money"
@@ -21,6 +20,7 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend"
 	moneyclient "github.com/alphabill-org/alphabill-wallet/wallet/money/backend/client"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 )
 
 var defaultTokenSDR = &genesis.SystemDescriptionRecord{
@@ -254,7 +254,7 @@ func setupMoneyInfraAndWallet(t *testing.T, otherPartitions []*testpartition.Nod
 	accountKey, err := am.GetAccountKey(0)
 	require.NoError(t, err)
 
-	genesisConfig := &abcmd.MoneyGenesisConfig{
+	genesisConfig := &testutil.MoneyGenesisConfig{
 		InitialBillID:      defaultInitialBillID,
 		InitialBillValue:   1e18,
 		InitialBillOwner:   templates.NewP2pkh256BytesFromKey(accountKey.PubKey),
@@ -273,7 +273,7 @@ func setupMoneyInfraAndWallet(t *testing.T, otherPartitions []*testpartition.Nod
 	return homedir, abNet
 }
 
-func startMoneyBackend(t *testing.T, moneyPart *testpartition.NodePartition, genesisConfig *abcmd.MoneyGenesisConfig) (string, *moneyclient.MoneyBackendClient) {
+func startMoneyBackend(t *testing.T, moneyPart *testpartition.NodePartition, genesisConfig *testutil.MoneyGenesisConfig) (string, *moneyclient.MoneyBackendClient) {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	t.Cleanup(cancelFunc)
 	observe := observability.Default(t)
