@@ -31,7 +31,7 @@ type Configuration interface {
 	HttpServer(http.Handler) http.Server
 	Listener() net.Listener
 	Logger() *slog.Logger
-	SystemID() []byte
+	SystemID() types.SystemID
 	APIAddr() string
 }
 
@@ -138,7 +138,7 @@ type cfg struct {
 	boltDB   string
 	apiAddr  string
 	observe  Observability
-	systemID []byte
+	systemID types.SystemID
 }
 
 /*
@@ -148,7 +148,7 @@ NewConfig returns Configuration suitable for using as Run parameter.
   - boltDB: filename (with full path) of the bolt db to use as storage;
   - logger: logger implementation.
 */
-func NewConfig(systemID []byte, apiAddr, abURL, boltDB string, observe Observability) Configuration {
+func NewConfig(systemID types.SystemID, apiAddr, abURL, boltDB string, observe Observability) Configuration {
 	return &cfg{
 		abc:      client.AlphabillClientConfig{Uri: abURL},
 		boltDB:   boltDB,
@@ -163,7 +163,7 @@ func (c *cfg) Storage() (Storage, error) { return newBoltStore(c.boltDB) }
 func (c *cfg) BatchSize() int            { return 100 }
 func (c *cfg) Logger() *slog.Logger      { return c.observe.Logger() }
 func (c *cfg) Listener() net.Listener    { return nil } // we do set Addr in HttpServer
-func (c *cfg) SystemID() []byte          { return c.systemID }
+func (c *cfg) SystemID() types.SystemID  { return c.systemID }
 func (c *cfg) APIAddr() string           { return c.apiAddr }
 
 func (c *cfg) HttpServer(endpoints http.Handler) http.Server {

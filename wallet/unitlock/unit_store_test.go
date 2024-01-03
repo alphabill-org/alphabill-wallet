@@ -19,7 +19,7 @@ func TestUnitStore_GetSetDeleteUnits(t *testing.T) {
 	accountID := []byte{4}
 	account2ID := []byte{5}
 	txHash := []byte{6}
-	systemID := []byte{0, 0, 0, 0}
+	systemID := types.SystemID(1)
 
 	// verify missing account for unit returns nil and no error
 	unit, err := s.GetUnit(accountID, unitID)

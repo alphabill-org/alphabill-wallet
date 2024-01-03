@@ -9,6 +9,7 @@ import (
 
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	moneytx "github.com/alphabill-org/alphabill/txsystem/money"
+	"github.com/alphabill-org/alphabill/types"
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/spf13/cobra"
 
@@ -124,22 +125,22 @@ func execListCmd(cmd *cobra.Command, config *walletConfig) error {
 
 func lockCmd(config *walletConfig) *cobra.Command {
 	var billID bytesHex
-	var systemID bytesHex = moneytx.DefaultSystemIdentifier
+	var systemID uint32
 	cmd := &cobra.Command{
 		Use:   "lock",
 		Short: "locks specific bill",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return execLockCmd(cmd, config, billID, systemID)
+			return execLockCmd(cmd, config, billID, types.SystemID(systemID))
 		},
 	}
 	cmd.Flags().StringP(alphabillApiURLCmdName, "r", defaultAlphabillApiURL, "alphabill API uri to connect to")
 	cmd.Flags().Uint64P(keyCmdName, "k", 1, "account number of the bill to lock")
 	cmd.Flags().Var(&billID, billIdCmdName, "id of the bill to lock")
-	cmd.Flags().Var(&systemID, systemIdentifierCmdName, "system identifier")
+	cmd.Flags().Uint32Var(&systemID, systemIdentifierCmdName, uint32(moneytx.DefaultSystemIdentifier), "system identifier")
 	return cmd
 }
 
-func execLockCmd(cmd *cobra.Command, config *walletConfig, billID, systemID []byte) error {
+func execLockCmd(cmd *cobra.Command, config *walletConfig, billID []byte, systemID types.SystemID) error {
 	uri, err := cmd.Flags().GetString(alphabillApiURLCmdName)
 	if err != nil {
 		return err
@@ -203,22 +204,22 @@ func execLockCmd(cmd *cobra.Command, config *walletConfig, billID, systemID []by
 
 func unlockCmd(config *walletConfig) *cobra.Command {
 	var billID bytesHex
-	var systemID bytesHex = moneytx.DefaultSystemIdentifier
+	var systemID uint32
 	cmd := &cobra.Command{
 		Use:   "unlock",
 		Short: "unlocks specific bill",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return execUnlockCmd(cmd, config, billID, systemID)
+			return execUnlockCmd(cmd, config, billID, types.SystemID(systemID))
 		},
 	}
 	cmd.Flags().StringP(alphabillApiURLCmdName, "r", defaultAlphabillApiURL, "alphabill API uri to connect to")
 	cmd.Flags().Uint64P(keyCmdName, "k", 1, "account number of the bill to unlock")
 	cmd.Flags().Var(&billID, billIdCmdName, "id of the bill to unlock")
-	cmd.Flags().Var(&systemID, systemIdentifierCmdName, "system identifier")
+	cmd.Flags().Uint32Var(&systemID, systemIdentifierCmdName, uint32(moneytx.DefaultSystemIdentifier), "system identifier")
 	return cmd
 }
 
-func execUnlockCmd(cmd *cobra.Command, config *walletConfig, billID, systemID []byte) error {
+func execUnlockCmd(cmd *cobra.Command, config *walletConfig, billID []byte, systemID types.SystemID) error {
 	uri, err := cmd.Flags().GetString(alphabillApiURLCmdName)
 	if err != nil {
 		return err

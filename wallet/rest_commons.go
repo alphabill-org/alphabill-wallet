@@ -128,7 +128,7 @@ func DecodePubKeyHex(pubKey string) (PubKey, error) {
 	return bytes, nil
 }
 
-func ParseHex[T types.SystemID | types.UnitID | TxHash | []byte](value string, required bool) (T, error) {
+func ParseHex[T types.UnitID | TxHash | []byte](value string, required bool) (T, error) {
 	if value == "" {
 		if required {
 			return nil, fmt.Errorf("parameter is required")

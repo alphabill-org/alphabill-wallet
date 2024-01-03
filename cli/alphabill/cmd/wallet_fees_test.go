@@ -227,7 +227,7 @@ func TestWalletFeesLockCmds_Ok(t *testing.T) {
 	stdout, err = execFeesCommand(logF, homedir, "list")
 	require.NoError(t, err)
 	require.Equal(t, "Partition: money", stdout.lines[0])
-	require.Equal(t, fmt.Sprintf("Account #1 0.999'999'97 (manually locked by user)"), stdout.lines[1])
+	require.Equal(t, "Account #1 0.999'999'97 (manually locked by user)", stdout.lines[1])
 
 	// unlock fee credit record
 	stdout, err = execFeesCommand(logF, homedir, "unlock -k 1")

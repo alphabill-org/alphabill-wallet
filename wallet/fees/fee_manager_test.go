@@ -21,9 +21,9 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/unitlock"
 )
 
-var (
-	moneySystemID  = []byte{0, 0, 0, 0}
-	tokensSystemID = []byte{0, 0, 0, 2}
+const (
+	moneySystemID  types.SystemID = 1
+	tokensSystemID types.SystemID = 2
 )
 
 /*

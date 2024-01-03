@@ -12,7 +12,6 @@ import (
 
 	abcrypto "github.com/alphabill-org/alphabill/crypto"
 	"github.com/alphabill-org/alphabill/predicates/templates"
-	moneytx "github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/fxamacker/cbor/v2"
 
@@ -28,13 +27,13 @@ type MoneyGenesisConfig struct {
 }
 
 var defaultMoneySDR = &genesis.SystemDescriptionRecord{
-		SystemIdentifier: money.DefaultSystemIdentifier,
-		T2Timeout:        2500,
-		FeeCreditBill: &genesis.FeeCreditBill{
-			UnitId:         money.NewBillID(nil, []byte{2}),
-			OwnerPredicate: templates.AlwaysTrueBytes(),
-		},
-	}
+	SystemIdentifier: money.DefaultSystemIdentifier,
+	T2Timeout:        2500,
+	FeeCreditBill: &genesis.FeeCreditBill{
+		UnitId:         money.NewBillID(nil, []byte{2}),
+		OwnerPredicate: templates.AlwaysTrueBytes(),
+	},
+}
 
 func MoneyGenesisState(t *testing.T, config *MoneyGenesisConfig) *state.State {
 	if len(config.SDRs) == 0 {
@@ -66,7 +65,7 @@ func MoneyGenesisState(t *testing.T, config *MoneyGenesisConfig) *state.State {
 }
 
 func CreateInitialBillTransferTx(accountKey *account.AccountKey, billID, fcrID types.UnitID, billValue uint64, timeout uint64, backlink []byte) (*types.TransactionOrder, error) {
-	attr := &moneytx.TransferAttributes{
+	attr := &money.TransferAttributes{
 		NewBearer:   templates.NewP2pkh256BytesFromKey(accountKey.PubKey),
 		TargetValue: billValue,
 		Backlink:    backlink,
@@ -77,8 +76,8 @@ func CreateInitialBillTransferTx(accountKey *account.AccountKey, billID, fcrID t
 	}
 	txo := &types.TransactionOrder{
 		Payload: &types.Payload{
-			SystemID:   []byte{0, 0, 0, 0},
-			Type:       moneytx.PayloadTypeTransfer,
+			SystemID:   money.DefaultSystemIdentifier,
+			Type:       money.PayloadTypeTransfer,
 			UnitID:     billID,
 			Attributes: attrBytes,
 			ClientMetadata: &types.ClientMetadata{
@@ -90,6 +89,9 @@ func CreateInitialBillTransferTx(accountKey *account.AccountKey, billID, fcrID t
 	}
 	signer, _ := abcrypto.NewInMemorySecp256K1SignerFromKey(accountKey.PrivKey)
 	sigBytes, err := txo.PayloadBytes()
+	if err != nil {
+		return nil, err
+	}
 	sigData, _ := signer.SignBytes(sigBytes)
 	txo.OwnerProof = templates.NewP2pkh256SignatureBytes(sigData, accountKey.PubKey)
 	return txo, nil

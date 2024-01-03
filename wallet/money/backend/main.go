@@ -101,7 +101,7 @@ type (
 	}
 
 	Config struct {
-		ABMoneySystemIdentifier  []byte
+		ABMoneySystemIdentifier  types.SystemID
 		AlphabillUrl             string
 		ServerAddr               string
 		DbFile                   string

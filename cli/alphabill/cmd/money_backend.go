@@ -9,6 +9,7 @@ import (
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/txsystem/money"
+	"github.com/alphabill-org/alphabill/types"
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/spf13/cobra"
 
@@ -48,7 +49,7 @@ type moneyBackendConfig struct {
 	InitialBillID      uint64
 	InitialBillValue   uint64
 	SDRFiles           []string // system description record files
-	SystemID           bytesHex // hex encoded money system identifier
+	SystemID           types.SystemID
 }
 
 func (c *moneyBackendConfig) GetDbFile() (string, error) {
@@ -92,9 +93,11 @@ func newMoneyBackendCmd(baseConfig *baseConfiguration) *cobra.Command {
 }
 
 func startMoneyBackendCmd(config *moneyBackendConfig) *cobra.Command {
+	var systemID uint32
 	cmd := &cobra.Command{
 		Use: "start",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			config.SystemID = types.SystemID(systemID)
 			return execMoneyBackendStartCmd(cmd.Context(), config)
 		},
 	}
@@ -105,7 +108,7 @@ func startMoneyBackendCmd(config *moneyBackendConfig) *cobra.Command {
 	cmd.Flags().Uint64Var(&config.InitialBillValue, "initial-bill-value", 100000000, "initial bill value (needed for initial startup only)")
 	cmd.Flags().Uint64Var(&config.InitialBillID, "initial-bill-id", 1, "initial bill id hex string with 0x prefix (needed for initial startup only)")
 	cmd.Flags().StringSliceVarP(&config.SDRFiles, "system-description-record-files", "c", nil, "path to SDR files (one for each partition, including money partition itself; defaults to single money partition only SDR; needed for initial startup only)")
-	cmd.Flags().Var(&config.SystemID, systemIdentifierCmdName, "system identifier")
+	cmd.Flags().Uint32Var(&systemID, systemIdentifierCmdName, uint32(money.DefaultSystemIdentifier), "system identifier")
 	return cmd
 }
 

@@ -3,13 +3,14 @@ package unitlock
 import (
 	"testing"
 
+	"github.com/alphabill-org/alphabill/types"
 	"github.com/stretchr/testify/require"
 )
 
 func TestUnitLocker(t *testing.T) {
 	unitLocker := createUnitLocker(t)
 	accountID := []byte{200}
-	systemID := []byte{0, 0, 0, 0}
+	systemID := types.SystemID(1)
 
 	// lock bill id=1
 	lockedBill1 := NewLockedUnit(accountID, []byte{1}, []byte{2}, systemID, LockReasonAddFees)

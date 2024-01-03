@@ -26,7 +26,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	testsig "github.com/alphabill-org/alphabill-wallet/internal/testutils/sig"
 	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
 )
@@ -180,7 +180,7 @@ func Test_restAPI_postTransaction(t *testing.T) {
 		txs := &sdk.Transactions{Transactions: []*types.TransactionOrder{
 			testtransaction.NewTransactionOrder(t,
 				testtransaction.WithUnitId([]byte{0, 0, 0, 1}),
-				testtransaction.WithSystemID([]byte{0, 0, 0, 0}),
+				testtransaction.WithSystemID(1),
 			),
 		}}
 		txBytes, err := txs.Transactions[0].PayloadBytes()

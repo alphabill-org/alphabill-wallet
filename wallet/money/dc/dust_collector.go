@@ -24,7 +24,7 @@ import (
 
 type (
 	DustCollector struct {
-		systemID      []byte
+		systemID      types.SystemID
 		maxBillsPerDC int
 		txTimeout     uint64
 		backend       BackendAPI
@@ -56,7 +56,7 @@ type (
 	}
 )
 
-func NewDustCollector(systemID []byte, maxBillsPerDC int, txTimeout uint64, backend BackendAPI, unitLocker UnitLocker, log *slog.Logger) *DustCollector {
+func NewDustCollector(systemID types.SystemID, maxBillsPerDC int, txTimeout uint64, backend BackendAPI, unitLocker UnitLocker, log *slog.Logger) *DustCollector {
 	return &DustCollector{
 		systemID:      systemID,
 		maxBillsPerDC: maxBillsPerDC,

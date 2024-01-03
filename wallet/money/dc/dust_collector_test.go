@@ -723,7 +723,7 @@ func newBackendAPIMock(t *testing.T, bills []*wallet.Bill, opts ...Option) *dust
 
 func createProofWithDCTx(t *testing.T, b *wallet.Bill, targetBill *wallet.Bill, timeout uint64) *wallet.Proof {
 	keys, _ := account.NewKeys("")
-	dcTx, err := txbuilder.NewDustTx(keys.AccountKey, []byte{0, 0, 0, 0}, b, targetBill.Id, targetBill.TxHash, timeout)
+	dcTx, err := txbuilder.NewDustTx(keys.AccountKey, money.DefaultSystemIdentifier, b, targetBill.Id, targetBill.TxHash, timeout)
 	require.NoError(t, err)
 	return createProofForTx(dcTx)
 }
@@ -739,7 +739,7 @@ func createProofWithSwapTx(t *testing.T, b *wallet.Bill) *wallet.Proof {
 
 func createProofWithLockTx(t *testing.T, b *wallet.Bill, timeout uint64) *wallet.Proof {
 	keys, _ := account.NewKeys("")
-	tx, err := txbuilder.NewLockTx(keys.AccountKey, []byte{0, 0, 0, 0}, b.Id, b.TxHash, unitlock.LockReasonCollectDust, timeout)
+	tx, err := txbuilder.NewLockTx(keys.AccountKey, money.DefaultSystemIdentifier, b.Id, b.TxHash, unitlock.LockReasonCollectDust, timeout)
 	require.NoError(t, err)
 	return createProofForTx(tx)
 }

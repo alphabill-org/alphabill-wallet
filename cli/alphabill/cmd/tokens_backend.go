@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
+	"github.com/alphabill-org/alphabill/types"
 	"github.com/spf13/cobra"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/backend"
@@ -25,21 +26,21 @@ func newTokensBackendCmd(baseConfig *baseConfiguration) *cobra.Command {
 }
 
 func buildCmdStartTokensBackend(config *baseConfiguration) *cobra.Command {
-	var systemID bytesHex = tokens.DefaultSystemIdentifier
+	var systemID uint32
 	cmd := &cobra.Command{
 		Use: "start",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return execTokensBackendStartCmd(cmd.Context(), cmd, config, systemID)
+			return execTokensBackendStartCmd(cmd.Context(), cmd, config, types.SystemID(systemID))
 		},
 	}
 	cmd.Flags().StringP(alphabillNodeURLCmdName, "u", defaultAlphabillNodeURL, "alphabill node url")
 	cmd.Flags().StringP(serverAddrCmdName, "s", defaultTokensBackendApiURL, "server address")
 	cmd.Flags().StringP(dbFileCmdName, "f", "", "path to the database file")
-	cmd.Flags().Var(&systemID, systemIdentifierCmdName, "system identifier in hex format")
+	cmd.Flags().Uint32Var(&systemID, systemIdentifierCmdName, uint32(tokens.DefaultSystemIdentifier), "system identifier")
 	return cmd
 }
 
-func execTokensBackendStartCmd(ctx context.Context, cmd *cobra.Command, config *baseConfiguration, systemID []byte) error {
+func execTokensBackendStartCmd(ctx context.Context, cmd *cobra.Command, config *baseConfiguration, systemID types.SystemID) error {
 	abURL, err := cmd.Flags().GetString(alphabillNodeURLCmdName)
 	if err != nil {
 		return fmt.Errorf("failed to get %q flag value: %w", alphabillNodeURLCmdName, err)

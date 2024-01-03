@@ -2,12 +2,13 @@ package cmd
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 
+	"github.com/alphabill-org/alphabill/types"
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/spf13/cobra"
 
@@ -429,10 +430,12 @@ func getFeeCreditManager(ctx context.Context, c *cliConf, am account.Manager, fe
 	if !strings.HasPrefix(moneySystemInfo.Name, moneyTypeVar.String()) {
 		return nil, errors.New("invalid wallet backend API URL provided for money partition")
 	}
-	moneySystemID, err := hex.DecodeString(moneySystemInfo.SystemID)
+	// the info response is expected to have system ID as hex, max 4 bytes
+	mSysID, err := strconv.ParseUint(moneySystemInfo.SystemID, 16, 32)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode money system identifier hex: %w", err)
 	}
+	moneySystemID := types.SystemID(mSysID)
 	moneyTxPublisher := moneywallet.NewTxPublisher(moneyBackendClient, obs.Logger())
 
 	switch c.partitionType {
@@ -465,7 +468,7 @@ func getFeeCreditManager(ctx context.Context, c *cliConf, am account.Manager, fe
 		if !strings.HasPrefix(tokenInfo.Name, tokenTypeVar.String()) {
 			return nil, errors.New("invalid wallet backend API URL provided for tokens partition")
 		}
-		tokenSystemID, err := hex.DecodeString(tokenInfo.SystemID)
+		tokenSystemID, err := strconv.ParseUint(tokenInfo.SystemID, 16, 32)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode tokens system identifier hex: %w", err)
 		}
@@ -476,7 +479,7 @@ func getFeeCreditManager(ctx context.Context, c *cliConf, am account.Manager, fe
 			moneyTxPublisher,
 			moneyBackendClient,
 			moneywallet.FeeCreditRecordIDFormPublicKey,
-			tokenSystemID,
+			types.SystemID(tokenSystemID),
 			tokenTxPublisher,
 			tokenBackendClient,
 			tokenswallet.FeeCreditRecordIDFromPublicKey,
@@ -497,7 +500,7 @@ func getFeeCreditManager(ctx context.Context, c *cliConf, am account.Manager, fe
 		if !strings.HasPrefix(evmInfo.Name, evmTypeVar.String()) {
 			return nil, errors.New("invalid validator node URL provided for evm partition")
 		}
-		evmSystemID, err := hex.DecodeString(evmInfo.SystemID)
+		evmSystemID, err := strconv.ParseUint(evmInfo.SystemID, 16, 32)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode evm system identifier hex: %w", err)
 		}
@@ -508,7 +511,7 @@ func getFeeCreditManager(ctx context.Context, c *cliConf, am account.Manager, fe
 			moneyTxPublisher,
 			moneyBackendClient,
 			moneywallet.FeeCreditRecordIDFormPublicKey,
-			evmSystemID,
+			types.SystemID(evmSystemID),
 			evmTxPublisher,
 			evmClient,
 			evmwallet.FeeCreditRecordIDFromPublicKey,

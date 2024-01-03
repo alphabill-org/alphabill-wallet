@@ -11,7 +11,7 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	evmclient "github.com/alphabill-org/alphabill-wallet/wallet/evm/client"
@@ -194,18 +194,18 @@ func TestNew(t *testing.T) {
 	am, err := account.NewManager(dir, "", true)
 	require.NoError(t, err)
 	// no system id
-	w, err := New(nil, ":23435", am)
-	require.ErrorContains(t, err, "system id is nil")
+	w, err := New(0, ":23435", am)
+	require.ErrorContains(t, err, "system id is unassigned")
 	require.Nil(t, w)
 	// no URL
-	w, err = New([]byte{0, 0, 0, 0}, "", am)
+	w, err = New(1, "", am)
 	require.ErrorContains(t, err, "rest url is empty")
 	require.Nil(t, w)
 	// no account manager
-	w, err = New([]byte{0, 0, 0, 0}, ":23435", nil)
+	w, err = New(1, ":23435", nil)
 	require.ErrorContains(t, err, "account manager is nil")
 	require.Nil(t, w)
-	w, err = New([]byte{0, 0, 0, 0}, ":23435", am)
+	w, err = New(1, ":23435", am)
 	require.NoError(t, err)
 	require.NotNil(t, w)
 	w.Shutdown()

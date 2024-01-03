@@ -21,21 +21,21 @@ const (
 
 type BlockProcessor struct {
 	store    BillStore
-	sdrs     map[string]*genesis.SystemDescriptionRecord
+	sdrs     map[types.SystemID]*genesis.SystemDescriptionRecord
 	moneySDR *genesis.SystemDescriptionRecord
 	log      *slog.Logger
 }
 
-func NewBlockProcessor(store BillStore, moneySystemID []byte, log *slog.Logger) (*BlockProcessor, error) {
+func NewBlockProcessor(store BillStore, moneySystemID types.SystemID, log *slog.Logger) (*BlockProcessor, error) {
 	sdrs, err := store.Do().GetSystemDescriptionRecords()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get system description records: %w", err)
 	}
-	sdrsMap := map[string]*genesis.SystemDescriptionRecord{}
+	sdrsMap := map[types.SystemID]*genesis.SystemDescriptionRecord{}
 	for _, sdr := range sdrs {
-		sdrsMap[string(sdr.SystemIdentifier)] = sdr
+		sdrsMap[sdr.SystemIdentifier] = sdr
 	}
-	return &BlockProcessor{store: store, sdrs: sdrsMap, moneySDR: sdrsMap[string(moneySystemID)], log: log}, nil
+	return &BlockProcessor{store: store, sdrs: sdrsMap, moneySDR: sdrsMap[moneySystemID], log: log}, nil
 }
 
 func (p *BlockProcessor) ProcessBlock(ctx context.Context, b *types.Block) error {
@@ -402,7 +402,7 @@ func saveTx(dbTx BillStoreTx, bearer sdk.Predicate, txo *types.TransactionOrder,
 }
 
 func (p *BlockProcessor) addTransferredCreditToPartitionFeeBill(dbTx BillStoreTx, tx *transactions.TransferFeeCreditAttributes, proof *sdk.Proof, actualFee uint64) error {
-	sdr, f := p.sdrs[string(tx.TargetSystemIdentifier)]
+	sdr, f := p.sdrs[tx.TargetSystemIdentifier]
 	if !f {
 		return fmt.Errorf("received transferFC for unknown tx system: %x", tx.TargetSystemIdentifier)
 	}
@@ -419,7 +419,7 @@ func (p *BlockProcessor) addTransferredCreditToPartitionFeeBill(dbTx BillStoreTx
 
 func (p *BlockProcessor) removeReclaimedCreditFromPartitionFeeBill(dbTx BillStoreTx, txr *types.TransactionRecord, attr *transactions.CloseFeeCreditAttributes, proof *sdk.Proof) error {
 	txo := txr.TransactionOrder
-	sdr, f := p.sdrs[string(txo.SystemID())]
+	sdr, f := p.sdrs[txo.SystemID()]
 	if !f {
 		return fmt.Errorf("received reclaimFC for unknown tx system: %x", txo.SystemID())
 	}

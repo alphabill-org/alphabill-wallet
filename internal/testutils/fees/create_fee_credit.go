@@ -34,7 +34,7 @@ func CreateFeeCredit(t *testing.T, initialBillID, fcrID types.UnitID, fcrAmount 
 	sig, _ := signer.SignBytes(sigBytes)
 	transferFC.OwnerProof = templates.NewP2pkh256SignatureBytes(sig, pubKey)
 
-	moneyPartition, err := network.GetNodePartition([]byte{0, 0, 0, 0})
+	moneyPartition, err := network.GetNodePartition(1)
 	require.NoError(t, err)
 	require.NoError(t, moneyPartition.SubmitTx(transferFC))
 

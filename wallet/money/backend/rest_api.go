@@ -2,7 +2,6 @@ package backend
 
 import (
 	"bytes"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -38,7 +37,7 @@ type (
 		rw                 *sdk.ResponseWriter
 		log                *slog.Logger
 		tracer             trace.Tracer
-		SystemID           []byte
+		SystemID           types.SystemID
 	}
 
 	ListBillsResponse struct {
@@ -375,9 +374,8 @@ func (api *moneyRestAPI) postTransactions(w http.ResponseWriter, r *http.Request
 }
 
 func (api *moneyRestAPI) getInfo(w http.ResponseWriter, _ *http.Request) {
-	systemID := hex.EncodeToString(api.SystemID)
 	res := sdk.InfoResponse{
-		SystemID: systemID,
+		SystemID: api.SystemID.String(),
 		Name:     "money backend",
 	}
 	api.rw.WriteResponse(w, res)
