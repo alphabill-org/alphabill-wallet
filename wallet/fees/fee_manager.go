@@ -67,13 +67,13 @@ type (
 		log *slog.Logger
 
 		// money partition fields
-		moneySystemID         []byte
+		moneySystemID         types.SystemID
 		moneyTxPublisher      TxPublisher
 		moneyBackendClient    MoneyClient
 		moneyPartitionFcrIDFn GenerateFcrIDFromPublicKey
 
 		// target partition fields
-		targetPartitionSystemID      []byte
+		targetPartitionSystemID      types.SystemID
 		targetPartitionTxPublisher   TxPublisher
 		targetPartitionBackendClient PartitionDataProvider
 		targetPartitionFcrIDFn       GenerateFcrIDFromPublicKey
@@ -124,7 +124,7 @@ type (
 	}
 
 	AddFeeCreditCtx struct {
-		TargetPartitionID  []byte                  `json:"targetPartitionId"`         // target partition id where the fee is being added to
+		TargetPartitionID  types.SystemID          `json:"targetPartitionId"`         // target partition id where the fee is being added to
 		TargetBillID       []byte                  `json:"targetBillId"`              // transferFC target bill id
 		TargetBillBacklink []byte                  `json:"targetBillBacklink"`        // transferFC target bill backlink
 		TargetAmount       uint64                  `json:"targetAmount"`              // the amount to add to the fee credit bill
@@ -138,7 +138,7 @@ type (
 	}
 
 	ReclaimFeeCreditCtx struct {
-		TargetPartitionID  []byte                  `json:"targetPartitionId"`  // target partition id where the fee credit is being reclaimed from
+		TargetPartitionID  types.SystemID          `json:"targetPartitionId"`  // target partition id where the fee credit is being reclaimed from
 		TargetBillID       []byte                  `json:"targetBillId"`       // closeFC target bill id
 		TargetBillBacklink []byte                  `json:"targetBillBacklink"` // closeFC target bill backlink
 		LockingDisabled    bool                    `json:"lockingDisabled,omitempty"`
@@ -168,11 +168,11 @@ type (
 func NewFeeManager(
 	am account.Manager,
 	db FeeManagerDB,
-	moneySystemID []byte,
+	moneySystemID types.SystemID,
 	moneyTxPublisher TxPublisher,
 	moneyBackendClient MoneyClient,
 	moneyPartitionFcrIDFn GenerateFcrIDFromPublicKey,
-	targetPartitionSystemID []byte,
+	targetPartitionSystemID types.SystemID,
 	targetPartitionTxPublisher TxPublisher,
 	targetPartitionBackendClient PartitionDataProvider,
 	fcrIDFn GenerateFcrIDFromPublicKey,
@@ -221,8 +221,8 @@ func (w *FeeManager) AddFeeCredit(ctx context.Context, cmd AddFeeCmd) (*AddFeeCm
 	}
 	if addFeeCtx != nil {
 		// verify fee ctx exists for current partition
-		if !bytes.Equal(addFeeCtx.TargetPartitionID, w.targetPartitionSystemID) {
-			return nil, fmt.Errorf("%w: pendingProcessSystemID=%X, providedSystemID=%X",
+		if addFeeCtx.TargetPartitionID != w.targetPartitionSystemID {
+			return nil, fmt.Errorf("%w: pendingProcessSystemID=%s, providedSystemID=%s",
 				ErrInvalidPartition, addFeeCtx.TargetPartitionID, w.targetPartitionSystemID)
 		}
 		// handle the pending fee credit process
@@ -269,8 +269,8 @@ func (w *FeeManager) ReclaimFeeCredit(ctx context.Context, cmd ReclaimFeeCmd) (*
 	}
 	if reclaimFeeCtx != nil {
 		// verify fee ctx exists for current partition
-		if !bytes.Equal(reclaimFeeCtx.TargetPartitionID, w.targetPartitionSystemID) {
-			return nil, fmt.Errorf("%w: pendingProcessSystemID=%X, providedSystemID=%X",
+		if reclaimFeeCtx.TargetPartitionID != w.targetPartitionSystemID {
+			return nil, fmt.Errorf("%w: pendingProcessSystemID=%s, providedSystemID=%s",
 				ErrInvalidPartition, reclaimFeeCtx.TargetPartitionID, w.targetPartitionSystemID)
 		}
 		// handle the pending fee credit process

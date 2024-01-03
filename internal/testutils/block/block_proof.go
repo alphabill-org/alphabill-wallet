@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	DefaultSystemIdentifier = []byte{0, 0, 0, 0}
+const (
+	DefaultSystemIdentifier = types.SystemID(1)
 	DefaultT2Timeout        = uint32(2500)
 	DefaultRoundNumber      = uint64(1)
 )
@@ -38,7 +38,7 @@ func DefaultSDR() *genesis.SystemDescriptionRecord {
 	}
 }
 
-func WithSystemIdentifier(systemID []byte) Option {
+func WithSystemIdentifier(systemID types.SystemID) Option {
 	return func(g *Options) {
 		g.sdr.SystemIdentifier = systemID
 	}
