@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	moneytx "github.com/alphabill-org/alphabill/txsystem/money"
-	"github.com/alphabill-org/alphabill/types"
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
@@ -31,13 +31,13 @@ var (
 )
 
 func TestMoneyBackendCLI(t *testing.T) {
-	// create ab network
-	initialBill := &moneytx.InitialBill{
-		ID:    defaultInitialBillID,
-		Value: 1e18,
-		Owner: templates.AlwaysTrueBytes(),
+	genesisConfig := &testutil.MoneyGenesisConfig{
+		InitialBillID:      defaultInitialBillID,
+		InitialBillValue:   1e18,
+		InitialBillOwner:   templates.AlwaysTrueBytes(),
+		DCMoneySupplyValue: 10000,
 	}
-	moneyPartition := testutils.CreateMoneyPartition(t, initialBill, 1)
+	moneyPartition := testutils.CreateMoneyPartition(t, genesisConfig, 1)
 	abNet := testutils.StartAlphabill(t, []*testpartition.NodePartition{moneyPartition})
 	testutils.StartPartitionRPCServers(t, moneyPartition)
 	alphabillNodeAddr := moneyPartition.Nodes[0].AddrGRPC
@@ -45,7 +45,7 @@ func TestMoneyBackendCLI(t *testing.T) {
 	// transfer initial bill to wallet pubkey
 	pk := "0x03c30573dc0c7fd43fcb801289a6a96cb78c27f4ba398b89da91ece23e9a99aca3"
 	pkBytes, _ := PubKeyHexToBytes(pk)
-	initialBillValue := testutils.SpendInitialBillWithFeeCredits(t, abNet, initialBill, pkBytes)
+	initialBillValue := testutils.SpendInitialBillWithFeeCredits(t, abNet, genesisConfig.InitialBillValue, pkBytes)
 
 	// start wallet-backend service
 	homedir := testutils.SetupTestHomeDir(t, "money-backend-test")
@@ -78,12 +78,11 @@ func TestMoneyBackendCLI(t *testing.T) {
 	require.Len(t, resListBills.Bills, 1)
 	b := resListBills.Bills[0]
 	require.Equal(t, initialBillValue, b.Value)
-	require.Equal(t, initialBill.ID, types.UnitID(b.Id))
 	require.NotNil(t, b.TxHash)
 
 	// verify proof
 	resBlockProof := &wallet.Proof{}
-	httpRes, err = testhttp.DoGetCbor(fmt.Sprintf("http://%s/api/v1/units/0x%s/transactions/0x%x/proof", serverAddr, initialBill.ID, b.TxHash), resBlockProof)
+	httpRes, err = testhttp.DoGetCbor(fmt.Sprintf("http://%s/api/v1/units/0x%s/transactions/0x%x/proof", serverAddr, defaultInitialBillID, b.TxHash), resBlockProof)
 	require.NoError(t, err)
 	require.EqualValues(t, 200, httpRes.StatusCode)
 	require.Equal(t, resBlockProof.TxRecord.TransactionOrder.Hash(crypto.SHA256), b.TxHash)

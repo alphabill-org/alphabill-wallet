@@ -14,6 +14,7 @@ import (
 	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend/client"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 )
 
 func TestWalletBillsListCmd_EmptyWallet(t *testing.T) {
@@ -163,18 +164,19 @@ func TestWalletBillsLockUnlockCmd_Ok(t *testing.T) {
 	am.Close()
 
 	// start money partition
-	initialBill := &money.InitialBill{
-		ID:    defaultInitialBillID,
-		Value: 2e8,
-		Owner: templates.NewP2pkh256BytesFromKey(pubkey),
+	genesisConfig := &testutil.MoneyGenesisConfig{
+		InitialBillID:      defaultInitialBillID,
+		InitialBillValue:   2e8,
+		InitialBillOwner:   templates.NewP2pkh256BytesFromKey(pubkey),
+		DCMoneySupplyValue: 10000,
 	}
-	moneyPartition := testutils.CreateMoneyPartition(t, initialBill, 1)
+	moneyPartition := testutils.CreateMoneyPartition(t, genesisConfig, 1)
 	logF := testobserve.NewFactory(t)
 	_ = testutils.StartAlphabill(t, []*testpartition.NodePartition{moneyPartition})
 	testutils.StartPartitionRPCServers(t, moneyPartition)
 
 	// start wallet backend
-	addr, _ := testutils.StartMoneyBackend(t, moneyPartition, initialBill)
+	addr, _ := testutils.StartMoneyBackend(t, moneyPartition, genesisConfig)
 
 	// create fee credit for txs
 	stdout, err := execCommand(logF, homedir, fmt.Sprintf("fees add --alphabill-api-uri %s", addr))
@@ -210,19 +212,20 @@ func TestWalletBillsLockUnlockCmd_Nok(t *testing.T) {
 	am.Close()
 
 	// start money partition
-	initialBill := &money.InitialBill{
-		ID:    defaultInitialBillID,
-		Value: 2e8,
-		Owner: templates.NewP2pkh256BytesFromKey(pubkey),
+	genesisConfig := &testutil.MoneyGenesisConfig{
+		InitialBillID:      defaultInitialBillID,
+		InitialBillValue:   2e8,
+		InitialBillOwner:   templates.NewP2pkh256BytesFromKey(pubkey),
+		DCMoneySupplyValue: 10000,
 	}
-	moneyPartition := testutils.CreateMoneyPartition(t, initialBill, 1)
+	moneyPartition := testutils.CreateMoneyPartition(t, genesisConfig, 1)
 	logF := testobserve.NewFactory(t)
 	_ = testutils.StartAlphabill(t, []*testpartition.NodePartition{moneyPartition})
 	testutils.StartPartitionRPCServers(t, moneyPartition)
 	testutils.StartPartitionRPCServers(t, moneyPartition)
 
 	// start wallet backend
-	addr, _ := testutils.StartMoneyBackend(t, moneyPartition, initialBill)
+	addr, _ := testutils.StartMoneyBackend(t, moneyPartition, genesisConfig)
 
 	// lock bill
 	_, err = execBillsCommand(logF, homedir, fmt.Sprintf("lock --alphabill-api-uri %s --bill-id %s", addr, defaultInitialBillID))

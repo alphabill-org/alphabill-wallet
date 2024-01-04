@@ -2,13 +2,14 @@ package wallet
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 
-	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
+	cmdtypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
+	"github.com/alphabill-org/alphabill/types"
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/spf13/cobra"
 
@@ -31,7 +32,7 @@ const (
 // NewWalletFeesCmd creates a new cobra command for the wallet fees component.
 func NewWalletFeesCmd(config *WalletConfig) *cobra.Command {
 	var cliConfig = &cliConf{
-		partitionType: types.MoneyType, // shows default value in help context
+		partitionType: cmdtypes.MoneyType, // shows default value in help context
 	}
 	var cmd = &cobra.Command{
 		Use:   "fees",
@@ -202,7 +203,7 @@ func lockFeeCreditCmd(walletConfig *WalletConfig, cliConfig *cliConf) *cobra.Com
 }
 
 func lockFeeCreditCmdExec(cmd *cobra.Command, walletConfig *WalletConfig, cliConfig *cliConf) error {
-	if cliConfig.partitionType == types.EvmType {
+	if cliConfig.partitionType == cmdtypes.EvmType {
 		return errors.New("locking fee credit is not supported for EVM partition")
 	}
 	accountNumber, err := cmd.Flags().GetUint64(keyCmdName)
@@ -257,7 +258,7 @@ func unlockFeeCreditCmd(walletConfig *WalletConfig, cliConfig *cliConf) *cobra.C
 }
 
 func unlockFeeCreditCmdExec(cmd *cobra.Command, walletConfig *WalletConfig, cliConfig *cliConf) error {
-	if cliConfig.partitionType == types.EvmType {
+	if cliConfig.partitionType == cmdtypes.EvmType {
 		return errors.New("locking fee credit is not supported for EVM partition")
 	}
 	accountNumber, err := cmd.Flags().GetUint64(keyCmdName)
@@ -307,7 +308,7 @@ type FeeCreditManager interface {
 	Close()
 }
 
-func listFees(ctx context.Context, accountNumber uint64, am account.Manager, c *cliConf, w FeeCreditManager, consoleWriter types.ConsoleWrapper) error {
+func listFees(ctx context.Context, accountNumber uint64, am account.Manager, c *cliConf, w FeeCreditManager, consoleWriter cmdtypes.ConsoleWrapper) error {
 	if accountNumber == 0 {
 		pubKeys, err := am.GetPublicKeys()
 		if err != nil {
@@ -336,7 +337,7 @@ func listFees(ctx context.Context, accountNumber uint64, am account.Manager, c *
 	return nil
 }
 
-func addFees(ctx context.Context, accountNumber uint64, amountString string, c *cliConf, w FeeCreditManager, consoleWriter types.ConsoleWrapper) error {
+func addFees(ctx context.Context, accountNumber uint64, amountString string, c *cliConf, w FeeCreditManager, consoleWriter cmdtypes.ConsoleWrapper) error {
 	amount, err := util.StringToAmount(amountString, 8)
 	if err != nil {
 		return err
@@ -344,7 +345,7 @@ func addFees(ctx context.Context, accountNumber uint64, amountString string, c *
 	rsp, err := w.AddFeeCredit(ctx, fees.AddFeeCmd{
 		Amount:         amount,
 		AccountIndex:   accountNumber - 1,
-		DisableLocking: c.partitionType == types.EvmType,
+		DisableLocking: c.partitionType == cmdtypes.EvmType,
 	})
 	if err != nil {
 		if errors.Is(err, fees.ErrMinimumFeeAmount) {
@@ -367,7 +368,7 @@ func addFees(ctx context.Context, accountNumber uint64, amountString string, c *
 	return nil
 }
 
-func reclaimFees(ctx context.Context, accountNumber uint64, c *cliConf, w FeeCreditManager, consoleWriter types.ConsoleWrapper) error {
+func reclaimFees(ctx context.Context, accountNumber uint64, c *cliConf, w FeeCreditManager, consoleWriter cmdtypes.ConsoleWrapper) error {
 	rsp, err := w.ReclaimFeeCredit(ctx, fees.ReclaimFeeCmd{
 		AccountIndex: accountNumber - 1,
 	})
@@ -386,7 +387,7 @@ func reclaimFees(ctx context.Context, accountNumber uint64, c *cliConf, w FeeCre
 }
 
 type cliConf struct {
-	partitionType       types.PartitionType
+	partitionType       cmdtypes.PartitionType
 	partitionBackendURL string
 }
 
@@ -403,11 +404,11 @@ func (c *cliConf) getPartitionBackendURL() string {
 		return c.partitionBackendURL
 	}
 	switch c.partitionType {
-	case types.MoneyType:
+	case cmdtypes.MoneyType:
 		return defaultAlphabillApiURL
-	case types.TokensType:
+	case cmdtypes.TokensType:
 		return defaultTokensBackendApiURL
-	case types.EvmType:
+	case cmdtypes.EvmType:
 		return defaultEvmNodeRestURL // evm does not use backend and instead talks to an actual evm node
 	default:
 		panic("invalid \"partition\" flag value: " + c.partitionType)
@@ -416,7 +417,7 @@ func (c *cliConf) getPartitionBackendURL() string {
 
 // Creates a fees.FeeManager that needs to be closed with the Close() method.
 // Does not close the account.Manager passed as an argument.
-func getFeeCreditManager(ctx context.Context, c *cliConf, am account.Manager, feeManagerDB fees.FeeManagerDB, moneyBackendURL string, obs types.Observability) (FeeCreditManager, error) {
+func getFeeCreditManager(ctx context.Context, c *cliConf, am account.Manager, feeManagerDB fees.FeeManagerDB, moneyBackendURL string, obs cmdtypes.Observability) (FeeCreditManager, error) {
 	moneyBackendClient, err := moneyclient.New(moneyBackendURL, obs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create money backend client: %w", err)
@@ -425,18 +426,20 @@ func getFeeCreditManager(ctx context.Context, c *cliConf, am account.Manager, fe
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch money system info: %w", err)
 	}
-	moneyTypeVar := types.MoneyType
+	moneyTypeVar := cmdtypes.MoneyType
 	if !strings.HasPrefix(moneySystemInfo.Name, moneyTypeVar.String()) {
 		return nil, errors.New("invalid wallet backend API URL provided for money partition")
 	}
-	moneySystemID, err := hex.DecodeString(moneySystemInfo.SystemID)
+	// the info response is expected to have system ID as hex, max 4 bytes
+	mSysID, err := strconv.ParseUint(moneySystemInfo.SystemID, 16, 32)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode money system identifier hex: %w", err)
 	}
+	moneySystemID := types.SystemID(mSysID)
 	moneyTxPublisher := moneywallet.NewTxPublisher(moneyBackendClient, obs.Logger())
 
 	switch c.partitionType {
-	case types.MoneyType:
+	case cmdtypes.MoneyType:
 		return fees.NewFeeManager(
 			am,
 			feeManagerDB,
@@ -450,7 +453,7 @@ func getFeeCreditManager(ctx context.Context, c *cliConf, am account.Manager, fe
 			moneywallet.FeeCreditRecordIDFormPublicKey,
 			obs.Logger(),
 		), nil
-	case types.TokensType:
+	case cmdtypes.TokensType:
 		backendURL, err := c.parsePartitionBackendURL()
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse partition backend url: %w", err)
@@ -461,11 +464,11 @@ func getFeeCreditManager(ctx context.Context, c *cliConf, am account.Manager, fe
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch tokens system info: %w", err)
 		}
-		tokenTypeVar := types.TokensType
+		tokenTypeVar := cmdtypes.TokensType
 		if !strings.HasPrefix(tokenInfo.Name, tokenTypeVar.String()) {
 			return nil, errors.New("invalid wallet backend API URL provided for tokens partition")
 		}
-		tokenSystemID, err := hex.DecodeString(tokenInfo.SystemID)
+		tokenSystemID, err := strconv.ParseUint(tokenInfo.SystemID, 16, 32)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode tokens system identifier hex: %w", err)
 		}
@@ -476,13 +479,13 @@ func getFeeCreditManager(ctx context.Context, c *cliConf, am account.Manager, fe
 			moneyTxPublisher,
 			moneyBackendClient,
 			moneywallet.FeeCreditRecordIDFormPublicKey,
-			tokenSystemID,
+			types.SystemID(tokenSystemID),
 			tokenTxPublisher,
 			tokenBackendClient,
 			tokenswallet.FeeCreditRecordIDFromPublicKey,
 			obs.Logger(),
 		), nil
-	case types.EvmType:
+	case cmdtypes.EvmType:
 		evmNodeURL, err := c.parsePartitionBackendURL()
 		if err != nil {
 			return nil, err
@@ -493,11 +496,11 @@ func getFeeCreditManager(ctx context.Context, c *cliConf, am account.Manager, fe
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch evm system info: %w", err)
 		}
-		evmTypeVar := types.EvmType
+		evmTypeVar := cmdtypes.EvmType
 		if !strings.HasPrefix(evmInfo.Name, evmTypeVar.String()) {
 			return nil, errors.New("invalid validator node URL provided for evm partition")
 		}
-		evmSystemID, err := hex.DecodeString(evmInfo.SystemID)
+		evmSystemID, err := strconv.ParseUint(evmInfo.SystemID, 16, 32)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode evm system identifier hex: %w", err)
 		}
@@ -508,7 +511,7 @@ func getFeeCreditManager(ctx context.Context, c *cliConf, am account.Manager, fe
 			moneyTxPublisher,
 			moneyBackendClient,
 			moneywallet.FeeCreditRecordIDFormPublicKey,
-			evmSystemID,
+			types.SystemID(evmSystemID),
 			evmTxPublisher,
 			evmClient,
 			evmwallet.FeeCreditRecordIDFromPublicKey,

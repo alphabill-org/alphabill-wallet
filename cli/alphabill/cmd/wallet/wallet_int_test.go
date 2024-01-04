@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 	"github.com/alphabill-org/alphabill/predicates/templates"
-	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
@@ -37,18 +37,19 @@ func TestSendingMoneyUsingWallets_integration(t *testing.T) {
 	require.NoError(t, err)
 	am2.Close()
 
-	initialBill := &money.InitialBill{
-		ID:    defaultInitialBillID,
-		Value: 1e18,
-		Owner: templates.NewP2pkh256BytesFromKey(w1AccKey.PubKey),
+	genesisConfig := &testutil.MoneyGenesisConfig{
+		InitialBillID:      defaultInitialBillID,
+		InitialBillValue:   1e18,
+		InitialBillOwner:   templates.NewP2pkh256BytesFromKey(w1AccKey.PubKey),
+		DCMoneySupplyValue: 10000,
 	}
-	moneyPartition := testutils.CreateMoneyPartition(t, initialBill, 1)
+	moneyPartition := testutils.CreateMoneyPartition(t, genesisConfig, 1)
 	logF := testobserve.NewFactory(t)
 	_ = testutils.StartAlphabill(t, []*testpartition.NodePartition{moneyPartition})
 	testutils.StartPartitionRPCServers(t, moneyPartition)
 
 	// start wallet backend
-	moneyBackendURL, moneyRestClient := testutils.StartMoneyBackend(t, moneyPartition, initialBill)
+	moneyBackendURL, moneyRestClient := testutils.StartMoneyBackend(t, moneyPartition, genesisConfig)
 
 	// create fee credit for wallet-1
 	feeAmountAlpha := uint64(1)
@@ -57,7 +58,7 @@ func TestSendingMoneyUsingWallets_integration(t *testing.T) {
 	verifyStdout(t, stdout, fmt.Sprintf("Successfully created %d fee credits on money partition.", feeAmountAlpha))
 
 	// verify fee credit received
-	w1BalanceBilly := initialBill.Value - feeAmountAlpha*1e8
+	w1BalanceBilly := genesisConfig.InitialBillValue - feeAmountAlpha*1e8
 	waitForFeeCreditCLI(t, logF, homedir1, moneyBackendURL, feeAmountAlpha*1e8-2, 0)
 
 	// TS1:

@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
@@ -385,18 +386,19 @@ func NewAlphabillNetwork(t *testing.T) *AlphabillNetwork {
 	w1key2, err := am.GetAccountKey(1)
 	require.NoError(t, err)
 
-	initialBill := &money.InitialBill{
-		ID:    defaultInitialBillID,
-		Value: 1e18,
-		Owner: templates.NewP2pkh256BytesFromKey(w1key.PubKey),
+	genesisConfig := &testutil.MoneyGenesisConfig{
+		InitialBillID:      defaultInitialBillID,
+		InitialBillValue:   1e18,
+		InitialBillOwner:   templates.NewP2pkh256BytesFromKey(w1key.PubKey),
+		DCMoneySupplyValue: 10000,
 	}
-	moneyPartition := testutils.CreateMoneyPartition(t, initialBill, 1)
+	moneyPartition := testutils.CreateMoneyPartition(t, genesisConfig, 1)
 	tokensPartition := createTokensPartition(t)
 	abNet := testutils.StartAlphabill(t, []*testpartition.NodePartition{moneyPartition, tokensPartition})
 	testutils.StartPartitionRPCServers(t, moneyPartition)
 	testutils.StartPartitionRPCServers(t, tokensPartition)
 
-	moneyBackendURL, moneyBackendClient := testutils.StartMoneyBackend(t, moneyPartition, initialBill)
+	moneyBackendURL, moneyBackendClient := testutils.StartMoneyBackend(t, moneyPartition, genesisConfig)
 	tokenBackendURL, tokenBackendClient := testutils.StartTokensBackend(t, tokensPartition.Nodes[0].AddrGRPC)
 
 	unitLocker, err := unitlock.NewUnitLocker(walletDir)

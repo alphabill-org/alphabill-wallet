@@ -15,12 +15,15 @@ import (
 	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
 )
 
-func SpendInitialBillWithFeeCredits(t *testing.T, abNet *testpartition.AlphabillNetwork, initialBill *money.InitialBill, pk []byte) uint64 {
+var (
+	defaultInitialBillID = money.NewBillID(nil, []byte{1})
+)
+
+func SpendInitialBillWithFeeCredits(t *testing.T, abNet *testpartition.AlphabillNetwork, initialBillValue uint64, pk []byte) uint64 {
 	absoluteTimeout := uint64(10000)
-	initialValue := initialBill.Value
 	txFee := uint64(1)
 	feeAmount := uint64(2)
-	unitID := initialBill.ID
+	unitID := defaultInitialBillID
 	moneyPart, err := abNet.GetNodePartition(money.DefaultSystemIdentifier)
 	require.NoError(t, err)
 
@@ -34,14 +37,14 @@ func SpendInitialBillWithFeeCredits(t *testing.T, abNet *testpartition.Alphabill
 	require.NoError(t, err, "transfer fee credit tx failed")
 	// verify proof
 	require.NoError(t, types.VerifyTxProof(transferFCProof, transferFCRecord, abNet.RootPartition.TrustBase, crypto.SHA256))
-	unitState, err := testpartition.WaitUnitProof(t, moneyPart, initialBill.ID, transferFC)
+	unitState, err := testpartition.WaitUnitProof(t, moneyPart, defaultInitialBillID, transferFC)
 	require.NoError(t, err)
 	ucValidator, err := abNet.GetValidator(money.DefaultSystemIdentifier)
 	require.NoError(t, err)
 	require.NoError(t, types.VerifyUnitStateProof(unitState.Proof, crypto.SHA256, unitState.UnitData, ucValidator))
 	var bill money.BillData
 	require.NoError(t, unitState.UnmarshalUnitData(&bill))
-	require.EqualValues(t, initialValue-txFee-feeAmount, bill.V)
+	require.EqualValues(t, initialBillValue-txFee-feeAmount, bill.V)
 	// create addFC
 	addFC, err := createAddFC(fcrID, templates.AlwaysTrueBytes(), transferFCRecord, transferFCProof, absoluteTimeout, feeAmount)
 	require.NoError(t, err)
@@ -52,7 +55,7 @@ func SpendInitialBillWithFeeCredits(t *testing.T, abNet *testpartition.Alphabill
 	require.NoError(t, err, "add fee credit tx failed")
 
 	// create transfer tx
-	remainingValue := initialBill.Value - feeAmount - txFee
+	remainingValue := initialBillValue - feeAmount - txFee
 	tx, err := createTransferTx(pk, unitID, remainingValue, fcrID, absoluteTimeout, transferFCRecord.TransactionOrder.Hash(crypto.SHA256))
 	require.NoError(t, err)
 
@@ -77,7 +80,7 @@ func createTransferTx(pubKey []byte, billID []byte, billValue uint64, fcrID []by
 		Payload: &types.Payload{
 			UnitID:     billID,
 			Type:       money.PayloadTypeTransfer,
-			SystemID:   []byte{0, 0, 0, 0},
+			SystemID:   money.DefaultSystemIdentifier,
 			Attributes: attrBytes,
 			ClientMetadata: &types.ClientMetadata{
 				Timeout:           timeout,
@@ -93,7 +96,7 @@ func createTransferTx(pubKey []byte, billID []byte, billValue uint64, fcrID []by
 func createTransferFC(feeAmount uint64, unitID []byte, targetUnitID []byte, t1, t2 uint64) (*types.TransactionOrder, error) {
 	attr := &transactions.TransferFeeCreditAttributes{
 		Amount:                 feeAmount,
-		TargetSystemIdentifier: []byte{0, 0, 0, 0},
+		TargetSystemIdentifier: money.DefaultSystemIdentifier,
 		TargetRecordID:         targetUnitID,
 		EarliestAdditionTime:   t1,
 		LatestAdditionTime:     t2,
@@ -104,7 +107,7 @@ func createTransferFC(feeAmount uint64, unitID []byte, targetUnitID []byte, t1, 
 	}
 	tx := &types.TransactionOrder{
 		Payload: &types.Payload{
-			SystemID:   []byte{0, 0, 0, 0},
+			SystemID:   money.DefaultSystemIdentifier,
 			Type:       transactions.PayloadTypeTransferFeeCredit,
 			UnitID:     unitID,
 			Attributes: attrBytes,
@@ -130,7 +133,7 @@ func createAddFC(unitID []byte, ownerCondition []byte, transferFC *types.Transac
 	}
 	tx := &types.TransactionOrder{
 		Payload: &types.Payload{
-			SystemID:   []byte{0, 0, 0, 0},
+			SystemID:   money.DefaultSystemIdentifier,
 			Type:       transactions.PayloadTypeAddFeeCredit,
 			UnitID:     unitID,
 			Attributes: attrBytes,

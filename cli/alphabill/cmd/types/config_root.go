@@ -57,8 +57,6 @@ const (
 	defaultAlphabillDir = ".alphabill"
 	// The default logger configuration file name.
 	defaultLoggerConfigFile = "logger-config.yaml"
-	// The default rootchain directory
-	defaultRootChainDir = "rootchain"
 	// The configuration key for home directory.
 	keyHome = "home"
 	// The configuration key for config file name.
@@ -125,10 +123,6 @@ func (c *BaseConfiguration) LoggerCfgFilename() string {
 func (c *BaseConfiguration) ConfigFileExists() bool {
 	_, err := os.Stat(c.CfgFile)
 	return err == nil
-}
-
-func (c *BaseConfiguration) DefaultRootGenesisDir() string {
-	return filepath.Join(c.HomeDir, defaultRootChainDir)
 }
 
 /*

@@ -6,10 +6,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
+	"github.com/alphabill-org/alphabill/types"
 	"github.com/spf13/cobra"
 
+	cmdtypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/backend"
 )
 
@@ -22,7 +23,7 @@ const (
 	alphabillNodeURLCmdName = "alphabill-uri"
 )
 
-func NewTokensBackendCmd(baseConfig *types.BaseConfiguration) *cobra.Command {
+func NewTokensBackendCmd(baseConfig *cmdtypes.BaseConfiguration) *cobra.Command {
 	var cmd = &cobra.Command{
 		Use:   "tokens-backend",
 		Short: "Starts tokens backend service",
@@ -32,22 +33,22 @@ func NewTokensBackendCmd(baseConfig *types.BaseConfiguration) *cobra.Command {
 	return cmd
 }
 
-func buildCmdStartTokensBackend(config *types.BaseConfiguration) *cobra.Command {
-	var systemID types.BytesHex = tokens.DefaultSystemIdentifier
+func buildCmdStartTokensBackend(config *cmdtypes.BaseConfiguration) *cobra.Command {
+	var systemID uint32
 	cmd := &cobra.Command{
 		Use: "start",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return execTokensBackendStartCmd(cmd.Context(), cmd, config, systemID)
+			return execTokensBackendStartCmd(cmd.Context(), cmd, config, types.SystemID(systemID))
 		},
 	}
 	cmd.Flags().StringP(alphabillNodeURLCmdName, "u", defaultAlphabillNodeURL, "alphabill node url")
 	cmd.Flags().StringP(serverAddrCmdName, "s", defaultServerAddr, "server address")
 	cmd.Flags().StringP(dbFileCmdName, "f", "", "path to the database file")
-	cmd.Flags().Var(&systemID, systemIdentifierCmdName, "system identifier in hex format")
+	cmd.Flags().Uint32Var(&systemID, systemIdentifierCmdName, uint32(tokens.DefaultSystemIdentifier), "system identifier in hex format")
 	return cmd
 }
 
-func execTokensBackendStartCmd(ctx context.Context, cmd *cobra.Command, config *types.BaseConfiguration, systemID []byte) error {
+func execTokensBackendStartCmd(ctx context.Context, cmd *cobra.Command, config *cmdtypes.BaseConfiguration, systemID types.SystemID) error {
 	abURL, err := cmd.Flags().GetString(alphabillNodeURLCmdName)
 	if err != nil {
 		return fmt.Errorf("failed to get %q flag value: %w", alphabillNodeURLCmdName, err)

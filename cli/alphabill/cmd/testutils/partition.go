@@ -26,15 +26,17 @@ import (
 	testlogger "github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
 	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
 	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 )
 
-func CreateMoneyPartition(t *testing.T, initialBill *money.InitialBill, nodeCount uint8) *testpartition.NodePartition {
+func CreateMoneyPartition(t *testing.T, genesisConfig *testutil.MoneyGenesisConfig, nodeCount uint8) *testpartition.NodePartition {
+	genesisState := testutil.MoneyGenesisState(t, genesisConfig)
 	moneyPart, err := testpartition.NewPartition(t, nodeCount, func(tb map[string]abcrypto.Verifier) txsystem.TransactionSystem {
+		genesisState = genesisState.Clone()
 		system, err := money.NewTxSystem(
 			testlogger.New(t),
 			money.WithSystemIdentifier(money.DefaultSystemIdentifier),
 			money.WithHashAlgorithm(crypto.SHA256),
-			money.WithInitialBill(initialBill),
 			money.WithSystemDescriptionRecords([]*genesis.SystemDescriptionRecord{
 				{
 					SystemIdentifier: money.DefaultSystemIdentifier,
@@ -45,12 +47,12 @@ func CreateMoneyPartition(t *testing.T, initialBill *money.InitialBill, nodeCoun
 					},
 				},
 			}),
-			money.WithDCMoneyAmount(10000),
 			money.WithTrustBase(tb),
+			money.WithState(genesisState),
 		)
 		require.NoError(t, err)
 		return system
-	}, money.DefaultSystemIdentifier)
+	}, money.DefaultSystemIdentifier, genesisState)
 	require.NoError(t, err)
 	return moneyPart
 }
@@ -70,7 +72,7 @@ func StartPartitionRPCServers(t *testing.T, partition *testpartition.NodePartiti
 	// wait for partition servers to start
 	for _, n := range partition.Nodes {
 		require.Eventually(t, func() bool {
-			_, err := n.GetLatestBlock()
+			_, err := n.LatestBlockNumber()
 			return err == nil
 		}, test.WaitDuration, test.WaitTick)
 	}

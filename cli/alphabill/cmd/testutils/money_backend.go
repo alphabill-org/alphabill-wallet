@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/txsystem/money"
@@ -39,7 +40,7 @@ var (
 	}
 )
 
-func StartMoneyBackend(t *testing.T, moneyPart *testpartition.NodePartition, initialBill *money.InitialBill) (string, *moneyclient.MoneyBackendClient) {
+func StartMoneyBackend(t *testing.T, moneyPart *testpartition.NodePartition, genesisConfig *testutil.MoneyGenesisConfig) (string, *moneyclient.MoneyBackendClient) {
 	port, err := net.GetFreePort()
 	require.NoError(t, err)
 	serverAddr := fmt.Sprintf("localhost:%v", port)
@@ -59,9 +60,9 @@ func StartMoneyBackend(t *testing.T, moneyPart *testpartition.NodePartition, ini
 				DbFile:                  filepath.Join(t.TempDir(), moneybackend.BoltBillStoreFileName),
 				ListBillsPageLimit:      100,
 				InitialBill: moneybackend.InitialBill{
-					Id:        initialBill.ID,
-					Value:     initialBill.Value,
-					Predicate: initialBill.Owner,
+					Id:        genesisConfig.InitialBillID,
+					Value:     genesisConfig.InitialBillValue,
+					Predicate: genesisConfig.InitialBillOwner,
 				},
 				SystemDescriptionRecords: []*genesis.SystemDescriptionRecord{defaultMoneySDR, defaultTokenSDR},
 				Logger:                   observe.Logger(),

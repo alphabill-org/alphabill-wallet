@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 	"github.com/alphabill-org/alphabill/predicates/templates"
-	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/stretchr/testify/require"
 
@@ -203,7 +203,7 @@ func TestWalletFeesLockCmds_Ok(t *testing.T) {
 	stdout, err = execFeesCommand(t, homedir, moneyBackendURL, "list")
 	require.NoError(t, err)
 	require.Equal(t, "Partition: money", stdout.Lines[0])
-	require.Equal(t, fmt.Sprintf("Account #1 0.999'999'97 (manually locked by user)"), stdout.Lines[1])
+	require.Equal(t, "Account #1 0.999'999'97 (manually locked by user)", stdout.Lines[1])
 
 	// unlock fee credit record
 	stdout, err = execFeesCommand(t, homedir, moneyBackendURL, "unlock -k 1")
@@ -237,20 +237,21 @@ func setupMoneyInfraAndWallet(t *testing.T, otherPartitions []*testpartition.Nod
 	defer am.Close()
 	accountKey, err := am.GetAccountKey(0)
 	require.NoError(t, err)
-	initialBill := &money.InitialBill{
-		ID:    defaultInitialBillID,
-		Value: 1e18,
-		Owner: templates.NewP2pkh256BytesFromKey(accountKey.PubKey),
+	genesisConfig := &testutil.MoneyGenesisConfig{
+		InitialBillID:      defaultInitialBillID,
+		InitialBillValue:   1e18,
+		InitialBillOwner:   templates.NewP2pkh256BytesFromKey(accountKey.PubKey),
+		DCMoneySupplyValue: 10000,
 	}
 
 	// start money partition
-	moneyPartition := testutils.CreateMoneyPartition(t, initialBill, 1)
+	moneyPartition := testutils.CreateMoneyPartition(t, genesisConfig, 1)
 	nodePartitions := []*testpartition.NodePartition{moneyPartition}
 	nodePartitions = append(nodePartitions, otherPartitions...)
 	abNet := testutils.StartAlphabill(t, nodePartitions)
 
 	testutils.StartPartitionRPCServers(t, moneyPartition)
-	serverAddr, _ := testutils.StartMoneyBackend(t, moneyPartition, initialBill)
+	serverAddr, _ := testutils.StartMoneyBackend(t, moneyPartition, genesisConfig)
 
 	return homedir, serverAddr, abNet
 }
