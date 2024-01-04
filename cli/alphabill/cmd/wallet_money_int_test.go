@@ -11,15 +11,14 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
+	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 )
 
 var (
-	fcrID     = money.NewFeeCreditRecordID(nil, []byte{1})
-	fcrAmount = uint64(1e8)
+	fcrID = money.NewFeeCreditRecordID(nil, []byte{1})
 )
 
 /*

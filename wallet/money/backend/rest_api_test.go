@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils/http"
+	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	testhttp "github.com/alphabill-org/alphabill-wallet/internal/testutils/http"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/net"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
@@ -182,6 +182,7 @@ func Test_txHistory(t *testing.T) {
 	txs.Transactions[0].OwnerProof = templates.NewP2pkh256SignatureBytes(sigData, accKey.PubKey)
 
 	b, err := cbor.Marshal(txs)
+	require.NoError(t, err)
 	resp := makePostTxRequest(accKey.PubKey, b)
 	require.Equal(t, http.StatusAccepted, resp.StatusCode)
 
@@ -621,7 +622,7 @@ func TestInfoRequest_Ok(t *testing.T) {
 	httpRes, err := testhttp.DoGetJson(fmt.Sprintf("http://localhost:%d/api/v1/info", port), &res)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, httpRes.StatusCode)
-	require.Equal(t, "00000000", res.SystemID)
+	require.Equal(t, "00000001", res.SystemID)
 	require.Equal(t, "money backend", res.Name)
 }
 

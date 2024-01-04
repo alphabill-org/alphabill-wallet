@@ -106,7 +106,7 @@ func (w *Wallet) GetAccountManager() account.Manager {
 	return w.am
 }
 
-func (w *Wallet) SystemID() []byte {
+func (w *Wallet) SystemID() types.SystemID {
 	// TODO: return the default "AlphaBill Money System ID" for now
 	// but this should come from config (base wallet? AB client?)
 	return money.DefaultSystemIdentifier

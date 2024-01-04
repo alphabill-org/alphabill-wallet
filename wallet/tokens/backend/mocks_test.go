@@ -20,7 +20,7 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
 )
 
@@ -112,7 +112,7 @@ type mockCfg struct {
 	abc      ABClient
 	srvL     net.Listener
 	log      *slog.Logger
-	systemID []byte
+	systemID types.SystemID
 }
 
 func (c *mockCfg) BatchSize() int            { return 50 }
@@ -130,8 +130,8 @@ func (c *mockCfg) Storage() (Storage, error) {
 	return newBoltStore(c.dbFile)
 }
 
-func (c *mockCfg) SystemID() []byte {
-	if c.systemID != nil {
+func (c *mockCfg) SystemID() types.SystemID {
+	if c.systemID != 0 {
 		return c.systemID
 	}
 	return tokens.DefaultSystemIdentifier

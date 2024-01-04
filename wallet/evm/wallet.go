@@ -30,7 +30,7 @@ type (
 		GetGasPrice(ctx context.Context) (string, error)
 	}
 	Wallet struct {
-		systemID []byte
+		systemID types.SystemID
 		am       account.Manager
 		restCli  evmClient
 	}
@@ -40,9 +40,9 @@ func ConvertBalanceToAlpha(eth *big.Int) uint64 {
 	return evmclient.WeiToAlpha(eth)
 }
 
-func New(systemID []byte, restUrl string, am account.Manager) (*Wallet, error) {
-	if systemID == nil {
-		return nil, fmt.Errorf("system id is nil")
+func New(systemID types.SystemID, restUrl string, am account.Manager) (*Wallet, error) {
+	if systemID == 0 {
+		return nil, fmt.Errorf("system id is unassigned")
 	}
 	if len(restUrl) == 0 {
 		return nil, fmt.Errorf("rest url is empty")
@@ -200,7 +200,7 @@ func (w *Wallet) verifyFeeCreditBalance(ctx context.Context, acc *account.Accoun
 	return nil
 }
 
-func newTxPayload(systemID []byte, txType string, unitID []byte, timeout uint64, attr interface{}) (*types.Payload, error) {
+func newTxPayload(systemID types.SystemID, txType string, unitID []byte, timeout uint64, attr interface{}) (*types.Payload, error) {
 	attrBytes, err := cbor.Marshal(attr)
 	if err != nil {
 		return nil, err

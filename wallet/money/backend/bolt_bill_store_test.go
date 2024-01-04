@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	bolt "go.etcd.io/bbolt"
 
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
 	testtransaction "github.com/alphabill-org/alphabill/txsystem/testutils/transaction"
 )
@@ -230,7 +230,7 @@ func TestBillStore_GetSetSystemDescriptionRecordsBills(t *testing.T) {
 	// add system description records
 	sdrs = []*genesis.SystemDescriptionRecord{
 		{
-			SystemIdentifier: []byte{0},
+			SystemIdentifier: 1,
 			T2Timeout:        2500,
 			FeeCreditBill: &genesis.FeeCreditBill{
 				UnitId:         []byte{2},
@@ -238,7 +238,7 @@ func TestBillStore_GetSetSystemDescriptionRecordsBills(t *testing.T) {
 			},
 		},
 		{
-			SystemIdentifier: []byte{1},
+			SystemIdentifier: 2,
 			T2Timeout:        2500,
 			FeeCreditBill: &genesis.FeeCreditBill{
 				UnitId:         []byte{2},

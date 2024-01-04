@@ -303,7 +303,7 @@ func createTransferTx(pubKey []byte, billID []byte, billValue uint64, fcrID []by
 		Payload: &types.Payload{
 			UnitID:     billID,
 			Type:       money.PayloadTypeTransfer,
-			SystemID:   []byte{0, 0, 0, 0},
+			SystemID:   money.DefaultSystemIdentifier,
 			Attributes: attrBytes,
 			ClientMetadata: &types.ClientMetadata{
 				Timeout:           timeout,
@@ -319,7 +319,7 @@ func createTransferTx(pubKey []byte, billID []byte, billValue uint64, fcrID []by
 func createTransferFC(feeAmount uint64, unitID []byte, targetUnitID []byte, t1, t2 uint64) (*types.TransactionOrder, error) {
 	attr := &transactions.TransferFeeCreditAttributes{
 		Amount:                 feeAmount,
-		TargetSystemIdentifier: []byte{0, 0, 0, 0},
+		TargetSystemIdentifier: money.DefaultSystemIdentifier,
 		TargetRecordID:         targetUnitID,
 		EarliestAdditionTime:   t1,
 		LatestAdditionTime:     t2,
@@ -330,7 +330,7 @@ func createTransferFC(feeAmount uint64, unitID []byte, targetUnitID []byte, t1, 
 	}
 	tx := &types.TransactionOrder{
 		Payload: &types.Payload{
-			SystemID:   []byte{0, 0, 0, 0},
+			SystemID:   money.DefaultSystemIdentifier,
 			Type:       transactions.PayloadTypeTransferFeeCredit,
 			UnitID:     unitID,
 			Attributes: attrBytes,
@@ -356,7 +356,7 @@ func createAddFC(unitID []byte, ownerCondition []byte, transferFC *types.Transac
 	}
 	tx := &types.TransactionOrder{
 		Payload: &types.Payload{
-			SystemID:   []byte{0, 0, 0, 0},
+			SystemID:   money.DefaultSystemIdentifier,
 			Type:       transactions.PayloadTypeAddFeeCredit,
 			UnitID:     unitID,
 			Attributes: attrBytes,

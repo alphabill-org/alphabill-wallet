@@ -33,7 +33,7 @@ func TestSplitTransactionAmount(t *testing.T) {
 	}
 	amount := uint64(150)
 	timeout := uint64(100)
-	systemID := []byte{0, 0, 0, 0}
+	systemID := money.DefaultSystemIdentifier
 	remainingValue := b.Value - amount
 
 	tx, err := NewSplitTx([]*money.TargetUnit{
@@ -61,14 +61,14 @@ func TestCreateTransactions(t *testing.T) {
 		bills       []*wallet.Bill
 		amount      uint64
 		txCount     int
-		verify      func(t *testing.T, systemID []byte, txs []*types.TransactionOrder)
+		verify      func(t *testing.T, systemID types.SystemID, txs []*types.TransactionOrder)
 		expectedErr string
 	}{
 		{
 			name:   "have more bills than target amount",
 			bills:  []*wallet.Bill{createBill(5), createBill(3), createBill(1)},
 			amount: uint64(7),
-			verify: func(t *testing.T, systemID []byte, txs []*types.TransactionOrder) {
+			verify: func(t *testing.T, systemID types.SystemID, txs []*types.TransactionOrder) {
 				// verify tx count
 				require.Len(t, txs, 2)
 
@@ -94,7 +94,7 @@ func TestCreateTransactions(t *testing.T) {
 			name:   "have less bills than target amount",
 			bills:  []*wallet.Bill{createBill(5), createBill(1)},
 			amount: uint64(7),
-			verify: func(t *testing.T, systemID []byte, txs []*types.TransactionOrder) {
+			verify: func(t *testing.T, systemID types.SystemID, txs []*types.TransactionOrder) {
 				require.Empty(t, txs)
 			},
 			expectedErr: "insufficient balance",
@@ -103,7 +103,7 @@ func TestCreateTransactions(t *testing.T) {
 			name:   "have exact amount of bills than target amount",
 			bills:  []*wallet.Bill{createBill(5), createBill(5)},
 			amount: uint64(10),
-			verify: func(t *testing.T, systemID []byte, txs []*types.TransactionOrder) {
+			verify: func(t *testing.T, systemID types.SystemID, txs []*types.TransactionOrder) {
 				// verify tx count
 				require.Len(t, txs, 2)
 
@@ -121,7 +121,7 @@ func TestCreateTransactions(t *testing.T) {
 			name:   "have exactly one bill with equal target amount",
 			bills:  []*wallet.Bill{createBill(5)},
 			amount: uint64(5),
-			verify: func(t *testing.T, systemID []byte, txs []*types.TransactionOrder) {
+			verify: func(t *testing.T, systemID types.SystemID, txs []*types.TransactionOrder) {
 				// verify tx count
 				require.Len(t, txs, 1)
 
@@ -135,7 +135,7 @@ func TestCreateTransactions(t *testing.T) {
 		},
 	}
 
-	systemID := []byte{0, 0, 0, 0}
+	systemID := money.DefaultSystemIdentifier
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
