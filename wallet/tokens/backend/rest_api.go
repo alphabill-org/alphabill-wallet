@@ -43,7 +43,7 @@ type tokensRestAPI struct {
 	ab        abClient
 	streamSSE func(ctx context.Context, owner broker.PubKey, w http.ResponseWriter) error
 	rw        sdk.ResponseWriter
-	systemID  []byte
+	systemID  types.SystemID
 }
 
 const maxResponseItems = 100
@@ -329,9 +329,8 @@ func (api *tokensRestAPI) getFeeCreditBill(w http.ResponseWriter, r *http.Reques
 }
 
 func (api *tokensRestAPI) getInfo(w http.ResponseWriter, _ *http.Request) {
-	systemID := hex.EncodeToString(api.systemID)
 	res := sdk.InfoResponse{
-		SystemID: systemID,
+		SystemID: api.systemID.String(),
 		Name:     "tokens backend",
 	}
 	api.rw.WriteResponse(w, res)

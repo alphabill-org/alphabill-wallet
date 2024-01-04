@@ -329,7 +329,7 @@ func (w *Wallet) prepareSplitOrTransferTx(ctx context.Context, acc *account.Acco
 	return sub, nil
 }
 
-func createTx(systemID []byte, payloadType string, unitId []byte, timeout uint64, fcrID []byte) *types.TransactionOrder {
+func createTx(systemID types.SystemID, payloadType string, unitId []byte, timeout uint64, fcrID []byte) *types.TransactionOrder {
 	return &types.TransactionOrder{
 		Payload: &types.Payload{
 			SystemID: systemID,

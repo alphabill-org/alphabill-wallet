@@ -38,7 +38,7 @@ var (
 
 type (
 	Wallet struct {
-		systemID   []byte
+		systemID   types.SystemID
 		am         account.Manager
 		backend    TokenBackend
 		confirmTx  bool
@@ -75,7 +75,7 @@ type (
 	}
 )
 
-func New(systemID []byte, backendClient TokenBackend, am account.Manager, confirmTx bool, feeManager *fees.FeeManager, log *slog.Logger) (*Wallet, error) {
+func New(systemID types.SystemID, backendClient TokenBackend, am account.Manager, confirmTx bool, feeManager *fees.FeeManager, log *slog.Logger) (*Wallet, error) {
 	return &Wallet{
 		systemID:   systemID,
 		am:         am,

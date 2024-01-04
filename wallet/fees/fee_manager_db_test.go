@@ -3,13 +3,14 @@ package fees
 import (
 	"testing"
 
+	"github.com/alphabill-org/alphabill/types"
 	"github.com/stretchr/testify/require"
 )
 
 func TestDB_GetSetDeleteAddFeeCtx(t *testing.T) {
 	s := createFeeManagerDB(t)
 	accountID := []byte{4}
-	systemID := []byte{0, 0, 0, 0}
+	systemID := types.SystemID(1)
 
 	// verify missing account returns nil and no error
 	feeCtx, err := s.GetAddFeeContext(accountID)
@@ -39,7 +40,7 @@ func TestDB_GetSetDeleteAddFeeCtx(t *testing.T) {
 func TestDB_GetSetDeleteReclaimFeeCtx(t *testing.T) {
 	s := createFeeManagerDB(t)
 	accountID := []byte{4}
-	systemID := []byte{0, 0, 0, 0}
+	systemID := types.SystemID(1)
 
 	// verify missing account returns nil and no error
 	feeCtx, err := s.GetReclaimFeeContext(accountID)

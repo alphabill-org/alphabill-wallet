@@ -305,7 +305,7 @@ func (s *boltBillStoreTx) SetSystemDescriptionRecords(sdrs []*genesis.SystemDesc
 			if err != nil {
 				return err
 			}
-			err = tx.Bucket(sdrBucket).Put(sdr.SystemIdentifier, sdrBytes)
+			err = tx.Bucket(sdrBucket).Put(sdr.SystemIdentifier.Bytes(), sdrBytes)
 			if err != nil {
 				return err
 			}

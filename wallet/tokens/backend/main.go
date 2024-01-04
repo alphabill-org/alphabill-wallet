@@ -11,10 +11,8 @@ import (
 
 	"github.com/ainvaltin/httpsrv"
 	"github.com/alphabill-org/alphabill/client"
-	"github.com/alphabill-org/alphabill/crypto"
 	"github.com/alphabill-org/alphabill/logger"
 	"github.com/alphabill-org/alphabill/rpc/alphabill"
-	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/alphabill-org/alphabill/types"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/trace"
@@ -33,7 +31,7 @@ type Configuration interface {
 	HttpServer(http.Handler) http.Server
 	Listener() net.Listener
 	Logger() *slog.Logger
-	SystemID() []byte
+	SystemID() types.SystemID
 	APIAddr() string
 }
 
@@ -84,15 +82,6 @@ func Run(ctx context.Context, cfg Configuration) error {
 	}
 	defer db.Close()
 
-	txs, err := tokens.NewTxSystem(
-		cfg.Logger(),
-		tokens.WithTrustBase(map[string]crypto.Verifier{"test": nil}),
-		tokens.WithSystemIdentifier(cfg.SystemID()),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create token tx system: %w", err)
-	}
-
 	g, ctx := errgroup.WithContext(ctx)
 	msgBroker := broker.NewBroker(ctx.Done())
 	abc, err := cfg.Client()
@@ -102,7 +91,7 @@ func Run(ctx context.Context, cfg Configuration) error {
 
 	g.Go(func() error {
 		log := cfg.Logger()
-		bp := &blockProcessor{store: db, txs: txs, notify: msgBroker.Notify, log: log}
+		bp := &blockProcessor{store: db, notify: msgBroker.Notify, log: log}
 		// we act as if all errors returned by block sync are recoverable ie we
 		// just retry in a loop until ctx is cancelled
 		for {
@@ -149,7 +138,7 @@ type cfg struct {
 	boltDB   string
 	apiAddr  string
 	observe  Observability
-	systemID []byte
+	systemID types.SystemID
 }
 
 /*
@@ -159,7 +148,7 @@ NewConfig returns Configuration suitable for using as Run parameter.
   - boltDB: filename (with full path) of the bolt db to use as storage;
   - logger: logger implementation.
 */
-func NewConfig(systemID []byte, apiAddr, abURL, boltDB string, observe Observability) Configuration {
+func NewConfig(systemID types.SystemID, apiAddr, abURL, boltDB string, observe Observability) Configuration {
 	return &cfg{
 		abc:      client.AlphabillClientConfig{Uri: abURL},
 		boltDB:   boltDB,
@@ -174,7 +163,7 @@ func (c *cfg) Storage() (Storage, error) { return newBoltStore(c.boltDB) }
 func (c *cfg) BatchSize() int            { return 100 }
 func (c *cfg) Logger() *slog.Logger      { return c.observe.Logger() }
 func (c *cfg) Listener() net.Listener    { return nil } // we do set Addr in HttpServer
-func (c *cfg) SystemID() []byte          { return c.systemID }
+func (c *cfg) SystemID() types.SystemID  { return c.systemID }
 func (c *cfg) APIAddr() string           { return c.apiAddr }
 
 func (c *cfg) HttpServer(endpoints http.Handler) http.Server {

@@ -4,22 +4,27 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	testtxsystem "github.com/alphabill-org/alphabill-wallet/internal/testutils/txsystem"
 	"github.com/alphabill-org/alphabill/crypto"
+	"github.com/alphabill-org/alphabill/state"
 	"github.com/alphabill-org/alphabill/txsystem"
 	testtransaction "github.com/alphabill-org/alphabill/txsystem/testutils/transaction"
+	"github.com/alphabill-org/alphabill/types"
 	"github.com/stretchr/testify/require"
 )
 
-var systemIdentifier = []byte{1, 2, 4, 1}
+const systemIdentifier types.SystemID = 0x1020401
 
 func TestNewNetwork_Ok(t *testing.T) {
+	genesisState := state.NewEmptyState()
 	counterPartition, err := NewPartition(t, 3,
 		func(_ map[string]crypto.Verifier) txsystem.TransactionSystem {
-			return &testtxsystem.CounterTxSystem{}
+			txs := &testtxsystem.CounterTxSystem{}
+			txs.Commit(genesisState.CommittedUC())
+			return txs
 		},
-		systemIdentifier)
+		systemIdentifier, genesisState)
 	require.NoError(t, err)
 	abNetwork, err := NewMultiRootAlphabillPartition(3, []*NodePartition{counterPartition})
 	require.NoError(t, err)
