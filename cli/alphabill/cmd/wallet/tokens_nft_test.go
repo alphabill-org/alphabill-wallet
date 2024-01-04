@@ -1,4 +1,4 @@
-package cmd
+package wallet
 
 import (
 	"bytes"
@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
 
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
@@ -41,11 +42,12 @@ func TestNFTs_Integration(t *testing.T) {
 	w2.Shutdown()
 
 	// send money to w1k2 to create fee credits
-	stdout := execWalletCmd(t, logF, homedirW1, fmt.Sprintf("send --amount 100 --address %s -r %s", hexutil.Encode(w1key2.PubKey), moneyBackendURL))
+	stdout, err := execCommand(logF, homedirW1, fmt.Sprintf("send --amount 100 --address %s -r %s", hexutil.Encode(w1key2.PubKey), moneyBackendURL))
+	require.NoError(t, err)
 	verifyStdout(t, stdout, "Successfully confirmed transaction(s)")
 
 	// create fee credit on w1k2
-	stdout, err = execFeesCommand(logF, homedirW1, fmt.Sprintf("--partition tokens add -k 2 --amount 50 -r %s -m %s", moneyBackendURL, backendURL))
+	stdout, err = execFeesCommand(t, homedirW1, moneyBackendURL, fmt.Sprintf("--partition tokens add -k 2 --amount 50 -m %s", backendURL))
 	require.NoError(t, err)
 	verifyStdout(t, stdout, "Successfully created 50 fee credits on tokens partition.")
 
@@ -79,11 +81,12 @@ func TestNFTs_Integration(t *testing.T) {
 	verifyStdout(t, execTokensCmd(t, homedirW1, fmt.Sprintf("list-types non-fungible -r %s", backendURL)), "symbol=ABNFT (nft)")
 
 	// send money to w2 to create fee credits
-	stdout = execWalletCmd(t, logF, homedirW1, fmt.Sprintf("send --amount 100 --address %s -r %s", hexutil.Encode(w2key.PubKey), moneyBackendURL))
+	stdout, err = execCommand(logF, homedirW1, fmt.Sprintf("send --amount 100 --address %s -r %s", hexutil.Encode(w2key.PubKey), moneyBackendURL))
+	require.NoError(t, err)
 	verifyStdout(t, stdout, "Successfully confirmed transaction(s)")
 
 	// create fee credit on w2
-	stdout, err = execFeesCommand(logF, homedirW2, fmt.Sprintf("--partition tokens add --amount 50 -r %s -m %s", moneyBackendURL, backendURL))
+	stdout, err = execFeesCommand(t, homedirW2, moneyBackendURL, fmt.Sprintf("--partition tokens add --amount 50 -m %s", backendURL))
 	require.NoError(t, err)
 	verifyStdout(t, stdout, "Successfully created 50 fee credits on tokens partition.")
 
@@ -166,7 +169,7 @@ func TestNFTDataUpdateCmd_Integration(t *testing.T) {
 	execTokensCmd(t, homedir, fmt.Sprintf("new non-fungible -r %s --type %s --token-identifier %s --data 01 --data-update-clause false", backendURL, typeID, nftID2))
 	nft2 := ensureTokenIndexed(t, ctx, backendClient, w1key.PubKey, nftID2)
 	require.Equal(t, []byte{0x01}, nft2.NftData)
-	//try to update and observe failure
+	//try to update and Observe failure
 	execTokensCmd(t, homedir, fmt.Sprintf("update -r %s --token-identifier %s --data 02 --data-update-input false,true -w false", backendURL, nftID2))
 	testevent.ContainsEvent(t, tokenPartition.Nodes[0].EventHandler, event.TransactionFailed)
 }
@@ -238,13 +241,13 @@ func TestNFT_LockUnlock_Integration(t *testing.T) {
 
 	// lock NFT
 	execTokensCmd(t, homedirW1, fmt.Sprintf("lock -r %s --token-identifier %s -k 1", backendUrl, nftID))
-	verifyStdoutEventually(t, func() *testConsoleWriter {
+	verifyStdoutEventually(t, func() *testutils.TestConsoleWriter {
 		return execTokensCmd(t, homedirW1, fmt.Sprintf("list non-fungible -r %s", backendUrl))
 	}, "locked='manually locked by user'")
 
 	// unlock NFT
 	execTokensCmd(t, homedirW1, fmt.Sprintf("unlock -r %s --token-identifier %s -k 1", backendUrl, nftID))
-	verifyStdoutEventually(t, func() *testConsoleWriter {
+	verifyStdoutEventually(t, func() *testutils.TestConsoleWriter {
 		return execTokensCmd(t, homedirW1, fmt.Sprintf("list non-fungible -r %s", backendUrl))
 	}, "locked=''")
 }

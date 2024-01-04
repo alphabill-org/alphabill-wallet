@@ -1,14 +1,17 @@
-package cmd
+package wallet
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
 	"syscall"
 
+	"github.com/alphabill-org/alphabill/logger"
+	"github.com/alphabill-org/alphabill/observability"
 	moneytx "github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -19,6 +22,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/term"
 
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money"
@@ -26,18 +30,18 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/unitlock"
 )
 
-type walletConfig struct {
-	Base          *baseConfiguration
-	WalletHomeDir string
+type WalletConfig struct {
+	Base            *types.BaseConfiguration
+	WalletHomeDir   string
+	PasswordFromArg string
+	PromptPassword  bool
 }
 
 const (
-	defaultAlphabillNodeURL = "localhost:9543"
-	defaultAlphabillApiURL  = "localhost:9654"
-	passwordPromptUsage     = "password (interactive from prompt)"
-	passwordArgUsage        = "password (non-interactive from args)"
+	defaultAlphabillApiURL = "localhost:9654"
+	passwordPromptUsage    = "password (interactive from prompt)"
+	passwordArgUsage       = "password (non-interactive from args)"
 
-	alphabillNodeURLCmdName = "alphabill-uri"
 	alphabillApiURLCmdName  = "alphabill-api-uri"
 	seedCmdName             = "seed"
 	addressCmdName          = "address"
@@ -51,34 +55,40 @@ const (
 	quietCmdName            = "quiet"
 	showUnswappedCmdName    = "show-unswapped"
 	billIdCmdName           = "bill-id"
+	systemIdentifierCmdName = "system-identifier"
 )
 
-// newWalletCmd creates a new cobra command for the wallet component.
-func newWalletCmd(baseConfig *baseConfiguration, obsF Factory) *cobra.Command {
-	config := &walletConfig{Base: baseConfig}
+type Factory interface {
+	Logger(cfg *logger.LogConfiguration) (*slog.Logger, error)
+	Observability(metrics, traces string) (observability.MeterAndTracer, error)
+}
+
+// NewWalletCmd creates a new cobra command for the wallet component.
+func NewWalletCmd(baseConfig *types.BaseConfiguration, obsF Factory) *cobra.Command {
+	config := &WalletConfig{Base: baseConfig}
 	var walletCmd = &cobra.Command{
 		Use:   "wallet",
 		Short: "cli for managing alphabill wallet",
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			// initialize config so that baseConfig.HomeDir gets configured
-			if err := initializeConfig(cmd, baseConfig, obsF); err != nil {
+		PersistentPreRunE: func(ccmd *cobra.Command, args []string) error {
+			// initialize config so that baseConf.HomeDir gets configured
+			if err := types.InitializeConfig(ccmd, baseConfig, obsF); err != nil {
 				return fmt.Errorf("initializing base configuration: %w", err)
 			}
 
-			ctx, span := config.Tracer().Start(cmd.Context(), "execute.wallet.cmd", trace.WithAttributes(semconv.ProcessCommandArgs(os.Args...)))
-			cmd.SetContext(ctx)
+			ctx, span := config.Tracer().Start(ccmd.Context(), "execute.wallet.cmd", trace.WithAttributes(semconv.ProcessCommandArgs(os.Args...)))
+			ccmd.SetContext(ctx)
 			// when command returns error the PostRun hooks are not triggered so use OnFinalize to end the span
 			cobra.OnFinalize(func() { span.End() })
 
-			if err := initWalletConfig(cmd, config); err != nil {
+			if err := initWalletConfig(ccmd, config); err != nil {
 				return fmt.Errorf("initializing wallet configuration: %w", err)
 			}
 			span.SetAttributes(attribute.String("wallet.home", config.WalletHomeDir))
 			return nil
 		},
 	}
-	walletCmd.AddCommand(newWalletBillsCmd(config))
-	walletCmd.AddCommand(newWalletFeesCmd(config))
+	walletCmd.AddCommand(NewWalletBillsCmd(config))
+	walletCmd.AddCommand(NewWalletFeesCmd(config))
 	walletCmd.AddCommand(createCmd(config))
 	walletCmd.AddCommand(sendCmd(config))
 	walletCmd.AddCommand(getPubKeysCmd(config))
@@ -86,15 +96,17 @@ func newWalletCmd(baseConfig *baseConfiguration, obsF Factory) *cobra.Command {
 	walletCmd.AddCommand(collectDustCmd(config))
 	walletCmd.AddCommand(addKeyCmd(config))
 	walletCmd.AddCommand(tokenCmd(config))
-	walletCmd.AddCommand(evmCmd(config))
+	walletCmd.AddCommand(NewEvmCmd(config))
 	// add passwords flags for (encrypted)wallet
-	walletCmd.PersistentFlags().BoolP(passwordPromptCmdName, "p", false, passwordPromptUsage)
-	walletCmd.PersistentFlags().String(passwordArgCmdName, "", passwordArgUsage)
+	//walletCmd.PersistentFlags().BoolP(passwordPromptCmdName, "p", false, passwordPromptUsage)
+	//walletCmd.PersistentFlags().String(passwordArgCmdName, "", passwordArgUsage)
+	walletCmd.PersistentFlags().BoolVarP(&config.PromptPassword, passwordPromptCmdName, "p", false, passwordPromptUsage)
+	walletCmd.PersistentFlags().StringVar(&config.PasswordFromArg, passwordArgCmdName, "", passwordArgUsage)
 	walletCmd.PersistentFlags().StringVarP(&config.WalletHomeDir, walletLocationCmdName, "l", "", "wallet home directory (default $AB_HOME/wallet)")
 	return walletCmd
 }
 
-func createCmd(config *walletConfig) *cobra.Command {
+func createCmd(config *WalletConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "create",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -105,7 +117,7 @@ func createCmd(config *walletConfig) *cobra.Command {
 	return cmd
 }
 
-func execCreateCmd(cmd *cobra.Command, config *walletConfig) (err error) {
+func execCreateCmd(cmd *cobra.Command, config *WalletConfig) (err error) {
 	mnemonic := ""
 	if cmd.Flags().Changed(seedCmdName) {
 		// when user omits value for "s" flag, ie by executing
@@ -120,7 +132,7 @@ func execCreateCmd(cmd *cobra.Command, config *walletConfig) (err error) {
 		}
 	}
 
-	password, err := createPassphrase(cmd)
+	password, err := createPassphrase(config)
 	if err != nil {
 		return err
 	}
@@ -140,13 +152,13 @@ func execCreateCmd(cmd *cobra.Command, config *walletConfig) (err error) {
 		if err != nil {
 			return fmt.Errorf("failed to read mnemonic created for the wallet: %w", err)
 		}
-		consoleWriter.Println("The following mnemonic key can be used to recover your wallet. Please write it down now, and keep it in a safe, offline place.")
-		consoleWriter.Println("mnemonic key: " + mnemonicSeed)
+		config.Base.ConsoleWriter.Println("The following mnemonic key can be used to recover your wallet. Please write it down now, and keep it in a safe, offline place.")
+		config.Base.ConsoleWriter.Println("mnemonic key: " + mnemonicSeed)
 	}
 	return nil
 }
 
-func sendCmd(config *walletConfig) *cobra.Command {
+func sendCmd(config *WalletConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "send",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -171,7 +183,7 @@ func sendCmd(config *walletConfig) *cobra.Command {
 	return cmd
 }
 
-func execSendCmd(ctx context.Context, cmd *cobra.Command, config *walletConfig) error {
+func execSendCmd(ctx context.Context, cmd *cobra.Command, config *WalletConfig) error {
 	ctx, span := config.Tracer().Start(ctx, "execSendCmd")
 	defer span.End()
 
@@ -179,11 +191,11 @@ func execSendCmd(ctx context.Context, cmd *cobra.Command, config *walletConfig) 
 	if err != nil {
 		return err
 	}
-	restClient, err := moneyclient.New(apiUri, config.Base.observe)
+	restClient, err := moneyclient.New(apiUri, config.Base.Observe)
 	if err != nil {
 		return err
 	}
-	am, err := loadExistingAccountManager(cmd, config.WalletHomeDir)
+	am, err := LoadExistingAccountManager(config)
 	if err != nil {
 		return err
 	}
@@ -198,7 +210,7 @@ func execSendCmd(ctx context.Context, cmd *cobra.Command, config *walletConfig) 
 	}
 	defer feeManagerDB.Close()
 
-	w, err := money.LoadExistingWallet(am, unitLocker, feeManagerDB, restClient, config.Base.observe.Logger())
+	w, err := money.LoadExistingWallet(am, unitLocker, feeManagerDB, restClient, config.Base.Observe.Logger())
 	if err != nil {
 		return err
 	}
@@ -236,20 +248,20 @@ func execSendCmd(ctx context.Context, cmd *cobra.Command, config *walletConfig) 
 		return err
 	}
 	if waitForConf {
-		consoleWriter.Println("Successfully confirmed transaction(s)")
+		config.Base.ConsoleWriter.Println("Successfully confirmed transaction(s)")
 
 		var feeSum uint64
 		for _, proof := range proofs {
 			feeSum += proof.TxRecord.ServerMetadata.GetActualFee()
 		}
-		consoleWriter.Println("Paid", util.AmountToString(feeSum, 8), "fees for transaction(s).")
+		config.Base.ConsoleWriter.Println("Paid", util.AmountToString(feeSum, 8), "fees for transaction(s).")
 	} else {
-		consoleWriter.Println("Successfully sent transaction(s)")
+		config.Base.ConsoleWriter.Println("Successfully sent transaction(s)")
 	}
 	return nil
 }
 
-func getBalanceCmd(config *walletConfig) *cobra.Command {
+func getBalanceCmd(config *WalletConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "get-balance",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -267,7 +279,7 @@ func getBalanceCmd(config *walletConfig) *cobra.Command {
 	return cmd
 }
 
-func execGetBalanceCmd(cmd *cobra.Command, config *walletConfig) error {
+func execGetBalanceCmd(cmd *cobra.Command, config *WalletConfig) error {
 	ctx, span := config.Tracer().Start(cmd.Context(), "execGetBalanceCmd")
 	defer span.End()
 
@@ -275,11 +287,11 @@ func execGetBalanceCmd(cmd *cobra.Command, config *walletConfig) error {
 	if err != nil {
 		return err
 	}
-	restClient, err := moneyclient.New(uri, config.Base.observe)
+	restClient, err := moneyclient.New(uri, config.Base.Observe)
 	if err != nil {
 		return err
 	}
-	am, err := loadExistingAccountManager(cmd, config.WalletHomeDir)
+	am, err := LoadExistingAccountManager(config)
 	if err != nil {
 		return err
 	}
@@ -297,7 +309,7 @@ func execGetBalanceCmd(cmd *cobra.Command, config *walletConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	w, err := money.LoadExistingWallet(am, unitLocker, feeManagerDB, restClient, config.Base.observe.Logger())
+	w, err := money.LoadExistingWallet(am, unitLocker, feeManagerDB, restClient, config.Base.Observe.Logger())
 	if err != nil {
 		return err
 	}
@@ -329,14 +341,14 @@ func execGetBalanceCmd(cmd *cobra.Command, config *walletConfig) error {
 		}
 		if !total {
 			for i, v := range totals {
-				consoleWriter.Println(fmt.Sprintf("#%d %s", i+1, util.AmountToString(v, 8)))
+				config.Base.ConsoleWriter.Println(fmt.Sprintf("#%d %s", i+1, util.AmountToString(v, 8)))
 			}
 		}
 		sumStr := util.AmountToString(sum, 8)
 		if quiet {
-			consoleWriter.Println(sumStr)
+			config.Base.ConsoleWriter.Println(sumStr)
 		} else {
-			consoleWriter.Println(fmt.Sprintf("Total %s", sumStr))
+			config.Base.ConsoleWriter.Println(fmt.Sprintf("Total %s", sumStr))
 		}
 	} else {
 		balance, err := w.GetBalance(ctx, money.GetBalanceCmd{AccountIndex: accountNumber - 1, CountDCBills: showUnswapped})
@@ -345,15 +357,15 @@ func execGetBalanceCmd(cmd *cobra.Command, config *walletConfig) error {
 		}
 		balanceStr := util.AmountToString(balance, 8)
 		if quiet {
-			consoleWriter.Println(balanceStr)
+			config.Base.ConsoleWriter.Println(balanceStr)
 		} else {
-			consoleWriter.Println(fmt.Sprintf("#%d %s", accountNumber, balanceStr))
+			config.Base.ConsoleWriter.Println(fmt.Sprintf("#%d %s", accountNumber, balanceStr))
 		}
 	}
 	return nil
 }
 
-func getPubKeysCmd(config *walletConfig) *cobra.Command {
+func getPubKeysCmd(config *WalletConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "get-pubkeys",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -364,8 +376,8 @@ func getPubKeysCmd(config *walletConfig) *cobra.Command {
 	return cmd
 }
 
-func execGetPubKeysCmd(cmd *cobra.Command, config *walletConfig) error {
-	am, err := loadExistingAccountManager(cmd, config.WalletHomeDir)
+func execGetPubKeysCmd(cmd *cobra.Command, config *WalletConfig) error {
+	am, err := LoadExistingAccountManager(config)
 	if err != nil {
 		return err
 	}
@@ -378,15 +390,15 @@ func execGetPubKeysCmd(cmd *cobra.Command, config *walletConfig) error {
 	hideKeyNumber, _ := cmd.Flags().GetBool(quietCmdName)
 	for accIdx, accPubKey := range pubKeys {
 		if hideKeyNumber {
-			consoleWriter.Println(hexutil.Encode(accPubKey))
+			config.Base.ConsoleWriter.Println(hexutil.Encode(accPubKey))
 		} else {
-			consoleWriter.Println(fmt.Sprintf("#%d %s", accIdx+1, hexutil.Encode(accPubKey)))
+			config.Base.ConsoleWriter.Println(fmt.Sprintf("#%d %s", accIdx+1, hexutil.Encode(accPubKey)))
 		}
 	}
 	return nil
 }
 
-func collectDustCmd(config *walletConfig) *cobra.Command {
+func collectDustCmd(config *WalletConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "collect-dust",
 		Short: "consolidates bills",
@@ -400,7 +412,7 @@ func collectDustCmd(config *walletConfig) *cobra.Command {
 	return cmd
 }
 
-func execCollectDust(cmd *cobra.Command, config *walletConfig) error {
+func execCollectDust(cmd *cobra.Command, config *WalletConfig) error {
 	apiUri, err := cmd.Flags().GetString(alphabillApiURLCmdName)
 	if err != nil {
 		return err
@@ -409,11 +421,11 @@ func execCollectDust(cmd *cobra.Command, config *walletConfig) error {
 	if err != nil {
 		return err
 	}
-	restClient, err := moneyclient.New(apiUri, config.Base.observe)
+	restClient, err := moneyclient.New(apiUri, config.Base.Observe)
 	if err != nil {
 		return err
 	}
-	am, err := loadExistingAccountManager(cmd, config.WalletHomeDir)
+	am, err := LoadExistingAccountManager(config)
 	if err != nil {
 		return err
 	}
@@ -431,16 +443,16 @@ func execCollectDust(cmd *cobra.Command, config *walletConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	w, err := money.LoadExistingWallet(am, unitLocker, feeManagerDB, restClient, config.Base.observe.Logger())
+	w, err := money.LoadExistingWallet(am, unitLocker, feeManagerDB, restClient, config.Base.Observe.Logger())
 	if err != nil {
 		return err
 	}
 	defer w.Close()
 
-	consoleWriter.Println("Starting dust collection, this may take a while...")
+	config.Base.ConsoleWriter.Println("Starting dust collection, this may take a while...")
 	dcResults, err := w.CollectDust(cmd.Context(), accountNumber)
 	if err != nil {
-		consoleWriter.Println("Failed to collect dust: " + err.Error())
+		config.Base.ConsoleWriter.Println("Failed to collect dust: " + err.Error())
 		return err
 	}
 	for _, dcResult := range dcResults {
@@ -454,7 +466,7 @@ func execCollectDust(cmd *cobra.Command, config *walletConfig) error {
 			if err != nil {
 				return fmt.Errorf("failed to calculate fee sum: %w", err)
 			}
-			consoleWriter.Println(fmt.Sprintf(
+			config.Base.ConsoleWriter.Println(fmt.Sprintf(
 				"Dust collection finished successfully on account #%d. Joined %d bills with total value of %s "+
 					"ALPHA into an existing target bill with unit identifier 0x%s. Paid %s fees for transaction(s).",
 				dcResult.AccountIndex+1,
@@ -464,13 +476,13 @@ func execCollectDust(cmd *cobra.Command, config *walletConfig) error {
 				util.AmountToString(feeSum, 8),
 			))
 		} else {
-			consoleWriter.Println(fmt.Sprintf("Nothing to swap on account #%d", dcResult.AccountIndex+1))
+			config.Base.ConsoleWriter.Println(fmt.Sprintf("Nothing to swap on account #%d", dcResult.AccountIndex+1))
 		}
 	}
 	return nil
 }
 
-func addKeyCmd(config *walletConfig) *cobra.Command {
+func addKeyCmd(config *WalletConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add-key",
 		Short: "adds the next key in the series to the wallet",
@@ -481,8 +493,8 @@ func addKeyCmd(config *walletConfig) *cobra.Command {
 	return cmd
 }
 
-func execAddKeyCmd(cmd *cobra.Command, config *walletConfig) error {
-	am, err := loadExistingAccountManager(cmd, config.WalletHomeDir)
+func execAddKeyCmd(cmd *cobra.Command, config *WalletConfig) error {
+	am, err := LoadExistingAccountManager(config)
 	if err != nil {
 		return err
 	}
@@ -492,23 +504,23 @@ func execAddKeyCmd(cmd *cobra.Command, config *walletConfig) error {
 	if err != nil {
 		return err
 	}
-	consoleWriter.Println(fmt.Sprintf("Added key #%d %s", accIdx+1, hexutil.Encode(accPubKey)))
+	config.Base.ConsoleWriter.Println(fmt.Sprintf("Added key #%d %s", accIdx+1, hexutil.Encode(accPubKey)))
 	return nil
 }
 
-func loadExistingAccountManager(cmd *cobra.Command, walletDir string) (account.Manager, error) {
-	pw, err := getPassphrase(cmd, "Enter passphrase: ")
+func LoadExistingAccountManager(config *WalletConfig) (account.Manager, error) {
+	pw, err := getPassphrase(config, "Enter passphrase: ")
 	if err != nil {
 		return nil, err
 	}
-	am, err := account.NewManager(walletDir, pw, false)
+	am, err := account.NewManager(config.WalletHomeDir, pw, false)
 	if err != nil {
 		return nil, err
 	}
 	return am, nil
 }
 
-func initWalletConfig(cmd *cobra.Command, config *walletConfig) error {
+func initWalletConfig(cmd *cobra.Command, config *WalletConfig) error {
 	walletLocation, err := cmd.Flags().GetString(walletLocationCmdName)
 	if err != nil {
 		return err
@@ -521,26 +533,18 @@ func initWalletConfig(cmd *cobra.Command, config *walletConfig) error {
 	return nil
 }
 
-func createPassphrase(cmd *cobra.Command) (string, error) {
-	passwordFromArg, err := cmd.Flags().GetString(passwordArgCmdName)
-	if err != nil {
-		return "", err
+func createPassphrase(config *WalletConfig) (string, error) {
+	if config.PasswordFromArg != "" {
+		return config.PasswordFromArg, nil
 	}
-	if passwordFromArg != "" {
-		return passwordFromArg, nil
-	}
-	passwordFlag, err := cmd.Flags().GetBool(passwordPromptCmdName)
-	if err != nil {
-		return "", err
-	}
-	if !passwordFlag {
+	if !config.PromptPassword {
 		return "", nil
 	}
-	p1, err := readPassword("Create new passphrase: ")
+	p1, err := readPassword(config.Base.ConsoleWriter, "Create new passphrase: ")
 	if err != nil {
 		return "", err
 	}
-	p2, err := readPassword("Confirm passphrase: ")
+	p2, err := readPassword(config.Base.ConsoleWriter, "Confirm passphrase: ")
 	if err != nil {
 		return "", err
 	}
@@ -550,25 +554,17 @@ func createPassphrase(cmd *cobra.Command) (string, error) {
 	return p1, nil
 }
 
-func getPassphrase(cmd *cobra.Command, promptMessage string) (string, error) {
-	passwordFromArg, err := cmd.Flags().GetString(passwordArgCmdName)
-	if err != nil {
-		return "", err
+func getPassphrase(config *WalletConfig, promptMessage string) (string, error) {
+	if config.PasswordFromArg != "" {
+		return config.PasswordFromArg, nil
 	}
-	if passwordFromArg != "" {
-		return passwordFromArg, nil
-	}
-	passwordFlag, err := cmd.Flags().GetBool(passwordPromptCmdName)
-	if err != nil {
-		return "", err
-	}
-	if !passwordFlag {
+	if !config.PromptPassword {
 		return "", nil
 	}
-	return readPassword(promptMessage)
+	return readPassword(config.Base.ConsoleWriter, promptMessage)
 }
 
-func readPassword(promptMessage string) (string, error) {
+func readPassword(consoleWriter types.ConsoleWrapper, promptMessage string) (string, error) {
 	consoleWriter.Print(promptMessage)
 	passwordBytes, err := term.ReadPassword(syscall.Stdin)
 	if err != nil {
@@ -578,7 +574,7 @@ func readPassword(promptMessage string) (string, error) {
 	return string(passwordBytes), nil
 }
 
-func pubKeyHexToBytes(s string) ([]byte, bool) {
+func PubKeyHexToBytes(s string) ([]byte, bool) {
 	if len(s) != 68 {
 		return nil, false
 	}
@@ -611,6 +607,6 @@ func groupPubKeysAndAmounts(pubKeys []string, amounts []string) ([]money.Receive
 	return receivers, nil
 }
 
-func (wc *walletConfig) Tracer() trace.Tracer {
-	return wc.Base.observe.Tracer("main")
+func (wc *WalletConfig) Tracer() trace.Tracer {
+	return wc.Base.Observe.Tracer("main")
 }

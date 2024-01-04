@@ -5,19 +5,21 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/alphabill-org/alphabill/logger"
 	"github.com/alphabill-org/alphabill/observability"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
+
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/money"
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/tokens"
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet"
 )
 
 type (
-	alphabillApp struct {
-		baseCmd    *cobra.Command
-		baseConfig *baseConfiguration
+	WalletApp struct {
+		baseCmd  *cobra.Command
+		baseConf *types.BaseConfiguration
 	}
 
 	Factory interface {
@@ -26,34 +28,34 @@ type (
 	}
 )
 
-// New creates a new Alphabill application
-func New(obsF Factory, opts ...interface{}) *alphabillApp {
-	baseCmd, baseConfig := newBaseCmd(obsF)
-	app := &alphabillApp{baseCmd: baseCmd, baseConfig: baseConfig}
-	app.addSubcommands(obsF, opts)
+// New creates a new Alphabill wallet application
+func New(obsF Factory, opts ...interface{}) *WalletApp {
+	baseCmd, baseConfig := NewBaseCmd(obsF)
+	app := &WalletApp{baseCmd: baseCmd, baseConf: baseConfig}
+	app.AddSubcommands(obsF, opts)
 	return app
 }
 
 // Execute runs the application
-func (a *alphabillApp) Execute(ctx context.Context) (err error) {
+func (a *WalletApp) Execute(ctx context.Context) (err error) {
 	defer func() {
-		if a.baseConfig.observe != nil {
-			err = errors.Join(err, a.baseConfig.observe.Shutdown())
+		if a.baseConf.Observe != nil {
+			err = errors.Join(err, a.baseConf.Observe.Shutdown())
 		}
 	}()
 
 	return a.baseCmd.ExecuteContext(ctx)
 }
 
-func (a *alphabillApp) addSubcommands(obsF Factory, opts []interface{}) {
-	a.baseCmd.AddCommand(newWalletCmd(a.baseConfig, obsF))
-	a.baseCmd.AddCommand(newMoneyBackendCmd(a.baseConfig))
-	a.baseCmd.AddCommand(newTokensBackendCmd(a.baseConfig))
+func (a *WalletApp) AddSubcommands(obsF Factory, opts []interface{}) {
+	a.baseCmd.AddCommand(wallet.NewWalletCmd(a.baseConf, obsF))
+	a.baseCmd.AddCommand(money.NewMoneyBackendCmd(a.baseConf))
+	a.baseCmd.AddCommand(tokens.NewTokensBackendCmd(a.baseConf))
 }
 
-func newBaseCmd(obsF Factory) (*cobra.Command, *baseConfiguration) {
-	config := &baseConfiguration{}
-	// baseCmd represents the base command when called without any subcommands
+func NewBaseCmd(obsF Factory) (*cobra.Command, *types.BaseConfiguration) {
+	config := &types.BaseConfiguration{}
+	// BaseCmd represents the base command when called without any subcommands
 	var baseCmd = &cobra.Command{
 		Use:           "abwallet",
 		Short:         "The alphabill wallet CLI",
@@ -62,115 +64,13 @@ func newBaseCmd(obsF Factory) (*cobra.Command, *baseConfiguration) {
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			// You can bind cobra and viper in a few locations, but PersistencePreRunE on the base command works well
 			// If subcommand does not define PersistentPreRunE, the one from base cmd is used.
-			if err := initializeConfig(cmd, config, obsF); err != nil {
+			if err := types.InitializeConfig(cmd, config, obsF); err != nil {
 				return fmt.Errorf("failed to initialize configuration: %w", err)
 			}
 			return nil
 		},
 	}
-	config.addConfigurationFlags(baseCmd)
+	config.AddConfigurationFlags(baseCmd)
 
 	return baseCmd, config
-}
-
-func initializeConfig(cmd *cobra.Command, config *baseConfiguration, obsF Factory) error {
-	var errs []error
-
-	if err := config.initializeConfig(cmd); err != nil {
-		errs = append(errs, fmt.Errorf("reading configuration: %w", err))
-	}
-
-	logger, err := config.initLogger(cmd, obsF.Logger)
-	if err != nil {
-		errs = append(errs, fmt.Errorf("initializing logger: %w", err))
-	}
-
-	metrics, err := cmd.Flags().GetString(keyMetrics)
-	if err != nil {
-		errs = append(errs, fmt.Errorf("reading flag %q: %w", keyMetrics, err))
-	}
-	tracing, err := cmd.Flags().GetString(keyTracing)
-	if err != nil {
-		errs = append(errs, fmt.Errorf("reading flag %q: %w", keyTracing, err))
-	}
-	observe, err := obsF.Observability(metrics, tracing)
-	if err != nil {
-		errs = append(errs, fmt.Errorf("initializing observability: %w", err))
-	}
-	if observe != nil && logger != nil {
-		config.observe = observability.WithLogger(observe, logger)
-	}
-
-	return errors.Join(errs...)
-}
-
-// initializeConfig reads in config file and ENV variables if set.
-func (config *baseConfiguration) initializeConfig(cmd *cobra.Command) error {
-	v := viper.New()
-
-	config.initConfigFileLocation()
-
-	if config.configFileExists() {
-		v.SetConfigFile(config.CfgFile)
-	}
-
-	// Attempt to read the config file, gracefully ignoring errors
-	// caused by a config file not being found. Return an error
-	// if we cannot parse the config file.
-	if err := v.ReadInConfig(); err != nil {
-		// It's okay if there isn't a config file
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			return err
-		}
-	}
-
-	// When we bind flags to environment variables expect that the
-	// environment variables are prefixed, e.g. a flag like --number
-	// binds to an environment variable AB_NUMBER. This helps
-	// avoid conflicts.
-	v.SetEnvPrefix(envPrefix)
-
-	// Bind to environment variables
-	// Works great for simple config names, but needs help for names
-	// like --favorite-color which we fix in the bindFlags function
-	v.AutomaticEnv()
-
-	// Bind the current command's flags to viper
-	if err := bindFlags(cmd, v); err != nil {
-		return fmt.Errorf("binding flags: %w", err)
-	}
-
-	return nil
-}
-
-// Bind each cobra flag to its associated viper configuration (config file and environment variable)
-func bindFlags(cmd *cobra.Command, v *viper.Viper) error {
-	var bindFlagErr []error
-	cmd.Flags().VisitAll(func(f *pflag.Flag) {
-		if f.Name == keyHome || f.Name == keyConfig {
-			// "home" and "config" are special configuration values, handled separately.
-			return
-		}
-
-		// Environment variables can't have dashes in them, so bind them to their equivalent
-		// keys with underscores, e.g. --favorite-color to AB_FAVORITE_COLOR
-		if strings.Contains(f.Name, "-") {
-			envVarSuffix := strings.ToUpper(strings.ReplaceAll(f.Name, "-", "_"))
-			if err := v.BindEnv(f.Name, fmt.Sprintf("%s_%s", envPrefix, envVarSuffix)); err != nil {
-				bindFlagErr = append(bindFlagErr, fmt.Errorf("binding env to flag %q: %w", f.Name, err))
-				return
-			}
-		}
-
-		// Apply the viper config value to the flag when the flag is not set and viper has a value
-		if !f.Changed && v.IsSet(f.Name) {
-			val := v.Get(f.Name)
-			if err := cmd.Flags().Set(f.Name, fmt.Sprintf("%v", val)); err != nil {
-				bindFlagErr = append(bindFlagErr, fmt.Errorf("seting flag %q value: %w", f.Name, err))
-				return
-			}
-		}
-	})
-
-	return errors.Join(bindFlagErr...)
 }

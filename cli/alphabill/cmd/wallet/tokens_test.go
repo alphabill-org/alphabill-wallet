@@ -1,9 +1,8 @@
-package cmd
+package wallet
 
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -19,9 +18,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
+	cmdtypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils/net"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
 	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
@@ -119,7 +119,7 @@ func TestListTokensCommandInputs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			exec := false
-			cmd := tokenCmdList(&walletConfig{}, func(cmd *cobra.Command, config *walletConfig, accountNumber *uint64, kind backend.Kind) error {
+			cmd := tokenCmdList(&WalletConfig{}, func(cmd *cobra.Command, config *WalletConfig, accountNumber *uint64, kind backend.Kind) error {
 				require.Equal(t, tt.accountNumber, *accountNumber)
 				require.Equal(t, tt.expectedKind, kind)
 				if len(tt.expectedPass) > 0 {
@@ -194,7 +194,7 @@ func TestListTokensTypesCommandInputs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			exec := false
-			cmd := tokenCmdListTypes(&walletConfig{}, func(cmd *cobra.Command, config *walletConfig, accountNumber *uint64, kind backend.Kind) error {
+			cmd := tokenCmdListTypes(&WalletConfig{}, func(cmd *cobra.Command, config *WalletConfig, accountNumber *uint64, kind backend.Kind) error {
 				require.Equal(t, tt.expectedAccNr, *accountNumber)
 				require.Equal(t, tt.expectedKind, kind)
 				if len(tt.expectedPass) != 0 {
@@ -483,32 +483,6 @@ func createTokensPartition(t *testing.T) *testpartition.NodePartition {
 	return network
 }
 
-func startTokensBackend(t *testing.T, nodeAddr string) (srvUri string, restApi *client.TokenBackend) {
-	port, err := net.GetFreePort()
-	require.NoError(t, err)
-	host := fmt.Sprintf("localhost:%v", port)
-	srvUri = "http://" + host
-	addr, err := url.Parse(srvUri)
-	require.NoError(t, err)
-	observe := observability.Default(t)
-	restApi = client.New(*addr, observe)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-
-	go func() {
-		cfg := backend.NewConfig(tokens.DefaultSystemIdentifier, host, nodeAddr, filepath.Join(t.TempDir(), "backend.db"), observe)
-		require.ErrorIs(t, backend.Run(ctx, cfg), context.Canceled)
-	}()
-
-	require.Eventually(t, func() bool {
-		rnr, err := restApi.GetRoundNumber(ctx)
-		return err == nil && rnr.RoundNumber > 0
-	}, test.WaitDuration, test.WaitTick)
-
-	return
-}
-
 func createNewTokenWallet(t *testing.T, addr string) (*tw.Wallet, string) {
 	return createNewTokenWalletWithFeeManager(t, addr, nil)
 }
@@ -536,22 +510,20 @@ func execTokensCmdWithError(t *testing.T, homedir string, command string, expect
 	require.ErrorContains(t, err, expectedError)
 }
 
-func execTokensCmd(t *testing.T, homedir string, command string) *testConsoleWriter {
+func execTokensCmd(t *testing.T, homedir string, command string) *testutils.TestConsoleWriter {
 	outputWriter, err := doExecTokensCmd(t, homedir, command)
 	require.NoError(t, err)
-
 	return outputWriter
 }
 
-func doExecTokensCmd(t *testing.T, homedir string, command string) (*testConsoleWriter, error) {
-	outputWriter := &testConsoleWriter{}
-	consoleWriter = outputWriter
-
-	cmd := New(observability.NewFactory(t))
-	args := "wallet token --log-level DEBUG --home " + homedir + " " + command
-	cmd.baseCmd.SetArgs(strings.Split(args, " "))
-
-	return outputWriter, cmd.Execute(context.Background())
+func doExecTokensCmd(t *testing.T, homedir string, command string) (*testutils.TestConsoleWriter, error) {
+	outputWriter := &testutils.TestConsoleWriter{}
+	ccmd := tokenCmd(&WalletConfig{
+		Base:          &cmdtypes.BaseConfiguration{HomeDir: homedir, ConsoleWriter: outputWriter, LogCfgFile: "logger-config.yaml", Observe: observability.Default(t)},
+		WalletHomeDir: filepath.Join(homedir, "wallet"),
+	})
+	ccmd.SetArgs(strings.Split(command, " "))
+	return outputWriter, ccmd.Execute()
 }
 
 func randomFungibleTokenTypeID(t *testing.T) types.UnitID {
@@ -572,13 +544,13 @@ func randomNonFungibleTokenID(t *testing.T) types.UnitID {
 	return unitID
 }
 
-func verifyStdoutEventually(t *testing.T, exec func() *testConsoleWriter, expectedLines ...string) {
+func verifyStdoutEventually(t *testing.T, exec func() *testutils.TestConsoleWriter, expectedLines ...string) {
 	verifyStdoutEventuallyWithTimeout(t, exec, test.WaitDuration, test.WaitTick, expectedLines...)
 }
 
-func verifyStdoutEventuallyWithTimeout(t *testing.T, exec func() *testConsoleWriter, waitFor time.Duration, tick time.Duration, expectedLines ...string) {
+func verifyStdoutEventuallyWithTimeout(t *testing.T, exec func() *testutils.TestConsoleWriter, waitFor time.Duration, tick time.Duration, expectedLines ...string) {
 	require.Eventually(t, func() bool {
-		joined := strings.Join(exec().lines, "\n")
+		joined := strings.Join(exec().Lines, "\n")
 		res := true
 		for _, expectedLine := range expectedLines {
 			res = res && strings.Contains(joined, expectedLine)

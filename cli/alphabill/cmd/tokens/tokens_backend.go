@@ -1,4 +1,4 @@
-package cmd
+package tokens
 
 import (
 	"context"
@@ -6,15 +6,23 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/spf13/cobra"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/backend"
 )
 
-const defaultTokensBackendApiURL = "localhost:9735"
+const (
+	serverAddrCmdName       = "server-addr"
+	dbFileCmdName           = "db"
+	systemIdentifierCmdName = "system-identifier"
+	defaultServerAddr       = "localhost:9735"
+	defaultAlphabillNodeURL = "localhost:9543"
+	alphabillNodeURLCmdName = "alphabill-uri"
+)
 
-func newTokensBackendCmd(baseConfig *baseConfiguration) *cobra.Command {
+func NewTokensBackendCmd(baseConfig *types.BaseConfiguration) *cobra.Command {
 	var cmd = &cobra.Command{
 		Use:   "tokens-backend",
 		Short: "Starts tokens backend service",
@@ -24,8 +32,8 @@ func newTokensBackendCmd(baseConfig *baseConfiguration) *cobra.Command {
 	return cmd
 }
 
-func buildCmdStartTokensBackend(config *baseConfiguration) *cobra.Command {
-	var systemID bytesHex = tokens.DefaultSystemIdentifier
+func buildCmdStartTokensBackend(config *types.BaseConfiguration) *cobra.Command {
+	var systemID types.BytesHex = tokens.DefaultSystemIdentifier
 	cmd := &cobra.Command{
 		Use: "start",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -33,13 +41,13 @@ func buildCmdStartTokensBackend(config *baseConfiguration) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringP(alphabillNodeURLCmdName, "u", defaultAlphabillNodeURL, "alphabill node url")
-	cmd.Flags().StringP(serverAddrCmdName, "s", defaultTokensBackendApiURL, "server address")
+	cmd.Flags().StringP(serverAddrCmdName, "s", defaultServerAddr, "server address")
 	cmd.Flags().StringP(dbFileCmdName, "f", "", "path to the database file")
 	cmd.Flags().Var(&systemID, systemIdentifierCmdName, "system identifier in hex format")
 	return cmd
 }
 
-func execTokensBackendStartCmd(ctx context.Context, cmd *cobra.Command, config *baseConfiguration, systemID []byte) error {
+func execTokensBackendStartCmd(ctx context.Context, cmd *cobra.Command, config *types.BaseConfiguration, systemID []byte) error {
 	abURL, err := cmd.Flags().GetString(alphabillNodeURLCmdName)
 	if err != nil {
 		return fmt.Errorf("failed to get %q flag value: %w", alphabillNodeURLCmdName, err)
@@ -52,7 +60,7 @@ func execTokensBackendStartCmd(ctx context.Context, cmd *cobra.Command, config *
 	if err != nil {
 		return fmt.Errorf("failed to get path for database: %w", err)
 	}
-	return backend.Run(ctx, backend.NewConfig(systemID, srvAddr, abURL, dbFile, config.observe))
+	return backend.Run(ctx, backend.NewConfig(systemID, srvAddr, abURL, dbFile, config.Observe))
 }
 
 /*
@@ -68,7 +76,6 @@ func filenameEnsureDir(flagName string, cmd *cobra.Command, defaultPathElements 
 	if fileName == "" {
 		fileName = filepath.Join(defaultPathElements...)
 	}
-
 	if err := os.MkdirAll(filepath.Dir(fileName), 0700); err != nil {
 		return "", fmt.Errorf("failed to create directory path: %w", err)
 	}
