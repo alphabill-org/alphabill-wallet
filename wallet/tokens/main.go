@@ -427,7 +427,7 @@ func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId 
 		}
 	}
 	if targetAmount > totalBalance {
-		return nil, fmt.Errorf("insufficient value: got %v, need %v", totalBalance, targetAmount)
+		return nil, fmt.Errorf("insufficient tokens of type %s: got %v, need %v", typeId, totalBalance, targetAmount)
 	}
 	// optimization: first try to make a single operation instead of iterating through all tokens in doSendMultiple
 	if closestMatch.Amount >= targetAmount {
