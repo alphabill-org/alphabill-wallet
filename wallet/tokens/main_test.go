@@ -531,7 +531,7 @@ func TestSendFungible(t *testing.T) {
 			name:             "insufficient balance",
 			tokenTypeID:      typeId,
 			targetAmount:     60,
-			expectedErrorMsg: "insufficient value",
+			expectedErrorMsg: fmt.Sprintf("insufficient tokens of type %s: got 33, need 60", backend.TokenTypeID(typeId)),
 		},
 		{
 			name:             "zero amount",
@@ -580,7 +580,7 @@ func TestSendFungible(t *testing.T) {
 			name:             "locked tokens are ignored",
 			tokenTypeID:      typeId2,
 			targetAmount:     1,
-			expectedErrorMsg: "insufficient value",
+			expectedErrorMsg: fmt.Sprintf("insufficient tokens of type %s: got 0, need 1", backend.TokenTypeID(typeId2)),
 		},
 	}
 
