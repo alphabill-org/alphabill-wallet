@@ -1,4 +1,4 @@
-package wallet
+package evm
 
 import (
 	"bytes"
@@ -40,7 +40,7 @@ func Test_evmCmdDeploy_error_cases(t *testing.T) {
 	_, err = execEvmCmd(logF, homedir, "evm deploy --data accbdeef --alphabill-api-uri "+addr.Host)
 	require.ErrorContains(t, err, "required flag(s) \"max-gas\" not set")
 	// smart contract code too big
-	code := hex.EncodeToString(make([]byte, scSizeLimit24Kb+1))
+	code := hex.EncodeToString(make([]byte, ScSizeLimit24Kb+1))
 	_, err = execEvmCmd(logF, homedir, "evm deploy --max-gas 10000 --data "+code+" --alphabill-api-uri "+addr.Host)
 	require.ErrorContains(t, err, "contract code too big, maximum size is 24Kb")
 	_, err = execEvmCmd(logF, homedir, "evm deploy --max-gas 1000 --data accbxdeef --alphabill-api-uri "+addr.Host)
@@ -247,7 +247,7 @@ func Test_evmCmdCall_ok_defaultGas(t *testing.T) {
 	require.EqualValues(t, toAddr, mockConf.callReq.To)
 	//value is currently hardcoded as 0
 	require.Equal(t, big.NewInt(0), mockConf.callReq.Value)
-	require.EqualValues(t, defaultCallMaxGas, mockConf.callReq.Gas)
+	require.EqualValues(t, DefaultCallMaxGas, mockConf.callReq.Gas)
 	data, err := hex.DecodeString("9021ACFE")
 	require.NoError(t, err)
 	require.EqualValues(t, data, mockConf.callReq.Data)
@@ -354,7 +354,7 @@ func mockClientCalls(br *clientMockConf, logF func() *slog.Logger) (*httptest.Se
 func execEvmCmd(obs *testobserve.Observability, homeDir, command string) (*testutils.TestConsoleWriter, error) {
 	outputWriter := &testutils.TestConsoleWriter{}
 	command = strings.TrimPrefix(command, "evm ")
-	ccmd := NewEvmCmd(&WalletConfig{
+	ccmd := NewEvmCmd(&cmdtypes.WalletConfig{
 		Base:          &cmdtypes.BaseConfiguration{HomeDir: homeDir, ConsoleWriter: outputWriter, Observe: obs},
 		WalletHomeDir: filepath.Join(homeDir, "wallet")})
 	ccmd.SetArgs(strings.Split(command, " "))

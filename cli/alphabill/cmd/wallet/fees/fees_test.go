@@ -1,4 +1,4 @@
-package wallet
+package fees
 
 import (
 	"fmt"
@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/stretchr/testify/require"
@@ -16,6 +15,7 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
 	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 )
 
 func TestWalletFeesCmds_MoneyPartition(t *testing.T) {
@@ -78,7 +78,7 @@ func TestWalletFeesCmds_MoneyPartition(t *testing.T) {
 
 func TestWalletFeesCmds_TokenPartition(t *testing.T) {
 	// start money partition and create wallet with token partition as well
-	tokensPartition := createTokensPartition(t)
+	tokensPartition := testutils.CreateTokensPartition(t)
 	homedir, moneyBackendURL, _ := setupMoneyInfraAndWallet(t, []*testpartition.NodePartition{tokensPartition})
 
 	// start token partition
@@ -219,7 +219,7 @@ func TestWalletFeesLockCmds_Ok(t *testing.T) {
 
 func execFeesCommand(t *testing.T, homeDir, moneyBackendURL, command string) (*testutils.TestConsoleWriter, error) {
 	outputWriter := &testutils.TestConsoleWriter{}
-	wcmd := NewWalletFeesCmd(&WalletConfig{
+	wcmd := NewFeesCmd(&types.WalletConfig{
 		Base:          &types.BaseConfiguration{HomeDir: homeDir, Observe: observability.Default(t), ConsoleWriter: outputWriter},
 		WalletHomeDir: filepath.Join(homeDir, "wallet"),
 	})
@@ -233,12 +233,12 @@ func execFeesCommand(t *testing.T, homeDir, moneyBackendURL, command string) (*t
 // to the wallet. Returns wallet homedir, money backend url, and reference to alphabill partition object.
 func setupMoneyInfraAndWallet(t *testing.T, otherPartitions []*testpartition.NodePartition) (string, string, *testpartition.AlphabillNetwork) {
 	// create wallet
-	am, homedir := createNewWallet(t)
+	am, homedir := testutils.CreateNewWallet(t)
 	defer am.Close()
 	accountKey, err := am.GetAccountKey(0)
 	require.NoError(t, err)
 	genesisConfig := &testutil.MoneyGenesisConfig{
-		InitialBillID:      defaultInitialBillID,
+		InitialBillID:      testutils.DefaultInitialBillID,
 		InitialBillValue:   1e18,
 		InitialBillOwner:   templates.NewP2pkh256BytesFromKey(accountKey.PubKey),
 		DCMoneySupplyValue: 10000,

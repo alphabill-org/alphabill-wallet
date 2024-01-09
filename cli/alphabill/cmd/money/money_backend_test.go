@@ -8,15 +8,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 	"github.com/alphabill-org/alphabill/predicates/templates"
-	moneytx "github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/util"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
-	types2 "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
+	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
+	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/http"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/net"
@@ -24,15 +22,12 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend"
-)
-
-var (
-	defaultInitialBillID = moneytx.NewBillID(nil, []byte{1})
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 )
 
 func TestMoneyBackendCLI(t *testing.T) {
 	genesisConfig := &testutil.MoneyGenesisConfig{
-		InitialBillID:      defaultInitialBillID,
+		InitialBillID:      testutils.DefaultInitialBillID,
 		InitialBillValue:   1e18,
 		InitialBillOwner:   templates.AlwaysTrueBytes(),
 		DCMoneySupplyValue: 10000,
@@ -44,7 +39,7 @@ func TestMoneyBackendCLI(t *testing.T) {
 
 	// transfer initial bill to wallet pubkey
 	pk := "0x03c30573dc0c7fd43fcb801289a6a96cb78c27f4ba398b89da91ece23e9a99aca3"
-	pkBytes, _ := PubKeyHexToBytes(pk)
+	pkBytes, _ := cliaccount.PubKeyHexToBytes(pk)
 	initialBillValue := testutils.SpendInitialBillWithFeeCredits(t, abNet, genesisConfig.InitialBillValue, pkBytes)
 
 	// start wallet-backend service
@@ -53,7 +48,7 @@ func TestMoneyBackendCLI(t *testing.T) {
 	require.NoError(t, err)
 	serverAddr := fmt.Sprintf("localhost:%d", port)
 	go func() {
-		cmd := NewMoneyBackendCmd(&types2.BaseConfiguration{HomeDir: homedir, Observe: observability.Default(t)})
+		cmd := NewMoneyBackendCmd(&clitypes.BaseConfiguration{HomeDir: homedir, Observe: observability.Default(t)})
 		args := fmt.Sprintf("start --%s %s --%s %s", serverAddrCmdName, serverAddr, alphabillNodeURLCmdName, alphabillNodeAddr)
 		cmd.SetArgs(strings.Split(args, " "))
 		ctx, cancelFunc := context.WithCancel(context.Background())
@@ -82,7 +77,7 @@ func TestMoneyBackendCLI(t *testing.T) {
 
 	// verify proof
 	resBlockProof := &wallet.Proof{}
-	httpRes, err = testhttp.DoGetCbor(fmt.Sprintf("http://%s/api/v1/units/0x%s/transactions/0x%x/proof", serverAddr, defaultInitialBillID, b.TxHash), resBlockProof)
+	httpRes, err = testhttp.DoGetCbor(fmt.Sprintf("http://%s/api/v1/units/0x%s/transactions/0x%x/proof", serverAddr, testutils.DefaultInitialBillID, b.TxHash), resBlockProof)
 	require.NoError(t, err)
 	require.EqualValues(t, 200, httpRes.StatusCode)
 	require.Equal(t, resBlockProof.TxRecord.TransactionOrder.Hash(crypto.SHA256), b.TxHash)
@@ -94,15 +89,4 @@ func TestMoneyBackendConfig_DbFileParentDirsAreCreated(t *testing.T) {
 	_, err := c.GetDbFile()
 	require.NoError(t, err)
 	require.True(t, util.FileExists(filepath.Dir(expectedFilePath)))
-}
-
-func PubKeyHexToBytes(s string) ([]byte, bool) {
-	if len(s) != 68 {
-		return nil, false
-	}
-	pubKeyBytes, err := hexutil.Decode(s)
-	if err != nil {
-		return nil, false
-	}
-	return pubKeyBytes, true
 }

@@ -1,4 +1,4 @@
-package wallet
+package evm
 
 import (
 	"encoding/hex"
@@ -6,40 +6,42 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	"github.com/alphabill-org/alphabill/txsystem/evm"
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/spf13/cobra"
 
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
 	evmwallet "github.com/alphabill-org/alphabill-wallet/wallet/evm"
 	evmclient "github.com/alphabill-org/alphabill-wallet/wallet/evm/client"
 )
 
 const (
-	dataCmdName           = "data"
-	maxGasCmdName         = "max-gas"
-	valueCmdName          = "value"
-	scSizeLimit24Kb       = 24 * 1024
-	defaultEvmAddrLen     = 20
-	defaultCallMaxGas     = 50000000
-	defaultEvmNodeRestURL = "localhost:29866"
+	DataCmdName       = "data"
+	MaxGasCmdName     = "max-gas"
+	ValueCmdName      = "value"
+	ScSizeLimit24Kb   = 24 * 1024
+	DefaultEvmAddrLen = 20
+	DefaultCallMaxGas = 50000000
 )
 
-func NewEvmCmd(config *WalletConfig) *cobra.Command {
+func NewEvmCmd(config *types.WalletConfig) *cobra.Command {
+	evmConfig := &types.EvmConfig{WalletConfig: config}
 	cmd := &cobra.Command{
 		Use:   "evm",
 		Short: "interact with alphabill EVM partition",
 	}
-	cmd.AddCommand(evmCmdDeploy(config))
-	cmd.AddCommand(evmCmdExecute(config))
-	cmd.AddCommand(evmCmdCall(config))
-	cmd.AddCommand(evmCmdBalance(config))
-	cmd.PersistentFlags().StringP(alphabillApiURLCmdName, "r", defaultEvmNodeRestURL, "alphabill EVM partition node REST URI to connect to")
+	cmd.AddCommand(evmCmdDeploy(evmConfig))
+	cmd.AddCommand(evmCmdExecute(evmConfig))
+	cmd.AddCommand(evmCmdCall(evmConfig))
+	cmd.AddCommand(evmCmdBalance(evmConfig))
+	cmd.PersistentFlags().StringVarP(&evmConfig.NodeURL, args.AlphabillApiURLCmdName, "r", args.DefaultEvmNodeRestURL, "alphabill EVM partition node REST URI to connect to")
 	return cmd
 }
 
-func evmCmdDeploy(config *WalletConfig) *cobra.Command {
+func evmCmdDeploy(config *types.EvmConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "deploy",
 		Short: "deploys a new smart contract on evm partition by sending a transaction on the block chain",
@@ -50,21 +52,21 @@ func evmCmdDeploy(config *WalletConfig) *cobra.Command {
 		},
 	}
 	// account from which to call - pay for the transaction
-	cmd.Flags().Uint64P(keyCmdName, "k", 1, "which key to use for sending the transaction")
+	cmd.Flags().Uint64P(args.KeyCmdName, "k", 1, "which key to use for sending the transaction")
 	// data - smart contract code
-	cmd.Flags().String(dataCmdName, "", "contract code as hex string")
+	cmd.Flags().String(DataCmdName, "", "contract code as hex string")
 	// max-gas
-	cmd.Flags().Uint64(maxGasCmdName, 0, "maximum amount of gas user is willing to spend")
-	if err := cmd.MarkFlagRequired(dataCmdName); err != nil {
+	cmd.Flags().Uint64(MaxGasCmdName, 0, "maximum amount of gas user is willing to spend")
+	if err := cmd.MarkFlagRequired(DataCmdName); err != nil {
 		panic(err)
 	}
-	if err := cmd.MarkFlagRequired(maxGasCmdName); err != nil {
+	if err := cmd.MarkFlagRequired(MaxGasCmdName); err != nil {
 		panic(err)
 	}
 	return cmd
 }
 
-func evmCmdExecute(config *WalletConfig) *cobra.Command {
+func evmCmdExecute(config *types.EvmConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "execute",
 		Short: "executes smart contract call by sending a transaction on the block chain",
@@ -75,26 +77,26 @@ func evmCmdExecute(config *WalletConfig) *cobra.Command {
 		},
 	}
 	// account from which to call - pay for the transaction
-	cmd.Flags().Uint64P(keyCmdName, "k", 1, "which key to use for sending the transaction")
+	cmd.Flags().Uint64P(args.KeyCmdName, "k", 1, "which key to use for sending the transaction")
 	// to address - smart contract to call
-	cmd.Flags().String(addressCmdName, "", "smart contract address in hexadecimal format, must start with 0x and be 20 characters in length")
+	cmd.Flags().String(args.AddressCmdName, "", "smart contract address in hexadecimal format, must start with 0x and be 20 characters in length")
 	// data - function ID + parameter
-	cmd.Flags().String(dataCmdName, "", "4 byte function ID and optionally argument in hex")
+	cmd.Flags().String(DataCmdName, "", "4 byte function ID and optionally argument in hex")
 	// max amount of gas user is willing to spend
-	cmd.Flags().Uint64(maxGasCmdName, 0, "maximum amount of gas user is willing to spend")
-	if err := cmd.MarkFlagRequired(addressCmdName); err != nil {
+	cmd.Flags().Uint64(MaxGasCmdName, 0, "maximum amount of gas user is willing to spend")
+	if err := cmd.MarkFlagRequired(args.AddressCmdName); err != nil {
 		panic(err)
 	}
-	if err := cmd.MarkFlagRequired(dataCmdName); err != nil {
+	if err := cmd.MarkFlagRequired(DataCmdName); err != nil {
 		panic(err)
 	}
-	if err := cmd.MarkFlagRequired(maxGasCmdName); err != nil {
+	if err := cmd.MarkFlagRequired(MaxGasCmdName); err != nil {
 		panic(err)
 	}
 	return cmd
 }
 
-func evmCmdCall(config *WalletConfig) *cobra.Command {
+func evmCmdCall(config *types.EvmConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "call",
 		Short: "executes a smart contract call immediately without creating a transaction on the block chain",
@@ -105,26 +107,26 @@ func evmCmdCall(config *WalletConfig) *cobra.Command {
 		},
 	}
 	// account from which to call - pay for the transaction
-	cmd.Flags().Uint64P(keyCmdName, "k", 1, "which key to use for from address in evm call")
+	cmd.Flags().Uint64P(args.KeyCmdName, "k", 1, "which key to use for from address in evm call")
 	// to address - smart contract to call
-	cmd.Flags().String(addressCmdName, "", "to address in hexadecimal format, must be 20 characters in length")
+	cmd.Flags().String(args.AddressCmdName, "", "to address in hexadecimal format, must be 20 characters in length")
 	// data
-	cmd.Flags().String(dataCmdName, "", "data as hex string")
+	cmd.Flags().String(DataCmdName, "", "data as hex string")
 	// max amount of gas user is willing to spend
-	cmd.Flags().Uint64(maxGasCmdName, defaultCallMaxGas, "(optional) maximum amount of gas user is willing to spend")
+	cmd.Flags().Uint64(MaxGasCmdName, DefaultCallMaxGas, "(optional) maximum amount of gas user is willing to spend")
 	// value, default 0
-	cmd.Flags().Uint64(valueCmdName, 0, "(optional) value to transfer")
-	_ = cmd.Flags().MarkHidden(valueCmdName)
-	if err := cmd.MarkFlagRequired(addressCmdName); err != nil {
+	cmd.Flags().Uint64(ValueCmdName, 0, "(optional) value to transfer")
+	_ = cmd.Flags().MarkHidden(ValueCmdName)
+	if err := cmd.MarkFlagRequired(args.AddressCmdName); err != nil {
 		panic(err)
 	}
-	if err := cmd.MarkFlagRequired(dataCmdName); err != nil {
+	if err := cmd.MarkFlagRequired(DataCmdName); err != nil {
 		panic(err)
 	}
 	return cmd
 }
 
-func evmCmdBalance(config *WalletConfig) *cobra.Command {
+func evmCmdBalance(config *types.EvmConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:    "balance",
 		Short:  "get account balance",
@@ -134,16 +136,16 @@ func evmCmdBalance(config *WalletConfig) *cobra.Command {
 		},
 	}
 	// account from which to call - pay for the transaction
-	cmd.Flags().Uint64P(keyCmdName, "k", 1, "which key to use for balance")
+	cmd.Flags().Uint64P(args.KeyCmdName, "k", 1, "which key to use for balance")
 	return cmd
 }
 
-func initEvmWallet(cobraCmd *cobra.Command, config *WalletConfig) (*evmwallet.Wallet, error) {
-	uri, err := cobraCmd.Flags().GetString(alphabillApiURLCmdName)
+func initEvmWallet(cobraCmd *cobra.Command, config *types.EvmConfig) (*evmwallet.Wallet, error) {
+	uri, err := cobraCmd.Flags().GetString(args.AlphabillApiURLCmdName)
 	if err != nil {
 		return nil, err
 	}
-	am, err := LoadExistingAccountManager(config)
+	am, err := account.LoadExistingAccountManager(config.WalletConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -170,8 +172,8 @@ func readHexFlag(cmd *cobra.Command, flag string) ([]byte, error) {
 	return res, err
 }
 
-func execEvmCmdDeploy(cmd *cobra.Command, config *WalletConfig) error {
-	accountNumber, err := cmd.Flags().GetUint64(keyCmdName)
+func execEvmCmdDeploy(cmd *cobra.Command, config *types.EvmConfig) error {
+	accountNumber, err := cmd.Flags().GetUint64(args.KeyCmdName)
 	if err != nil {
 		return fmt.Errorf("key parameter read failed: %w", err)
 	}
@@ -180,16 +182,16 @@ func execEvmCmdDeploy(cmd *cobra.Command, config *WalletConfig) error {
 		return fmt.Errorf("evm wallet init failed: %w", err)
 	}
 	defer w.Shutdown()
-	code, err := readHexFlag(cmd, dataCmdName)
+	code, err := readHexFlag(cmd, DataCmdName)
 	if err != nil {
-		return fmt.Errorf("failed to read '%s' parameter: %w", dataCmdName, err)
+		return fmt.Errorf("failed to read '%s' parameter: %w", DataCmdName, err)
 	}
-	if len(code) > scSizeLimit24Kb {
+	if len(code) > ScSizeLimit24Kb {
 		return fmt.Errorf("contract code too big, maximum size is 24Kb")
 	}
-	maxGas, err := cmd.Flags().GetUint64(maxGasCmdName)
+	maxGas, err := cmd.Flags().GetUint64(MaxGasCmdName)
 	if err != nil {
-		return fmt.Errorf("failed to read '%s' parameter: %w", maxGasCmdName, err)
+		return fmt.Errorf("failed to read '%s' parameter: %w", MaxGasCmdName, err)
 	}
 	attributes := &evmclient.TxAttributes{
 		Data: code,
@@ -202,12 +204,12 @@ func execEvmCmdDeploy(cmd *cobra.Command, config *WalletConfig) error {
 		}
 		return fmt.Errorf("deploy failed, %w", err)
 	}
-	printResult(config.Base.ConsoleWriter, result)
+	printResult(config.WalletConfig.Base.ConsoleWriter, result)
 	return nil
 }
 
-func execEvmCmdExecute(cmd *cobra.Command, config *WalletConfig) error {
-	accountNumber, err := cmd.Flags().GetUint64(keyCmdName)
+func execEvmCmdExecute(cmd *cobra.Command, config *types.EvmConfig) error {
+	accountNumber, err := cmd.Flags().GetUint64(args.KeyCmdName)
 	if err != nil {
 		return fmt.Errorf("key parameter read failed: %w", err)
 	}
@@ -217,21 +219,21 @@ func execEvmCmdExecute(cmd *cobra.Command, config *WalletConfig) error {
 	}
 	defer w.Shutdown()
 	// get to address
-	toAddr, err := readHexFlag(cmd, addressCmdName)
+	toAddr, err := readHexFlag(cmd, args.AddressCmdName)
 	if err != nil {
-		return fmt.Errorf("failed to read '%s' parameter: %w", addressCmdName, err)
+		return fmt.Errorf("failed to read '%s' parameter: %w", args.AddressCmdName, err)
 	}
-	if len(toAddr) != defaultEvmAddrLen {
+	if len(toAddr) != DefaultEvmAddrLen {
 		return fmt.Errorf("invalid address %x, address must be 20 bytes", toAddr)
 	}
 	// read binary contract file
-	fnIDAndArg, err := readHexFlag(cmd, dataCmdName)
+	fnIDAndArg, err := readHexFlag(cmd, DataCmdName)
 	if err != nil {
-		return fmt.Errorf("failed to read '%s' parameter: %w", dataCmdName, err)
+		return fmt.Errorf("failed to read '%s' parameter: %w", DataCmdName, err)
 	}
-	maxGas, err := cmd.Flags().GetUint64(maxGasCmdName)
+	maxGas, err := cmd.Flags().GetUint64(MaxGasCmdName)
 	if err != nil {
-		return fmt.Errorf("failed to read '%s' parameter: %w", maxGasCmdName, err)
+		return fmt.Errorf("failed to read '%s' parameter: %w", MaxGasCmdName, err)
 	}
 	attributes := &evmclient.TxAttributes{
 		To:   toAddr,
@@ -245,12 +247,12 @@ func execEvmCmdExecute(cmd *cobra.Command, config *WalletConfig) error {
 		}
 		return fmt.Errorf("excution failed, %w", err)
 	}
-	printResult(config.Base.ConsoleWriter, result)
+	printResult(config.WalletConfig.Base.ConsoleWriter, result)
 	return nil
 }
 
-func execEvmCmdCall(cmd *cobra.Command, config *WalletConfig) error {
-	accountNumber, err := cmd.Flags().GetUint64(keyCmdName)
+func execEvmCmdCall(cmd *cobra.Command, config *types.EvmConfig) error {
+	accountNumber, err := cmd.Flags().GetUint64(args.KeyCmdName)
 	if err != nil {
 		return fmt.Errorf("key parameter read failed: %w", err)
 	}
@@ -260,28 +262,28 @@ func execEvmCmdCall(cmd *cobra.Command, config *WalletConfig) error {
 	}
 	defer w.Shutdown()
 	// get to address
-	toAddr, err := readHexFlag(cmd, addressCmdName)
+	toAddr, err := readHexFlag(cmd, args.AddressCmdName)
 	if err != nil {
-		return fmt.Errorf("failed to read '%s' parameter: %w", addressCmdName, err)
+		return fmt.Errorf("failed to read '%s' parameter: %w", args.AddressCmdName, err)
 	}
-	if len(toAddr) != defaultEvmAddrLen {
+	if len(toAddr) != DefaultEvmAddrLen {
 		return fmt.Errorf("invalid address %x, address must be 20 bytes", toAddr)
 	}
 	// data
-	data, err := readHexFlag(cmd, dataCmdName)
+	data, err := readHexFlag(cmd, DataCmdName)
 	if err != nil {
-		return fmt.Errorf("failed to read '%s' parameter: %w", dataCmdName, err)
+		return fmt.Errorf("failed to read '%s' parameter: %w", DataCmdName, err)
 	}
-	if len(data) > scSizeLimit24Kb {
+	if len(data) > ScSizeLimit24Kb {
 		return fmt.Errorf("")
 	}
-	maxGas, err := cmd.Flags().GetUint64(maxGasCmdName)
+	maxGas, err := cmd.Flags().GetUint64(MaxGasCmdName)
 	if err != nil {
-		return fmt.Errorf("failed to read '%s' parameter: %w", maxGasCmdName, err)
+		return fmt.Errorf("failed to read '%s' parameter: %w", MaxGasCmdName, err)
 	}
-	value, err := cmd.Flags().GetUint64(valueCmdName)
+	value, err := cmd.Flags().GetUint64(ValueCmdName)
 	if err != nil {
-		return fmt.Errorf("failed to read '%s' parameter: %w", valueCmdName, err)
+		return fmt.Errorf("failed to read '%s' parameter: %w", ValueCmdName, err)
 	}
 	attributes := &evmclient.CallAttributes{
 		To:    toAddr,
@@ -293,12 +295,12 @@ func execEvmCmdCall(cmd *cobra.Command, config *WalletConfig) error {
 	if err != nil {
 		return fmt.Errorf("call failed, %w", err)
 	}
-	printResult(config.Base.ConsoleWriter, result)
+	printResult(config.WalletConfig.Base.ConsoleWriter, result)
 	return nil
 }
 
-func execEvmCmdBalance(cmd *cobra.Command, config *WalletConfig) error {
-	accountNumber, err := cmd.Flags().GetUint64(keyCmdName)
+func execEvmCmdBalance(cmd *cobra.Command, config *types.EvmConfig) error {
+	accountNumber, err := cmd.Flags().GetUint64(args.KeyCmdName)
 	if err != nil {
 		return fmt.Errorf("key parameter read failed: %w", err)
 	}
@@ -314,7 +316,7 @@ func execEvmCmdBalance(cmd *cobra.Command, config *WalletConfig) error {
 	inAlpha := evmwallet.ConvertBalanceToAlpha(balance)
 	balanceStr := util.AmountToString(inAlpha, 8)
 	balanceEthStr := util.AmountToString(balance.Uint64(), 18)
-	config.Base.ConsoleWriter.Println(fmt.Sprintf("#%d %s (eth: %s)", accountNumber, balanceStr, balanceEthStr))
+	config.WalletConfig.Base.ConsoleWriter.Println(fmt.Sprintf("#%d %s (eth: %s)", accountNumber, balanceStr, balanceEthStr))
 	return nil
 }
 

@@ -35,7 +35,6 @@ type (
 )
 
 const (
-	DefaultServerAddr            = ":9543"
 	DefaultMaxRecvMsgSize        = 1024 * 1024 * 4
 	DefaultMaxSendMsgSize        = math.MaxInt32
 	DefaultMaxGetBlocksBatchSize = 100

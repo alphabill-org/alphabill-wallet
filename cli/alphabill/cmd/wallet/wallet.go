@@ -2,13 +2,11 @@ package wallet
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
-	"syscall"
 
 	"github.com/alphabill-org/alphabill/logger"
 	"github.com/alphabill-org/alphabill/observability"
@@ -20,42 +18,19 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 	"go.opentelemetry.io/otel/trace"
-	"golang.org/x/term"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
+	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/bills"
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/evm"
+	clifees "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/fees"
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/tokens"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money"
-	moneyclient "github.com/alphabill-org/alphabill-wallet/wallet/money/backend/client"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend/client"
 	"github.com/alphabill-org/alphabill-wallet/wallet/unitlock"
-)
-
-type WalletConfig struct {
-	Base            *types.BaseConfiguration
-	WalletHomeDir   string
-	PasswordFromArg string
-	PromptPassword  bool
-}
-
-const (
-	defaultAlphabillApiURL = "localhost:9654"
-	passwordPromptUsage    = "password (interactive from prompt)"
-	passwordArgUsage       = "password (non-interactive from args)"
-
-	alphabillApiURLCmdName  = "alphabill-api-uri"
-	seedCmdName             = "seed"
-	addressCmdName          = "address"
-	amountCmdName           = "amount"
-	passwordPromptCmdName   = "password"
-	passwordArgCmdName      = "pn"
-	walletLocationCmdName   = "wallet-location"
-	keyCmdName              = "key"
-	waitForConfCmdName      = "wait-for-confirmation"
-	totalCmdName            = "total"
-	quietCmdName            = "quiet"
-	showUnswappedCmdName    = "show-unswapped"
-	billIdCmdName           = "bill-id"
-	systemIdentifierCmdName = "system-identifier"
 )
 
 type Factory interface {
@@ -65,7 +40,7 @@ type Factory interface {
 
 // NewWalletCmd creates a new cobra command for the wallet component.
 func NewWalletCmd(baseConfig *types.BaseConfiguration, obsF Factory) *cobra.Command {
-	config := &WalletConfig{Base: baseConfig}
+	config := &types.WalletConfig{Base: baseConfig}
 	var walletCmd = &cobra.Command{
 		Use:   "wallet",
 		Short: "cli for managing alphabill wallet",
@@ -80,59 +55,59 @@ func NewWalletCmd(baseConfig *types.BaseConfiguration, obsF Factory) *cobra.Comm
 			// when command returns error the PostRun hooks are not triggered so use OnFinalize to end the span
 			cobra.OnFinalize(func() { span.End() })
 
-			if err := initWalletConfig(ccmd, config); err != nil {
+			if err := InitWalletConfig(ccmd, config); err != nil {
 				return fmt.Errorf("initializing wallet configuration: %w", err)
 			}
 			span.SetAttributes(attribute.String("wallet.home", config.WalletHomeDir))
 			return nil
 		},
 	}
-	walletCmd.AddCommand(NewWalletBillsCmd(config))
-	walletCmd.AddCommand(NewWalletFeesCmd(config))
-	walletCmd.AddCommand(createCmd(config))
-	walletCmd.AddCommand(sendCmd(config))
-	walletCmd.AddCommand(getPubKeysCmd(config))
-	walletCmd.AddCommand(getBalanceCmd(config))
-	walletCmd.AddCommand(collectDustCmd(config))
-	walletCmd.AddCommand(addKeyCmd(config))
-	walletCmd.AddCommand(tokenCmd(config))
-	walletCmd.AddCommand(NewEvmCmd(config))
+	walletCmd.AddCommand(bills.NewBillsCmd(config))
+	walletCmd.AddCommand(clifees.NewFeesCmd(config))
+	walletCmd.AddCommand(CreateCmd(config))
+	walletCmd.AddCommand(SendCmd(config))
+	walletCmd.AddCommand(GetPubKeysCmd(config))
+	walletCmd.AddCommand(GetBalanceCmd(config))
+	walletCmd.AddCommand(CollectDustCmd(config))
+	walletCmd.AddCommand(AddKeyCmd(config))
+	walletCmd.AddCommand(tokens.NewTokenCmd(config))
+	walletCmd.AddCommand(evm.NewEvmCmd(config))
 	// add passwords flags for (encrypted)wallet
 	//walletCmd.PersistentFlags().BoolP(passwordPromptCmdName, "p", false, passwordPromptUsage)
 	//walletCmd.PersistentFlags().String(passwordArgCmdName, "", passwordArgUsage)
-	walletCmd.PersistentFlags().BoolVarP(&config.PromptPassword, passwordPromptCmdName, "p", false, passwordPromptUsage)
-	walletCmd.PersistentFlags().StringVar(&config.PasswordFromArg, passwordArgCmdName, "", passwordArgUsage)
-	walletCmd.PersistentFlags().StringVarP(&config.WalletHomeDir, walletLocationCmdName, "l", "", "wallet home directory (default $AB_HOME/wallet)")
+	walletCmd.PersistentFlags().BoolVarP(&config.PromptPassword, args.PasswordPromptCmdName, "p", false, args.PasswordPromptUsage)
+	walletCmd.PersistentFlags().StringVar(&config.PasswordFromArg, args.PasswordArgCmdName, "", args.PasswordArgUsage)
+	walletCmd.PersistentFlags().StringVarP(&config.WalletHomeDir, args.WalletLocationCmdName, "l", "", "wallet home directory (default $AB_HOME/wallet)")
 	return walletCmd
 }
 
-func createCmd(config *WalletConfig) *cobra.Command {
+func CreateCmd(config *types.WalletConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "create",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return execCreateCmd(cmd, config)
+			return ExecCreateCmd(cmd, config)
 		},
 	}
-	cmd.Flags().StringP(seedCmdName, "s", "", "mnemonic seed, the number of words should be 12, 15, 18, 21 or 24")
+	cmd.Flags().StringP(args.SeedCmdName, "s", "", "mnemonic seed, the number of words should be 12, 15, 18, 21 or 24")
 	return cmd
 }
 
-func execCreateCmd(cmd *cobra.Command, config *WalletConfig) (err error) {
+func ExecCreateCmd(cmd *cobra.Command, config *types.WalletConfig) (err error) {
 	mnemonic := ""
-	if cmd.Flags().Changed(seedCmdName) {
+	if cmd.Flags().Changed(args.SeedCmdName) {
 		// when user omits value for "s" flag, ie by executing
 		// wallet create -s --wallet-location some/path
 		// then Cobra eats next param name (--wallet-location) as value for "s". So we validate the mnemonic here to
 		// catch this case as otherwise we most likely get error about creating wallet db which is confusing
-		if mnemonic, err = cmd.Flags().GetString(seedCmdName); err != nil {
-			return fmt.Errorf("failed to read the value of the %q flag: %w", seedCmdName, err)
+		if mnemonic, err = cmd.Flags().GetString(args.SeedCmdName); err != nil {
+			return fmt.Errorf("failed to read the value of the %q flag: %w", args.SeedCmdName, err)
 		}
 		if !bip39.IsMnemonicValid(mnemonic) {
-			return fmt.Errorf("invalid value %q for flag %q (mnemonic)", mnemonic, seedCmdName)
+			return fmt.Errorf("invalid value %q for flag %q (mnemonic)", mnemonic, args.SeedCmdName)
 		}
 	}
 
-	password, err := createPassphrase(config)
+	password, err := cliaccount.CreatePassphrase(config)
 	if err != nil {
 		return err
 	}
@@ -158,44 +133,45 @@ func execCreateCmd(cmd *cobra.Command, config *WalletConfig) (err error) {
 	return nil
 }
 
-func sendCmd(config *WalletConfig) *cobra.Command {
+func SendCmd(config *types.WalletConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "send",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return execSendCmd(cmd.Context(), cmd, config)
+			return ExecSendCmd(cmd.Context(), cmd, config)
 		},
 	}
-	cmd.Flags().StringSliceP(addressCmdName, "a", nil, "compressed secp256k1 public key(s) of "+
+	cmd.Flags().StringSliceP(args.AddressCmdName, "a", nil, "compressed secp256k1 public key(s) of "+
 		"the receiver(s) in hexadecimal format, must start with 0x and be 68 characters in length, must match with "+
 		"amounts")
-	cmd.Flags().StringSliceP(amountCmdName, "v", nil, "the amount(s) to send to the "+
+	cmd.Flags().StringSliceP(args.AmountCmdName, "v", nil, "the amount(s) to send to the "+
 		"receiver(s), must match with addresses")
-	cmd.Flags().StringP(alphabillApiURLCmdName, "r", defaultAlphabillApiURL, "alphabill API uri to connect to")
-	cmd.Flags().Uint64P(keyCmdName, "k", 1, "which key to use for sending the transaction")
+	cmd.Flags().StringP(args.AlphabillApiURLCmdName, "r", args.DefaultAlphabillApiURL, "alphabill API uri to connect to")
+	cmd.Flags().Uint64P(args.KeyCmdName, "k", 1, "which key to use for sending the transaction")
 	// use string instead of boolean as boolean requires equals sign between name and value e.g. w=[true|false]
-	cmd.Flags().StringP(waitForConfCmdName, "w", "true", "waits for transaction confirmation on the blockchain, otherwise just broadcasts the transaction")
-	if err := cmd.MarkFlagRequired(addressCmdName); err != nil {
+	cmd.Flags().StringP(args.WaitForConfCmdName, "w", "true", "waits for transaction confirmation "+
+		"on the blockchain, otherwise just broadcasts the transaction")
+	if err := cmd.MarkFlagRequired(args.AddressCmdName); err != nil {
 		panic(err)
 	}
-	if err := cmd.MarkFlagRequired(amountCmdName); err != nil {
+	if err := cmd.MarkFlagRequired(args.AmountCmdName); err != nil {
 		panic(err)
 	}
 	return cmd
 }
 
-func execSendCmd(ctx context.Context, cmd *cobra.Command, config *WalletConfig) error {
+func ExecSendCmd(ctx context.Context, cmd *cobra.Command, config *types.WalletConfig) error {
 	ctx, span := config.Tracer().Start(ctx, "execSendCmd")
 	defer span.End()
 
-	apiUri, err := cmd.Flags().GetString(alphabillApiURLCmdName)
+	apiUri, err := cmd.Flags().GetString(args.AlphabillApiURLCmdName)
 	if err != nil {
 		return err
 	}
-	restClient, err := moneyclient.New(apiUri, config.Base.Observe)
+	restClient, err := client.New(apiUri, config.Base.Observe)
 	if err != nil {
 		return err
 	}
-	am, err := LoadExistingAccountManager(config)
+	am, err := cliaccount.LoadExistingAccountManager(config)
 	if err != nil {
 		return err
 	}
@@ -216,14 +192,14 @@ func execSendCmd(ctx context.Context, cmd *cobra.Command, config *WalletConfig) 
 	}
 	defer w.Close()
 
-	accountNumber, err := cmd.Flags().GetUint64(keyCmdName)
+	accountNumber, err := cmd.Flags().GetUint64(args.KeyCmdName)
 	if err != nil {
 		return err
 	}
 	if accountNumber == 0 {
-		return fmt.Errorf("invalid parameter for flag %q: 0 is not a valid account key", keyCmdName)
+		return fmt.Errorf("invalid parameter for flag %q: 0 is not a valid account key", args.KeyCmdName)
 	}
-	waitForConfStr, err := cmd.Flags().GetString(waitForConfCmdName)
+	waitForConfStr, err := cmd.Flags().GetString(args.WaitForConfCmdName)
 	if err != nil {
 		return err
 	}
@@ -231,15 +207,15 @@ func execSendCmd(ctx context.Context, cmd *cobra.Command, config *WalletConfig) 
 	if err != nil {
 		return err
 	}
-	receiverPubKeys, err := cmd.Flags().GetStringSlice(addressCmdName)
+	receiverPubKeys, err := cmd.Flags().GetStringSlice(args.AddressCmdName)
 	if err != nil {
 		return err
 	}
-	receiverAmounts, err := cmd.Flags().GetStringSlice(amountCmdName)
+	receiverAmounts, err := cmd.Flags().GetStringSlice(args.AmountCmdName)
 	if err != nil {
 		return err
 	}
-	receivers, err := groupPubKeysAndAmounts(receiverPubKeys, receiverAmounts)
+	receivers, err := GroupPubKeysAndAmounts(receiverPubKeys, receiverAmounts)
 	if err != nil {
 		return err
 	}
@@ -261,37 +237,37 @@ func execSendCmd(ctx context.Context, cmd *cobra.Command, config *WalletConfig) 
 	return nil
 }
 
-func getBalanceCmd(config *WalletConfig) *cobra.Command {
+func GetBalanceCmd(config *types.WalletConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "get-balance",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return execGetBalanceCmd(cmd, config)
+			return ExecGetBalanceCmd(cmd, config)
 		},
 	}
-	cmd.Flags().StringP(alphabillApiURLCmdName, "r", defaultAlphabillApiURL, "alphabill API uri to connect to")
-	cmd.Flags().Uint64P(keyCmdName, "k", 0, "specifies which key balance to query "+
+	cmd.Flags().StringP(args.AlphabillApiURLCmdName, "r", args.DefaultAlphabillApiURL, "alphabill API uri to connect to")
+	cmd.Flags().Uint64P(args.KeyCmdName, "k", 0, "specifies which key balance to query "+
 		"(by default returns all key balances including total balance over all keys)")
-	cmd.Flags().BoolP(totalCmdName, "t", false,
+	cmd.Flags().BoolP(args.TotalCmdName, "t", false,
 		"if specified shows only total balance over all accounts")
-	cmd.Flags().BoolP(quietCmdName, "q", false, "hides info irrelevant for scripting, "+
+	cmd.Flags().BoolP(args.QuietCmdName, "q", false, "hides info irrelevant for scripting, "+
 		"e.g. account key numbers, can only be used together with key or total flag")
-	cmd.Flags().BoolP(showUnswappedCmdName, "s", false, "includes unswapped dust bills in balance output")
+	cmd.Flags().BoolP(args.ShowUnswappedCmdName, "s", false, "includes unswapped dust bills in balance output")
 	return cmd
 }
 
-func execGetBalanceCmd(cmd *cobra.Command, config *WalletConfig) error {
+func ExecGetBalanceCmd(cmd *cobra.Command, config *types.WalletConfig) error {
 	ctx, span := config.Tracer().Start(cmd.Context(), "execGetBalanceCmd")
 	defer span.End()
 
-	uri, err := cmd.Flags().GetString(alphabillApiURLCmdName)
+	uri, err := cmd.Flags().GetString(args.AlphabillApiURLCmdName)
 	if err != nil {
 		return err
 	}
-	restClient, err := moneyclient.New(uri, config.Base.Observe)
+	restClient, err := client.New(uri, config.Base.Observe)
 	if err != nil {
 		return err
 	}
-	am, err := LoadExistingAccountManager(config)
+	am, err := cliaccount.LoadExistingAccountManager(config)
 	if err != nil {
 		return err
 	}
@@ -315,19 +291,19 @@ func execGetBalanceCmd(cmd *cobra.Command, config *WalletConfig) error {
 	}
 	defer w.Close()
 
-	accountNumber, err := cmd.Flags().GetUint64(keyCmdName)
+	accountNumber, err := cmd.Flags().GetUint64(args.KeyCmdName)
 	if err != nil {
 		return err
 	}
-	total, err := cmd.Flags().GetBool(totalCmdName)
+	total, err := cmd.Flags().GetBool(args.TotalCmdName)
 	if err != nil {
 		return err
 	}
-	quiet, err := cmd.Flags().GetBool(quietCmdName)
+	quiet, err := cmd.Flags().GetBool(args.QuietCmdName)
 	if err != nil {
 		return err
 	}
-	showUnswapped, err := cmd.Flags().GetBool(showUnswappedCmdName)
+	showUnswapped, err := cmd.Flags().GetBool(args.ShowUnswappedCmdName)
 	if err != nil {
 		return err
 	}
@@ -365,19 +341,19 @@ func execGetBalanceCmd(cmd *cobra.Command, config *WalletConfig) error {
 	return nil
 }
 
-func getPubKeysCmd(config *WalletConfig) *cobra.Command {
+func GetPubKeysCmd(config *types.WalletConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "get-pubkeys",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return execGetPubKeysCmd(cmd, config)
+			return ExecGetPubKeysCmd(cmd, config)
 		},
 	}
-	cmd.Flags().BoolP(quietCmdName, "q", false, "hides info irrelevant for scripting, e.g. account key numbers")
+	cmd.Flags().BoolP(args.QuietCmdName, "q", false, "hides info irrelevant for scripting, e.g. account key numbers")
 	return cmd
 }
 
-func execGetPubKeysCmd(cmd *cobra.Command, config *WalletConfig) error {
-	am, err := LoadExistingAccountManager(config)
+func ExecGetPubKeysCmd(cmd *cobra.Command, config *types.WalletConfig) error {
+	am, err := cliaccount.LoadExistingAccountManager(config)
 	if err != nil {
 		return err
 	}
@@ -387,7 +363,7 @@ func execGetPubKeysCmd(cmd *cobra.Command, config *WalletConfig) error {
 	if err != nil {
 		return err
 	}
-	hideKeyNumber, _ := cmd.Flags().GetBool(quietCmdName)
+	hideKeyNumber, _ := cmd.Flags().GetBool(args.QuietCmdName)
 	for accIdx, accPubKey := range pubKeys {
 		if hideKeyNumber {
 			config.Base.ConsoleWriter.Println(hexutil.Encode(accPubKey))
@@ -398,34 +374,34 @@ func execGetPubKeysCmd(cmd *cobra.Command, config *WalletConfig) error {
 	return nil
 }
 
-func collectDustCmd(config *WalletConfig) *cobra.Command {
+func CollectDustCmd(config *types.WalletConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "collect-dust",
 		Short: "consolidates bills",
 		Long:  "consolidates all bills into a single bill",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return execCollectDust(cmd, config)
+			return ExecCollectDust(cmd, config)
 		},
 	}
-	cmd.Flags().StringP(alphabillApiURLCmdName, "r", defaultAlphabillApiURL, "alphabill API uri to connect to")
-	cmd.Flags().Uint64P(keyCmdName, "k", 0, "which key to use for dust collection, 0 for all bills from all accounts")
+	cmd.Flags().StringP(args.AlphabillApiURLCmdName, "r", args.DefaultAlphabillApiURL, "alphabill API uri to connect to")
+	cmd.Flags().Uint64P(args.KeyCmdName, "k", 0, "which key to use for dust collection, 0 for all bills from all accounts")
 	return cmd
 }
 
-func execCollectDust(cmd *cobra.Command, config *WalletConfig) error {
-	apiUri, err := cmd.Flags().GetString(alphabillApiURLCmdName)
+func ExecCollectDust(cmd *cobra.Command, config *types.WalletConfig) error {
+	apiUri, err := cmd.Flags().GetString(args.AlphabillApiURLCmdName)
 	if err != nil {
 		return err
 	}
-	accountNumber, err := cmd.Flags().GetUint64(keyCmdName)
+	accountNumber, err := cmd.Flags().GetUint64(args.KeyCmdName)
 	if err != nil {
 		return err
 	}
-	restClient, err := moneyclient.New(apiUri, config.Base.Observe)
+	restClient, err := client.New(apiUri, config.Base.Observe)
 	if err != nil {
 		return err
 	}
-	am, err := LoadExistingAccountManager(config)
+	am, err := cliaccount.LoadExistingAccountManager(config)
 	if err != nil {
 		return err
 	}
@@ -482,19 +458,19 @@ func execCollectDust(cmd *cobra.Command, config *WalletConfig) error {
 	return nil
 }
 
-func addKeyCmd(config *WalletConfig) *cobra.Command {
+func AddKeyCmd(config *types.WalletConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add-key",
 		Short: "adds the next key in the series to the wallet",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return execAddKeyCmd(cmd, config)
+			return ExecAddKeyCmd(cmd, config)
 		},
 	}
 	return cmd
 }
 
-func execAddKeyCmd(cmd *cobra.Command, config *WalletConfig) error {
-	am, err := LoadExistingAccountManager(config)
+func ExecAddKeyCmd(cmd *cobra.Command, config *types.WalletConfig) error {
+	am, err := cliaccount.LoadExistingAccountManager(config)
 	if err != nil {
 		return err
 	}
@@ -508,20 +484,8 @@ func execAddKeyCmd(cmd *cobra.Command, config *WalletConfig) error {
 	return nil
 }
 
-func LoadExistingAccountManager(config *WalletConfig) (account.Manager, error) {
-	pw, err := getPassphrase(config, "Enter passphrase: ")
-	if err != nil {
-		return nil, err
-	}
-	am, err := account.NewManager(config.WalletHomeDir, pw, false)
-	if err != nil {
-		return nil, err
-	}
-	return am, nil
-}
-
-func initWalletConfig(cmd *cobra.Command, config *WalletConfig) error {
-	walletLocation, err := cmd.Flags().GetString(walletLocationCmdName)
+func InitWalletConfig(cmd *cobra.Command, config *types.WalletConfig) error {
+	walletLocation, err := cmd.Flags().GetString(args.WalletLocationCmdName)
 	if err != nil {
 		return err
 	}
@@ -533,59 +497,7 @@ func initWalletConfig(cmd *cobra.Command, config *WalletConfig) error {
 	return nil
 }
 
-func createPassphrase(config *WalletConfig) (string, error) {
-	if config.PasswordFromArg != "" {
-		return config.PasswordFromArg, nil
-	}
-	if !config.PromptPassword {
-		return "", nil
-	}
-	p1, err := readPassword(config.Base.ConsoleWriter, "Create new passphrase: ")
-	if err != nil {
-		return "", err
-	}
-	p2, err := readPassword(config.Base.ConsoleWriter, "Confirm passphrase: ")
-	if err != nil {
-		return "", err
-	}
-	if p1 != p2 {
-		return "", errors.New("passphrases do not match")
-	}
-	return p1, nil
-}
-
-func getPassphrase(config *WalletConfig, promptMessage string) (string, error) {
-	if config.PasswordFromArg != "" {
-		return config.PasswordFromArg, nil
-	}
-	if !config.PromptPassword {
-		return "", nil
-	}
-	return readPassword(config.Base.ConsoleWriter, promptMessage)
-}
-
-func readPassword(consoleWriter types.ConsoleWrapper, promptMessage string) (string, error) {
-	consoleWriter.Print(promptMessage)
-	passwordBytes, err := term.ReadPassword(syscall.Stdin)
-	if err != nil {
-		return "", err
-	}
-	consoleWriter.Println("") // line break after reading password
-	return string(passwordBytes), nil
-}
-
-func PubKeyHexToBytes(s string) ([]byte, bool) {
-	if len(s) != 68 {
-		return nil, false
-	}
-	pubKeyBytes, err := hexutil.Decode(s)
-	if err != nil {
-		return nil, false
-	}
-	return pubKeyBytes, true
-}
-
-func groupPubKeysAndAmounts(pubKeys []string, amounts []string) ([]money.ReceiverData, error) {
+func GroupPubKeysAndAmounts(pubKeys []string, amounts []string) ([]money.ReceiverData, error) {
 	if len(pubKeys) != len(amounts) {
 		return nil, fmt.Errorf("must specify the same amount of addresses and amounts")
 	}
@@ -605,8 +517,4 @@ func groupPubKeysAndAmounts(pubKeys []string, amounts []string) ([]money.Receive
 		})
 	}
 	return receivers, nil
-}
-
-func (wc *WalletConfig) Tracer() trace.Tracer {
-	return wc.Base.Observe.Tracer("main")
 }

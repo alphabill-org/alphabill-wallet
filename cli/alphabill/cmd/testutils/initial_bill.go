@@ -16,19 +16,20 @@ import (
 )
 
 var (
-	defaultInitialBillID = money.NewBillID(nil, []byte{1})
+	DefaultInitialBillID = money.NewBillID(nil, []byte{1})
+	FCRID                = money.NewFeeCreditRecordID(nil, []byte{1})
 )
 
 func SpendInitialBillWithFeeCredits(t *testing.T, abNet *testpartition.AlphabillNetwork, initialBillValue uint64, pk []byte) uint64 {
 	absoluteTimeout := uint64(10000)
 	txFee := uint64(1)
 	feeAmount := uint64(2)
-	unitID := defaultInitialBillID
+	unitID := DefaultInitialBillID
 	moneyPart, err := abNet.GetNodePartition(money.DefaultSystemIdentifier)
 	require.NoError(t, err)
 
 	// create transferFC
-	transferFC, err := createTransferFC(feeAmount+txFee, unitID, fcrID, 0, absoluteTimeout)
+	transferFC, err := createTransferFC(feeAmount+txFee, money.DefaultSystemIdentifier, unitID, FCRID, 0, absoluteTimeout)
 	require.NoError(t, err)
 
 	// send transferFC
@@ -37,7 +38,7 @@ func SpendInitialBillWithFeeCredits(t *testing.T, abNet *testpartition.Alphabill
 	require.NoError(t, err, "transfer fee credit tx failed")
 	// verify proof
 	require.NoError(t, types.VerifyTxProof(transferFCProof, transferFCRecord, abNet.RootPartition.TrustBase, crypto.SHA256))
-	unitState, err := testpartition.WaitUnitProof(t, moneyPart, defaultInitialBillID, transferFC)
+	unitState, err := testpartition.WaitUnitProof(t, moneyPart, DefaultInitialBillID, transferFC)
 	require.NoError(t, err)
 	ucValidator, err := abNet.GetValidator(money.DefaultSystemIdentifier)
 	require.NoError(t, err)
@@ -46,7 +47,7 @@ func SpendInitialBillWithFeeCredits(t *testing.T, abNet *testpartition.Alphabill
 	require.NoError(t, unitState.UnmarshalUnitData(&bill))
 	require.EqualValues(t, initialBillValue-txFee-feeAmount, bill.V)
 	// create addFC
-	addFC, err := createAddFC(fcrID, templates.AlwaysTrueBytes(), transferFCRecord, transferFCProof, absoluteTimeout, feeAmount)
+	addFC, err := createAddFC(money.DefaultSystemIdentifier, FCRID, templates.AlwaysTrueBytes(), transferFCRecord, transferFCProof, absoluteTimeout, feeAmount)
 	require.NoError(t, err)
 
 	// send addFC
@@ -56,7 +57,7 @@ func SpendInitialBillWithFeeCredits(t *testing.T, abNet *testpartition.Alphabill
 
 	// create transfer tx
 	remainingValue := initialBillValue - feeAmount - txFee
-	tx, err := createTransferTx(pk, unitID, remainingValue, fcrID, absoluteTimeout, transferFCRecord.TransactionOrder.Hash(crypto.SHA256))
+	tx, err := createTransferTx(pk, unitID, remainingValue, FCRID, absoluteTimeout, transferFCRecord.TransactionOrder.Hash(crypto.SHA256))
 	require.NoError(t, err)
 
 	// send transfer tx
@@ -93,10 +94,10 @@ func createTransferTx(pubKey []byte, billID []byte, billValue uint64, fcrID []by
 	return tx, nil
 }
 
-func createTransferFC(feeAmount uint64, unitID []byte, targetUnitID []byte, t1, t2 uint64) (*types.TransactionOrder, error) {
+func createTransferFC(feeAmount uint64, targetSystemID types.SystemID, unitID, targetUnitID []byte, t1, t2 uint64) (*types.TransactionOrder, error) {
 	attr := &transactions.TransferFeeCreditAttributes{
 		Amount:                 feeAmount,
-		TargetSystemIdentifier: money.DefaultSystemIdentifier,
+		TargetSystemIdentifier: targetSystemID,
 		TargetRecordID:         targetUnitID,
 		EarliestAdditionTime:   t1,
 		LatestAdditionTime:     t2,
@@ -121,7 +122,7 @@ func createTransferFC(feeAmount uint64, unitID []byte, targetUnitID []byte, t1, 
 	return tx, nil
 }
 
-func createAddFC(unitID []byte, ownerCondition []byte, transferFC *types.TransactionRecord, transferFCProof *types.TxProof, timeout uint64, maxFee uint64) (*types.TransactionOrder, error) {
+func createAddFC(systemID types.SystemID, unitID []byte, ownerCondition []byte, transferFC *types.TransactionRecord, transferFCProof *types.TxProof, timeout uint64, maxFee uint64) (*types.TransactionOrder, error) {
 	attr := &transactions.AddFeeCreditAttributes{
 		FeeCreditTransfer:       transferFC,
 		FeeCreditTransferProof:  transferFCProof,
@@ -133,7 +134,7 @@ func createAddFC(unitID []byte, ownerCondition []byte, transferFC *types.Transac
 	}
 	tx := &types.TransactionOrder{
 		Payload: &types.Payload{
-			SystemID:   money.DefaultSystemIdentifier,
+			SystemID:   systemID,
 			Type:       transactions.PayloadTypeAddFeeCredit,
 			UnitID:     unitID,
 			Attributes: attrBytes,

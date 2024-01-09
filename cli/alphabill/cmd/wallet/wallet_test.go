@@ -1,12 +1,6 @@
 package wallet
 
 import (
-	"encoding/base64"
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -16,27 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils/mocksrv"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
-	"github.com/alphabill-org/alphabill-wallet/wallet/account"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend/client"
-)
-
-const walletBaseDir = "wallet"
-
-type (
-	backendMockReturnConf struct {
-		balance        uint64
-		blockHeight    uint64
-		targetBill     *wallet.Bill
-		feeCreditBill  *wallet.Bill
-		proofList      string
-		customBillList string
-		customPath     string
-		customFullPath string
-		customResponse string
-	}
 )
 
 func TestWalletCreateCmd(t *testing.T) {
@@ -48,7 +25,7 @@ func TestWalletCreateCmd(t *testing.T) {
 	err := wcmd.Execute()
 	require.NoError(t, err)
 	require.True(t, util.FileExists(filepath.Join(homeDir, "wallet", "accounts.db")))
-	verifyStdout(t, outputWriter,
+	testutils.VerifyStdout(t, outputWriter,
 		"The following mnemonic key can be used to recover your wallet. Please write it down now, and keep it in a safe, offline place.")
 }
 
@@ -62,7 +39,7 @@ func TestWalletCreateCmd_encrypt(t *testing.T) {
 	err := wcmd.Execute()
 	require.NoError(t, err)
 	require.True(t, util.FileExists(filepath.Join(homeDir, "wallet", "accounts.db")))
-	verifyStdout(t, outputWriter,
+	testutils.VerifyStdout(t, outputWriter,
 		"The following mnemonic key can be used to recover your wallet. Please write it down now, and keep it in a safe, offline place.")
 
 	// verify wallet is encrypted
@@ -97,89 +74,89 @@ func TestWalletCreateCmd_invalidSeed(t *testing.T) {
 }
 
 func TestWalletGetBalanceCmd(t *testing.T) {
-	homedir := createNewTestWallet(t)
-	mockServer, addr := mockBackendCalls(&backendMockReturnConf{balance: 15 * 1e8})
+	homedir := testutils.CreateNewTestWallet(t)
+	mockServer, addr := mocksrv.MockBackendCalls(&mocksrv.BackendMockReturnConf{Balance: 15 * 1e8})
 	defer mockServer.Close()
 	stdout, _ := execCommand(observability.NewFactory(t), homedir, "get-balance --alphabill-api-uri "+addr.Host)
-	verifyStdout(t, stdout, "#1 15", "Total 15")
+	testutils.VerifyStdout(t, stdout, "#1 15", "Total 15")
 }
 
 func TestWalletGetBalanceKeyCmdKeyFlag(t *testing.T) {
-	homedir := createNewTestWallet(t)
-	mockServer, addr := mockBackendCalls(&backendMockReturnConf{balance: 15 * 1e8})
+	homedir := testutils.CreateNewTestWallet(t)
+	mockServer, addr := mocksrv.MockBackendCalls(&mocksrv.BackendMockReturnConf{Balance: 15 * 1e8})
 	defer mockServer.Close()
 	obsF := observability.NewFactory(t)
 	addAccount(t, obsF, homedir)
 	stdout, err := execCommand(obsF, homedir, "get-balance --key 2 --alphabill-api-uri "+addr.Host)
 	require.NoError(t, err)
-	verifyStdout(t, stdout, "#2 15")
-	verifyStdoutNotExists(t, stdout, "Total 15")
+	testutils.VerifyStdout(t, stdout, "#2 15")
+	testutils.VerifyStdoutNotExists(t, stdout, "Total 15")
 }
 
 func TestWalletGetBalanceCmdTotalFlag(t *testing.T) {
-	homedir := createNewTestWallet(t)
-	mockServer, addr := mockBackendCalls(&backendMockReturnConf{balance: 15 * 1e8})
+	homedir := testutils.CreateNewTestWallet(t)
+	mockServer, addr := mocksrv.MockBackendCalls(&mocksrv.BackendMockReturnConf{Balance: 15 * 1e8})
 	defer mockServer.Close()
 	stdout, _ := execCommand(observability.NewFactory(t), homedir, "get-balance --total --alphabill-api-uri "+addr.Host)
-	verifyStdout(t, stdout, "Total 15")
-	verifyStdoutNotExists(t, stdout, "#1 15")
+	testutils.VerifyStdout(t, stdout, "Total 15")
+	testutils.VerifyStdoutNotExists(t, stdout, "#1 15")
 }
 
 func TestWalletGetBalanceCmdTotalWithKeyFlag(t *testing.T) {
-	homedir := createNewTestWallet(t)
-	mockServer, addr := mockBackendCalls(&backendMockReturnConf{balance: 15 * 1e8})
+	homedir := testutils.CreateNewTestWallet(t)
+	mockServer, addr := mocksrv.MockBackendCalls(&mocksrv.BackendMockReturnConf{Balance: 15 * 1e8})
 	defer mockServer.Close()
 	stdout, _ := execCommand(observability.NewFactory(t), homedir, "get-balance --key 1 --total --alphabill-api-uri "+addr.Host)
-	verifyStdout(t, stdout, "#1 15")
-	verifyStdoutNotExists(t, stdout, "Total 15")
+	testutils.VerifyStdout(t, stdout, "#1 15")
+	testutils.VerifyStdoutNotExists(t, stdout, "Total 15")
 }
 
 func TestWalletGetBalanceCmdQuietFlag(t *testing.T) {
 	obsF := observability.NewFactory(t)
-	homedir := createNewTestWallet(t)
-	mockServer, addr := mockBackendCalls(&backendMockReturnConf{balance: 15 * 1e8})
+	homedir := testutils.CreateNewTestWallet(t)
+	mockServer, addr := mocksrv.MockBackendCalls(&mocksrv.BackendMockReturnConf{Balance: 15 * 1e8})
 	defer mockServer.Close()
 
 	// verify quiet flag does nothing if no key or total flag is not provided
 	stdout, _ := execCommand(obsF, homedir, "get-balance --quiet --alphabill-api-uri "+addr.Host)
-	verifyStdout(t, stdout, "#1 15")
-	verifyStdout(t, stdout, "Total 15")
+	testutils.VerifyStdout(t, stdout, "#1 15")
+	testutils.VerifyStdout(t, stdout, "Total 15")
 
 	// verify quiet with total
 	stdout, _ = execCommand(obsF, homedir, "get-balance --quiet --total --alphabill-api-uri "+addr.Host)
-	verifyStdout(t, stdout, "15")
-	verifyStdoutNotExists(t, stdout, "#1 15")
+	testutils.VerifyStdout(t, stdout, "15")
+	testutils.VerifyStdoutNotExists(t, stdout, "#1 15")
 
 	// verify quiet with key
 	stdout, _ = execCommand(obsF, homedir, "get-balance --quiet --key 1 --alphabill-api-uri "+addr.Host)
-	verifyStdout(t, stdout, "15")
-	verifyStdoutNotExists(t, stdout, "Total 15")
+	testutils.VerifyStdout(t, stdout, "15")
+	testutils.VerifyStdoutNotExists(t, stdout, "Total 15")
 
 	// verify quiet with key and total (total is not shown if key is provided)
 	stdout, _ = execCommand(obsF, homedir, "get-balance --quiet --key 1 --total --alphabill-api-uri "+addr.Host)
-	verifyStdout(t, stdout, "15")
-	verifyStdoutNotExists(t, stdout, "#1 15")
+	testutils.VerifyStdout(t, stdout, "15")
+	testutils.VerifyStdoutNotExists(t, stdout, "#1 15")
 }
 
 func TestPubKeysCmd(t *testing.T) {
-	am, homedir := createNewWallet(t)
+	am, homedir := testutils.CreateNewWallet(t)
 	pk, err := am.GetPublicKey(0)
 	require.NoError(t, err)
 	am.Close()
 	stdout, err := execCommand(observability.NewFactory(t), homedir, "get-pubkeys")
 	require.NoError(t, err)
-	verifyStdout(t, stdout, "#1 "+hexutil.Encode(pk))
+	testutils.VerifyStdout(t, stdout, "#1 "+hexutil.Encode(pk))
 }
 
 func TestSendingFailsWithInsufficientBalance(t *testing.T) {
-	am, homedir := createNewWallet(t)
+	am, homedir := testutils.CreateNewWallet(t)
 	pubKey, err := am.GetPublicKey(0)
 	require.NoError(t, err)
 	am.Close()
 
-	mockServer, addr := mockBackendCalls(&backendMockReturnConf{
-		targetBill:    &wallet.Bill{Id: []byte{8}, Value: 5e8},
-		feeCreditBill: &wallet.Bill{Id: []byte{9}},
+	mockServer, addr := mocksrv.MockBackendCalls(&mocksrv.BackendMockReturnConf{
+		TargetBill:    &wallet.Bill{Id: []byte{8}, Value: 5e8},
+		FeeCreditBill: &wallet.Bill{Id: []byte{9}},
 	})
 	defer mockServer.Close()
 
@@ -199,91 +176,9 @@ func addAccount(t *testing.T, obsF Factory, homedir string) string {
 	return ""
 }
 
-func createNewWallet(t *testing.T) (account.Manager, string) {
-	homeDir := t.TempDir()
-	walletDir := filepath.Join(homeDir, walletBaseDir)
-	am, err := account.NewManager(walletDir, "", true)
-	require.NoError(t, err)
-	t.Cleanup(am.Close)
-	err = am.CreateKeys("")
-	require.NoError(t, err)
-	return am, homeDir
-}
-
-func createNewTestWallet(t *testing.T) string {
-	homeDir := t.TempDir()
-	walletDir := filepath.Join(homeDir, walletBaseDir)
-	am, err := account.NewManager(walletDir, "", true)
-	require.NoError(t, err)
-	defer am.Close()
-	err = am.CreateKeys("")
-	require.NoError(t, err)
-	return homeDir
-}
-
-func verifyStdout(t *testing.T, consoleWriter *testutils.TestConsoleWriter, expectedLines ...string) {
-	joined := consoleWriter.String()
-	for _, expectedLine := range expectedLines {
-		require.Contains(t, joined, expectedLine)
-	}
-}
-
-func verifyStdoutNotExists(t *testing.T, consoleWriter *testutils.TestConsoleWriter, expectedLines ...string) {
-	for _, expectedLine := range expectedLines {
-		require.NotContains(t, consoleWriter.Lines, expectedLine)
-	}
-}
-
 func execCommand(obsF Factory, homeDir, command string) (*testutils.TestConsoleWriter, error) {
 	outputWriter := &testutils.TestConsoleWriter{}
 	wcmd := NewWalletCmd(&types.BaseConfiguration{HomeDir: homeDir, ConsoleWriter: outputWriter, LogCfgFile: "logger-config.yaml"}, obsF)
 	wcmd.SetArgs(strings.Split(command, " "))
 	return outputWriter, wcmd.Execute()
-}
-
-func mockBackendCalls(br *backendMockReturnConf) (*httptest.Server, *url.URL) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == br.customPath || r.URL.RequestURI() == br.customFullPath {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(br.customResponse))
-		} else {
-			path := r.URL.Path
-			switch {
-			case path == "/"+client.BalancePath:
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(fmt.Sprintf(`{"balance": "%d"}`, br.balance)))
-			case path == "/"+client.RoundNumberPath:
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(fmt.Sprintf(`{"blockHeight": "%d"}`, br.blockHeight)))
-			case path == "/api/v1/units/":
-				if br.proofList != "" {
-					w.WriteHeader(http.StatusOK)
-					w.Write([]byte(br.proofList))
-				} else {
-					w.WriteHeader(http.StatusNotFound)
-				}
-			case path == "/"+client.ListBillsPath:
-				w.WriteHeader(http.StatusOK)
-				if br.customBillList != "" {
-					w.Write([]byte(br.customBillList))
-				} else {
-					b, _ := json.Marshal(br.targetBill)
-					w.Write([]byte(fmt.Sprintf(`{"bills": [%s]}`, b)))
-				}
-			case strings.Contains(path, client.FeeCreditPath):
-				w.WriteHeader(http.StatusOK)
-				fcb, _ := json.Marshal(br.feeCreditBill)
-				w.Write(fcb)
-			default:
-				w.WriteHeader(http.StatusNotFound)
-			}
-		}
-	}))
-
-	serverAddress, _ := url.Parse(server.URL)
-	return server, serverAddress
-}
-
-func toBase64(bytes []byte) string {
-	return base64.StdEncoding.EncodeToString(bytes)
 }

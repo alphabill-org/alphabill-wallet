@@ -12,8 +12,10 @@ import (
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/rpc"
 	"github.com/alphabill-org/alphabill/rpc/alphabill"
+	"github.com/alphabill-org/alphabill/state"
 	"github.com/alphabill-org/alphabill/txsystem"
 	"github.com/alphabill-org/alphabill/txsystem/money"
+	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
@@ -118,4 +120,22 @@ func initRPCServer(node *partition.Node, cfg *types.GrpcServerConfiguration, obs
 
 	alphabill.RegisterAlphabillServiceServer(grpcServer, rpcServer)
 	return grpcServer, nil
+}
+
+func CreateTokensPartition(t *testing.T) *testpartition.NodePartition {
+	tokensState := state.NewEmptyState()
+	network, err := testpartition.NewPartition(t, 1,
+		func(tb map[string]abcrypto.Verifier) txsystem.TransactionSystem {
+			tokensState = tokensState.Clone()
+			system, err := tokens.NewTxSystem(
+				testlogger.New(t),
+				tokens.WithState(tokensState),
+				tokens.WithTrustBase(tb),
+			)
+			require.NoError(t, err)
+			return system
+		}, tokens.DefaultSystemIdentifier, tokensState,
+	)
+	require.NoError(t, err)
+	return network
 }

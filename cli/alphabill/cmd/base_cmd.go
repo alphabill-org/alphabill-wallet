@@ -30,7 +30,7 @@ type (
 
 // New creates a new Alphabill wallet application
 func New(obsF Factory, opts ...interface{}) *WalletApp {
-	baseCmd, baseConfig := NewBaseCmd(obsF)
+	baseCmd, baseConfig := newBaseCmd(obsF)
 	app := &WalletApp{baseCmd: baseCmd, baseConf: baseConfig}
 	app.AddSubcommands(obsF, opts)
 	return app
@@ -53,7 +53,7 @@ func (a *WalletApp) AddSubcommands(obsF Factory, opts []interface{}) {
 	a.baseCmd.AddCommand(tokens.NewTokensBackendCmd(a.baseConf))
 }
 
-func NewBaseCmd(obsF Factory) (*cobra.Command, *types.BaseConfiguration) {
+func newBaseCmd(obsF Factory) (*cobra.Command, *types.BaseConfiguration) {
 	config := &types.BaseConfiguration{}
 	// BaseCmd represents the base command when called without any subcommands
 	var baseCmd = &cobra.Command{
@@ -71,6 +71,5 @@ func NewBaseCmd(obsF Factory) (*cobra.Command, *types.BaseConfiguration) {
 		},
 	}
 	config.AddConfigurationFlags(baseCmd)
-
 	return baseCmd, config
 }
