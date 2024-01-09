@@ -22,7 +22,6 @@ import (
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
 
-	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	testblock "github.com/alphabill-org/alphabill-wallet/internal/testutils/block"
 	testlogger "github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
@@ -84,11 +83,11 @@ func startRPCServer(t *testing.T, node *partition.Node, log *slog.Logger) string
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 
-	grpcServer, err := initRPCServer(node, &types.GrpcServerConfiguration{
-		Address:               listener.Addr().String(),
-		MaxGetBlocksBatchSize: types.DefaultMaxGetBlocksBatchSize,
-		MaxRecvMsgSize:        types.DefaultMaxRecvMsgSize,
-		MaxSendMsgSize:        types.DefaultMaxSendMsgSize,
+	grpcServer, err := initRPCServer(node, &grpcServerConfiguration{
+		address:               listener.Addr().String(),
+		maxGetBlocksBatchSize: defaultMaxGetBlocksBatchSize,
+		maxRecvMsgSize:        defaultMaxRecvMsgSize,
+		maxSendMsgSize:        defaultMaxSendMsgSize,
 	}, testobserve.Default(t), log)
 	require.NoError(t, err)
 
@@ -103,17 +102,17 @@ func startRPCServer(t *testing.T, node *partition.Node, log *slog.Logger) string
 	return listener.Addr().String()
 }
 
-func initRPCServer(node *partition.Node, cfg *types.GrpcServerConfiguration, obs partition.Observability, log *slog.Logger) (*grpc.Server, error) {
+func initRPCServer(node *partition.Node, cfg *grpcServerConfiguration, obs partition.Observability, log *slog.Logger) (*grpc.Server, error) {
 	grpcServer := grpc.NewServer(
-		grpc.MaxSendMsgSize(cfg.MaxSendMsgSize),
-		grpc.MaxRecvMsgSize(cfg.MaxRecvMsgSize),
-		grpc.KeepaliveParams(cfg.GrpcKeepAliveServerParameters()),
+		grpc.MaxSendMsgSize(cfg.maxSendMsgSize),
+		grpc.MaxRecvMsgSize(cfg.maxRecvMsgSize),
+		grpc.KeepaliveParams(cfg.grpcKeepAliveServerParameters()),
 		grpc.UnaryInterceptor(rpc.InstrumentMetricsUnaryServerInterceptor(obs.Meter(rpc.MetricsScopeGRPCAPI), log)),
 		grpc.StatsHandler(otelgrpc.NewServerHandler(otelgrpc.WithTracerProvider(obs.TracerProvider()))),
 	)
 	grpc_health_v1.RegisterHealthServer(grpcServer, health.NewServer())
 
-	rpcServer, err := rpc.NewGRPCServer(node, obs, rpc.WithMaxGetBlocksBatchSize(cfg.MaxGetBlocksBatchSize))
+	rpcServer, err := rpc.NewGRPCServer(node, obs, rpc.WithMaxGetBlocksBatchSize(cfg.maxGetBlocksBatchSize))
 	if err != nil {
 		return nil, err
 	}
