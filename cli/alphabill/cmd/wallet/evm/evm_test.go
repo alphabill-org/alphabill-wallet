@@ -1,4 +1,4 @@
-package cmd
+package evm
 
 import (
 	"bytes"
@@ -10,10 +10,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/logger"
 	"github.com/alphabill-org/alphabill/rpc"
 	"github.com/alphabill-org/alphabill/txsystem/evm"
 	"github.com/alphabill-org/alphabill/txsystem/evm/api"
@@ -21,34 +21,36 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/stretchr/testify/require"
 
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
+	cmdtypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
 )
 
 func Test_evmCmdDeploy_error_cases(t *testing.T) {
-	homedir := createNewTestWallet(t)
-	logF := testobserve.NewFactory(t)
+	homedir := testutils.CreateNewTestWallet(t)
+	logF := testobserve.Default(t)
 	// balance is returned by EVM in wei 10^-18
 	mockServer, addr := mockClientCalls(&clientMockConf{balance: "15000000000000000000", backlink: make([]byte, 32)}, logF.Logger)
 	defer mockServer.Close()
-	_, err := execCommand(logF, homedir, "evm deploy --alphabill-api-uri "+addr.Host)
+	_, err := execEvmCmd(logF, homedir, "evm deploy --alphabill-api-uri "+addr.Host)
 	require.ErrorContains(t, err, "required flag(s) \"data\", \"max-gas\" not set")
-	_, err = execCommand(logF, homedir, "evm deploy --max-gas 10000 --alphabill-api-uri "+addr.Host)
+	_, err = execEvmCmd(logF, homedir, "evm deploy --max-gas 10000 --alphabill-api-uri "+addr.Host)
 	require.ErrorContains(t, err, "required flag(s) \"data\" not set")
-	_, err = execCommand(logF, homedir, "evm deploy --data accbdeef --alphabill-api-uri "+addr.Host)
+	_, err = execEvmCmd(logF, homedir, "evm deploy --data accbdeef --alphabill-api-uri "+addr.Host)
 	require.ErrorContains(t, err, "required flag(s) \"max-gas\" not set")
 	// smart contract code too big
-	code := hex.EncodeToString(make([]byte, scSizeLimit24Kb+1))
-	_, err = execCommand(logF, homedir, "evm deploy --max-gas 10000 --data "+code+" --alphabill-api-uri "+addr.Host)
+	code := hex.EncodeToString(make([]byte, ScSizeLimit24Kb+1))
+	_, err = execEvmCmd(logF, homedir, "evm deploy --max-gas 10000 --data "+code+" --alphabill-api-uri "+addr.Host)
 	require.ErrorContains(t, err, "contract code too big, maximum size is 24Kb")
-	_, err = execCommand(logF, homedir, "evm deploy --max-gas 1000 --data accbxdeef --alphabill-api-uri "+addr.Host)
+	_, err = execEvmCmd(logF, homedir, "evm deploy --max-gas 1000 --data accbxdeef --alphabill-api-uri "+addr.Host)
 	require.ErrorContains(t, err, "failed to read 'data' parameter: hex decode error: encoding/hex: invalid byte: U+0078 'x'")
-	_, err = execCommand(logF, homedir, "evm deploy --max-gas abba --data accbdeef --alphabill-api-uri "+addr.Host)
+	_, err = execEvmCmd(logF, homedir, "evm deploy --max-gas abba --data accbdeef --alphabill-api-uri "+addr.Host)
 	require.ErrorContains(t, err, "invalid argument \"abba\" for \"--max-gas\"")
 }
 
 func Test_evmCmdDeploy_ok(t *testing.T) {
-	homedir := createNewTestWallet(t)
+	homedir := testutils.CreateNewTestWallet(t)
 	evmDetails := evm.ProcessingDetails{
 		ErrorDetails: "something went wrong",
 	}
@@ -67,12 +69,12 @@ func Test_evmCmdDeploy_ok(t *testing.T) {
 			ProcessingDetails: detailBytes,
 		},
 	}
-	logF := testobserve.NewFactory(t)
+	logF := testobserve.Default(t)
 	mockServer, addr := mockClientCalls(mockConf, logF.Logger)
 	defer mockServer.Close()
-	stdout, err := execCommand(logF, homedir, "evm deploy --max-gas 10000 --data 9021ACFE0102 --alphabill-api-uri "+addr.Host)
+	stdout, err := execEvmCmd(logF, homedir, "evm deploy --max-gas 10000 --data 9021ACFE0102 --alphabill-api-uri "+addr.Host)
 	require.NoError(t, err)
-	verifyStdout(t, stdout,
+	testutils.VerifyStdout(t, stdout,
 		"Evm transaction failed: something went wrong",
 		"Evm transaction processing fee: 0.000'210'00")
 	// verify tx order
@@ -93,27 +95,27 @@ func Test_evmCmdDeploy_ok(t *testing.T) {
 }
 
 func Test_evmCmdExecute_error_cases(t *testing.T) {
-	homedir := createNewTestWallet(t)
-	logF := testobserve.NewFactory(t)
+	homedir := testutils.CreateNewTestWallet(t)
+	logF := testobserve.Default(t)
 	// balance is returned by EVM in wei 10^-18
 	mockServer, addr := mockClientCalls(&clientMockConf{balance: "15000000000000000000", backlink: make([]byte, 32), gasPrice: "20000000000000000000"}, logF.Logger)
 	defer mockServer.Close()
-	_, err := execCommand(logF, homedir, "evm execute --alphabill-api-uri "+addr.Host)
+	_, err := execEvmCmd(logF, homedir, "evm execute --alphabill-api-uri "+addr.Host)
 	require.ErrorContains(t, err, "required flag(s) \"address\", \"data\", \"max-gas\" not set")
-	_, err = execCommand(logF, homedir, "evm execute --max-gas 10000 --alphabill-api-uri "+addr.Host)
+	_, err = execEvmCmd(logF, homedir, "evm execute --max-gas 10000 --alphabill-api-uri "+addr.Host)
 	require.ErrorContains(t, err, "required flag(s) \"address\", \"data\" not set")
-	_, err = execCommand(logF, homedir, "evm execute --data accbdeee --alphabill-api-uri "+addr.Host)
+	_, err = execEvmCmd(logF, homedir, "evm execute --data accbdeee --alphabill-api-uri "+addr.Host)
 	require.ErrorContains(t, err, "required flag(s) \"address\", \"max-gas\" not set")
-	_, err = execCommand(logF, homedir, "evm execute --max-gas 1000 --address aabbccddeeff --data aabbccdd --alphabill-api-uri "+addr.Host)
+	_, err = execEvmCmd(logF, homedir, "evm execute --max-gas 1000 --address aabbccddeeff --data aabbccdd --alphabill-api-uri "+addr.Host)
 	require.ErrorContains(t, err, "invalid address aabbccddeeff, address must be 20 bytes")
-	_, err = execCommand(logF, homedir, "evm execute --max-gas 1000 --address 3443919fcbc4476b4f332fd5df6a82fe88dbf521 --data aabbkccdd --alphabill-api-uri "+addr.Host)
+	_, err = execEvmCmd(logF, homedir, "evm execute --max-gas 1000 --address 3443919fcbc4476b4f332fd5df6a82fe88dbf521 --data aabbkccdd --alphabill-api-uri "+addr.Host)
 	require.ErrorContains(t, err, "failed to read 'data' parameter: hex decode error: encoding/hex: invalid byte: U+006B 'k'")
-	_, err = execCommand(logF, homedir, "evm execute --max-gas 1 --address 3443919fcbc4476b4f332fd5df6a82fe88dbf521 --data aabbccdd --alphabill-api-uri "+addr.Host)
+	_, err = execEvmCmd(logF, homedir, "evm execute --max-gas 1 --address 3443919fcbc4476b4f332fd5df6a82fe88dbf521 --data aabbccdd --alphabill-api-uri "+addr.Host)
 	require.ErrorContains(t, err, "insufficient fee credit balance for transaction")
 }
 
 func Test_evmCmdExecute_ok(t *testing.T) {
-	homedir := createNewTestWallet(t)
+	homedir := testutils.CreateNewTestWallet(t)
 	evmDetails := evm.ProcessingDetails{
 		ReturnData: []byte{0xDE, 0xAD, 0x00, 0xBE, 0xEF},
 	}
@@ -132,12 +134,12 @@ func Test_evmCmdExecute_ok(t *testing.T) {
 			ProcessingDetails: detailBytes,
 		},
 	}
-	logF := testobserve.NewFactory(t)
+	logF := testobserve.Default(t)
 	mockServer, addr := mockClientCalls(mockConf, logF.Logger)
 	defer mockServer.Close()
-	stdout, err := execCommand(logF, homedir, "evm execute --address 3443919fcbc4476b4f332fd5df6a82fe88dbf521 --max-gas 10000 --data 9021ACFE --alphabill-api-uri "+addr.Host)
+	stdout, err := execEvmCmd(logF, homedir, "evm execute --address 3443919fcbc4476b4f332fd5df6a82fe88dbf521 --max-gas 10000 --data 9021ACFE --alphabill-api-uri "+addr.Host)
 	require.NoError(t, err)
-	verifyStdout(t, stdout,
+	testutils.VerifyStdout(t, stdout,
 		"Evm transaction succeeded",
 		"Evm transaction processing fee: 0.000'210'00",
 		"Evm execution returned: DEAD00BEEF")
@@ -162,25 +164,25 @@ func Test_evmCmdExecute_ok(t *testing.T) {
 }
 
 func Test_evmCmdCall_error_cases(t *testing.T) {
-	homedir := createNewTestWallet(t)
-	logF := testobserve.NewFactory(t)
+	homedir := testutils.CreateNewTestWallet(t)
+	logF := testobserve.Default(t)
 	// balance is returned by EVM in wei 10^-18
 	mockServer, addr := mockClientCalls(&clientMockConf{balance: "15000000000000000000", backlink: make([]byte, 32)}, logF.Logger)
 	defer mockServer.Close()
-	_, err := execCommand(logF, homedir, "evm call --alphabill-api-uri "+addr.Host)
+	_, err := execEvmCmd(logF, homedir, "evm call --alphabill-api-uri "+addr.Host)
 	require.ErrorContains(t, err, "required flag(s) \"address\", \"data\" not set")
-	_, err = execCommand(logF, homedir, "evm call --alphabill-api-uri "+addr.Host)
+	_, err = execEvmCmd(logF, homedir, "evm call --alphabill-api-uri "+addr.Host)
 	require.ErrorContains(t, err, "required flag(s) \"address\", \"data\" not set")
-	_, err = execCommand(logF, homedir, "evm call --data accbdeee --alphabill-api-uri "+addr.Host)
+	_, err = execEvmCmd(logF, homedir, "evm call --data accbdeee --alphabill-api-uri "+addr.Host)
 	require.ErrorContains(t, err, "required flag(s) \"address\" not set")
-	_, err = execCommand(logF, homedir, "evm call --max-gas 1000 --address aabbccddeeff --data aabbccdd --alphabill-api-uri "+addr.Host)
+	_, err = execEvmCmd(logF, homedir, "evm call --max-gas 1000 --address aabbccddeeff --data aabbccdd --alphabill-api-uri "+addr.Host)
 	require.ErrorContains(t, err, "invalid address aabbccddeeff, address must be 20 bytes")
-	_, err = execCommand(logF, homedir, "evm call --max-gas 1000 --address 3443919fcbc4476b4f332fd5df6a82fe88dbf521 --data aabbkccdd --alphabill-api-uri "+addr.Host)
+	_, err = execEvmCmd(logF, homedir, "evm call --max-gas 1000 --address 3443919fcbc4476b4f332fd5df6a82fe88dbf521 --data aabbkccdd --alphabill-api-uri "+addr.Host)
 	require.ErrorContains(t, err, "failed to read 'data' parameter: hex decode error: encoding/hex: invalid byte: U+006B 'k'")
 }
 
 func Test_evmCmdCall_ok(t *testing.T) {
-	homedir := createNewTestWallet(t)
+	homedir := testutils.CreateNewTestWallet(t)
 	evmDetails := &evm.ProcessingDetails{
 		ReturnData: []byte{0xDE, 0xAD, 0x00, 0xBE, 0xEF},
 	}
@@ -193,12 +195,12 @@ func Test_evmCmdCall_ok(t *testing.T) {
 			ProcessingDetails: evmDetails,
 		},
 	}
-	logF := testobserve.NewFactory(t)
+	logF := testobserve.Default(t)
 	mockServer, addr := mockClientCalls(mockConf, logF.Logger)
 	defer mockServer.Close()
-	stdout, err := execCommand(logF, homedir, "evm call --address 3443919fcbc4476b4f332fd5df6a82fe88dbf521 --max-gas 10000 --data 9021ACFE --alphabill-api-uri "+addr.Host)
+	stdout, err := execEvmCmd(logF, homedir, "evm call --address 3443919fcbc4476b4f332fd5df6a82fe88dbf521 --max-gas 10000 --data 9021ACFE --alphabill-api-uri "+addr.Host)
 	require.NoError(t, err)
-	verifyStdout(t, stdout,
+	testutils.VerifyStdout(t, stdout,
 		"Evm transaction succeeded",
 		"Evm transaction processing fee: 0.000'000'00",
 		"Evm execution returned: DEAD00BEEF")
@@ -216,7 +218,7 @@ func Test_evmCmdCall_ok(t *testing.T) {
 }
 
 func Test_evmCmdCall_ok_defaultGas(t *testing.T) {
-	homedir := createNewTestWallet(t)
+	homedir := testutils.CreateNewTestWallet(t)
 	evmDetails := &evm.ProcessingDetails{
 		ReturnData: []byte{0xDE, 0xAD, 0x00, 0xBE, 0xEF},
 	}
@@ -229,12 +231,12 @@ func Test_evmCmdCall_ok_defaultGas(t *testing.T) {
 			ProcessingDetails: evmDetails,
 		},
 	}
-	logF := testobserve.NewFactory(t)
+	logF := testobserve.Default(t)
 	mockServer, addr := mockClientCalls(mockConf, logF.Logger)
 	defer mockServer.Close()
-	stdout, err := execCommand(logF, homedir, "evm call --address 3443919fcbc4476b4f332fd5df6a82fe88dbf521 --data 9021ACFE --alphabill-api-uri "+addr.Host)
+	stdout, err := execEvmCmd(logF, homedir, "evm call --address 3443919fcbc4476b4f332fd5df6a82fe88dbf521 --data 9021ACFE --alphabill-api-uri "+addr.Host)
 	require.NoError(t, err)
-	verifyStdout(t, stdout,
+	testutils.VerifyStdout(t, stdout,
 		"Evm transaction succeeded",
 		"Evm transaction processing fee: 0.000'000'00",
 		"Evm execution returned: DEAD00BEEF")
@@ -245,22 +247,22 @@ func Test_evmCmdCall_ok_defaultGas(t *testing.T) {
 	require.EqualValues(t, toAddr, mockConf.callReq.To)
 	//value is currently hardcoded as 0
 	require.Equal(t, big.NewInt(0), mockConf.callReq.Value)
-	require.EqualValues(t, defaultCallMaxGas, mockConf.callReq.Gas)
+	require.EqualValues(t, DefaultCallMaxGas, mockConf.callReq.Gas)
 	data, err := hex.DecodeString("9021ACFE")
 	require.NoError(t, err)
 	require.EqualValues(t, data, mockConf.callReq.Data)
 }
 
 func Test_evmCmdBalance(t *testing.T) {
-	homedir := createNewTestWallet(t)
-	logF := testobserve.NewFactory(t)
+	homedir := testutils.CreateNewTestWallet(t)
+	logF := testobserve.Default(t)
 	// balance is returned by EVM in wei 10^-18
 	mockServer, addr := mockClientCalls(&clientMockConf{balance: "15000000000000000000", backlink: make([]byte, 32)}, logF.Logger)
 	defer mockServer.Close()
-	stdout, _ := execCommand(logF, homedir, "evm balance --alphabill-api-uri "+addr.Host)
-	verifyStdout(t, stdout, "#1 15.000'000'00 (eth: 15.000'000'000'000'000'000)")
+	stdout, _ := execEvmCmd(logF, homedir, "evm balance --alphabill-api-uri "+addr.Host)
+	testutils.VerifyStdout(t, stdout, "#1 15.000'000'00 (eth: 15.000'000'000'000'000'000)")
 	// -k 2 -> no such account
-	_, err := execCommand(logF, homedir, "evm balance -k 2 --alphabill-api-uri "+addr.Host)
+	_, err := execEvmCmd(logF, homedir, "evm balance -k 2 --alphabill-api-uri "+addr.Host)
 	require.ErrorContains(t, err, "get balance failed, account key read failed: account does not exist")
 }
 
@@ -276,11 +278,8 @@ type clientMockConf struct {
 	callResp   *api.CallEVMResponse
 }
 
-func mockClientCalls(br *clientMockConf, logF func(*logger.LogConfiguration) (*slog.Logger, error)) (*httptest.Server, *url.URL) {
-	log, err := logF(&logger.LogConfiguration{})
-	if err != nil {
-		panic("logger builder returned error: " + err.Error())
-	}
+func mockClientCalls(br *clientMockConf, logF func() *slog.Logger) (*httptest.Server, *url.URL) {
+	log := logF()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.Contains(r.URL.Path, "/api/v1/evm/balance/"):
@@ -350,4 +349,14 @@ func mockClientCalls(br *clientMockConf, logF func(*logger.LogConfiguration) (*s
 	}))
 	serverAddress, _ := url.Parse(server.URL)
 	return server, serverAddress
+}
+
+func execEvmCmd(obs *testobserve.Observability, homeDir, command string) (*testutils.TestConsoleWriter, error) {
+	outputWriter := &testutils.TestConsoleWriter{}
+	command = strings.TrimPrefix(command, "evm ")
+	ccmd := NewEvmCmd(&cmdtypes.WalletConfig{
+		Base:          &cmdtypes.BaseConfiguration{HomeDir: homeDir, ConsoleWriter: outputWriter, Observe: obs},
+		WalletHomeDir: filepath.Join(homeDir, "wallet")})
+	ccmd.SetArgs(strings.Split(command, " "))
+	return outputWriter, ccmd.Execute()
 }

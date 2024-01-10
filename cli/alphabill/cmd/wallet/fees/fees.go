@@ -1,4 +1,4 @@
-package cmd
+package fees
 
 import (
 	"context"
@@ -12,6 +12,9 @@ import (
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/spf13/cobra"
 
+	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
+	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	evmwallet "github.com/alphabill-org/alphabill-wallet/wallet/evm"
@@ -23,66 +26,58 @@ import (
 	tokensclient "github.com/alphabill-org/alphabill-wallet/wallet/tokens/client"
 )
 
-const (
-	apiUsage                   = "wallet backend API URL"
-	partitionCmdName           = "partition"
-	partitionBackendUrlCmdName = "partition-backend-url"
-)
-
-// newWalletFeesCmd creates a new cobra command for the wallet fees component.
-func newWalletFeesCmd(config *walletConfig) *cobra.Command {
-	var cliConfig = &cliConf{
-		partitionType: moneyType, // shows default value in help context
+// NewFeesCmd creates a new cobra command for the wallet fees component.
+func NewFeesCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
+	var config = &feesConfig{
+		walletConfig:  walletConfig,
+		partitionType: clitypes.MoneyType, // shows default value in help context
 	}
 	var cmd = &cobra.Command{
 		Use:   "fees",
 		Short: "cli for managing alphabill wallet fees",
 		Run: func(cmd *cobra.Command, args []string) {
-			consoleWriter.Println("Error: must specify a subcommand")
+			walletConfig.Base.ConsoleWriter.Println("Error: must specify a subcommand")
 		},
 	}
-	cmd.AddCommand(listFeesCmd(config, cliConfig))
-	cmd.AddCommand(addFeeCreditCmd(config, cliConfig))
-	cmd.AddCommand(reclaimFeeCreditCmd(config, cliConfig))
-	cmd.AddCommand(lockFeeCreditCmd(config, cliConfig))
-	cmd.AddCommand(unlockFeeCreditCmd(config, cliConfig))
+	cmd.AddCommand(listFeesCmd(config))
+	cmd.AddCommand(addFeeCreditCmd(config))
+	cmd.AddCommand(reclaimFeeCreditCmd(config))
+	cmd.AddCommand(lockFeeCreditCmd(config))
+	cmd.AddCommand(unlockFeeCreditCmd(config))
 
-	cmd.PersistentFlags().VarP(&cliConfig.partitionType, partitionCmdName, "n", "partition name for which to manage fees [money|tokens|evm]")
-	cmd.PersistentFlags().StringP(alphabillApiURLCmdName, "r", defaultAlphabillApiURL, apiUsage)
+	cmd.PersistentFlags().VarP(&config.partitionType, args.PartitionCmdName, "n", "partition name for which to manage fees [money|tokens|evm]")
+	cmd.PersistentFlags().StringVarP(&config.moneyBackendURL, args.AlphabillApiURLCmdName, "r", args.DefaultAlphabillApiURL, "wallet backend API URL")
 
-	usage := fmt.Sprintf("partition backend url for which to manage fees (default: [%s|%s|%s] based on --partition flag)", defaultAlphabillApiURL, defaultTokensBackendApiURL, defaultEvmNodeRestURL)
-	cmd.PersistentFlags().StringVarP(&cliConfig.partitionBackendURL, partitionBackendUrlCmdName, "m", "", usage)
+	usage := fmt.Sprintf("partition backend url for which to manage fees (default: [%s|%s|%s] based on --partition flag)", args.DefaultAlphabillApiURL, args.DefaultTokensBackendApiURL, args.DefaultEvmNodeRestURL)
+	cmd.PersistentFlags().StringVarP(&config.partitionBackendURL, args.PartitionBackendUrlCmdName, "m", "", usage)
 	return cmd
 }
 
-func addFeeCreditCmd(walletConfig *walletConfig, cliConfig *cliConf) *cobra.Command {
+func addFeeCreditCmd(config *feesConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add",
 		Short: "adds fee credit to the wallet",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return addFeeCreditCmdExec(cmd, walletConfig, cliConfig)
+			return addFeeCreditCmdExec(cmd, config)
 		},
 	}
-	cmd.Flags().Uint64P(keyCmdName, "k", 1, "specifies to which account to add the fee credit")
-	cmd.Flags().StringP(amountCmdName, "v", "1", "specifies how much fee credit to create in ALPHA")
+	cmd.Flags().Uint64P(args.KeyCmdName, "k", 1, "specifies to which account to add the fee credit")
+	cmd.Flags().StringP(args.AmountCmdName, "v", "1", "specifies how much fee credit to create in ALPHA")
 	return cmd
 }
 
-func addFeeCreditCmdExec(cmd *cobra.Command, walletConfig *walletConfig, cliConfig *cliConf) error {
-	moneyBackendURL, err := cmd.Flags().GetString(alphabillApiURLCmdName)
+func addFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
+	accountNumber, err := cmd.Flags().GetUint64(args.KeyCmdName)
 	if err != nil {
 		return err
 	}
-	accountNumber, err := cmd.Flags().GetUint64(keyCmdName)
-	if err != nil {
-		return err
-	}
-	amountString, err := cmd.Flags().GetString(amountCmdName)
+	amountString, err := cmd.Flags().GetString(args.AmountCmdName)
 	if err != nil {
 		return err
 	}
 
-	am, err := loadExistingAccountManager(cmd, walletConfig.WalletHomeDir)
+	walletConfig := config.walletConfig
+	am, err := cliaccount.LoadExistingAccountManager(walletConfig)
 	if err != nil {
 		return fmt.Errorf("failed to load account manager: %w", err)
 	}
@@ -94,38 +89,35 @@ func addFeeCreditCmdExec(cmd *cobra.Command, walletConfig *walletConfig, cliConf
 	}
 	defer feeManagerDB.Close()
 
-	fm, err := getFeeCreditManager(cmd.Context(), cliConfig, am, feeManagerDB, moneyBackendURL, walletConfig.Base.observe)
+	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, config.moneyBackendURL, walletConfig.Base.Observe)
 	if err != nil {
 		return fmt.Errorf("failed to create fee credit manager: %w", err)
 	}
 	defer fm.Close()
 
-	return addFees(cmd.Context(), accountNumber, amountString, cliConfig, fm)
+	return addFees(cmd.Context(), accountNumber, amountString, config, fm, walletConfig.Base.ConsoleWriter)
 }
 
-func listFeesCmd(walletConfig *walletConfig, cliConfig *cliConf) *cobra.Command {
+func listFeesCmd(config *feesConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "lists fee credit of the wallet",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return listFeesCmdExec(cmd, walletConfig, cliConfig)
+			return listFeesCmdExec(cmd, config)
 		},
 	}
-	cmd.Flags().Uint64P(keyCmdName, "k", 0, "specifies which account fee bills to list (default: all accounts)")
+	cmd.Flags().Uint64P(args.KeyCmdName, "k", 0, "specifies which account fee bills to list (default: all accounts)")
 	return cmd
 }
 
-func listFeesCmdExec(cmd *cobra.Command, walletConfig *walletConfig, cliConfig *cliConf) error {
-	accountNumber, err := cmd.Flags().GetUint64(keyCmdName)
-	if err != nil {
-		return err
-	}
-	moneyBackendURL, err := cmd.Flags().GetString(alphabillApiURLCmdName)
+func listFeesCmdExec(cmd *cobra.Command, config *feesConfig) error {
+	accountNumber, err := cmd.Flags().GetUint64(args.KeyCmdName)
 	if err != nil {
 		return err
 	}
 
-	am, err := loadExistingAccountManager(cmd, walletConfig.WalletHomeDir)
+	walletConfig := config.walletConfig
+	am, err := cliaccount.LoadExistingAccountManager(walletConfig)
 	if err != nil {
 		return fmt.Errorf("failed to load account manager: %w", err)
 	}
@@ -137,38 +129,35 @@ func listFeesCmdExec(cmd *cobra.Command, walletConfig *walletConfig, cliConfig *
 	}
 	defer feeManagerDB.Close()
 
-	fm, err := getFeeCreditManager(cmd.Context(), cliConfig, am, feeManagerDB, moneyBackendURL, walletConfig.Base.observe)
+	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, config.moneyBackendURL, walletConfig.Base.Observe)
 	if err != nil {
 		return err
 	}
 	defer fm.Close()
 
-	return listFees(cmd.Context(), accountNumber, am, cliConfig, fm)
+	return listFees(cmd.Context(), accountNumber, am, config, fm, walletConfig.Base.ConsoleWriter)
 }
 
-func reclaimFeeCreditCmd(walletConfig *walletConfig, cliConfig *cliConf) *cobra.Command {
+func reclaimFeeCreditCmd(config *feesConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "reclaim",
 		Short: "reclaims fee credit of the wallet",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return reclaimFeeCreditCmdExec(cmd, walletConfig, cliConfig)
+			return reclaimFeeCreditCmdExec(cmd, config)
 		},
 	}
-	cmd.Flags().Uint64P(keyCmdName, "k", 1, "specifies to which account to reclaim the fee credit")
+	cmd.Flags().Uint64P(args.KeyCmdName, "k", 1, "specifies to which account to reclaim the fee credit")
 	return cmd
 }
 
-func reclaimFeeCreditCmdExec(cmd *cobra.Command, walletConfig *walletConfig, cliConfig *cliConf) error {
-	moneyBackendURL, err := cmd.Flags().GetString(alphabillApiURLCmdName)
-	if err != nil {
-		return err
-	}
-	accountNumber, err := cmd.Flags().GetUint64(keyCmdName)
+func reclaimFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
+	accountNumber, err := cmd.Flags().GetUint64(args.KeyCmdName)
 	if err != nil {
 		return err
 	}
 
-	am, err := loadExistingAccountManager(cmd, walletConfig.WalletHomeDir)
+	walletConfig := config.walletConfig
+	am, err := cliaccount.LoadExistingAccountManager(walletConfig)
 	if err != nil {
 		return fmt.Errorf("failed to load account manager: %w", err)
 	}
@@ -180,45 +169,42 @@ func reclaimFeeCreditCmdExec(cmd *cobra.Command, walletConfig *walletConfig, cli
 	}
 	defer feeManagerDB.Close()
 
-	fm, err := getFeeCreditManager(cmd.Context(), cliConfig, am, feeManagerDB, moneyBackendURL, walletConfig.Base.observe)
+	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, config.moneyBackendURL, walletConfig.Base.Observe)
 	if err != nil {
 		return err
 	}
 	defer fm.Close()
 
-	return reclaimFees(cmd.Context(), accountNumber, cliConfig, fm)
+	return reclaimFees(cmd.Context(), accountNumber, config, fm, walletConfig.Base.ConsoleWriter)
 }
 
-func lockFeeCreditCmd(walletConfig *walletConfig, cliConfig *cliConf) *cobra.Command {
+func lockFeeCreditCmd(config *feesConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "lock",
 		Short: "locks fee credit of the wallet",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return lockFeeCreditCmdExec(cmd, walletConfig, cliConfig)
+			return lockFeeCreditCmdExec(cmd, config)
 		},
 	}
-	cmd.Flags().Uint64P(keyCmdName, "k", 0, "specifies which account fee credit record to lock")
-	_ = cmd.MarkFlagRequired(keyCmdName)
+	cmd.Flags().Uint64P(args.KeyCmdName, "k", 0, "specifies which account fee credit record to lock")
+	_ = cmd.MarkFlagRequired(args.KeyCmdName)
 	return cmd
 }
 
-func lockFeeCreditCmdExec(cmd *cobra.Command, walletConfig *walletConfig, cliConfig *cliConf) error {
-	if cliConfig.partitionType == evmType {
+func lockFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
+	if config.partitionType == clitypes.EvmType {
 		return errors.New("locking fee credit is not supported for EVM partition")
 	}
-	accountNumber, err := cmd.Flags().GetUint64(keyCmdName)
+	accountNumber, err := cmd.Flags().GetUint64(args.KeyCmdName)
 	if err != nil {
 		return err
 	}
 	if accountNumber == 0 {
 		return errors.New("account number must be greater than zero")
 	}
-	moneyBackendURL, err := cmd.Flags().GetString(alphabillApiURLCmdName)
-	if err != nil {
-		return err
-	}
 
-	am, err := loadExistingAccountManager(cmd, walletConfig.WalletHomeDir)
+	walletConfig := config.walletConfig
+	am, err := cliaccount.LoadExistingAccountManager(walletConfig)
 	if err != nil {
 		return fmt.Errorf("failed to load account manager: %w", err)
 	}
@@ -230,7 +216,7 @@ func lockFeeCreditCmdExec(cmd *cobra.Command, walletConfig *walletConfig, cliCon
 	}
 	defer feeManagerDB.Close()
 
-	fm, err := getFeeCreditManager(cmd.Context(), cliConfig, am, feeManagerDB, moneyBackendURL, walletConfig.Base.observe)
+	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, config.moneyBackendURL, walletConfig.Base.Observe)
 	if err != nil {
 		return err
 	}
@@ -240,40 +226,37 @@ func lockFeeCreditCmdExec(cmd *cobra.Command, walletConfig *walletConfig, cliCon
 	if err != nil {
 		return fmt.Errorf("failed to lock fee credit: %w", err)
 	}
-	consoleWriter.Println("Fee credit record locked successfully.")
+	walletConfig.Base.ConsoleWriter.Println("Fee credit record locked successfully.")
 	return nil
 }
 
-func unlockFeeCreditCmd(walletConfig *walletConfig, cliConfig *cliConf) *cobra.Command {
+func unlockFeeCreditCmd(config *feesConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "unlock",
 		Short: "unlocks fee credit of the wallet",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return unlockFeeCreditCmdExec(cmd, walletConfig, cliConfig)
+			return unlockFeeCreditCmdExec(cmd, config)
 		},
 	}
-	cmd.Flags().Uint64P(keyCmdName, "k", 0, "specifies which account fee credit record to unlock")
-	_ = cmd.MarkFlagRequired(keyCmdName)
+	cmd.Flags().Uint64P(args.KeyCmdName, "k", 0, "specifies which account fee credit record to unlock")
+	_ = cmd.MarkFlagRequired(args.KeyCmdName)
 	return cmd
 }
 
-func unlockFeeCreditCmdExec(cmd *cobra.Command, walletConfig *walletConfig, cliConfig *cliConf) error {
-	if cliConfig.partitionType == evmType {
+func unlockFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
+	if config.partitionType == clitypes.EvmType {
 		return errors.New("locking fee credit is not supported for EVM partition")
 	}
-	accountNumber, err := cmd.Flags().GetUint64(keyCmdName)
+	accountNumber, err := cmd.Flags().GetUint64(args.KeyCmdName)
 	if err != nil {
 		return err
 	}
 	if accountNumber == 0 {
 		return errors.New("account number must be greater than zero")
 	}
-	moneyBackendURL, err := cmd.Flags().GetString(alphabillApiURLCmdName)
-	if err != nil {
-		return err
-	}
 
-	am, err := loadExistingAccountManager(cmd, walletConfig.WalletHomeDir)
+	walletConfig := config.walletConfig
+	am, err := cliaccount.LoadExistingAccountManager(walletConfig)
 	if err != nil {
 		return fmt.Errorf("failed to load account manager: %w", err)
 	}
@@ -285,7 +268,7 @@ func unlockFeeCreditCmdExec(cmd *cobra.Command, walletConfig *walletConfig, cliC
 	}
 	defer feeManagerDB.Close()
 
-	fm, err := getFeeCreditManager(cmd.Context(), cliConfig, am, feeManagerDB, moneyBackendURL, walletConfig.Base.observe)
+	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, config.moneyBackendURL, walletConfig.Base.Observe)
 	if err != nil {
 		return err
 	}
@@ -295,7 +278,7 @@ func unlockFeeCreditCmdExec(cmd *cobra.Command, walletConfig *walletConfig, cliC
 	if err != nil {
 		return fmt.Errorf("failed to unlock fee credit: %w", err)
 	}
-	consoleWriter.Println("Fee credit record unlocked successfully.")
+	walletConfig.Base.ConsoleWriter.Println("Fee credit record unlocked successfully.")
 	return nil
 }
 
@@ -308,7 +291,7 @@ type FeeCreditManager interface {
 	Close()
 }
 
-func listFees(ctx context.Context, accountNumber uint64, am account.Manager, c *cliConf, w FeeCreditManager) error {
+func listFees(ctx context.Context, accountNumber uint64, am account.Manager, c *feesConfig, w FeeCreditManager, consoleWriter clitypes.ConsoleWrapper) error {
 	if accountNumber == 0 {
 		pubKeys, err := am.GetPublicKeys()
 		if err != nil {
@@ -337,7 +320,7 @@ func listFees(ctx context.Context, accountNumber uint64, am account.Manager, c *
 	return nil
 }
 
-func addFees(ctx context.Context, accountNumber uint64, amountString string, c *cliConf, w FeeCreditManager) error {
+func addFees(ctx context.Context, accountNumber uint64, amountString string, c *feesConfig, w FeeCreditManager, consoleWriter clitypes.ConsoleWrapper) error {
 	amount, err := util.StringToAmount(amountString, 8)
 	if err != nil {
 		return err
@@ -345,7 +328,7 @@ func addFees(ctx context.Context, accountNumber uint64, amountString string, c *
 	rsp, err := w.AddFeeCredit(ctx, fees.AddFeeCmd{
 		Amount:         amount,
 		AccountIndex:   accountNumber - 1,
-		DisableLocking: c.partitionType == evmType,
+		DisableLocking: c.partitionType == clitypes.EvmType,
 	})
 	if err != nil {
 		if errors.Is(err, fees.ErrMinimumFeeAmount) {
@@ -368,7 +351,7 @@ func addFees(ctx context.Context, accountNumber uint64, amountString string, c *
 	return nil
 }
 
-func reclaimFees(ctx context.Context, accountNumber uint64, c *cliConf, w FeeCreditManager) error {
+func reclaimFees(ctx context.Context, accountNumber uint64, c *feesConfig, w FeeCreditManager, consoleWriter clitypes.ConsoleWrapper) error {
 	rsp, err := w.ReclaimFeeCredit(ctx, fees.ReclaimFeeCmd{
 		AccountIndex: accountNumber - 1,
 	})
@@ -386,12 +369,14 @@ func reclaimFees(ctx context.Context, accountNumber uint64, c *cliConf, w FeeCre
 	return nil
 }
 
-type cliConf struct {
-	partitionType       partitionType
+type feesConfig struct {
+	walletConfig        *clitypes.WalletConfig
+	moneyBackendURL     string
+	partitionType       clitypes.PartitionType
 	partitionBackendURL string
 }
 
-func (c *cliConf) parsePartitionBackendURL() (*url.URL, error) {
+func (c *feesConfig) parsePartitionBackendURL() (*url.URL, error) {
 	backendURL := c.getPartitionBackendURL()
 	if !strings.HasPrefix(backendURL, "http://") && !strings.HasPrefix(backendURL, "https://") {
 		backendURL = "http://" + backendURL
@@ -399,17 +384,17 @@ func (c *cliConf) parsePartitionBackendURL() (*url.URL, error) {
 	return url.Parse(backendURL)
 }
 
-func (c *cliConf) getPartitionBackendURL() string {
+func (c *feesConfig) getPartitionBackendURL() string {
 	if c.partitionBackendURL != "" {
 		return c.partitionBackendURL
 	}
 	switch c.partitionType {
-	case moneyType:
-		return defaultAlphabillApiURL
-	case tokensType:
-		return defaultTokensBackendApiURL
-	case evmType:
-		return defaultEvmNodeRestURL // evm does not use backend and instead talks to an actual evm node
+	case clitypes.MoneyType:
+		return args.DefaultAlphabillApiURL
+	case clitypes.TokensType:
+		return args.DefaultTokensBackendApiURL
+	case clitypes.EvmType:
+		return args.DefaultEvmNodeRestURL // evm does not use backend and instead talks to an actual evm node
 	default:
 		panic("invalid \"partition\" flag value: " + c.partitionType)
 	}
@@ -417,7 +402,7 @@ func (c *cliConf) getPartitionBackendURL() string {
 
 // Creates a fees.FeeManager that needs to be closed with the Close() method.
 // Does not close the account.Manager passed as an argument.
-func getFeeCreditManager(ctx context.Context, c *cliConf, am account.Manager, feeManagerDB fees.FeeManagerDB, moneyBackendURL string, obs Observability) (FeeCreditManager, error) {
+func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager, feeManagerDB fees.FeeManagerDB, moneyBackendURL string, obs clitypes.Observability) (FeeCreditManager, error) {
 	moneyBackendClient, err := moneyclient.New(moneyBackendURL, obs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create money backend client: %w", err)
@@ -426,7 +411,7 @@ func getFeeCreditManager(ctx context.Context, c *cliConf, am account.Manager, fe
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch money system info: %w", err)
 	}
-	moneyTypeVar := moneyType
+	moneyTypeVar := clitypes.MoneyType
 	if !strings.HasPrefix(moneySystemInfo.Name, moneyTypeVar.String()) {
 		return nil, errors.New("invalid wallet backend API URL provided for money partition")
 	}
@@ -439,7 +424,7 @@ func getFeeCreditManager(ctx context.Context, c *cliConf, am account.Manager, fe
 	moneyTxPublisher := moneywallet.NewTxPublisher(moneyBackendClient, obs.Logger())
 
 	switch c.partitionType {
-	case moneyType:
+	case clitypes.MoneyType:
 		return fees.NewFeeManager(
 			am,
 			feeManagerDB,
@@ -453,7 +438,7 @@ func getFeeCreditManager(ctx context.Context, c *cliConf, am account.Manager, fe
 			moneywallet.FeeCreditRecordIDFormPublicKey,
 			obs.Logger(),
 		), nil
-	case tokensType:
+	case clitypes.TokensType:
 		backendURL, err := c.parsePartitionBackendURL()
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse partition backend url: %w", err)
@@ -464,7 +449,7 @@ func getFeeCreditManager(ctx context.Context, c *cliConf, am account.Manager, fe
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch tokens system info: %w", err)
 		}
-		tokenTypeVar := tokensType
+		tokenTypeVar := clitypes.TokensType
 		if !strings.HasPrefix(tokenInfo.Name, tokenTypeVar.String()) {
 			return nil, errors.New("invalid wallet backend API URL provided for tokens partition")
 		}
@@ -485,7 +470,7 @@ func getFeeCreditManager(ctx context.Context, c *cliConf, am account.Manager, fe
 			tokenswallet.FeeCreditRecordIDFromPublicKey,
 			obs.Logger(),
 		), nil
-	case evmType:
+	case clitypes.EvmType:
 		evmNodeURL, err := c.parsePartitionBackendURL()
 		if err != nil {
 			return nil, err
@@ -496,7 +481,7 @@ func getFeeCreditManager(ctx context.Context, c *cliConf, am account.Manager, fe
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch evm system info: %w", err)
 		}
-		evmTypeVar := evmType
+		evmTypeVar := clitypes.EvmType
 		if !strings.HasPrefix(evmInfo.Name, evmTypeVar.String()) {
 			return nil, errors.New("invalid validator node URL provided for evm partition")
 		}
@@ -520,4 +505,11 @@ func getFeeCreditManager(ctx context.Context, c *cliConf, am account.Manager, fe
 	default:
 		panic(`invalid "partition" flag value: ` + c.partitionType)
 	}
+}
+
+func getLockedReasonString(bill *wallet.Bill) string {
+	if bill.IsLocked() {
+		return fmt.Sprintf(" (%s)", bill.Locked.String())
+	}
+	return ""
 }

@@ -1,0 +1,25 @@
+package args
+
+const (
+	DefaultAlphabillApiURL     = "localhost:9654"
+	DefaultTokensBackendApiURL = "localhost:9735"
+	DefaultEvmNodeRestURL      = "localhost:29866"
+	PasswordPromptUsage        = "password (interactive from prompt)"
+	PasswordArgUsage           = "password (non-interactive from args)"
+	AlphabillApiURLCmdName     = "alphabill-api-uri"
+	SeedCmdName                = "seed"
+	AddressCmdName             = "address"
+	AmountCmdName              = "amount"
+	PasswordPromptCmdName      = "password"
+	PasswordArgCmdName         = "pn"
+	WalletLocationCmdName      = "wallet-location"
+	KeyCmdName                 = "key"
+	WaitForConfCmdName         = "wait-for-confirmation"
+	TotalCmdName               = "total"
+	QuietCmdName               = "quiet"
+	ShowUnswappedCmdName       = "show-unswapped"
+	BillIdCmdName              = "bill-id"
+	SystemIdentifierCmdName    = "system-identifier"
+	PartitionCmdName           = "partition"
+	PartitionBackendUrlCmdName = "partition-backend-url"
+)

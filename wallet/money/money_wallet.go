@@ -116,6 +116,7 @@ func (w *Wallet) SystemID() types.SystemID {
 func (w *Wallet) Close() {
 	w.am.Close()
 	w.feeManager.Close()
+	_ = w.dustCollector.Close()
 }
 
 // GetBalance returns sum value of all bills currently owned by the wallet, for given account.
