@@ -1,53 +1,57 @@
-package cmd
+package tokens
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/alphabill-org/alphabill/partition/event"
 	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/alphabill-org/alphabill/types"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
 
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
-	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/partition/event"
+	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
+	moneywallet "github.com/alphabill-org/alphabill-wallet/wallet/money"
 )
 
 func TestNFTs_Integration(t *testing.T) {
-	logF := testobserve.NewFactory(t)
 	network := NewAlphabillNetwork(t)
 	_, err := network.abNetwork.GetNodePartition(money.DefaultSystemIdentifier)
 	require.NoError(t, err)
-	moneyBackendURL := network.moneyBackendURL
 	tokenPartition, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemIdentifier)
 	require.NoError(t, err)
-	homedirW1 := network.walletHomedir
-	//w1key := network.walletKey1
+	homedirW1 := network.homeDir
 	w1key2 := network.walletKey2
 	backendURL := network.tokenBackendURL
 	backendClient := network.tokenBackendClient
 	ctx := network.ctx
 
-	w2, homedirW2 := createNewTokenWallet(t, backendURL)
+	// create w2
+	w2, homedirW2 := testutils.CreateNewTokenWallet(t, backendURL)
 	w2key, err := w2.GetAccountManager().GetAccountKey(0)
 	require.NoError(t, err)
 	w2.Shutdown()
 
 	// send money to w1k2 to create fee credits
-	stdout := execWalletCmd(t, logF, homedirW1, fmt.Sprintf("send --amount 100 --address %s -r %s", hexutil.Encode(w1key2.PubKey), moneyBackendURL))
-	verifyStdout(t, stdout, "Successfully confirmed transaction(s)")
-
-	// create fee credit on w1k2
-	stdout, err = execFeesCommand(logF, homedirW1, fmt.Sprintf("--partition tokens add -k 2 --amount 50 -r %s -m %s", moneyBackendURL, backendURL))
+	wallet := loadMoneyWallet(t, network.walletHomeDir, network.moneyBackendClient)
+	_, err = wallet.Send(context.Background(), moneywallet.SendCmd{Receivers: []moneywallet.ReceiverData{{PubKey: w1key2.PubKey, Amount: 100 * 1e8}}, WaitForConfirmation: true})
 	require.NoError(t, err)
-	verifyStdout(t, stdout, "Successfully created 50 fee credits on tokens partition.")
+	wallet.Close()
+
+	// create fee credit for w1k2
+	tokensWallet := loadTokensWallet(t, network.walletHomeDir, network.moneyBackendClient, network.tokenBackendClient)
+	_, err = tokensWallet.AddFeeCredit(context.Background(), fees.AddFeeCmd{AccountIndex: 1, Amount: 50 * 1e8, DisableLocking: true})
+	require.NoError(t, err)
+	tokensWallet.Shutdown()
 
 	// non-fungible token types
 	typeID := randomNonFungibleTokenTypeID(t)
@@ -59,49 +63,56 @@ func TestNFTs_Integration(t *testing.T) {
 	ensureTokenTypeIndexed(t, ctx, backendClient, w1key2.PubKey, typeID)
 	execTokensCmd(t, homedirW1, fmt.Sprintf("new-type non-fungible -k 2 --symbol %s -r %s --type %s --parent-type %s --subtype-input ptpkh", symbol+"2", backendURL, typeID2, typeID))
 	ensureTokenTypeIndexed(t, ctx, backendClient, w1key2.PubKey, typeID2)
+
 	// mint NFT
 	execTokensCmd(t, homedirW1, fmt.Sprintf("new non-fungible -k 2 -r %s --type %s --token-identifier %s", backendURL, typeID, nftID))
 	require.Eventually(t, testpartition.BlockchainContains(tokenPartition, func(tx *types.TransactionOrder) bool {
 		return tx.PayloadType() == tokens.PayloadTypeMintNFT && bytes.Equal(tx.UnitID(), nftID)
 	}), test.WaitDuration, test.WaitTick)
 	ensureTokenIndexed(t, ctx, backendClient, w1key2.PubKey, nftID)
+
 	// transfer NFT
 	execTokensCmd(t, homedirW1, fmt.Sprintf("send non-fungible -k 2 -r %s --token-identifier %s --address 0x%X", backendURL, nftID, w2key.PubKey))
 	require.Eventually(t, testpartition.BlockchainContains(tokenPartition, func(tx *types.TransactionOrder) bool {
 		return tx.PayloadType() == tokens.PayloadTypeTransferNFT && bytes.Equal(tx.UnitID(), nftID)
 	}), test.WaitDuration, test.WaitTick)
 	ensureTokenIndexed(t, ctx, backendClient, w2key.PubKey, nftID)
-	verifyStdout(t, execTokensCmd(t, homedirW2, fmt.Sprintf("list non-fungible -r %s", backendURL)), fmt.Sprintf("ID='%s'", nftID))
+	testutils.VerifyStdout(t, execTokensCmd(t, homedirW2, fmt.Sprintf("list non-fungible -r %s", backendURL)), fmt.Sprintf("ID='%s'", nftID))
+
 	//check what is left in w1, nothing, that is
-	verifyStdout(t, execTokensCmd(t, homedirW1, fmt.Sprintf("list non-fungible -k 2 -r %s", backendURL)), "No tokens")
+	testutils.VerifyStdout(t, execTokensCmd(t, homedirW1, fmt.Sprintf("list non-fungible -k 2 -r %s", backendURL)), "No tokens")
 	// list token types
-	verifyStdout(t, execTokensCmd(t, homedirW1, fmt.Sprintf("list-types -r %s", backendURL)), "symbol=ABNFT (nft)")
-	verifyStdout(t, execTokensCmd(t, homedirW1, fmt.Sprintf("list-types non-fungible -r %s", backendURL)), "symbol=ABNFT (nft)")
+	testutils.VerifyStdout(t, execTokensCmd(t, homedirW1, fmt.Sprintf("list-types -r %s", backendURL)), "symbol=ABNFT (nft)")
+	testutils.VerifyStdout(t, execTokensCmd(t, homedirW1, fmt.Sprintf("list-types non-fungible -r %s", backendURL)), "symbol=ABNFT (nft)")
 
 	// send money to w2 to create fee credits
-	stdout = execWalletCmd(t, logF, homedirW1, fmt.Sprintf("send --amount 100 --address %s -r %s", hexutil.Encode(w2key.PubKey), moneyBackendURL))
-	verifyStdout(t, stdout, "Successfully confirmed transaction(s)")
-
-	// create fee credit on w2
-	stdout, err = execFeesCommand(logF, homedirW2, fmt.Sprintf("--partition tokens add --amount 50 -r %s -m %s", moneyBackendURL, backendURL))
+	wallet = loadMoneyWallet(t, network.walletHomeDir, network.moneyBackendClient)
+	_, err = wallet.Send(context.Background(), moneywallet.SendCmd{Receivers: []moneywallet.ReceiverData{{PubKey: w2key.PubKey, Amount: 100 * 1e8}}, WaitForConfirmation: true})
 	require.NoError(t, err)
-	verifyStdout(t, stdout, "Successfully created 50 fee credits on tokens partition.")
+	wallet.Close()
+
+	// create fee credit for w2
+	tokensWallet = loadTokensWallet(t, filepath.Join(homedirW2, "wallet"), network.moneyBackendClient, network.tokenBackendClient)
+	_, err = tokensWallet.AddFeeCredit(context.Background(), fees.AddFeeCmd{Amount: 50 * 1e8, DisableLocking: true})
+	require.NoError(t, err)
+	tokensWallet.Shutdown()
 
 	// transfer back
 	execTokensCmd(t, homedirW2, fmt.Sprintf("send non-fungible -r %s --token-identifier %s --address 0x%X -k 1", backendURL, nftID, w1key2.PubKey))
 	ensureTokenIndexed(t, ctx, backendClient, w1key2.PubKey, nftID)
+
 	// mint nft from w1 and set the owner to w2
 	nftID2 := randomNonFungibleTokenID(t)
-	verifyStdout(t, execTokensCmd(t, homedirW2, fmt.Sprintf("list non-fungible -r %s", backendURL)), "No tokens")
+	testutils.VerifyStdout(t, execTokensCmd(t, homedirW2, fmt.Sprintf("list non-fungible -r %s", backendURL)), "No tokens")
 	execTokensCmd(t, homedirW1, fmt.Sprintf("new non-fungible -k 2 -r %s --type %s --bearer-clause ptpkh:0x%X --token-identifier %s", backendURL, typeID, w2key.PubKeyHash.Sha256, nftID2))
-	verifyStdout(t, execTokensCmd(t, homedirW2, fmt.Sprintf("list non-fungible -r %s", backendURL)), fmt.Sprintf("ID='%s'", nftID2))
+	testutils.VerifyStdout(t, execTokensCmd(t, homedirW2, fmt.Sprintf("list non-fungible -r %s", backendURL)), fmt.Sprintf("ID='%s'", nftID2))
 }
 
 func TestNFTDataUpdateCmd_Integration(t *testing.T) {
 	network := NewAlphabillNetwork(t)
 	tokenPartition, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemIdentifier)
 	require.NoError(t, err)
-	homedir := network.walletHomedir
+	homedir := network.homeDir
 	w1key := network.walletKey1
 	backendURL := network.tokenBackendURL
 	backendClient := network.tokenBackendClient
@@ -109,9 +120,11 @@ func TestNFTDataUpdateCmd_Integration(t *testing.T) {
 
 	typeID := randomNonFungibleTokenTypeID(t)
 	symbol := "ABNFT"
+
 	// create type
 	execTokensCmd(t, homedir, fmt.Sprintf("new-type non-fungible --symbol %s -r %s --type %s", symbol, backendURL, typeID))
 	ensureTokenTypeIndexed(t, ctx, backendClient, w1key.PubKey, typeID)
+
 	// create non-fungible token from using data-file
 	nftID := randomNonFungibleTokenID(t)
 	data := make([]byte, 1024)
@@ -133,8 +146,9 @@ func TestNFTDataUpdateCmd_Integration(t *testing.T) {
 		return false
 	}), test.WaitDuration, test.WaitTick)
 	nft := ensureTokenIndexed(t, ctx, backendClient, w1key.PubKey, nftID)
-	verifyStdout(t, execTokensCmd(t, homedir, fmt.Sprintf("list non-fungible -r %s", backendURL)), fmt.Sprintf("ID='%s'", nftID))
+	testutils.VerifyStdout(t, execTokensCmd(t, homedir, fmt.Sprintf("list non-fungible -r %s", backendURL)), fmt.Sprintf("ID='%s'", nftID))
 	require.Equal(t, data, nft.NftData)
+
 	// generate new data
 	data2 := make([]byte, 1024)
 	n, err = rand.Read(data2)
@@ -145,6 +159,7 @@ func TestNFTDataUpdateCmd_Integration(t *testing.T) {
 	require.NoError(t, err)
 	_, err = tmpfile.Write(data2)
 	require.NoError(t, err)
+
 	// update data, assumes default [--data-update-input true,true]
 	execTokensCmd(t, homedir, fmt.Sprintf("update -r %s --token-identifier %s --data-file %s", backendURL, nftID, tmpfile.Name()))
 	require.Eventually(t, testpartition.BlockchainContains(tokenPartition, func(tx *types.TransactionOrder) bool {
@@ -156,6 +171,7 @@ func TestNFTDataUpdateCmd_Integration(t *testing.T) {
 		}
 		return false
 	}), test.WaitDuration, test.WaitTick)
+
 	// check that data was updated on the backend
 	require.Eventually(t, func() bool {
 		return bytes.Equal(data2, ensureTokenIndexed(t, ctx, backendClient, w1key.PubKey, nftID).NftData)
@@ -166,7 +182,8 @@ func TestNFTDataUpdateCmd_Integration(t *testing.T) {
 	execTokensCmd(t, homedir, fmt.Sprintf("new non-fungible -r %s --type %s --token-identifier %s --data 01 --data-update-clause false", backendURL, typeID, nftID2))
 	nft2 := ensureTokenIndexed(t, ctx, backendClient, w1key.PubKey, nftID2)
 	require.Equal(t, []byte{0x01}, nft2.NftData)
-	//try to update and observe failure
+
+	// try to update and Observe failure
 	execTokensCmd(t, homedir, fmt.Sprintf("update -r %s --token-identifier %s --data 02 --data-update-input false,true -w false", backendURL, nftID2))
 	testevent.ContainsEvent(t, tokenPartition.Nodes[0].EventHandler, event.TransactionFailed)
 }
@@ -175,13 +192,13 @@ func TestNFT_InvariantPredicate_Integration(t *testing.T) {
 	network := NewAlphabillNetwork(t)
 	tokenPartition, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemIdentifier)
 	require.NoError(t, err)
-	homedirW1 := network.walletHomedir
+	homedirW1 := network.homeDir
 	w1key := network.walletKey1
 	backendURL := network.tokenBackendURL
 	backendClient := network.tokenBackendClient
 	ctx := network.ctx
 
-	w2, homedirW2 := createNewTokenWallet(t, backendURL)
+	w2, homedirW2 := testutils.CreateNewTokenWallet(t, backendURL)
 	w2key, err := w2.GetAccountManager().GetAccountKey(0)
 	require.NoError(t, err)
 	w2.Shutdown()
@@ -204,11 +221,11 @@ func TestNFT_InvariantPredicate_Integration(t *testing.T) {
 	id := randomNonFungibleTokenID(t)
 	execTokensCmd(t, homedirW1, fmt.Sprintf("new non-fungible -r %s --type %s --token-identifier %s --mint-input %s,%s", backendURL, typeID12, id, predicatePtpkh, predicatePtpkh))
 	ensureTokenIndexed(t, ctx, backendClient, w1key.PubKey, id)
-	verifyStdout(t, execTokensCmd(t, homedirW1, fmt.Sprintf("list non-fungible -r %s", backendURL)), "symbol='ABNFT'")
+	testutils.VerifyStdout(t, execTokensCmd(t, homedirW1, fmt.Sprintf("list non-fungible -r %s", backendURL)), "symbol='ABNFT'")
 	//send to w2
 	execTokensCmd(t, homedirW1, fmt.Sprintf("send non-fungible -r %s --token-identifier %s --address 0x%X -k 1 --inherit-bearer-input %s,%s", backendURL, id, w2key.PubKey, predicateTrue, predicatePtpkh))
 	ensureTokenIndexed(t, ctx, backendClient, w2key.PubKey, id)
-	verifyStdout(t, execTokensCmd(t, homedirW2, fmt.Sprintf("list non-fungible -r %s", backendURL)), "symbol='ABNFT'")
+	testutils.VerifyStdout(t, execTokensCmd(t, homedirW2, fmt.Sprintf("list non-fungible -r %s", backendURL)), "symbol='ABNFT'")
 }
 
 func TestNFT_LockUnlock_Integration(t *testing.T) {
@@ -217,7 +234,7 @@ func TestNFT_LockUnlock_Integration(t *testing.T) {
 	require.NoError(t, err)
 	tokensPartition, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemIdentifier)
 	require.NoError(t, err)
-	homedirW1 := network.walletHomedir
+	homedirW1 := network.homeDir
 	backendUrl := network.tokenBackendURL
 	backendClient := network.tokenBackendClient
 	w1key := network.walletKey1
@@ -238,13 +255,13 @@ func TestNFT_LockUnlock_Integration(t *testing.T) {
 
 	// lock NFT
 	execTokensCmd(t, homedirW1, fmt.Sprintf("lock -r %s --token-identifier %s -k 1", backendUrl, nftID))
-	verifyStdoutEventually(t, func() *testConsoleWriter {
+	testutils.VerifyStdoutEventually(t, func() *testutils.TestConsoleWriter {
 		return execTokensCmd(t, homedirW1, fmt.Sprintf("list non-fungible -r %s", backendUrl))
 	}, "locked='manually locked by user'")
 
 	// unlock NFT
 	execTokensCmd(t, homedirW1, fmt.Sprintf("unlock -r %s --token-identifier %s -k 1", backendUrl, nftID))
-	verifyStdoutEventually(t, func() *testConsoleWriter {
+	testutils.VerifyStdoutEventually(t, func() *testutils.TestConsoleWriter {
 		return execTokensCmd(t, homedirW1, fmt.Sprintf("list non-fungible -r %s", backendUrl))
 	}, "locked=''")
 }

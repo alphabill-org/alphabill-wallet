@@ -483,3 +483,7 @@ func (w *DustCollector) getLockedTargetBill(accountID []byte) (*unitlock.LockedU
 	}
 	return nil, nil
 }
+
+func (w *DustCollector) Close() error {
+	return w.unitLocker.Close()
+}

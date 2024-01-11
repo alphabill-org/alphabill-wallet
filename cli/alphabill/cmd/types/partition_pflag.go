@@ -1,28 +1,28 @@
-package cmd
+package types
 
 import (
 	"errors"
 )
 
-// partitionType "partition" cli flag, implements github.com/spf13/pflag/flag.go#Value interface
-type partitionType string
+// PartitionType "partition" cli flag, implements github.com/spf13/pflag/flag.go#Value interface
+type PartitionType string
 
 const (
-	moneyType  partitionType = "money"
-	tokensType partitionType = "tokens"
-	evmType    partitionType = "evm"
+	MoneyType  PartitionType = "money"
+	TokensType PartitionType = "tokens"
+	EvmType    PartitionType = "evm"
 )
 
 // String returns string value of given partitionType, used in Printf and help context
-func (e *partitionType) String() string {
+func (e *PartitionType) String() string {
 	return string(*e)
 }
 
 // Set sets the value of this partitionType string
-func (e *partitionType) Set(v string) error {
+func (e *PartitionType) Set(v string) error {
 	switch v {
 	case "money", "tokens", "evm":
-		*e = partitionType(v)
+		*e = PartitionType(v)
 		return nil
 	default:
 		return errors.New("must be one of [money|tokens|evm]")
@@ -30,6 +30,6 @@ func (e *partitionType) Set(v string) error {
 }
 
 // Type used to show the type value in the help context
-func (e *partitionType) Type() string {
+func (e *PartitionType) Type() string {
 	return "string"
 }

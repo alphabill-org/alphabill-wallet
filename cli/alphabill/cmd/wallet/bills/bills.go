@@ -1,4 +1,4 @@
-package cmd
+package bills
 
 import (
 	"bytes"
@@ -13,6 +13,9 @@ import (
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/spf13/cobra"
 
+	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
+	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money"
@@ -28,19 +31,20 @@ type (
 	}
 )
 
-// newWalletBillsCmd creates a new cobra command for the wallet bills component.
-func newWalletBillsCmd(config *walletConfig) *cobra.Command {
+// NewBillsCmd creates a new cobra command for the wallet bills component.
+func NewBillsCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 	var cmd = &cobra.Command{
 		Use:   "bills",
 		Short: "cli for managing alphabill wallet bills and proofs",
 	}
-	cmd.AddCommand(listCmd(config))
-	cmd.AddCommand(lockCmd(config))
-	cmd.AddCommand(unlockCmd(config))
+	cmd.AddCommand(listCmd(walletConfig))
+	cmd.AddCommand(lockCmd(walletConfig))
+	cmd.AddCommand(unlockCmd(walletConfig))
 	return cmd
 }
 
-func listCmd(config *walletConfig) *cobra.Command {
+func listCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
+	config := &clitypes.BillsConfig{WalletConfig: walletConfig}
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "lists bill ids and values",
@@ -48,31 +52,21 @@ func listCmd(config *walletConfig) *cobra.Command {
 			return execListCmd(cmd, config)
 		},
 	}
-	cmd.Flags().StringP(alphabillApiURLCmdName, "r", defaultAlphabillApiURL, "alphabill API uri to connect to")
-	cmd.Flags().Uint64P(keyCmdName, "k", 0, "specifies which account bills to list (default: all accounts)")
-	cmd.Flags().BoolP(showUnswappedCmdName, "s", false, "includes unswapped dust bills in output")
+	cmd.Flags().StringVarP(&config.NodeURL, args.AlphabillApiURLCmdName, "r", args.DefaultAlphabillApiURL, "alphabill API uri to connect to")
+	cmd.Flags().Uint64VarP(&config.Key, args.KeyCmdName, "k", 0, "specifies which account bills to list (default: all accounts)")
+	cmd.Flags().BoolVarP(&config.ShowUnswapped, args.ShowUnswappedCmdName, "s", false, "includes unswapped dust bills in output")
 	return cmd
 }
 
-func execListCmd(cmd *cobra.Command, config *walletConfig) error {
-	uri, err := cmd.Flags().GetString(alphabillApiURLCmdName)
+func execListCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
+	restClient, err := client.New(config.NodeURL, config.WalletConfig.Base.Observe)
 	if err != nil {
 		return err
 	}
-	restClient, err := client.New(uri, config.Base.observe)
-	if err != nil {
-		return err
-	}
-	accountNumber, err := cmd.Flags().GetUint64(keyCmdName)
-	if err != nil {
-		return err
-	}
-	showUnswapped, err := cmd.Flags().GetBool(showUnswappedCmdName)
-	if err != nil {
-		return err
-	}
+	accountNumber := config.Key
+	showUnswapped := config.ShowUnswapped
 
-	am, err := loadExistingAccountManager(cmd, config.WalletHomeDir)
+	am, err := cliaccount.LoadExistingAccountManager(config.WalletConfig)
 	if err != nil {
 		return err
 	}
@@ -111,49 +105,38 @@ func execListCmd(cmd *cobra.Command, config *walletConfig) error {
 
 	for _, group := range accountBillGroups {
 		if len(group.bills.Bills) == 0 {
-			consoleWriter.Println(fmt.Sprintf("Account #%d - empty", group.accountIndex+1))
+			config.WalletConfig.Base.ConsoleWriter.Println(fmt.Sprintf("Account #%d - empty", group.accountIndex+1))
 		} else {
-			consoleWriter.Println(fmt.Sprintf("Account #%d", group.accountIndex+1))
+			config.WalletConfig.Base.ConsoleWriter.Println(fmt.Sprintf("Account #%d", group.accountIndex+1))
 		}
 		for j, bill := range group.bills.Bills {
 			billValueStr := util.AmountToString(bill.Value, 8)
-			consoleWriter.Println(fmt.Sprintf("#%d 0x%X %s%s", j+1, bill.Id, billValueStr, getLockedReasonString(bill)))
+			config.WalletConfig.Base.ConsoleWriter.Println(fmt.Sprintf("#%d 0x%X %s%s", j+1, bill.Id, billValueStr, getLockedReasonString(bill)))
 		}
 	}
 	return nil
 }
 
-func lockCmd(config *walletConfig) *cobra.Command {
-	var billID bytesHex
-	var systemID uint32
+func lockCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
+	config := &clitypes.BillsConfig{WalletConfig: walletConfig}
 	cmd := &cobra.Command{
 		Use:   "lock",
 		Short: "locks specific bill",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return execLockCmd(cmd, config, billID, types.SystemID(systemID))
+			return execLockCmd(cmd, config)
 		},
 	}
-	cmd.Flags().StringP(alphabillApiURLCmdName, "r", defaultAlphabillApiURL, "alphabill API uri to connect to")
-	cmd.Flags().Uint64P(keyCmdName, "k", 1, "account number of the bill to lock")
-	cmd.Flags().Var(&billID, billIdCmdName, "id of the bill to lock")
-	cmd.Flags().Uint32Var(&systemID, systemIdentifierCmdName, uint32(moneytx.DefaultSystemIdentifier), "system identifier")
+	cmd.Flags().StringVarP(&config.NodeURL, args.AlphabillApiURLCmdName, "r", args.DefaultAlphabillApiURL, "alphabill API uri to connect to")
+	cmd.Flags().Uint64VarP(&config.Key, args.KeyCmdName, "k", 1, "account number of the bill to lock")
+	cmd.Flags().Var(&config.BillID, args.BillIdCmdName, "id of the bill to lock")
+	cmd.Flags().Uint32Var(&config.SystemID, args.SystemIdentifierCmdName, uint32(moneytx.DefaultSystemIdentifier), "system identifier")
 	return cmd
 }
 
-func execLockCmd(cmd *cobra.Command, config *walletConfig, billID []byte, systemID types.SystemID) error {
-	uri, err := cmd.Flags().GetString(alphabillApiURLCmdName)
-	if err != nil {
-		return err
-	}
-	restClient, err := client.New(uri, config.Base.observe)
-	if err != nil {
-		return err
-	}
-	accountNumber, err := cmd.Flags().GetUint64(keyCmdName)
-	if err != nil {
-		return err
-	}
-	am, err := loadExistingAccountManager(cmd, config.WalletHomeDir)
+func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
+	restClient, err := client.New(config.NodeURL, config.WalletConfig.Base.Observe)
+	accountNumber := config.Key
+	am, err := cliaccount.LoadExistingAccountManager(config.WalletConfig)
 	if err != nil {
 		return fmt.Errorf("failed to load account manager: %w", err)
 	}
@@ -166,7 +149,7 @@ func execLockCmd(cmd *cobra.Command, config *walletConfig, billID []byte, system
 	if err != nil {
 		return err
 	}
-	moneyTypeVar := moneyType
+	moneyTypeVar := clitypes.MoneyType
 	if !strings.HasPrefix(infoResponse.Name, moneyTypeVar.String()) {
 		return errors.New("invalid wallet backend API URL provided for money partition")
 	}
@@ -178,7 +161,7 @@ func execLockCmd(cmd *cobra.Command, config *walletConfig, billID []byte, system
 	if fcb.GetValue() < txbuilder.MaxFee {
 		return errors.New("not enough fee credit in wallet")
 	}
-	bill, err := fetchBillByID(cmd.Context(), billID, restClient, accountKey)
+	bill, err := fetchBillByID(cmd.Context(), config.BillID, restClient, accountKey)
 	if err != nil {
 		return fmt.Errorf("failed to fetch bill by id: %w", err)
 	}
@@ -189,50 +172,39 @@ func execLockCmd(cmd *cobra.Command, config *walletConfig, billID []byte, system
 	if err != nil {
 		return fmt.Errorf("failed to fetch round number: %w", err)
 	}
-	tx, err := txbuilder.NewLockTx(accountKey, systemID, bill.Id, bill.TxHash, wallet.LockReasonManual, rnr.RoundNumber+10)
+	tx, err := txbuilder.NewLockTx(accountKey, types.SystemID(config.SystemID), bill.Id, bill.TxHash, wallet.LockReasonManual, rnr.RoundNumber+10)
 	if err != nil {
 		return fmt.Errorf("failed to create lock tx: %w", err)
 	}
-	moneyTxPublisher := money.NewTxPublisher(restClient, config.Base.observe.Logger())
+	moneyTxPublisher := money.NewTxPublisher(restClient, config.WalletConfig.Base.Observe.Logger())
 	_, err = moneyTxPublisher.SendTx(cmd.Context(), tx, accountKey.PubKey)
 	if err != nil {
 		return fmt.Errorf("failed to send lock tx: %w", err)
 	}
-	consoleWriter.Println("Bill locked successfully.")
+	config.WalletConfig.Base.ConsoleWriter.Println("Bill locked successfully.")
 	return nil
 }
 
-func unlockCmd(config *walletConfig) *cobra.Command {
-	var billID bytesHex
-	var systemID uint32
+func unlockCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
+	config := &clitypes.BillsConfig{WalletConfig: walletConfig}
 	cmd := &cobra.Command{
 		Use:   "unlock",
 		Short: "unlocks specific bill",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return execUnlockCmd(cmd, config, billID, types.SystemID(systemID))
+			return execUnlockCmd(cmd, config)
 		},
 	}
-	cmd.Flags().StringP(alphabillApiURLCmdName, "r", defaultAlphabillApiURL, "alphabill API uri to connect to")
-	cmd.Flags().Uint64P(keyCmdName, "k", 1, "account number of the bill to unlock")
-	cmd.Flags().Var(&billID, billIdCmdName, "id of the bill to unlock")
-	cmd.Flags().Uint32Var(&systemID, systemIdentifierCmdName, uint32(moneytx.DefaultSystemIdentifier), "system identifier")
+	cmd.Flags().StringVarP(&config.NodeURL, args.AlphabillApiURLCmdName, "r", args.DefaultAlphabillApiURL, "alphabill API uri to connect to")
+	cmd.Flags().Uint64VarP(&config.Key, args.KeyCmdName, "k", 1, "account number of the bill to unlock")
+	cmd.Flags().Var(&config.BillID, args.BillIdCmdName, "id of the bill to lock")
+	cmd.Flags().Uint32Var(&config.SystemID, args.SystemIdentifierCmdName, uint32(moneytx.DefaultSystemIdentifier), "system identifier")
 	return cmd
 }
 
-func execUnlockCmd(cmd *cobra.Command, config *walletConfig, billID []byte, systemID types.SystemID) error {
-	uri, err := cmd.Flags().GetString(alphabillApiURLCmdName)
-	if err != nil {
-		return err
-	}
-	restClient, err := client.New(uri, config.Base.observe)
-	if err != nil {
-		return err
-	}
-	accountNumber, err := cmd.Flags().GetUint64(keyCmdName)
-	if err != nil {
-		return err
-	}
-	am, err := loadExistingAccountManager(cmd, config.WalletHomeDir)
+func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
+	restClient, err := client.New(config.NodeURL, config.WalletConfig.Base.Observe)
+	accountNumber := config.Key
+	am, err := cliaccount.LoadExistingAccountManager(config.WalletConfig)
 	if err != nil {
 		return fmt.Errorf("failed to load account manager: %w", err)
 	}
@@ -242,7 +214,7 @@ func execUnlockCmd(cmd *cobra.Command, config *walletConfig, billID []byte, syst
 	if err != nil {
 		return err
 	}
-	moneyTypeVar := moneyType
+	moneyTypeVar := clitypes.MoneyType
 	if !strings.HasPrefix(infoResponse.Name, moneyTypeVar.String()) {
 		return errors.New("invalid wallet backend API URL provided for money partition")
 	}
@@ -258,7 +230,7 @@ func execUnlockCmd(cmd *cobra.Command, config *walletConfig, billID []byte, syst
 	if fcb.GetValue() < txbuilder.MaxFee {
 		return errors.New("not enough fee credit in wallet")
 	}
-	bill, err := fetchBillByID(cmd.Context(), billID, restClient, accountKey)
+	bill, err := fetchBillByID(cmd.Context(), config.BillID, restClient, accountKey)
 	if err != nil {
 		return fmt.Errorf("failed to fetch bill by id: %w", err)
 	}
@@ -269,16 +241,16 @@ func execUnlockCmd(cmd *cobra.Command, config *walletConfig, billID []byte, syst
 	if err != nil {
 		return fmt.Errorf("failed to fetch round number: %w", err)
 	}
-	tx, err := txbuilder.NewUnlockTx(accountKey, systemID, bill, rnr.RoundNumber+10)
+	tx, err := txbuilder.NewUnlockTx(accountKey, types.SystemID(config.SystemID), bill, rnr.RoundNumber+10)
 	if err != nil {
 		return fmt.Errorf("failed to create unlock tx: %w", err)
 	}
-	moneyTxPublisher := money.NewTxPublisher(restClient, config.Base.observe.Logger())
+	moneyTxPublisher := money.NewTxPublisher(restClient, config.WalletConfig.Base.Observe.Logger())
 	_, err = moneyTxPublisher.SendTx(cmd.Context(), tx, accountKey.PubKey)
 	if err != nil {
 		return fmt.Errorf("failed to send unlock tx: %w", err)
 	}
-	consoleWriter.Println("Bill unlocked successfully.")
+	config.WalletConfig.Base.ConsoleWriter.Println("Bill unlocked successfully.")
 	return nil
 }
 

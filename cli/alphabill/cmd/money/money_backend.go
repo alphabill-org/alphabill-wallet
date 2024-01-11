@@ -1,4 +1,4 @@
-package cmd
+package money
 
 import (
 	"context"
@@ -13,18 +13,20 @@ import (
 	"github.com/alphabill-org/alphabill/util"
 	"github.com/spf13/cobra"
 
+	cmdtypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend"
 )
 
 const (
-	moneyBackendHomeDir = "money-backend"
-
+	moneyBackendHomeDir     = "money-backend"
+	alphabillNodeURLCmdName = "alphabill-uri"
+	defaultAlphabillNodeURL = "localhost:9543"
 	serverAddrCmdName       = "server-addr"
+	defaultServerAddr       = "localhost:9654"
 	dbFileCmdName           = "db"
 	listBillsPageLimit      = "list-bills-page-limit"
 	systemIdentifierCmdName = "system-identifier"
-
-	defaultT2Timeout = 2500
+	defaultT2Timeout        = 2500
 )
 
 var defaultMoneySDR = &genesis.SystemDescriptionRecord{
@@ -36,10 +38,8 @@ var defaultMoneySDR = &genesis.SystemDescriptionRecord{
 	},
 }
 
-var defaultInitialBillID = money.NewBillID(nil, []byte{1})
-
 type moneyBackendConfig struct {
-	Base               *baseConfiguration
+	Base               *cmdtypes.BaseConfiguration
 	AlphabillUrl       string
 	ServerAddr         string
 	DbFile             string
@@ -80,8 +80,8 @@ func (c *moneyBackendConfig) getSDRFiles() ([]*genesis.SystemDescriptionRecord, 
 	return sdrs, nil
 }
 
-// newMoneyBackendCmd creates a new cobra command for the money-backend component.
-func newMoneyBackendCmd(baseConfig *baseConfiguration) *cobra.Command {
+// NewMoneyBackendCmd creates a new cobra command for the money-backend component.
+func NewMoneyBackendCmd(baseConfig *cmdtypes.BaseConfiguration) *cobra.Command {
 	config := &moneyBackendConfig{Base: baseConfig, SystemID: money.DefaultSystemIdentifier}
 	var walletCmd = &cobra.Command{
 		Use:   "money-backend",
@@ -102,7 +102,7 @@ func startMoneyBackendCmd(config *moneyBackendConfig) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVarP(&config.AlphabillUrl, alphabillNodeURLCmdName, "u", defaultAlphabillNodeURL, "alphabill node url")
-	cmd.Flags().StringVarP(&config.ServerAddr, serverAddrCmdName, "s", defaultAlphabillApiURL, "server address")
+	cmd.Flags().StringVarP(&config.ServerAddr, serverAddrCmdName, "s", defaultServerAddr, "server address")
 	cmd.Flags().StringVarP(&config.DbFile, dbFileCmdName, "f", "", "path to the database file (default: $AB_HOME/"+moneyBackendHomeDir+"/"+backend.BoltBillStoreFileName+")")
 	cmd.Flags().IntVarP(&config.ListBillsPageLimit, listBillsPageLimit, "l", 100, "GET /list-bills request default/max limit size")
 	cmd.Flags().Uint64Var(&config.InitialBillValue, "initial-bill-value", 100000000, "initial bill value (needed for initial startup only)")
@@ -133,7 +133,7 @@ func execMoneyBackendStartCmd(ctx context.Context, config *moneyBackendConfig) e
 			Predicate: templates.AlwaysTrueBytes(),
 		},
 		SystemDescriptionRecords: sdrFiles,
-		Logger:                   config.Base.observe.Logger(),
-		Observe:                  config.Base.observe,
+		Logger:                   config.Base.Observe.Logger(),
+		Observe:                  config.Base.Observe,
 	})
 }
