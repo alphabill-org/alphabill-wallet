@@ -25,7 +25,6 @@ import (
 	"github.com/alphabill-org/alphabill/txsystem/money"
 	testtransaction "github.com/alphabill-org/alphabill/txsystem/testutils/transaction"
 	"github.com/alphabill-org/alphabill/types"
-	"github.com/alphabill-org/alphabill/util"
 
 	"github.com/ainvaltin/httpsrv"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -33,6 +32,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
 
+	"github.com/alphabill-org/alphabill-wallet/util"
 	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
 )
 

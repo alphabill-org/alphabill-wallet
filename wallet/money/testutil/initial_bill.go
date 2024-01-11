@@ -30,7 +30,7 @@ var defaultMoneySDR = &genesis.SystemDescriptionRecord{
 	SystemIdentifier: money.DefaultSystemIdentifier,
 	T2Timeout:        2500,
 	FeeCreditBill: &genesis.FeeCreditBill{
-		UnitId:         money.NewBillID(nil, []byte{2}),
+		UnitID:         money.NewBillID(nil, []byte{2}),
 		OwnerPredicate: templates.AlwaysTrueBytes(),
 	},
 }
@@ -54,8 +54,8 @@ func MoneyGenesisState(t *testing.T, config *MoneyGenesisConfig) *state.State {
 	// fee credit bills
 	for _, sdr := range config.SDRs {
 		fcb := sdr.FeeCreditBill
-		require.NoError(t, s.Apply(state.AddUnit(fcb.UnitId, fcb.OwnerPredicate, &money.BillData{})))
-		require.NoError(t, s.AddUnitLog(fcb.UnitId, zeroHash))
+		require.NoError(t, s.Apply(state.AddUnit(fcb.UnitID, fcb.OwnerPredicate, &money.BillData{})))
+		require.NoError(t, s.AddUnitLog(fcb.UnitID, zeroHash))
 	}
 
 	_, _, err := s.CalculateRoot()

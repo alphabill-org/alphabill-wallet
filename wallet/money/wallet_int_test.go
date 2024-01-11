@@ -319,7 +319,7 @@ func sendTo(t *testing.T, w *Wallet, receivers []ReceiverData, fromAccount uint6
 }
 
 func startMoneyOnlyAlphabillPartition(t *testing.T, genesisConfig *testutil.MoneyGenesisConfig) *testpartition.AlphabillNetwork {
-	genesisConfig.DCMoneySupplyValue = 10000*1e8
+	genesisConfig.DCMoneySupplyValue = 10000 * 1e8
 	genesisConfig.SDRs = createSDRs()
 	genesisState := testutil.MoneyGenesisState(t, genesisConfig)
 	mPart, err := testpartition.NewPartition(t, 1, func(tb map[string]abcrypto.Verifier) txsystem.TransactionSystem {
@@ -383,7 +383,7 @@ func createSDRs() []*genesis.SystemDescriptionRecord {
 		SystemIdentifier: money.DefaultSystemIdentifier,
 		T2Timeout:        2500,
 		FeeCreditBill: &genesis.FeeCreditBill{
-			UnitId:         money.NewBillID(nil, []byte{2}),
+			UnitID:         money.NewBillID(nil, []byte{2}),
 			OwnerPredicate: templates.AlwaysTrueBytes(),
 		},
 	}}

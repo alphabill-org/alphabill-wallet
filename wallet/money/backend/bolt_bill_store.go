@@ -9,10 +9,10 @@ import (
 
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/types"
-	"github.com/alphabill-org/alphabill/util"
 	"github.com/fxamacker/cbor/v2"
 	bolt "go.etcd.io/bbolt"
 
+	"github.com/alphabill-org/alphabill-wallet/util"
 	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
 )
 
