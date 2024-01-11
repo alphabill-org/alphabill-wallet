@@ -26,7 +26,7 @@ var (
 		SystemIdentifier: money.DefaultSystemIdentifier,
 		T2Timeout:        2500,
 		FeeCreditBill: &genesis.FeeCreditBill{
-			UnitId:         money.NewBillID(nil, []byte{2}),
+			UnitID:         money.NewBillID(nil, []byte{2}),
 			OwnerPredicate: templates.AlwaysTrueBytes(),
 		},
 	}
@@ -34,7 +34,7 @@ var (
 		SystemIdentifier: tokens.DefaultSystemIdentifier,
 		T2Timeout:        2500,
 		FeeCreditBill: &genesis.FeeCreditBill{
-			UnitId:         money.NewBillID(nil, []byte{3}),
+			UnitID:         money.NewBillID(nil, []byte{3}),
 			OwnerPredicate: templates.AlwaysTrueBytes(),
 		},
 	}

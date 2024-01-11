@@ -7,13 +7,13 @@ import (
 	"testing"
 
 	"github.com/alphabill-org/alphabill/predicates/templates"
-	"github.com/alphabill-org/alphabill/util"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
 	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
+	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 )

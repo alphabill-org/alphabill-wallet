@@ -11,11 +11,11 @@ import (
 	"github.com/alphabill-org/alphabill/txsystem/money"
 	testtransaction "github.com/alphabill-org/alphabill/txsystem/testutils/transaction"
 	"github.com/alphabill-org/alphabill/types"
-	"github.com/alphabill-org/alphabill/util"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
 	testsig "github.com/alphabill-org/alphabill-wallet/internal/testutils/sig"
+	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend"

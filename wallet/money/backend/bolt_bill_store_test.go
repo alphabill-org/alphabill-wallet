@@ -8,12 +8,12 @@ import (
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/types"
-	"github.com/alphabill-org/alphabill/util"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
 	bolt "go.etcd.io/bbolt"
 
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	"github.com/alphabill-org/alphabill-wallet/util"
 	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
 	testtransaction "github.com/alphabill-org/alphabill/txsystem/testutils/transaction"
 )
@@ -233,7 +233,7 @@ func TestBillStore_GetSetSystemDescriptionRecordsBills(t *testing.T) {
 			SystemIdentifier: 1,
 			T2Timeout:        2500,
 			FeeCreditBill: &genesis.FeeCreditBill{
-				UnitId:         []byte{2},
+				UnitID:         []byte{2},
 				OwnerPredicate: []byte{3},
 			},
 		},
@@ -241,7 +241,7 @@ func TestBillStore_GetSetSystemDescriptionRecordsBills(t *testing.T) {
 			SystemIdentifier: 2,
 			T2Timeout:        2500,
 			FeeCreditBill: &genesis.FeeCreditBill{
-				UnitId:         []byte{2},
+				UnitID:         []byte{2},
 				OwnerPredicate: []byte{3},
 			},
 		},

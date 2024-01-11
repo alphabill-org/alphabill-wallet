@@ -43,7 +43,7 @@ func CreateMoneyPartition(t *testing.T, genesisConfig *testutil.MoneyGenesisConf
 					SystemIdentifier: money.DefaultSystemIdentifier,
 					T2Timeout:        testblock.DefaultT2Timeout,
 					FeeCreditBill: &genesis.FeeCreditBill{
-						UnitId:         money.NewBillID(nil, []byte{2}),
+						UnitID:         money.NewBillID(nil, []byte{2}),
 						OwnerPredicate: templates.AlwaysTrueBytes(),
 					},
 				},

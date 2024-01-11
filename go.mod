@@ -6,13 +6,14 @@ replace github.com/multiformats/go-multistream v0.5.0 => github.com/multiformats
 
 require (
 	github.com/ainvaltin/httpsrv v0.1.2
-	github.com/alphabill-org/alphabill v0.2.2-0.20240103120558-6b0435dc38e2
+	github.com/alphabill-org/alphabill v0.2.2-0.20240111143825-53d097472d94
 	github.com/btcsuite/btcd v0.23.2
 	github.com/btcsuite/btcd/btcutil v1.1.2
 	github.com/ethereum/go-ethereum v1.12.2
 	github.com/fxamacker/cbor/v2 v2.5.0
 	github.com/gorilla/handlers v1.5.1
 	github.com/gorilla/mux v1.8.1
+	github.com/holiman/uint256 v1.2.3
 	github.com/libp2p/go-libp2p v0.31.0
 	github.com/multiformats/go-multiaddr v0.12.0
 	github.com/neilotoole/slogt v1.1.0
@@ -35,9 +36,11 @@ require (
 	go.opentelemetry.io/otel/metric v1.21.0
 	go.opentelemetry.io/otel/sdk v1.21.0
 	go.opentelemetry.io/otel/trace v1.21.0
+	golang.org/x/crypto v0.15.0
 	golang.org/x/sync v0.4.0
 	golang.org/x/term v0.14.0
 	google.golang.org/grpc v1.59.0
+	google.golang.org/protobuf v1.32.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -94,7 +97,6 @@ require (
 	github.com/hashicorp/golang-lru v1.0.2 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
-	github.com/holiman/uint256 v1.2.3 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.1 // indirect
 	github.com/ipfs/boxo v0.13.1 // indirect
@@ -188,7 +190,6 @@ require (
 	go.uber.org/fx v1.20.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.26.0 // indirect
-	golang.org/x/crypto v0.15.0 // indirect
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/mod v0.13.0 // indirect
 	golang.org/x/net v0.18.0 // indirect
@@ -198,7 +199,6 @@ require (
 	gonum.org/v1/gonum v0.14.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20230822172742-b8732ec3820d // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231016165738-49dd2c1f3d0b // indirect
-	google.golang.org/protobuf v1.32.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

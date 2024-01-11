@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/ainvaltin/httpsrv"
-	"github.com/alphabill-org/alphabill/client"
 	"github.com/alphabill-org/alphabill/logger"
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/predicates/templates"
@@ -23,6 +22,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 
+	"github.com/alphabill-org/alphabill-wallet/client"
 	"github.com/alphabill-org/alphabill-wallet/internal/debug"
 	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
@@ -161,7 +161,7 @@ func Run(ctx context.Context, config *Config) error {
 		}
 		for _, sdr := range config.SystemDescriptionRecords {
 			err = txc.SetBill(&Bill{
-				Id:             sdr.FeeCreditBill.UnitId,
+				Id:             sdr.FeeCreditBill.UnitID,
 				OwnerPredicate: sdr.FeeCreditBill.OwnerPredicate,
 			}, nil)
 			if err != nil {

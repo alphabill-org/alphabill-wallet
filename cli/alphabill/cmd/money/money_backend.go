@@ -10,10 +10,11 @@ import (
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/types"
-	"github.com/alphabill-org/alphabill/util"
+	abutil "github.com/alphabill-org/alphabill/util"
 	"github.com/spf13/cobra"
 
 	cmdtypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
+	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend"
 )
 
@@ -33,7 +34,7 @@ var defaultMoneySDR = &genesis.SystemDescriptionRecord{
 	SystemIdentifier: money.DefaultSystemIdentifier,
 	T2Timeout:        defaultT2Timeout,
 	FeeCreditBill: &genesis.FeeCreditBill{
-		UnitId:         money.NewBillID(nil, []byte{2}),
+		UnitID:         money.NewBillID(nil, []byte{2}),
 		OwnerPredicate: templates.AlwaysTrueBytes(),
 	},
 }
@@ -70,7 +71,7 @@ func (c *moneyBackendConfig) getSDRFiles() ([]*genesis.SystemDescriptionRecord, 
 		sdrs = append(sdrs, defaultMoneySDR)
 	} else {
 		for _, sdrFile := range c.SDRFiles {
-			sdr, err := util.ReadJsonFile(sdrFile, &genesis.SystemDescriptionRecord{})
+			sdr, err := abutil.ReadJsonFile(sdrFile, &genesis.SystemDescriptionRecord{})
 			if err != nil {
 				return nil, err
 			}

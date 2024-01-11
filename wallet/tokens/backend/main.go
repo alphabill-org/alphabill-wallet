@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/ainvaltin/httpsrv"
-	"github.com/alphabill-org/alphabill/client"
 	"github.com/alphabill-org/alphabill/logger"
 	"github.com/alphabill-org/alphabill/rpc/alphabill"
 	"github.com/alphabill-org/alphabill/types"
@@ -18,6 +17,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/alphabill-org/alphabill-wallet/client"
 	"github.com/alphabill-org/alphabill-wallet/internal/debug"
 	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/blocksync"
