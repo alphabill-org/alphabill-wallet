@@ -103,7 +103,7 @@ func TestBlockProcessor_EachTxTypeCanBeProcessed(t *testing.T) {
 			SystemIdentifier: moneySystemID,
 			T2Timeout:        2500,
 			FeeCreditBill: &genesis.FeeCreditBill{
-				UnitId:         money.NewBillID(nil, []byte{2}),
+				UnitID:         money.NewBillID(nil, []byte{2}),
 				OwnerPredicate: templates.AlwaysTrueBytes(),
 			},
 		},
@@ -266,7 +266,7 @@ func TestBlockProcessor_TransferAndReclaimFeeCycle_TargetMoneyPartition(t *testi
 			SystemIdentifier: moneySystemID,
 			T2Timeout:        2500,
 			FeeCreditBill: &genesis.FeeCreditBill{
-				UnitId:         moneyPartitionFeeBillID,
+				UnitID:         moneyPartitionFeeBillID,
 				OwnerPredicate: templates.AlwaysTrueBytes(),
 			},
 		},
@@ -433,7 +433,7 @@ func TestBlockProcessor_TransferAndReclaimFeeCycle_TargetTokenPartition(t *testi
 			SystemIdentifier: moneySystemID,
 			T2Timeout:        2500,
 			FeeCreditBill: &genesis.FeeCreditBill{
-				UnitId:         moneyPartitionFeeBillID,
+				UnitID:         moneyPartitionFeeBillID,
 				OwnerPredicate: templates.AlwaysTrueBytes(),
 			},
 		},
@@ -441,7 +441,7 @@ func TestBlockProcessor_TransferAndReclaimFeeCycle_TargetTokenPartition(t *testi
 			SystemIdentifier: tokenSystemID,
 			T2Timeout:        2500,
 			FeeCreditBill: &genesis.FeeCreditBill{
-				UnitId:         tokenPartitionFeeBillID,
+				UnitID:         tokenPartitionFeeBillID,
 				OwnerPredicate: templates.AlwaysTrueBytes(),
 			},
 		},
@@ -650,7 +650,7 @@ func TestBlockProcessor_NWaySplit(t *testing.T) {
 			SystemIdentifier: moneySystemID,
 			T2Timeout:        2500,
 			FeeCreditBill: &genesis.FeeCreditBill{
-				UnitId:         money.NewBillID(nil, []byte{2}),
+				UnitID:         money.NewBillID(nil, []byte{2}),
 				OwnerPredicate: templates.AlwaysTrueBytes(),
 			},
 		},
@@ -695,7 +695,7 @@ func TestLockTx_Ok(t *testing.T) {
 			SystemIdentifier: moneySystemID,
 			T2Timeout:        2500,
 			FeeCreditBill: &genesis.FeeCreditBill{
-				UnitId:         money.NewBillID(nil, []byte{2}),
+				UnitID:         money.NewBillID(nil, []byte{2}),
 				OwnerPredicate: templates.AlwaysTrueBytes(),
 			},
 		},
@@ -859,7 +859,7 @@ func TestReclaimUnlocksBill(t *testing.T) {
 
 	// store system description records
 	moneyPartitionFeeBill := &genesis.FeeCreditBill{
-		UnitId:         money.NewBillID(nil, []byte{2}),
+		UnitID:         money.NewBillID(nil, []byte{2}),
 		OwnerPredicate: templates.AlwaysTrueBytes(),
 	}
 	err = store.Do().SetSystemDescriptionRecords([]*genesis.SystemDescriptionRecord{
@@ -870,7 +870,7 @@ func TestReclaimUnlocksBill(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	err = store.Do().SetBill(&Bill{Id: moneyPartitionFeeBill.UnitId, OwnerPredicate: moneyPartitionFeeBill.OwnerPredicate, Value: 100}, nil)
+	err = store.Do().SetBill(&Bill{Id: moneyPartitionFeeBill.UnitID, OwnerPredicate: moneyPartitionFeeBill.OwnerPredicate, Value: 100}, nil)
 	require.NoError(t, err)
 
 	// create block processor
@@ -929,7 +929,7 @@ func TestLockFC_Ok(t *testing.T) {
 			SystemIdentifier: moneySystemID,
 			T2Timeout:        2500,
 			FeeCreditBill: &genesis.FeeCreditBill{
-				UnitId:         money.NewBillID(nil, []byte{2}),
+				UnitID:         money.NewBillID(nil, []byte{2}),
 				OwnerPredicate: templates.AlwaysTrueBytes(),
 			},
 		},

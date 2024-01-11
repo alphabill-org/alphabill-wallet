@@ -11,13 +11,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
-	"github.com/alphabill-org/alphabill/util"
 	"github.com/spf13/cobra"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
+	"github.com/alphabill-org/alphabill-wallet/util"
 	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	wallet "github.com/alphabill-org/alphabill-wallet/wallet/tokens"
@@ -1182,7 +1182,7 @@ func readIconFile(iconFilePath string) (*wallet.Icon, error) {
 }
 
 func readFile(path string, flag string, sizeLimit int64) ([]byte, error) {
-	size, err := util.GetFileSize(path)
+	size, err := getFileSize(path)
 	if err != nil {
 		return nil, fmt.Errorf("%s read error: %w", flag, err)
 	}
@@ -1194,4 +1194,13 @@ func readFile(path string, flag string, sizeLimit int64) ([]byte, error) {
 		return nil, fmt.Errorf("%s read error: %w", flag, err)
 	}
 	return data, nil
+}
+
+func getFileSize(filepath string) (int64, error) {
+	fi, err := os.Stat(filepath)
+	if err != nil {
+		return 0, err
+	}
+	// get the size
+	return fi.Size(), nil
 }

@@ -406,12 +406,12 @@ func (p *BlockProcessor) addTransferredCreditToPartitionFeeBill(dbTx BillStoreTx
 	if !f {
 		return fmt.Errorf("received transferFC for unknown tx system: %x", tx.TargetSystemIdentifier)
 	}
-	partitionFeeBill, err := dbTx.GetBill(sdr.FeeCreditBill.UnitId)
+	partitionFeeBill, err := dbTx.GetBill(sdr.FeeCreditBill.UnitID)
 	if err != nil {
 		return err
 	}
 	if partitionFeeBill == nil {
-		return fmt.Errorf("partition fee bill not found: systemID=%x unitID=%x", tx.TargetSystemIdentifier, sdr.FeeCreditBill.UnitId)
+		return fmt.Errorf("partition fee bill not found: systemID=%x unitID=%x", tx.TargetSystemIdentifier, sdr.FeeCreditBill.UnitID)
 	}
 	partitionFeeBill.Value += tx.Amount - actualFee
 	return dbTx.SetBill(partitionFeeBill, proof)
@@ -423,12 +423,12 @@ func (p *BlockProcessor) removeReclaimedCreditFromPartitionFeeBill(dbTx BillStor
 	if !f {
 		return fmt.Errorf("received reclaimFC for unknown tx system: %x", txo.SystemID())
 	}
-	partitionFeeBill, err := dbTx.GetBill(sdr.FeeCreditBill.UnitId)
+	partitionFeeBill, err := dbTx.GetBill(sdr.FeeCreditBill.UnitID)
 	if err != nil {
 		return err
 	}
 	if partitionFeeBill == nil {
-		return fmt.Errorf("partition fee bill not found: systemID=%x unitID=%x", txo.SystemID(), sdr.FeeCreditBill.UnitId)
+		return fmt.Errorf("partition fee bill not found: systemID=%x unitID=%x", txo.SystemID(), sdr.FeeCreditBill.UnitID)
 	}
 	partitionFeeBill.Value -= attr.Amount
 	partitionFeeBill.Value += txr.ServerMetadata.ActualFee
@@ -436,7 +436,7 @@ func (p *BlockProcessor) removeReclaimedCreditFromPartitionFeeBill(dbTx BillStor
 }
 
 func (p *BlockProcessor) addTxFeeToMoneyFeeBill(dbTx BillStoreTx, tx *types.TransactionRecord, proof *sdk.Proof) error {
-	moneyFeeBill, err := dbTx.GetBill(p.moneySDR.FeeCreditBill.UnitId)
+	moneyFeeBill, err := dbTx.GetBill(p.moneySDR.FeeCreditBill.UnitID)
 	if err != nil {
 		return err
 	}

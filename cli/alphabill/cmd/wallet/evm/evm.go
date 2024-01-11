@@ -7,13 +7,13 @@ import (
 	"math/big"
 
 	"github.com/alphabill-org/alphabill/txsystem/evm"
-	"github.com/alphabill-org/alphabill/util"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/spf13/cobra"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
+	"github.com/alphabill-org/alphabill-wallet/util"
 	evmwallet "github.com/alphabill-org/alphabill-wallet/wallet/evm"
 	evmclient "github.com/alphabill-org/alphabill-wallet/wallet/evm/client"
 )

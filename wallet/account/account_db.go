@@ -10,9 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alphabill-org/alphabill/crypto"
-	"github.com/alphabill-org/alphabill/util"
+	abutil "github.com/alphabill-org/alphabill/util"
 	bolt "go.etcd.io/bbolt"
+
+	"github.com/alphabill-org/alphabill-wallet/crypto"
+	"github.com/alphabill-org/alphabill-wallet/util"
 )
 
 var (
@@ -301,7 +303,7 @@ func (a *adbtx) decryptValue(val []byte) ([]byte, error) {
 }
 
 func openDb(dbFilePath string, pw string, create bool) (*adb, error) {
-	exists := util.FileExists(dbFilePath)
+	exists := abutil.FileExists(dbFilePath)
 	if create && exists {
 		return nil, fmt.Errorf("cannot create account db, file (%s) already exists", dbFilePath)
 	} else if !create && !exists {
