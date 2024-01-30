@@ -1,4 +1,4 @@
-package client
+package grpc
 
 import (
 	"context"
@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alphabill-org/alphabill-wallet/client/grpc/testserver"
 	"github.com/alphabill-org/alphabill/hash"
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alphabill-org/alphabill-wallet/client/testserver"
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
 )
