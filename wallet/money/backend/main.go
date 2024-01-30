@@ -22,7 +22,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 
-	"github.com/alphabill-org/alphabill-wallet/client"
+	"github.com/alphabill-org/alphabill-wallet/client/grpc"
 	"github.com/alphabill-org/alphabill-wallet/internal/debug"
 	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
@@ -174,7 +174,7 @@ func Run(ctx context.Context, config *Config) error {
 		return err
 	}
 
-	abc, err := client.New(client.AlphabillClientConfig{Uri: config.AlphabillUrl}, config.Observe)
+	abc, err := grpc.New(grpc.AlphabillClientConfig{Uri: config.AlphabillUrl}, config.Observe)
 	if err != nil {
 		return err
 	}

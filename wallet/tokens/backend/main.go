@@ -17,7 +17,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/alphabill-org/alphabill-wallet/client"
+	"github.com/alphabill-org/alphabill-wallet/client/grpc"
 	"github.com/alphabill-org/alphabill-wallet/internal/debug"
 	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/blocksync"
@@ -134,7 +134,7 @@ func runBlockSync(ctx context.Context, getBlocks blocksync.BlocksLoaderFunc, get
 }
 
 type cfg struct {
-	abc      client.AlphabillClientConfig
+	abc      grpc.AlphabillClientConfig
 	boltDB   string
 	apiAddr  string
 	observe  Observability
@@ -150,7 +150,7 @@ NewConfig returns Configuration suitable for using as Run parameter.
 */
 func NewConfig(systemID types.SystemID, apiAddr, abURL, boltDB string, observe Observability) Configuration {
 	return &cfg{
-		abc:      client.AlphabillClientConfig{Uri: abURL},
+		abc:      grpc.AlphabillClientConfig{Uri: abURL},
 		boltDB:   boltDB,
 		apiAddr:  apiAddr,
 		observe:  observe,
@@ -158,7 +158,7 @@ func NewConfig(systemID types.SystemID, apiAddr, abURL, boltDB string, observe O
 	}
 }
 
-func (c *cfg) Client() (ABClient, error) { return client.New(c.abc, c.observe) }
+func (c *cfg) Client() (ABClient, error) { return grpc.New(c.abc, c.observe) }
 func (c *cfg) Storage() (Storage, error) { return newBoltStore(c.boltDB) }
 func (c *cfg) BatchSize() int            { return 100 }
 func (c *cfg) Logger() *slog.Logger      { return c.observe.Logger() }
