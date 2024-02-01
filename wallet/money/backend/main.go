@@ -14,6 +14,7 @@ import (
 	"github.com/ainvaltin/httpsrv"
 	"github.com/alphabill-org/alphabill/logger"
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
+	"github.com/alphabill-org/alphabill/predicates"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/types"
@@ -387,12 +388,12 @@ func (w *WalletBackend) storeIncomingTransactions(sender sdk.PubKey, txs []*type
 
 // extractOwnerFromP2pkh extracts owner from p2pkh predicate.
 func extractOwnerHashFromP2pkh(bearer sdk.Predicate) sdk.PubKeyHash {
-	pkh, _ := templates.ExtractPubKeyHash(bearer)
+	pkh, _ := templates.ExtractPubKeyHashFromP2pkhPredicate(bearer)
 	return pkh
 }
 
 func extractOwnerKeyFromProof(signature sdk.Predicate) sdk.PubKey {
-	pk, _ := templates.ExtractPubKey(signature)
+	pk, _ := predicates.ExtractPubKey(signature)
 	return pk
 }
 
