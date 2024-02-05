@@ -7,6 +7,10 @@ Client side software to interface with Alphabill network. This repository contai
 * User Token partition CLI wallet
 * EVM partition client
 
+## Update Alphabill dependency
+
+`go get github.com/alphabill-org/alphabill@<commit-id>`
+
 ## Building the source
 
 Requires `golang` version 1.21. (https://go.dev/doc/install)
