@@ -65,9 +65,14 @@ type (
 		GetInfo(ctx context.Context) (*wallet.InfoResponse, error)
 	}
 
+	TxPublisher_ interface {
+		SendTx(ctx context.Context, tx *types.TransactionOrder, senderPubKey []byte) (*wallet.Proof, error)
+		Close()
+	}
+
 	MoneyDataProvider interface {
 		SystemID() []byte
-		fees.TxPublisher
+		TxPublisher
 	}
 
 	Observability interface {
@@ -435,7 +440,9 @@ func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId 
 		if err != nil {
 			return nil, err
 		}
-		err = sub.ToBatch(w.backend, acc.PubKey, w.log).SendTx(ctx, w.confirmTx)
+		if err = sub.ToBatch(w.backend, acc.PubKey, w.log).SendTx(ctx, w.confirmTx); err != nil {
+			return nil, err
+		}
 		if sub.Confirmed() {
 			return &SubmissionResult{FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee}, err
 		}

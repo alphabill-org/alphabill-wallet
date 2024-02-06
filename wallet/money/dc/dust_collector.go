@@ -4,11 +4,9 @@ import (
 	"bytes"
 	"context"
 	"crypto"
-	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
-	"time"
 
 	"github.com/alphabill-org/alphabill/logger"
 	"github.com/alphabill-org/alphabill/txsystem/money"
@@ -16,7 +14,7 @@ import (
 
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 	"github.com/alphabill-org/alphabill-wallet/wallet/unitlock"
@@ -27,7 +25,7 @@ type (
 		systemID      types.SystemID
 		maxBillsPerDC int
 		txTimeout     uint64
-		backend       BackendAPI
+		moneyClient   StateAPI
 		unitLocker    UnitLocker
 		log           *slog.Logger
 	}
@@ -37,14 +35,12 @@ type (
 		LockProof *wallet.Proof
 	}
 
-	BackendAPI interface {
-		GetBalance(ctx context.Context, pubKey []byte, includeDCBills bool) (uint64, error)
-		ListBills(ctx context.Context, pubKey []byte, includeDCBills bool, offsetKey string, limit int) (*backend.ListBillsResponse, error)
-		GetBills(ctx context.Context, pubKey []byte) ([]*wallet.Bill, error)
-		GetRoundNumber(ctx context.Context) (*wallet.RoundNumber, error)
-		GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*wallet.Bill, error)
-		PostTransactions(ctx context.Context, pubKey wallet.PubKey, txs *wallet.Transactions) error
-		GetTxProof(ctx context.Context, unitID types.UnitID, txHash wallet.TxHash) (*wallet.Proof, error)
+	StateAPI interface {
+		GetRoundNumber(ctx context.Context) (uint64, error)
+		GetUnit(ctx context.Context, unitID []byte, returnProof, returnData bool) (*types.UnitDataAndProof, error)
+		GetUnitsByOwnerID(ctx context.Context, ownerID []byte) ([]types.UnitID, error)
+		SendTransaction(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
+		GetTransactionProof(ctx context.Context, txHash []byte) (*types.TransactionRecord, *types.TxProof, error)
 	}
 
 	UnitLocker interface {
@@ -56,12 +52,12 @@ type (
 	}
 )
 
-func NewDustCollector(systemID types.SystemID, maxBillsPerDC int, txTimeout uint64, backend BackendAPI, unitLocker UnitLocker, log *slog.Logger) *DustCollector {
+func NewDustCollector(systemID types.SystemID, maxBillsPerDC int, txTimeout uint64, moneyClient StateAPI, unitLocker UnitLocker, log *slog.Logger) *DustCollector {
 	return &DustCollector{
 		systemID:      systemID,
 		maxBillsPerDC: maxBillsPerDC,
 		txTimeout:     txTimeout,
-		backend:       backend,
+		moneyClient:   moneyClient,
 		unitLocker:    unitLocker,
 		log:           log,
 	}
@@ -121,14 +117,14 @@ func (w *DustCollector) runExistingDustCollection(ctx context.Context, accountKe
 	}
 	w.log.InfoContext(ctx, fmt.Sprintf("locked target unit found, pubkey=%x", accountKey.PubKey), logger.UnitID(targetBill.UnitID))
 
-	serverLockedBill, err := w.fetchLockedBill(ctx, accountKey, targetBill)
+	serverLockedBill, err := w.fetchLockedBill(ctx, targetBill)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch server side locked bill: %w", err)
 	}
 
 	var dcProofs []*wallet.Proof
 	for _, tx := range targetBill.Transactions {
-		proof, err := w.waitForConf(ctx, tx)
+		proof, err := api.WaitForConf(ctx, w.moneyClient, tx.TxOrder)
 		if err != nil {
 			return nil, fmt.Errorf("failed to wait for tx confirmation: %w", err)
 		}
@@ -166,13 +162,14 @@ func (w *DustCollector) runExistingDustCollection(ctx context.Context, accountKe
 		}
 		return w.runDustCollection(ctx, accountKey, nil)
 	}
-	// if no dc proofs found then attempt to fetch them by target bill e.g. in case we have failed swap transfer
-	if len(dcProofs) == 0 {
-		dcProofs, err = w.fetchDCProofsForTargetUnit(ctx, accountKey, targetBill)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch dc proofs for target bill: %x", targetBill.UnitID)
-		}
-	}
+	// TODO
+	//// if no dc proofs found then attempt to fetch them by target bill e.g. in case we have failed swap transfer
+	//if len(dcProofs) == 0 {
+	//	dcProofs, err = w.fetchDCProofsForTargetUnit(ctx, accountKey, targetBill)
+	//	if err != nil {
+	//		return nil, fmt.Errorf("failed to fetch dc proofs for target bill: %x", targetBill.UnitID)
+	//	}
+	//}
 	// if dc proofs found, swap them
 	if len(dcProofs) > 0 {
 		return w.swapDCBills(ctx, accountKey, dcProofs, targetBill)
@@ -184,7 +181,7 @@ func (w *DustCollector) runExistingDustCollection(ctx context.Context, accountKe
 // runDustCollection executes dust collection process, if target bill is not provided then selects and locks target bill
 func (w *DustCollector) runDustCollection(ctx context.Context, accountKey *account.AccountKey, lockedTargetBill *unitlock.LockedUnit) (*DustCollectionResult, error) {
 	// fetch non-dc bills
-	bills, err := w.backend.GetBills(ctx, accountKey.PubKey)
+	bills, err := api.FetchBills(ctx, w.moneyClient, accountKey.PubKeyHash.Sha256)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch bills: %w", err)
 	}
@@ -195,15 +192,16 @@ func (w *DustCollector) runDustCollection(ctx context.Context, accountKey *accou
 	}
 	// sort bills by value smallest first
 	sort.Slice(bills, func(i, j int) bool {
-		return bills[i].Value < bills[j].Value
+		return bills[i].Value() < bills[j].Value()
 	})
 	// fetch fee credit bill
-	fcb, err := w.backend.GetFeeCreditBill(ctx, money.NewFeeCreditRecordID(nil, accountKey.PubKeyHash.Sha256))
+	fcbID := money.NewFeeCreditRecordID(nil, accountKey.PubKeyHash.Sha256)
+	fcb, err := api.FetchFeeCreditBill(ctx, w.moneyClient, fcbID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch fee credit bill: %w", err)
 	}
 	var lockTxProof *wallet.Proof
-	var billsToSwap []*wallet.Bill
+	var billsToSwap []*api.Bill
 	if lockedTargetBill == nil {
 		// verify that we have at least two bills to join
 		if len(bills) < 2 {
@@ -215,9 +213,9 @@ func (w *DustCollector) runDustCollection(ctx context.Context, accountKey *accou
 		billCountToSwap := min(w.maxBillsPerDC, len(bills)-1)
 		billsToSwap = bills[:billCountToSwap]
 		txsCost := tx_builder.MaxFee * uint64(len(billsToSwap)+2) // +2 for swap and lock tx
-		if fcb.GetValue() < txsCost {
+		if fcb.Balance() < txsCost {
 			return nil, fmt.Errorf("insufficient fee credit balance for transactions: need at least %d Tema "+
-				"but have %d Tema to send lock tx, %d dust transfer transactions and swap tx", txsCost, fcb.GetValue(), len(billsToSwap))
+				"but have %d Tema to send lock tx, %d dust transfer transactions and swap tx", txsCost, fcb.Balance(), len(billsToSwap))
 		}
 		lockedTargetBill, lockTxProof, err = w.lockTargetBill(ctx, accountKey, targetBill)
 		if err != nil {
@@ -232,9 +230,9 @@ func (w *DustCollector) runDustCollection(ctx context.Context, accountKey *accou
 		billCountToSwap := min(w.maxBillsPerDC, len(bills))
 		billsToSwap = bills[:billCountToSwap]
 		txsCost := tx_builder.MaxFee * uint64(len(billsToSwap)+1) // +1 for swap tx
-		if fcb.GetValue() < txsCost {
+		if fcb.Balance() < txsCost {
 			return nil, fmt.Errorf("insufficient fee credit balance for transactions: need at least %d Tema "+
-				"but have %d Tema to %d dust transfer transactions and swap tx", txsCost, fcb.GetValue(), len(billsToSwap))
+				"but have %d Tema to %d dust transfer transactions and swap tx", txsCost, fcb.Balance(), len(billsToSwap))
 		}
 	}
 	dcResult, err := w.submitDCBatch(ctx, accountKey, lockedTargetBill, billsToSwap)
@@ -247,15 +245,15 @@ func (w *DustCollector) runDustCollection(ctx context.Context, accountKey *accou
 
 // submitDCBatch creates dust transfers from given bills and target bill,
 // the target bill is expected to be locked both locally and on server side.
-func (w *DustCollector) submitDCBatch(ctx context.Context, k *account.AccountKey, targetBill *unitlock.LockedUnit, billsToSwap []*wallet.Bill) (*DustCollectionResult, error) {
+func (w *DustCollector) submitDCBatch(ctx context.Context, k *account.AccountKey, targetBill *unitlock.LockedUnit, billsToSwap []*api.Bill) (*DustCollectionResult, error) {
 	// create dc batch
 	timeout, err := w.getTxTimeout(ctx)
 	if err != nil {
 		return nil, err
 	}
-	dcBatch := txsubmitter.NewBatch(k.PubKey, w.backend, w.log)
+	dcBatch := txsubmitter.NewBatch(k.PubKey, w.moneyClient, w.log)
 	for _, b := range billsToSwap {
-		tx, err := tx_builder.NewDustTx(k, w.systemID, &wallet.Bill{Id: b.GetID(), Value: b.Value, TxHash: b.TxHash}, targetBill.UnitID, targetBill.TxHash, timeout)
+		tx, err := tx_builder.NewDustTx(k, w.systemID, &wallet.Bill{Id: b.ID, Value: b.Value(), TxHash: b.Backlink()}, targetBill.UnitID, targetBill.TxHash, timeout)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build dust transfer transaction: %w", err)
 		}
@@ -305,7 +303,7 @@ func (w *DustCollector) swapDCBills(ctx context.Context, k *account.AccountKey, 
 	}
 
 	// create new batch for sending tx
-	dcBatch := txsubmitter.NewBatch(k.PubKey, w.backend, w.log)
+	dcBatch := txsubmitter.NewBatch(k.PubKey, w.moneyClient, w.log)
 	sub := &txsubmitter.TxSubmission{
 		UnitID:      swapTx.UnitID(),
 		TxHash:      swapTx.Hash(crypto.SHA256),
@@ -332,41 +330,36 @@ func (w *DustCollector) swapDCBills(ctx context.Context, k *account.AccountKey, 
 
 // fetchLockedBill returns target *wallet.Bill if the wallet contains server side locked bill that matches the
 // locally locked bill, nil otherwise.
-func (w *DustCollector) fetchLockedBill(ctx context.Context, accountKey *account.AccountKey, lockedBill *unitlock.LockedUnit) (*wallet.Bill, error) {
-	// fetch all bills, alternatively, backend could have GetBill(ID) endpoint which would be a cleaner way to achieve
-	// the same result.
-	bills, err := w.backend.GetBills(ctx, accountKey.PubKey)
+func (w *DustCollector) fetchLockedBill(ctx context.Context, lockedBill *unitlock.LockedUnit) (*api.Bill, error) {
+	b, err := api.FetchBill(ctx, w.moneyClient, lockedBill.UnitID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch bills: %w", err)
+		return nil, err
 	}
-	actualLockedBill := w.getBillByID(bills, lockedBill.UnitID)
-	if actualLockedBill != nil {
-		if actualLockedBill.IsLocked() && bytes.Equal(actualLockedBill.TxHash, lockedBill.TxHash) {
-			return actualLockedBill, nil
-		}
+	if b != nil && b.IsLocked() && bytes.Equal(b.Backlink(), lockedBill.TxHash) {
+		return b, nil
 	}
 	return nil, nil
 }
 
-func (w *DustCollector) lockTargetBill(ctx context.Context, k *account.AccountKey, targetBill *wallet.Bill) (*unitlock.LockedUnit, *wallet.Proof, error) {
+func (w *DustCollector) lockTargetBill(ctx context.Context, k *account.AccountKey, targetBill *api.Bill) (*unitlock.LockedUnit, *wallet.Proof, error) {
 	// create lock tx
 	timeout, err := w.getTxTimeout(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
-	lockTx, err := tx_builder.NewLockTx(k, w.systemID, targetBill.Id, targetBill.TxHash, unitlock.LockReasonCollectDust, timeout)
+	lockTx, err := tx_builder.NewLockTx(k, w.systemID, targetBill.ID, targetBill.Backlink(), unitlock.LockReasonCollectDust, timeout)
 	if err != nil {
 		return nil, nil, err
 	}
 	// lock target bill locally
-	lockedTargetBill := unitlock.NewLockedUnit(k.PubKey, targetBill.Id, targetBill.TxHash, w.systemID, unitlock.LockReasonCollectDust, unitlock.NewTransaction(lockTx))
+	lockedTargetBill := unitlock.NewLockedUnit(k.PubKey, targetBill.ID, targetBill.Backlink(), w.systemID, unitlock.LockReasonCollectDust, unitlock.NewTransaction(lockTx))
 	if err := w.unitLocker.LockUnit(lockedTargetBill); err != nil {
 		return nil, nil, fmt.Errorf("failed to lock bill for dc batch: %w", err)
 	}
 	// lock target bill server side
-	w.log.InfoContext(ctx, fmt.Sprintf("locking target bill in node %x", targetBill.Id))
+	w.log.InfoContext(ctx, fmt.Sprintf("locking target bill in node %x", targetBill.ID))
 	lockTxHash := lockTx.Hash(crypto.SHA256)
-	lockTxBatch := txsubmitter.NewBatch(k.PubKey, w.backend, w.log)
+	lockTxBatch := txsubmitter.NewBatch(k.PubKey, w.moneyClient, w.log)
 	lockTxBatch.Add(&txsubmitter.TxSubmission{
 		UnitID:      lockTx.UnitID(),
 		TxHash:      lockTxHash,
@@ -383,15 +376,15 @@ func (w *DustCollector) lockTargetBill(ctx context.Context, k *account.AccountKe
 	return lockedTargetBill, lockTxBatch.Submissions()[0].Proof, nil
 }
 
-func (w *DustCollector) filterLockedBills(bills []*wallet.Bill, accountID []byte) ([]*wallet.Bill, error) {
-	var nonLockedBills []*wallet.Bill
+func (w *DustCollector) filterLockedBills(bills []*api.Bill, accountID []byte) ([]*api.Bill, error) {
+	var nonLockedBills []*api.Bill
 	for _, b := range bills {
 		// filter server side locked bills
 		if b.IsLocked() {
 			continue
 		}
 		// filter client-side locked bills
-		exists, err := w.unitLocker.GetUnit(accountID, b.GetID())
+		exists, err := w.unitLocker.GetUnit(accountID, b.ID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load locked unit: %w", err)
 		}
@@ -402,49 +395,23 @@ func (w *DustCollector) filterLockedBills(bills []*wallet.Bill, accountID []byte
 	return nonLockedBills, nil
 }
 
-func (w *DustCollector) fetchDCProofsForTargetUnit(ctx context.Context, k *account.AccountKey, targetUnit *unitlock.LockedUnit) ([]*wallet.Proof, error) {
-	billsResponse, err := w.backend.ListBills(ctx, k.PubKey, true, "", 100)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch bills: %w", err)
-	}
-	var dcProofs []*wallet.Proof
-	for _, b := range billsResponse.Bills {
-		if bytes.Equal(b.DCTargetUnitID, targetUnit.UnitID) && bytes.Equal(b.DCTargetUnitBacklink, targetUnit.TxHash) {
-			proof, err := w.backend.GetTxProof(ctx, b.Id, b.TxHash)
-			if err != nil {
-				return nil, fmt.Errorf("failed to fetch dc proof: %w", err)
-			}
-			dcProofs = append(dcProofs, proof)
-		}
-	}
-	return dcProofs, nil
-}
-
-func (w *DustCollector) waitForConf(ctx context.Context, tx *unitlock.Transaction) (*wallet.Proof, error) {
-	for {
-		// fetch round number before proof to ensure that we cannot miss the proof
-		rnr, err := w.backend.GetRoundNumber(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch round number: %w", err)
-		}
-		proof, err := w.backend.GetTxProof(ctx, tx.TxOrder.UnitID(), tx.TxHash)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch tx proof: %w", err)
-		}
-		if proof != nil {
-			return proof, nil
-		}
-		if rnr.LastIndexedRoundNumber >= tx.TxOrder.Timeout() {
-			break
-		}
-		select {
-		case <-time.After(time.Second):
-		case <-ctx.Done():
-			return nil, errors.New("context canceled")
-		}
-	}
-	return nil, nil
-}
+//func (w *DustCollector) fetchDCProofsForTargetUnit(ctx context.Context, k *account.AccountKey, targetUnit *unitlock.LockedUnit) ([]*wallet.Proof, error) {
+//	billsResponse, err := w.moneyClient.ListBills(ctx, k.PubKey, true, "", 100)
+//	if err != nil {
+//		return nil, fmt.Errorf("failed to fetch bills: %w", err)
+//	}
+//	var dcProofs []*wallet.Proof
+//	for _, b := range billsResponse.Bills {
+//		if bytes.Equal(b.DCTargetUnitID, targetUnit.UnitID) && bytes.Equal(b.DCTargetUnitBacklink, targetUnit.TxHash) {
+//			proof, err := w.moneyClient.GetTxProof(ctx, b.Id, b.TxHash)
+//			if err != nil {
+//				return nil, fmt.Errorf("failed to fetch dc proof: %w", err)
+//			}
+//			dcProofs = append(dcProofs, proof)
+//		}
+//	}
+//	return dcProofs, nil
+//}
 
 func (w *DustCollector) extractProofsFromBatch(dcBatch *txsubmitter.TxSubmissionBatch) ([]*wallet.Proof, error) {
 	var proofs []*wallet.Proof
@@ -455,11 +422,11 @@ func (w *DustCollector) extractProofsFromBatch(dcBatch *txsubmitter.TxSubmission
 }
 
 func (w *DustCollector) getTxTimeout(ctx context.Context) (uint64, error) {
-	rnr, err := w.backend.GetRoundNumber(ctx)
+	roundNumber, err := w.moneyClient.GetRoundNumber(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("failed to fetch round number: %w", err)
 	}
-	return rnr.RoundNumber + w.txTimeout, nil
+	return roundNumber + w.txTimeout, nil
 }
 
 func (w *DustCollector) getBillByID(bills []*wallet.Bill, id types.UnitID) *wallet.Bill {

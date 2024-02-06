@@ -2,60 +2,49 @@ package money
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
-	"strings"
 	"testing"
 
+	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
-	beclient "github.com/alphabill-org/alphabill-wallet/wallet/money/backend/client"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 	"github.com/alphabill-org/alphabill-wallet/wallet/unitlock"
 )
 
 const (
-	testMnemonic   = "dinosaur simple verify deliver bless ridge monkey design venue six problem lucky"
-	testPubKey0Hex = "03c30573dc0c7fd43fcb801289a6a96cb78c27f4ba398b89da91ece23e9a99aca3"
-	testPubKey1Hex = "02d36c574db299904b285aaeb57eb7b1fa145c43af90bec3c635c4174c224587b6"
-	testPubKey2Hex = "02f6cbeacfd97ebc9b657081eb8b6c9ed3a588646d618ddbd03e198290af94c9d2"
+	testMnemonic    = "dinosaur simple verify deliver bless ridge monkey design venue six problem lucky"
+	testPubKey0Hex  = "03c30573dc0c7fd43fcb801289a6a96cb78c27f4ba398b89da91ece23e9a99aca3"
+	testPubKey0Hash = "f52022bb450407d92f13bf1c53128a676bcf304818e9f41a5ef4ebeae9c0d6b0"
+	testPubKey1Hex  = "02d36c574db299904b285aaeb57eb7b1fa145c43af90bec3c635c4174c224587b6"
+	testPubKey2Hex  = "02f6cbeacfd97ebc9b657081eb8b6c9ed3a588646d618ddbd03e198290af94c9d2"
 )
 
 func TestExistingWalletCanBeLoaded(t *testing.T) {
 	homedir := t.TempDir()
 	am, err := account.NewManager(homedir, "", true)
 	require.NoError(t, err)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	restClient, err := beclient.New(server.URL, observability.Default(t))
-	require.NoError(t, err)
+	stateAPI := testutil.NewStateAPIMock()
 	unitLocker, err := unitlock.NewUnitLocker(homedir)
 	require.NoError(t, err)
 	feeManagerDB, err := fees.NewFeeManagerDB(homedir)
 	require.NoError(t, err)
-	_, err = LoadExistingWallet(am, unitLocker, feeManagerDB, restClient, logger.New(t))
+	_, err = LoadExistingWallet(am, unitLocker, feeManagerDB, stateAPI, logger.New(t))
 	require.NoError(t, err)
 }
 
 func TestWallet_GetPublicKey(t *testing.T) {
-	w := CreateTestWalletFromSeed(t, nil)
+	w := createTestWallet(t, nil)
 	pubKey, err := w.am.GetPublicKey(0)
 	require.NoError(t, err)
 	require.EqualValues(t, "0x"+testPubKey0Hex, hexutil.Encode(pubKey))
 }
 
 func TestWallet_GetPublicKeys(t *testing.T) {
-	w := CreateTestWalletFromSeed(t, nil)
+	w := createTestWallet(t, nil)
 	_, _, _ = w.am.AddAccount()
 
 	pubKeys, err := w.am.GetPublicKeys()
@@ -66,7 +55,7 @@ func TestWallet_GetPublicKeys(t *testing.T) {
 }
 
 func TestWallet_AddKey(t *testing.T) {
-	w := CreateTestWalletFromSeed(t, nil)
+	w := createTestWallet(t, nil)
 
 	accIdx, accPubKey, err := w.am.AddAccount()
 	require.NoError(t, err)
@@ -84,14 +73,20 @@ func TestWallet_AddKey(t *testing.T) {
 }
 
 func TestWallet_GetBalance(t *testing.T) {
-	w := CreateTestWalletFromSeed(t, &testutil.BackendMockReturnConf{Balance: 10})
+	stateAPI := testutil.NewStateAPIMock(
+		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{1}, &money.BillData{V: 10, Backlink: []byte{1}})),
+	)
+	w := createTestWallet(t, stateAPI)
 	balance, err := w.GetBalance(context.Background(), GetBalanceCmd{})
 	require.NoError(t, err)
 	require.EqualValues(t, 10, balance)
 }
 
 func TestWallet_GetBalances(t *testing.T) {
-	w := CreateTestWalletFromSeed(t, &testutil.BackendMockReturnConf{Balance: 10})
+	stateAPI := testutil.NewStateAPIMock(
+		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{1}, &money.BillData{V: 10, Backlink: []byte{1}})),
+	)
+	w := createTestWallet(t, stateAPI)
 	_, _, err := w.am.AddAccount()
 	require.NoError(t, err)
 
@@ -102,15 +97,12 @@ func TestWallet_GetBalances(t *testing.T) {
 	require.EqualValues(t, 20, sum)
 }
 
-func CreateTestWalletFromSeed(t *testing.T, br *testutil.BackendMockReturnConf) *Wallet {
+func createTestWallet(t *testing.T, stateAPI StateAPI) *Wallet {
 	dir := t.TempDir()
 	am, err := account.NewManager(dir, "", true)
 	require.NoError(t, err)
-	err = CreateNewWallet(am, testMnemonic)
-	require.NoError(t, err)
 
-	_, serverAddr := MockBackendCalls(br)
-	restClient, err := beclient.New(serverAddr.Host, observability.Default(t))
+	err = CreateNewWallet(am, testMnemonic)
 	require.NoError(t, err)
 
 	unitLocker, err := unitlock.NewUnitLocker(dir)
@@ -119,60 +111,8 @@ func CreateTestWalletFromSeed(t *testing.T, br *testutil.BackendMockReturnConf) 
 	feeManagerDB, err := fees.NewFeeManagerDB(dir)
 	require.NoError(t, err)
 
-	w, err := LoadExistingWallet(am, unitLocker, feeManagerDB, restClient, logger.New(t))
+	w, err := LoadExistingWallet(am, unitLocker, feeManagerDB, stateAPI, logger.New(t))
 	require.NoError(t, err)
+
 	return w
-}
-
-func MockBackendCalls(br *testutil.BackendMockReturnConf) (*httptest.Server, *url.URL) {
-	proofCount := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == br.CustomPath || r.URL.RequestURI() == br.CustomFullPath {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(br.CustomResponse))
-		} else {
-			path := r.URL.Path
-			switch {
-			case path == "/"+beclient.BalancePath:
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(fmt.Sprintf(`{"balance": "%d"}`, br.Balance)))
-			case path == "/"+beclient.RoundNumberPath:
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(fmt.Sprintf(`{"roundNumber": "%d"}`, br.RoundNumber)))
-			case path == "/"+beclient.UnitsPath:
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(br.ProofList[proofCount%len(br.ProofList)]))
-				proofCount++
-			case path == "/"+beclient.ListBillsPath:
-				w.WriteHeader(http.StatusOK)
-				if br.CustomBillList != "" {
-					w.Write([]byte(br.CustomBillList))
-				} else {
-					b, _ := json.Marshal(br.TargetBill)
-					w.Write([]byte(fmt.Sprintf(`{"bills": [%s]}`, b)))
-				}
-			case strings.Contains(path, beclient.FeeCreditPath):
-				w.WriteHeader(http.StatusOK)
-				fcb, _ := json.Marshal(br.FeeCreditBill)
-				w.Write(fcb)
-			case strings.Contains(path, beclient.TransactionsPath):
-				if br.PostTransactionsResponse == nil {
-					w.WriteHeader(http.StatusAccepted)
-				} else {
-					w.WriteHeader(http.StatusInternalServerError)
-					res, _ := json.Marshal(br.PostTransactionsResponse)
-					w.Write(res)
-				}
-			default:
-				w.WriteHeader(http.StatusNotFound)
-			}
-		}
-	}))
-
-	serverAddress, _ := url.Parse(server.URL)
-	return server, serverAddress
-}
-
-func toBase64(bytes []byte) string {
-	return base64.StdEncoding.EncodeToString(bytes)
 }
