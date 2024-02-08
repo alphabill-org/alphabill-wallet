@@ -33,7 +33,7 @@ var (
 )
 
 type (
-	StateAPI interface {
+	RpcClient interface {
 		GetRoundNumber(ctx context.Context) (uint64, error)
 		GetBill(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.Bill, error)
 		GetFeeCreditRecord(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error)
@@ -62,12 +62,12 @@ type (
 
 		// money partition fields
 		moneySystemID         types.SystemID
-		moneyClient           StateAPI
+		moneyClient           RpcClient
 		moneyPartitionFcrIDFn GenerateFcrIDFromPublicKey
 
 		// target partition fields
 		targetPartitionSystemID types.SystemID
-		targetPartitionClient   StateAPI
+		targetPartitionClient   RpcClient
 		targetPartitionFcrIDFn  GenerateFcrIDFromPublicKey
 	}
 
@@ -161,10 +161,10 @@ func NewFeeManager(
 	am account.Manager,
 	db FeeManagerDB,
 	moneySystemID types.SystemID,
-	moneyClient StateAPI,
+	moneyClient RpcClient,
 	moneyPartitionFcrIDFn GenerateFcrIDFromPublicKey,
 	targetPartitionSystemID types.SystemID,
-	targetPartitionClient StateAPI,
+	targetPartitionClient RpcClient,
 	fcrIDFn GenerateFcrIDFromPublicKey,
 	log *slog.Logger,
 ) *FeeManager {
@@ -1136,7 +1136,7 @@ func (p *ReclaimFeeTxProofs) GetFees() uint64 {
 	return p.Lock.GetActualFee() + p.CloseFC.GetActualFee() + p.ReclaimFC.GetActualFee()
 }
 
-func sendTx(ctx context.Context, tx *types.TransactionOrder, senderPubKey wallet.PubKey, c StateAPI, log *slog.Logger) (*wallet.Proof, error) {
+func sendTx(ctx context.Context, tx *types.TransactionOrder, senderPubKey wallet.PubKey, c RpcClient, log *slog.Logger) (*wallet.Proof, error) {
 	batch := txsubmitter.NewBatch(senderPubKey, c, log)
 	txSubmission := &txsubmitter.TxSubmission{
 		UnitID:      tx.UnitID(),
