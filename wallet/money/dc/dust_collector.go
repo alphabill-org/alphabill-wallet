@@ -37,7 +37,8 @@ type (
 
 	StateAPI interface {
 		GetRoundNumber(ctx context.Context) (uint64, error)
-		GetUnit(ctx context.Context, unitID []byte, returnProof, returnData bool) (*types.UnitDataAndProof, error)
+		GetBill(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.Bill, error)
+		GetFeeCreditRecord(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error)
 		GetUnitsByOwnerID(ctx context.Context, ownerID []byte) ([]types.UnitID, error)
 		SendTransaction(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
 		GetTransactionProof(ctx context.Context, txHash []byte) (*types.TransactionRecord, *types.TxProof, error)

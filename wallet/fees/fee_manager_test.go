@@ -8,6 +8,7 @@ import (
 
 	abcrypto "github.com/alphabill-org/alphabill/crypto"
 	"github.com/alphabill-org/alphabill/hash"
+	"github.com/alphabill-org/alphabill/rpc"
 	"github.com/alphabill-org/alphabill/txsystem/fc/testutils"
 	"github.com/alphabill-org/alphabill/txsystem/fc/transactions"
 	"github.com/alphabill-org/alphabill/txsystem/fc/unit"
@@ -595,7 +596,8 @@ func TestAddFeeCredit_ExistingTransferFC(t *testing.T) {
 		// mock tx timed out and the same bill used for transferFC is still valid
 		moneyClient := testutil.NewStateAPIMock(
 			testutil.WithRoundNumber(transferFCRecord.TransactionOrder.Timeout()+10),
-			testutil.WithOwnerUnit(transferFCRecord.TransactionOrder.UnitID(), testutil.NewUnit(t, &money.BillData{V: 50, Backlink: []byte{200}})),
+			testutil.WithOwnerUnit(transferFCRecord.TransactionOrder.UnitID(),
+				testutil.NewMoneyBill(t, transferFCRecord.TransactionOrder.UnitID(), &money.BillData{V: 50, Backlink: []byte{200}})),
 		)
 
 		// when fees are added
@@ -1197,6 +1199,6 @@ func testFeeCreditRecordIDFromPublicKey(shardPart, pubKey []byte) types.UnitID {
 	return money.NewFeeCreditRecordID(shardPart, unitPart)
 }
 
-func newMoneyFCR(t *testing.T, accountKey *account.AccountKey, fcr *unit.FeeCreditRecord) ([]byte, *types.UnitDataAndProof) {
+func newMoneyFCR(t *testing.T, accountKey *account.AccountKey, fcr *unit.FeeCreditRecord) *rpc.Unit[any] {
 	return testutil.NewMoneyFCR(t, accountKey.PubKeyHash.Sha256, fcr)
 }

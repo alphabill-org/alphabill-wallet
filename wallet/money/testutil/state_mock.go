@@ -6,12 +6,10 @@ import (
 	"crypto"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/state"
+	"github.com/alphabill-org/alphabill/rpc"
 	"github.com/alphabill-org/alphabill/txsystem/fc/unit"
 	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/types"
-	"github.com/fxamacker/cbor/v2"
-	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
@@ -20,7 +18,7 @@ import (
 type (
 	StateAPIMock struct {
 		Err         error
-		Units       map[string]*types.UnitDataAndProof
+		Units       map[string]*rpc.Unit[any]
 		OwnerUnits  []types.UnitID
 		RoundNumber uint64
 		TxProofs    map[string]*wallet.Proof
@@ -32,7 +30,7 @@ type (
 		Err         error
 		RoundNumber uint64
 		TxProofs    map[string]*wallet.Proof
-		Units       map[string]*types.UnitDataAndProof
+		Units       map[string]*rpc.Unit[any]
 		OwnerUnits  []types.UnitID
 	}
 
@@ -41,7 +39,7 @@ type (
 
 func NewStateAPIMock(opts ...Option) *StateAPIMock {
 	options := &Options{
-		Units:    map[string]*types.UnitDataAndProof{},
+		Units:    map[string]*rpc.Unit[any]{},
 		TxProofs: map[string]*wallet.Proof{},
 	}
 	for _, option := range opts {
@@ -56,10 +54,10 @@ func NewStateAPIMock(opts ...Option) *StateAPIMock {
 	}
 }
 
-func WithOwnerUnit(unitID []byte, unit *types.UnitDataAndProof) Option {
+func WithOwnerUnit(unit *rpc.Unit[any]) Option {
 	return func(o *Options) {
-		o.Units[string(unitID)] = unit
-		o.OwnerUnits = append(o.OwnerUnits, unitID)
+		o.Units[string(unit.UnitID)] = unit
+		o.OwnerUnits = append(o.OwnerUnits, unit.UnitID)
 	}
 }
 
@@ -88,7 +86,7 @@ func (b *StateAPIMock) GetRoundNumber(ctx context.Context) (uint64, error) {
 	return b.RoundNumber, nil
 }
 
-func (b *StateAPIMock) GetUnit(ctx context.Context, unitID []byte, returnProof, returnData bool) (*types.UnitDataAndProof, error) {
+func (b *StateAPIMock) GetUnit(ctx context.Context, unitID []byte, includeStateProof bool) (*rpc.Unit[any], error) {
 	if b.Err != nil {
 		return nil, b.Err
 	}
@@ -96,19 +94,6 @@ func (b *StateAPIMock) GetUnit(ctx context.Context, unitID []byte, returnProof, 
 	if ok {
 		return unitData, nil
 	}
-	//unitAndProof := &types.UnitDataAndProof{}
-	//if returnData {
-	//	unitAndProof.UnitData = &types.StateUnitData{
-	//		Data:   cbor.RawMessage{0x81, 0x00},
-	//		Bearer: predicates.PredicateBytes{0x83, 0x00, 0x01, 0xF6},
-	//	}
-	//}
-	//if returnProof {
-	//	unitAndProof.Proof = &types.UnitStateProof{
-	//		UnitID: unitID,
-	//	}
-	//}
-	//return unitAndProof, nil
 	return nil, api.ErrNotFound
 }
 
@@ -160,18 +145,18 @@ func (b *StateAPIMock) GetBlock(ctx context.Context, blockNumber uint64) (*types
 	return &types.Block{}, nil
 }
 
-func NewMoneyBill(t *testing.T, unitIDPart []byte, billData *money.BillData) ([]byte, *types.UnitDataAndProof) {
+func NewMoneyBill(t *testing.T, unitIDPart []byte, billData *money.BillData) *rpc.Unit[any] {
 	billID := money.NewBillID(nil, unitIDPart)
-	return billID, NewUnit(t, billData)
+	return &rpc.Unit[any]{
+		UnitID: billID,
+		Data: *billData,
+	}
 }
 
-func NewMoneyFCR(t *testing.T, pubKeyHash []byte, fcrData *unit.FeeCreditRecord) ([]byte, *types.UnitDataAndProof) {
+func NewMoneyFCR(t *testing.T, pubKeyHash []byte, fcrData *unit.FeeCreditRecord) *rpc.Unit[any] {
 	fcrID := money.NewFeeCreditRecordID(nil, pubKeyHash)
-	return fcrID, NewUnit(t, fcrData)
-}
-
-func NewUnit(t *testing.T, unitData state.UnitData) *types.UnitDataAndProof {
-	billDataCbor, err := cbor.Marshal(unitData)
-	require.NoError(t, err)
-	return &types.UnitDataAndProof{UnitData: &types.StateUnitData{Data: billDataCbor}}
+	return &rpc.Unit[any]{
+		UnitID: fcrID,
+		Data: *fcrData,
+	}
 }

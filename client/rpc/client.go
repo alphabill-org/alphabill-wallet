@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	"github.com/alphabill-org/alphabill/rpc"
+	"github.com/alphabill-org/alphabill/txsystem/fc/unit"
+	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/types"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/fxamacker/cbor/v2"
@@ -46,21 +49,34 @@ func (c *Client) GetRoundNumber(ctx context.Context) (uint64, error) {
 	return num, err
 }
 
-// GetUnit returns the unit data for given unitID.
-func (c *Client) GetUnit(ctx context.Context, unitID []byte, returnProof, returnData bool) (*types.UnitDataAndProof, error) {
-	var res *rpc.UnitData
-	if err := c.c.CallContext(ctx, &res, "state_getUnit", unitID, returnProof, returnData); err != nil {
+// GetBill returns the unit data for given unitID.
+func (c *Client) GetBill(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.Bill, error) {
+	var unit rpc.Unit[money.BillData]
+	if err := c.c.CallContext(ctx, &unit, "state_getUnit", unitID, includeStateProof); err != nil {
 		return nil, err
 	}
-	var unitData *types.UnitDataAndProof
-	if err := cbor.Unmarshal(res.DataAndProofCBOR, &unitData); err != nil {
-		return nil, fmt.Errorf("failed to decode unit data cbor: %w", err)
+
+	return &api.Bill{
+		ID:       unit.UnitID,
+		BillData: &unit.Data,
+	}, nil
+}
+
+// GetFeeCreditRecord returns the unit data for given unitID.
+func (c *Client) GetFeeCreditRecord(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
+	var unit rpc.Unit[unit.FeeCreditRecord]
+	if err := c.c.CallContext(ctx, &unit, "state_getUnit", unitID, includeStateProof); err != nil {
+		return nil, err
 	}
-	return unitData, nil
+
+	return &api.FeeCreditBill{
+		ID:              unit.UnitID,
+		FeeCreditRecord: &unit.Data,
+	}, nil
 }
 
 // GetUnitsByOwnerID returns list of unit identifiers that belong to the given owner.
-func (c *Client) GetUnitsByOwnerID(ctx context.Context, ownerID []byte) ([]types.UnitID, error) {
+func (c *Client) GetUnitsByOwnerID(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
 	var res []types.UnitID
 	err := c.c.CallContext(ctx, &res, "state_getUnitsByOwnerID", ownerID)
 	return res, err
@@ -72,8 +88,8 @@ func (c *Client) SendTransaction(ctx context.Context, tx *types.TransactionOrder
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode transaction to cbor: %w", err)
 	}
-	var res []byte
-	err = c.c.CallContext(ctx, &res, "state_sendTransaction", &rpc.Transaction{TxOrderCbor: txCbor})
+	var res types.Bytes
+	err = c.c.CallContext(ctx, &res, "state_sendTransaction", txCbor)
 	return res, err
 }
 
@@ -85,11 +101,11 @@ func (c *Client) GetTransactionProof(ctx context.Context, txHash []byte) (*types
 		return nil, nil, err
 	}
 	var txRecord *types.TransactionRecord
-	if err = cbor.Unmarshal(res.TxRecordCbor, &txRecord); err != nil {
+	if err = cbor.Unmarshal(res.TxRecord, &txRecord); err != nil {
 		return nil, nil, fmt.Errorf("failed to decode tx record: %w", err)
 	}
 	var txProof *types.TxProof
-	if err = cbor.Unmarshal(res.TxProofCbor, &txProof); err != nil {
+	if err = cbor.Unmarshal(res.TxProof, &txProof); err != nil {
 		return nil, nil, fmt.Errorf("failed to decode tx proof: %w", err)
 	}
 	return txRecord, txProof, nil
@@ -97,18 +113,18 @@ func (c *Client) GetTransactionProof(ctx context.Context, txHash []byte) (*types
 
 // GetBlock returns block for given round number.
 func (c *Client) GetBlock(ctx context.Context, roundNumber uint64) (*types.Block, error) {
-	var res *rpc.Block
+	var res types.Bytes
 	if err := c.c.CallContext(ctx, &res, "state_getBlock", roundNumber); err != nil {
 		return nil, err
 	}
 	var block *types.Block
-	if err := cbor.Unmarshal(res.BlockCbor, &block); err != nil {
+	if err := cbor.Unmarshal(res, &block); err != nil {
 		return nil, fmt.Errorf("failed to decode block: %w", err)
 	}
 	return block, nil
 }
 
-func encodeCbor(v interface{}) ([]byte, error) {
+func encodeCbor(v interface{}) (types.Bytes, error) {
 	enc, err := cbor.CanonicalEncOptions().EncMode()
 	if err != nil {
 		return nil, err

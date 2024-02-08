@@ -8,13 +8,14 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/predicates"
 	"github.com/alphabill-org/alphabill/rpc"
+	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/types"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/stretchr/testify/require"
 )
+
 
 func TestRpcClient(t *testing.T) {
 	service := &mockService{}
@@ -38,32 +39,29 @@ func TestRpcClient(t *testing.T) {
 
 	t.Run("GetUnit_OK", func(t *testing.T) {
 		service.reset()
-		unitID := []byte{1}
-		unitAndProof := &types.UnitDataAndProof{
-			UnitData: &types.StateUnitData{
-				Data:   cbor.RawMessage{0x81, 0x00},
-				Bearer: predicates.PredicateBytes{0x83, 0x00, 0x01, 0xF6},
-			},
-			Proof: &types.UnitStateProof{
-				UnitID: unitID,
+		unit := &rpc.Unit[any]{
+			UnitID: []byte{1},
+			Data: &money.BillData{
+				V: 192,
+				T: 168,
+				Locked: 0,
+				Backlink: []byte{1,2,3,4,5},
 			},
 		}
-		unitAndProofCbor, err := encodeCbor(unitAndProof)
-		require.NoError(t, err)
-		service.unitData = &rpc.UnitData{DataAndProofCBOR: unitAndProofCbor}
 
-		unitData, err := client.GetUnit(context.Background(), unitID, true, true)
+		service.unit = unit
+		returnedBill, err := client.GetBill(context.Background(), unit.UnitID, false)
 		require.NoError(t, err)
-		require.Equal(t, unitAndProof, unitData)
+		require.Equal(t, returnedBill.ID, unit.UnitID)
+		require.Equal(t, returnedBill.BillData.V, unit.Data.(*money.BillData).V)
 	})
 	t.Run("GetUnit_NOK", func(t *testing.T) {
 		service.reset()
 		service.err = errors.New("some error")
 		unitID := []byte{1}
 
-		unitData, err := client.GetUnit(context.Background(), unitID, true, true)
+		_, err := client.GetBill(context.Background(), unitID, false)
 		require.ErrorContains(t, err, "some error")
-		require.Nil(t, unitData)
 	})
 
 	t.Run("GetUnitsByOwnerID_OK", func(t *testing.T) {
@@ -71,11 +69,11 @@ func TestRpcClient(t *testing.T) {
 		ownerID := []byte{1}
 		unitID1 := []byte{2}
 		unitID2 := []byte{3}
-		service.ownerUnitIds = []types.UnitID{unitID1, unitID2}
+		service.ownerUnitIDs = []types.UnitID{unitID1, unitID2}
 
 		unitIDs, err := client.GetUnitsByOwnerID(context.Background(), ownerID)
 		require.NoError(t, err)
-		require.Equal(t, service.ownerUnitIds, unitIDs)
+		require.Equal(t, service.ownerUnitIDs, unitIDs)
 	})
 	t.Run("GetUnitsByOwnerID_NOK", func(t *testing.T) {
 		service.reset()
@@ -117,7 +115,7 @@ func TestRpcClient(t *testing.T) {
 		require.NoError(t, err)
 		txProofCbor, err := encodeCbor(txProof)
 		require.NoError(t, err)
-		service.txProof = &rpc.TransactionRecordAndProof{TxRecordCbor: txRecordCbor, TxProofCbor: txProofCbor}
+		service.txProof = &rpc.TransactionRecordAndProof{TxRecord: txRecordCbor, TxProof: txProofCbor}
 
 		txRecordRes, txProofRes, err := client.GetTransactionProof(context.Background(), txHash)
 		require.NoError(t, err)
@@ -142,7 +140,7 @@ func TestRpcClient(t *testing.T) {
 		block := &types.Block{Transactions: []*types.TransactionRecord{txRecord}}
 		blockCbor, err := encodeCbor(block)
 		require.NoError(t, err)
-		service.block = &rpc.Block{BlockCbor: blockCbor}
+		service.block = blockCbor
 
 		blockRes, err := client.GetBlock(context.Background(), 1)
 		require.NoError(t, err)
@@ -190,10 +188,10 @@ func startServerAndClient(t *testing.T, service *mockService) *Client {
 
 type mockService struct {
 	roundNumber  uint64
-	unitData     *rpc.UnitData
-	ownerUnitIds []types.UnitID
+	unit         *rpc.Unit[any]
+	ownerUnitIDs []types.UnitID
 	txProof      *rpc.TransactionRecordAndProof
-	block        *rpc.Block
+	block        types.Bytes
 	err          error
 }
 
@@ -201,17 +199,20 @@ func (s *mockService) GetRoundNumber() (uint64, error) {
 	return s.roundNumber, s.err
 }
 
-func (s *mockService) GetUnit(unitID []byte, returnProof, returnData bool) (*rpc.UnitData, error) {
-	return s.unitData, s.err
+func (s *mockService) GetUnit(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*rpc.Unit[any], error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.unit, nil
 }
 
 func (s *mockService) GetUnitsByOwnerID(ownerID []byte) ([]types.UnitID, error) {
-	return s.ownerUnitIds, s.err
+	return s.ownerUnitIDs, s.err
 }
 
-func (s *mockService) SendTransaction(tx *rpc.Transaction) ([]byte, error) {
+func (s *mockService) SendTransaction(tx types.Bytes) (types.Bytes, error) {
 	var txo *types.TransactionOrder
-	if err := cbor.Unmarshal(tx.TxOrderCbor, &txo); err != nil {
+	if err := cbor.Unmarshal(tx, &txo); err != nil {
 		return nil, err
 	}
 	return txo.Hash(crypto.SHA256), s.err
@@ -221,14 +222,14 @@ func (s *mockService) GetTransactionProof(txHash []byte) (*rpc.TransactionRecord
 	return s.txProof, s.err
 }
 
-func (s *mockService) GetBlock(roundNumber uint64) (*rpc.Block, error) {
+func (s *mockService) GetBlock(roundNumber uint64) (types.Bytes, error) {
 	return s.block, s.err
 }
 
 func (s *mockService) reset() {
 	s.roundNumber = 0
-	s.unitData = nil
-	s.ownerUnitIds = nil
+	s.unit = nil
+	s.ownerUnitIDs = nil
 	s.txProof = nil
 	s.err = nil
 }
