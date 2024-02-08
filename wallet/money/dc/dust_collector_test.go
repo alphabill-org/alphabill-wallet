@@ -26,11 +26,11 @@ func TestDC_OK(t *testing.T) {
 	require.NoError(t, err)
 	targetBillID := money.NewBillID(nil, []byte{3})
 	unitLocker := unitlock.NewInMemoryUnitLocker()
-	moneyClient := testutil.NewStateAPIMock(
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{2}, &money.BillData{V: 2, Backlink: []byte{2}})),
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{3}, &money.BillData{V: 3, Backlink: []byte{3}})),
-		testutil.WithOwnerUnit(testutil.NewMoneyFCR(t, accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
+	moneyClient := testutil.NewRpcClientMock(
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Backlink: []byte{2}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{3}, &money.BillData{V: 3, Backlink: []byte{3}})),
+		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
 	)
 	dc := NewDustCollector(money.DefaultSystemIdentifier, 10, 10, moneyClient, unitLocker, logger.New(t))
 
@@ -59,9 +59,9 @@ func TestDCWontRunForSingleBill(t *testing.T) {
 	// create backend with single bill
 	accountKeys, err := account.NewKeys("dinosaur simple verify deliver bless ridge monkey design venue six problem lucky")
 	require.NoError(t, err)
-	moneyClient := testutil.NewStateAPIMock(
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
-		testutil.WithOwnerUnit(testutil.NewMoneyFCR(t, accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
+	moneyClient := testutil.NewRpcClientMock(
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
+		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
 	)
 	unitLocker := unitlock.NewInMemoryUnitLocker()
 	dc := NewDustCollector(money.DefaultSystemIdentifier, 10, 10, moneyClient, unitLocker, logger.New(t))
@@ -86,11 +86,11 @@ func TestAllBillsAreSwapped_WhenWalletBillCountEqualToMaxBillCount(t *testing.T)
 	require.NoError(t, err)
 	unitLocker := unitlock.NewInMemoryUnitLocker()
 	targetBillID := money.NewBillID(nil, []byte{3})
-	moneyClient := testutil.NewStateAPIMock(
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{2}, &money.BillData{V: 2, Backlink: []byte{2}})),
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{3}, &money.BillData{V: 3, Backlink: []byte{3}})),
-		testutil.WithOwnerUnit(testutil.NewMoneyFCR(t, accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
+	moneyClient := testutil.NewRpcClientMock(
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Backlink: []byte{2}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{3}, &money.BillData{V: 3, Backlink: []byte{3}})),
+		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
 	)
 	w := NewDustCollector(money.DefaultSystemIdentifier, maxBillsPerDC, 10, moneyClient, unitLocker, logger.New(t))
 
@@ -125,12 +125,12 @@ func TestOnlyFirstNBillsAreSwapped_WhenBillCountOverLimit(t *testing.T) {
 	require.NoError(t, err)
 	unitLocker := unitlock.NewInMemoryUnitLocker()
 	targetBillID := money.NewBillID(nil, []byte{4})
-	moneyClient := testutil.NewStateAPIMock(
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{2}, &money.BillData{V: 2, Backlink: []byte{2}})),
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{3}, &money.BillData{V: 3, Backlink: []byte{3}})),
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{4}, &money.BillData{V: 4, Backlink: []byte{4}})),
-		testutil.WithOwnerUnit(testutil.NewMoneyFCR(t, accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
+	moneyClient := testutil.NewRpcClientMock(
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Backlink: []byte{2}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{3}, &money.BillData{V: 3, Backlink: []byte{3}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{4}, &money.BillData{V: 4, Backlink: []byte{4}})),
+		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
 	)
 	w := NewDustCollector(money.DefaultSystemIdentifier, maxBillsPerDC, 10, moneyClient, unitLocker, logger.New(t))
 
@@ -166,11 +166,11 @@ func TestExistingDC_UnconfirmedDCTxs_NewSwapIsSent(t *testing.T) {
 	unitLocker := unitlock.NewInMemoryUnitLocker()
 	targetBillID := money.NewBillID(nil, []byte{3})
 	targetBillTxHash := []byte{3}
-	moneyClient := testutil.NewStateAPIMock(
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{2}, &money.BillData{V: 2, Backlink: []byte{2}})),
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{3}, &money.BillData{V: 3, Backlink: []byte{3}})),
-		testutil.WithOwnerUnit(testutil.NewMoneyFCR(t, accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
+	moneyClient := testutil.NewRpcClientMock(
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Backlink: []byte{2}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{3}, &money.BillData{V: 3, Backlink: []byte{3}})),
+		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
 	)
 	dc := NewDustCollector(money.DefaultSystemIdentifier, 10, 10, moneyClient, unitLocker, logger.New(t))
 
@@ -217,8 +217,8 @@ func TestExistingDC_TargetUnitSwapIsConfirmed_ProofIsReturned(t *testing.T) {
 	swapProof := createProofWithSwapTx(t, targetBill)
 
 	unitLocker := unitlock.NewInMemoryUnitLocker()
-	moneyClient := testutil.NewStateAPIMock(
-		testutil.WithOwnerUnit(testutil.NewMoneyFCR(t, accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
+	moneyClient := testutil.NewRpcClientMock(
+		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
 		testutil.WithTxProof(targetBill.GetTxHash(), swapProof),
 	)
 	dc := NewDustCollector(money.DefaultSystemIdentifier, 10, 10, moneyClient, unitLocker, logger.New(t))
@@ -269,10 +269,10 @@ func TestExistingDC_TargetUnitIsInvalid_NewSwapIsSent(t *testing.T) {
 
 	unitLocker := unitlock.NewInMemoryUnitLocker()
 	targetUnitID := money.NewBillID(nil, []byte{2})
-	moneyClient := testutil.NewStateAPIMock(
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{2}, &money.BillData{V: 2, Backlink: []byte{2}})),
-		testutil.WithOwnerUnit(testutil.NewMoneyFCR(t, accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
+	moneyClient := testutil.NewRpcClientMock(
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Backlink: []byte{2}})),
+		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
 	)
 	dc := NewDustCollector(money.DefaultSystemIdentifier, 10, 10, moneyClient, unitLocker, logger.New(t))
 
@@ -313,11 +313,11 @@ func TestExistingDC_DCOnSecondAccountDoesNotClearFirstAccountUnitLock(t *testing
 	require.NoError(t, err)
 
 	unitLocker := unitlock.NewInMemoryUnitLocker()
-	moneyClient := testutil.NewStateAPIMock(
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{2}, &money.BillData{V: 2, Backlink: []byte{2}})),
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{3}, &money.BillData{V: 3, Backlink: []byte{3}})),
-		testutil.WithOwnerUnit(testutil.NewMoneyFCR(t, accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
+	moneyClient := testutil.NewRpcClientMock(
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Backlink: []byte{2}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{3}, &money.BillData{V: 3, Backlink: []byte{3}})),
+		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
 	)
 	dc := NewDustCollector(money.DefaultSystemIdentifier, 10, 10, moneyClient, unitLocker, logger.New(t))
 
@@ -355,11 +355,11 @@ func TestExistingDC_ServerAndClientSideLock(t *testing.T) {
 		unitLocker := unitlock.NewInMemoryUnitLocker()
 		targetBillID := money.NewBillID(nil, []byte{3})
 		targetBillTxHash := []byte{3}
-		moneyClient := testutil.NewStateAPIMock(
-			testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
-			testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{2}, &money.BillData{V: 2, Backlink: []byte{2}})),
-			testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{3}, &money.BillData{V: 3, Backlink: []byte{3}})),
-			testutil.WithOwnerUnit(testutil.NewMoneyFCR(t, accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
+		moneyClient := testutil.NewRpcClientMock(
+			testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
+			testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Backlink: []byte{2}})),
+			testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{3}, &money.BillData{V: 3, Backlink: []byte{3}})),
+			testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
 		)
 		w := NewDustCollector(money.DefaultSystemIdentifier, 10, 10, moneyClient, unitLocker, logger.New(t))
 
@@ -520,12 +520,12 @@ func TestExistingDC_FailedSwapTx(t *testing.T) {
 	unitLocker := unitlock.NewInMemoryUnitLocker()
 	targetBillID := money.NewBillID(nil, []byte{4})
 	targetBillTxHash := []byte{4}
-	moneyClient := testutil.NewStateAPIMock(
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{2}, &money.BillData{V: 2, Backlink: []byte{2}})),
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{3}, &money.BillData{V: 3, Backlink: []byte{3}})),
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{4}, &money.BillData{V: 4, Backlink: []byte{4}})),
-		testutil.WithOwnerUnit(testutil.NewMoneyFCR(t, accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
+	moneyClient := testutil.NewRpcClientMock(
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Backlink: []byte{2}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{3}, &money.BillData{V: 3, Backlink: []byte{3}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{4}, &money.BillData{V: 4, Backlink: []byte{4}})),
+		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
 	)
 	w := NewDustCollector(money.DefaultSystemIdentifier, 10, 10, moneyClient, unitLocker, logger.New(t))
 
@@ -596,11 +596,11 @@ func TestExistingDC_FailedDCTx(t *testing.T) {
 	}
 
 	unitLocker := unitlock.NewInMemoryUnitLocker()
-	moneyClient := testutil.NewStateAPIMock(
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{2}, &money.BillData{V: 2, Backlink: []byte{2}})),
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{3}, &money.BillData{V: 3, Backlink: []byte{3}})),
-		testutil.WithOwnerUnit(testutil.NewMoneyFCR(t, accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
+	moneyClient := testutil.NewRpcClientMock(
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Backlink: []byte{2}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{3}, &money.BillData{V: 3, Backlink: []byte{3}})),
+		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
 	)
 	dc := NewDustCollector(money.DefaultSystemIdentifier, 10, 10, moneyClient, unitLocker, logger.New(t))
 
