@@ -25,7 +25,7 @@ type (
 		systemID      types.SystemID
 		maxBillsPerDC int
 		txTimeout     uint64
-		moneyClient   StateAPI
+		moneyClient   RpcClient
 		unitLocker    UnitLocker
 		log           *slog.Logger
 	}
@@ -35,13 +35,13 @@ type (
 		LockProof *wallet.Proof
 	}
 
-	StateAPI interface {
+	RpcClient interface {
 		GetRoundNumber(ctx context.Context) (uint64, error)
 		GetBill(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.Bill, error)
 		GetFeeCreditRecord(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error)
-		GetUnitsByOwnerID(ctx context.Context, ownerID []byte) ([]types.UnitID, error)
+		GetUnitsByOwnerID(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error)
 		SendTransaction(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
-		GetTransactionProof(ctx context.Context, txHash []byte) (*types.TransactionRecord, *types.TxProof, error)
+		GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TransactionRecord, *types.TxProof, error)
 	}
 
 	UnitLocker interface {
@@ -53,7 +53,7 @@ type (
 	}
 )
 
-func NewDustCollector(systemID types.SystemID, maxBillsPerDC int, txTimeout uint64, moneyClient StateAPI, unitLocker UnitLocker, log *slog.Logger) *DustCollector {
+func NewDustCollector(systemID types.SystemID, maxBillsPerDC int, txTimeout uint64, moneyClient RpcClient, unitLocker UnitLocker, log *slog.Logger) *DustCollector {
 	return &DustCollector{
 		systemID:      systemID,
 		maxBillsPerDC: maxBillsPerDC,

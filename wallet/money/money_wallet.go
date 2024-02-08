@@ -19,7 +19,6 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/dc"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
@@ -34,31 +33,21 @@ const (
 type (
 	Wallet struct {
 		am            account.Manager
-		rpcClient     StateAPI
+		rpcClient     RpcClient
 		feeManager    *fees.FeeManager
 		TxPublisher   *TxPublisher
 		dustCollector *dc.DustCollector
 		log           *slog.Logger
 	}
 
-	StateAPI interface {
+	RpcClient interface {
 		GetRoundNumber(ctx context.Context) (uint64, error)
 		GetBill(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.Bill, error)
 		GetFeeCreditRecord(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error)
-		GetUnitsByOwnerID(ctx context.Context, ownerID []byte) ([]types.UnitID, error)
+		GetUnitsByOwnerID(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error)
 		SendTransaction(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
-		GetTransactionProof(ctx context.Context, txHash []byte) (*types.TransactionRecord, *types.TxProof, error)
+		GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TransactionRecord, *types.TxProof, error)
 		GetBlock(ctx context.Context, roundNumber uint64) (*types.Block, error)
-	}
-
-	OldBackendAPI interface {
-		GetBalance(ctx context.Context, pubKey []byte, includeDCBills bool) (uint64, error)
-		ListBills(ctx context.Context, pubKey []byte, includeDCBills bool, offsetKey string, limit int) (*backend.ListBillsResponse, error)
-		GetBills(ctx context.Context, pubKey []byte) ([]*wallet.Bill, error)
-		GetRoundNumber(ctx context.Context) (*wallet.RoundNumber, error)
-		GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*wallet.Bill, error)
-		PostTransactions(ctx context.Context, pubKey wallet.PubKey, txs *wallet.Transactions) error
-		GetTxProof(ctx context.Context, unitID types.UnitID, txHash wallet.TxHash) (*wallet.Proof, error)
 	}
 
 	SendCmd struct {
@@ -101,14 +90,14 @@ func CreateNewWallet(am account.Manager, mnemonic string) error {
 	return createMoneyWallet(mnemonic, am)
 }
 
-func LoadExistingWallet(am account.Manager, unitLocker UnitLocker, feeManagerDB fees.FeeManagerDB, stateAPI StateAPI, log *slog.Logger) (*Wallet, error) {
+func LoadExistingWallet(am account.Manager, unitLocker UnitLocker, feeManagerDB fees.FeeManagerDB, rpcClient RpcClient, log *slog.Logger) (*Wallet, error) {
 	moneySystemID := money.DefaultSystemIdentifier
-	moneyTxPublisher := NewTxPublisher(stateAPI, log)
-	feeManager := fees.NewFeeManager(am, feeManagerDB, moneySystemID, stateAPI, FeeCreditRecordIDFormPublicKey, moneySystemID, stateAPI, FeeCreditRecordIDFormPublicKey, log)
-	dustCollector := dc.NewDustCollector(moneySystemID, maxBillsForDustCollection, txTimeoutBlockCount, stateAPI, unitLocker, log)
+	moneyTxPublisher := NewTxPublisher(rpcClient, log)
+	feeManager := fees.NewFeeManager(am, feeManagerDB, moneySystemID, rpcClient, FeeCreditRecordIDFormPublicKey, moneySystemID, rpcClient, FeeCreditRecordIDFormPublicKey, log)
+	dustCollector := dc.NewDustCollector(moneySystemID, maxBillsForDustCollection, txTimeoutBlockCount, rpcClient, unitLocker, log)
 	return &Wallet{
 		am:            am,
-		rpcClient:     stateAPI,
+		rpcClient:     rpcClient,
 		TxPublisher:   moneyTxPublisher,
 		feeManager:    feeManager,
 		dustCollector: dustCollector,

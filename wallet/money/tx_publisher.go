@@ -14,11 +14,11 @@ import (
 )
 
 type TxPublisher struct {
-	rpcClient StateAPI
+	rpcClient RpcClient
 	log       *slog.Logger
 }
 
-func NewTxPublisher(rpcClient StateAPI, log *slog.Logger) *TxPublisher {
+func NewTxPublisher(rpcClient RpcClient, log *slog.Logger) *TxPublisher {
 	return &TxPublisher{
 		rpcClient: rpcClient,
 		log:       log,

@@ -94,7 +94,7 @@ func (c *Client) SendTransaction(ctx context.Context, tx *types.TransactionOrder
 }
 
 // GetTransactionProof returns transaction record and proof for the given transaction hash.
-func (c *Client) GetTransactionProof(ctx context.Context, txHash []byte) (*types.TransactionRecord, *types.TxProof, error) {
+func (c *Client) GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TransactionRecord, *types.TxProof, error) {
 	var res *rpc.TransactionRecordAndProof
 	err := c.c.CallContext(ctx, &res, "state_getTransactionProof", txHash)
 	if err != nil {

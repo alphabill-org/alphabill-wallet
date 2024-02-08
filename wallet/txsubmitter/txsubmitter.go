@@ -17,7 +17,7 @@ import (
 type (
 	TxSubmission struct {
 		UnitID      types.UnitID
-		TxHash      wallet.TxHash
+		TxHash      types.Bytes
 		Transaction *types.TransactionOrder
 		Proof       *wallet.Proof
 	}
@@ -26,18 +26,18 @@ type (
 		sender      wallet.PubKey
 		submissions []*TxSubmission
 		maxTimeout  uint64
-		rpcClient   StateAPI
+		rpcClient   RpcClient
 		log         *slog.Logger
 	}
 
-	StateAPI interface {
+	RpcClient interface {
 		GetRoundNumber(ctx context.Context) (uint64, error)
 		SendTransaction(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
-		GetTransactionProof(ctx context.Context, txHash []byte) (*types.TransactionRecord, *types.TxProof, error)
+		GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TransactionRecord, *types.TxProof, error)
 	}
 )
 
-func (s *TxSubmission) ToBatch(backend StateAPI, sender wallet.PubKey, log *slog.Logger) *TxSubmissionBatch {
+func (s *TxSubmission) ToBatch(backend RpcClient, sender wallet.PubKey, log *slog.Logger) *TxSubmissionBatch {
 	return &TxSubmissionBatch{
 		sender:      sender,
 		rpcClient:   backend,
@@ -51,7 +51,7 @@ func (s *TxSubmission) Confirmed() bool {
 	return s.Proof != nil
 }
 
-func NewBatch(sender wallet.PubKey, rpcClient StateAPI, log *slog.Logger) *TxSubmissionBatch {
+func NewBatch(sender wallet.PubKey, rpcClient RpcClient, log *slog.Logger) *TxSubmissionBatch {
 	return &TxSubmissionBatch{
 		sender:    sender,
 		rpcClient: rpcClient,

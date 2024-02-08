@@ -31,12 +31,12 @@ type (
 		FeeCreditRecord *unit.FeeCreditRecord
 	}
 
-	StateAPI interface {
+	RpcClient interface {
 		GetRoundNumber(ctx context.Context) (uint64, error)
 		GetBill(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*Bill, error)
 		GetFeeCreditRecord(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*FeeCreditBill, error)
-		GetUnitsByOwnerID(ctx context.Context, ownerID []byte) ([]types.UnitID, error)
-		GetTransactionProof(ctx context.Context, txHash []byte) (*types.TransactionRecord, *types.TxProof, error)
+		GetUnitsByOwnerID(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error)
+		GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TransactionRecord, *types.TxProof, error)
 	}
 )
 
@@ -94,7 +94,7 @@ func (b *Bill) Value() uint64 {
 	return b.BillData.V
 }
 
-func FetchBills(ctx context.Context, c StateAPI, ownerID []byte) ([]*Bill, error) {
+func FetchBills(ctx context.Context, c RpcClient, ownerID []byte) ([]*Bill, error) {
 	unitIDs, err := c.GetUnitsByOwnerID(ctx, ownerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch owner units: %w", err)
@@ -113,7 +113,7 @@ func FetchBills(ctx context.Context, c StateAPI, ownerID []byte) ([]*Bill, error
 	return bills, nil
 }
 
-func FetchBill(ctx context.Context, c StateAPI, unitID types.UnitID) (*Bill, error) {
+func FetchBill(ctx context.Context, c RpcClient, unitID types.UnitID) (*Bill, error) {
 	bill, err := c.GetBill(ctx, unitID, false)
 	if err != nil {
 		// TODO type safe error check
@@ -125,7 +125,7 @@ func FetchBill(ctx context.Context, c StateAPI, unitID types.UnitID) (*Bill, err
 	return bill, nil
 }
 
-func FetchFeeCreditBill(ctx context.Context, c StateAPI, fcrID types.UnitID) (*FeeCreditBill, error) {
+func FetchFeeCreditBill(ctx context.Context, c RpcClient, fcrID types.UnitID) (*FeeCreditBill, error) {
 	fcr, err := c.GetFeeCreditRecord(ctx, fcrID, false)
 	if err != nil {
 		// TODO type safe error check
@@ -137,7 +137,7 @@ func FetchFeeCreditBill(ctx context.Context, c StateAPI, fcrID types.UnitID) (*F
 	return fcr, nil
 }
 
-func WaitForConf(ctx context.Context, c StateAPI, tx *types.TransactionOrder) (*wallet.Proof, error) {
+func WaitForConf(ctx context.Context, c RpcClient, tx *types.TransactionOrder) (*wallet.Proof, error) {
 	txHash := tx.Hash(crypto.SHA256)
 	for {
 		// fetch round number before proof to ensure that we cannot miss the proof

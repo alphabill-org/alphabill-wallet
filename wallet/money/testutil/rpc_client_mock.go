@@ -117,7 +117,7 @@ func (b *RpcClientMock) GetFeeCreditRecord(ctx context.Context, unitID types.Uni
 	return nil, api.ErrNotFound
 }
 
-func (b *RpcClientMock) GetUnitsByOwnerID(ctx context.Context, ownerID []byte) ([]types.UnitID, error) {
+func (b *RpcClientMock) GetUnitsByOwnerID(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
 	if b.Err != nil {
 		return nil, b.Err
 	}
@@ -135,7 +135,7 @@ func (b *RpcClientMock) SendTransaction(ctx context.Context, tx *types.Transacti
 	return tx.Hash(crypto.SHA256), nil
 }
 
-func (b *RpcClientMock) GetTransactionProof(ctx context.Context, txHash []byte) (*types.TransactionRecord, *types.TxProof, error) {
+func (b *RpcClientMock) GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TransactionRecord, *types.TxProof, error) {
 	if b.Err != nil {
 		return nil, nil, b.Err
 	}

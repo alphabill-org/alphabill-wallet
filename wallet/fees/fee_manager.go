@@ -37,9 +37,9 @@ type (
 		GetRoundNumber(ctx context.Context) (uint64, error)
 		GetBill(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.Bill, error)
 		GetFeeCreditRecord(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error)
-		GetUnitsByOwnerID(ctx context.Context, ownerID []byte) ([]types.UnitID, error)
+		GetUnitsByOwnerID(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error)
 		SendTransaction(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
-		GetTransactionProof(ctx context.Context, txHash []byte) (*types.TransactionRecord, *types.TxProof, error)
+		GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TransactionRecord, *types.TxProof, error)
 	}
 
 	// GenerateFcrIDFromPublicKey function to generate fee credit UnitID from shard number nad public key

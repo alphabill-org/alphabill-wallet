@@ -27,12 +27,12 @@ func TestExistingWalletCanBeLoaded(t *testing.T) {
 	homedir := t.TempDir()
 	am, err := account.NewManager(homedir, "", true)
 	require.NoError(t, err)
-	stateAPI := testutil.NewStateAPIMock()
+	rpcClient := testutil.NewRpcClientMock()
 	unitLocker, err := unitlock.NewUnitLocker(homedir)
 	require.NoError(t, err)
 	feeManagerDB, err := fees.NewFeeManagerDB(homedir)
 	require.NoError(t, err)
-	_, err = LoadExistingWallet(am, unitLocker, feeManagerDB, stateAPI, logger.New(t))
+	_, err = LoadExistingWallet(am, unitLocker, feeManagerDB, rpcClient, logger.New(t))
 	require.NoError(t, err)
 }
 
@@ -73,20 +73,20 @@ func TestWallet_AddKey(t *testing.T) {
 }
 
 func TestWallet_GetBalance(t *testing.T) {
-	stateAPI := testutil.NewStateAPIMock(
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{1}, &money.BillData{V: 10, Backlink: []byte{1}})),
+	rpcClient := testutil.NewRpcClientMock(
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 10, Backlink: []byte{1}})),
 	)
-	w := createTestWallet(t, stateAPI)
+	w := createTestWallet(t, rpcClient)
 	balance, err := w.GetBalance(context.Background(), GetBalanceCmd{})
 	require.NoError(t, err)
 	require.EqualValues(t, 10, balance)
 }
 
 func TestWallet_GetBalances(t *testing.T) {
-	stateAPI := testutil.NewStateAPIMock(
-		testutil.WithOwnerUnit(testutil.NewMoneyBill(t, []byte{1}, &money.BillData{V: 10, Backlink: []byte{1}})),
+	rpcClient := testutil.NewRpcClientMock(
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 10, Backlink: []byte{1}})),
 	)
-	w := createTestWallet(t, stateAPI)
+	w := createTestWallet(t, rpcClient)
 	_, _, err := w.am.AddAccount()
 	require.NoError(t, err)
 
@@ -97,7 +97,7 @@ func TestWallet_GetBalances(t *testing.T) {
 	require.EqualValues(t, 20, sum)
 }
 
-func createTestWallet(t *testing.T, stateAPI StateAPI) *Wallet {
+func createTestWallet(t *testing.T, rpcClient RpcClient) *Wallet {
 	dir := t.TempDir()
 	am, err := account.NewManager(dir, "", true)
 	require.NoError(t, err)
@@ -111,7 +111,7 @@ func createTestWallet(t *testing.T, stateAPI StateAPI) *Wallet {
 	feeManagerDB, err := fees.NewFeeManagerDB(dir)
 	require.NoError(t, err)
 
-	w, err := LoadExistingWallet(am, unitLocker, feeManagerDB, stateAPI, logger.New(t))
+	w, err := LoadExistingWallet(am, unitLocker, feeManagerDB, rpcClient, logger.New(t))
 	require.NoError(t, err)
 
 	return w

@@ -248,7 +248,7 @@ func (s *mockService) SendTransaction(tx types.Bytes) (types.Bytes, error) {
 	return txo.Hash(crypto.SHA256), s.err
 }
 
-func (s *mockService) GetTransactionProof(txHash []byte) (*rpc.TransactionRecordAndProof, error) {
+func (s *mockService) GetTransactionProof(txHash types.Bytes) (*rpc.TransactionRecordAndProof, error) {
 	return s.txProof, s.err
 }
 
