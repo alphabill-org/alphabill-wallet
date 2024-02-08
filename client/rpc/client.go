@@ -51,27 +51,27 @@ func (c *Client) GetRoundNumber(ctx context.Context) (uint64, error) {
 
 // GetBill returns the unit data for given unitID.
 func (c *Client) GetBill(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.Bill, error) {
-	var unit rpc.Unit[money.BillData]
-	if err := c.c.CallContext(ctx, &unit, "state_getUnit", unitID, includeStateProof); err != nil {
+	var u rpc.Unit[money.BillData]
+	if err := c.c.CallContext(ctx, &u, "state_getUnit", unitID, includeStateProof); err != nil {
 		return nil, err
 	}
 
 	return &api.Bill{
-		ID:       unit.UnitID,
-		BillData: &unit.Data,
+		ID:       u.UnitID,
+		BillData: &u.Data,
 	}, nil
 }
 
 // GetFeeCreditRecord returns the unit data for given unitID.
 func (c *Client) GetFeeCreditRecord(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
-	var unit rpc.Unit[unit.FeeCreditRecord]
-	if err := c.c.CallContext(ctx, &unit, "state_getUnit", unitID, includeStateProof); err != nil {
+	var u rpc.Unit[unit.FeeCreditRecord]
+	if err := c.c.CallContext(ctx, &u, "state_getUnit", unitID, includeStateProof); err != nil {
 		return nil, err
 	}
 
 	return &api.FeeCreditBill{
-		ID:              unit.UnitID,
-		FeeCreditRecord: &unit.Data,
+		ID:              u.UnitID,
+		FeeCreditRecord: &u.Data,
 	}, nil
 }
 

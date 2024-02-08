@@ -8,14 +8,15 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	"github.com/alphabill-org/alphabill/rpc"
+	"github.com/alphabill-org/alphabill/txsystem/fc/unit"
 	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/types"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/stretchr/testify/require"
 )
-
 
 func TestRpcClient(t *testing.T) {
 	service := &mockService{}
@@ -37,30 +38,59 @@ func TestRpcClient(t *testing.T) {
 		require.ErrorContains(t, err, "some error")
 	})
 
-	t.Run("GetUnit_OK", func(t *testing.T) {
+	t.Run("GetBill_OK", func(t *testing.T) {
 		service.reset()
-		unit := &rpc.Unit[any]{
-			UnitID: []byte{1},
-			Data: &money.BillData{
-				V: 192,
-				T: 168,
-				Locked: 0,
-				Backlink: []byte{1,2,3,4,5},
+		bill := &api.Bill{
+			ID: []byte{1},
+			BillData: &money.BillData{
+				V:        192,
+				T:        168,
+				Backlink: []byte{1, 2, 3, 4, 5},
 			},
 		}
+		service.unit = &rpc.Unit[any]{
+			UnitID: bill.ID,
+			Data:   bill.BillData,
+		}
 
-		service.unit = unit
-		returnedBill, err := client.GetBill(context.Background(), unit.UnitID, false)
+		returnedBill, err := client.GetBill(context.Background(), bill.ID, false)
 		require.NoError(t, err)
-		require.Equal(t, returnedBill.ID, unit.UnitID)
-		require.Equal(t, returnedBill.BillData.V, unit.Data.(*money.BillData).V)
+		require.Equal(t, bill, returnedBill)
 	})
-	t.Run("GetUnit_NOK", func(t *testing.T) {
+	t.Run("GetBill_NOK", func(t *testing.T) {
 		service.reset()
 		service.err = errors.New("some error")
 		unitID := []byte{1}
 
 		_, err := client.GetBill(context.Background(), unitID, false)
+		require.ErrorContains(t, err, "some error")
+	})
+
+	t.Run("GetFeeCreditRecord_OK", func(t *testing.T) {
+		service.reset()
+		fcb := &api.FeeCreditBill{
+			ID: []byte{1},
+			FeeCreditRecord: &unit.FeeCreditRecord{
+				Balance:  192,
+				Timeout:  168,
+				Backlink: []byte{1, 2, 3, 4, 5},
+			},
+		}
+		service.unit = &rpc.Unit[any]{
+			UnitID: fcb.ID,
+			Data:   fcb.FeeCreditRecord,
+		}
+
+		returnedBill, err := client.GetFeeCreditRecord(context.Background(), fcb.ID, false)
+		require.NoError(t, err)
+		require.Equal(t, fcb, returnedBill)
+	})
+	t.Run("GetFeeCreditRecord_NOK", func(t *testing.T) {
+		service.reset()
+		service.err = errors.New("some error")
+		unitID := []byte{1}
+
+		_, err := client.GetFeeCreditRecord(context.Background(), unitID, false)
 		require.ErrorContains(t, err, "some error")
 	})
 
