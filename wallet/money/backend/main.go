@@ -14,6 +14,7 @@ import (
 	"github.com/ainvaltin/httpsrv"
 	"github.com/alphabill-org/alphabill/logger"
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
+	"github.com/alphabill-org/alphabill/predicates"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/types"
@@ -392,7 +393,7 @@ func extractOwnerHashFromP2pkh(bearer sdk.Predicate) sdk.PubKeyHash {
 }
 
 func extractOwnerKeyFromProof(signature sdk.Predicate) sdk.PubKey {
-	pk, _ := templates.ExtractPubKeyHashFromP2pkhPredicate(signature)
+	pk, _ := predicates.ExtractPubKey(signature)
 	return pk
 }
 

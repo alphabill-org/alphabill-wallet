@@ -48,7 +48,7 @@ func TestFungibleToken_Subtyping_Integration(t *testing.T) {
 	typeID12 := randomFungibleTokenTypeID(t)
 	typeID13 := randomFungibleTokenTypeID(t)
 	typeID14 := randomFungibleTokenTypeID(t)
-	execTokensCmd(t, homedirW1, fmt.Sprintf("new-type fungible -r %s --symbol %s --type %s --subtype-clause 0x830001F6", backendURL, symbol1, typeID11))
+	execTokensCmd(t, homedirW1, fmt.Sprintf("new-type fungible -r %s --symbol %s --type %s --subtype-clause 0x83004101F6", backendURL, symbol1, typeID11))
 	require.Eventually(t, testpartition.BlockchainContains(tokensPartition, func(tx *types.TransactionOrder) bool {
 		return bytes.Equal(tx.UnitID(), typeID11)
 	}), test.WaitDuration, test.WaitTick)

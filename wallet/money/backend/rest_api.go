@@ -12,7 +12,7 @@ import (
 
 	"github.com/alphabill-org/alphabill/logger"
 	"github.com/alphabill-org/alphabill/observability"
-	"github.com/alphabill-org/alphabill/predicates/templates"
+	"github.com/alphabill-org/alphabill/predicates"
 	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/types"
 
@@ -341,7 +341,7 @@ func (api *moneyRestAPI) postTransactions(w http.ResponseWriter, r *http.Request
 		return
 	}
 	for _, tx := range txs.Transactions {
-		pubKey, err := templates.ExtractPubKeyHashFromP2pkhPredicate(tx.OwnerProof)
+		pubKey, err := predicates.ExtractPubKey(tx.OwnerProof)
 		if err != nil {
 			api.rw.ErrorResponse(w, http.StatusBadRequest, fmt.Errorf("failed to obtain owner proof from tx with unitID %v", tx.Payload.UnitID))
 			return

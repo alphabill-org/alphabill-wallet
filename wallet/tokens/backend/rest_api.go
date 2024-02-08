@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alphabill-org/alphabill/predicates"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/alphabill-org/alphabill/types"
@@ -262,7 +263,7 @@ func (api *tokensRestAPI) postTransactions(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	for _, tx := range txs.Transactions {
-		pubKey, err := templates.ExtractPubKeyHashFromP2pkhPredicate(tx.OwnerProof)
+		pubKey, err := predicates.ExtractPubKey(tx.OwnerProof)
 		// if owner proof does not contain a pubKey (for txs in which ownership is not defined, like token type creation), ownership validation is skipped
 		if err == nil && pubKey != nil && !bytes.Equal(owner, pubKey) {
 			api.rw.ErrorResponse(w, http.StatusBadRequest, fmt.Errorf("transaction with unitID %v in request body does not match provided pubKey parameter", tx.Payload.UnitID))
