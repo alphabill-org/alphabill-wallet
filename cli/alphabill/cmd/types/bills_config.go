@@ -1,10 +1,16 @@
 package types
 
+import "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
+
 type BillsConfig struct {
 	WalletConfig  *WalletConfig
-	NodeURL       string
+	RpcUrl        string
 	Key           uint64
 	ShowUnswapped bool
 	BillID        BytesHex
 	SystemID      uint32
+}
+
+func (c *BillsConfig) GetRpcUrl() string {
+	return args.BuildRpcUrl(c.RpcUrl)
 }

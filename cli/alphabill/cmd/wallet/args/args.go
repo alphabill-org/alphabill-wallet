@@ -1,7 +1,15 @@
 package args
 
+import "strings"
+
 const (
-	DefaultAlphabillApiURL     = "localhost:9654"
+	RpcUrl                 = "rpc-url"
+	DefaultMoneyRpcUrl     = "localhost:26866"
+	DefaultTokensRpcUrl    = "localhost:28866"
+	DefaultEvmRpcUrl       = "localhost:29866"
+	PartitionCmdName       = "partition"
+	PartitionRpcUrlCmdName = "partition-rpc-url"
+
 	DefaultTokensBackendApiURL = "localhost:9735"
 	DefaultEvmNodeRestURL      = "localhost:29866"
 	PasswordPromptUsage        = "password (interactive from prompt)"
@@ -20,6 +28,12 @@ const (
 	ShowUnswappedCmdName       = "show-unswapped"
 	BillIdCmdName              = "bill-id"
 	SystemIdentifierCmdName    = "system-identifier"
-	PartitionCmdName           = "partition"
-	PartitionBackendUrlCmdName = "partition-backend-url"
 )
+
+func BuildRpcUrl(url string) string {
+	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+		url = "http://" + url
+	}
+	url = strings.TrimSuffix(url, "/")
+	return url + "/rpc"
+}
