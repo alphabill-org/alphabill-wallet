@@ -35,5 +35,8 @@ func BuildRpcUrl(url string) string {
 		url = "http://" + url
 	}
 	url = strings.TrimSuffix(url, "/")
-	return url + "/rpc"
+	if !strings.HasSuffix(url, "/rpc") {
+		url = url + "/rpc"
+	}
+	return url
 }
