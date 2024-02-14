@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/util"
-	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
+	mtypes "github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 )
 
 const testMnemonic = "dinosaur simple verify deliver bless ridge monkey design venue six problem lucky"
@@ -26,15 +26,17 @@ func TestSplitTransactionAmount(t *testing.T) {
 	receiverPubKeyHash := hash.Sum256(receiverPubKey)
 	keys, _ := account.NewKeys(testMnemonic)
 	billID := money.NewBillID(nil, nil)
-	b := &wallet.Bill{
-		Id:     billID,
-		Value:  500,
-		TxHash: []byte{1, 2, 3, 4},
+	b := &mtypes.Bill{
+		ID: billID,
+		BillData: &money.BillData{
+			V:        500,
+			Backlink: []byte{1, 2, 3, 4},
+		},
 	}
 	amount := uint64(150)
 	timeout := uint64(100)
 	systemID := money.DefaultSystemIdentifier
-	remainingValue := b.Value - amount
+	remainingValue := b.Value() - amount
 
 	tx, err := NewSplitTx([]*money.TargetUnit{
 		{OwnerCondition: templates.NewP2pkh256BytesFromKeyHash(receiverPubKeyHash), Amount: amount},
@@ -52,13 +54,13 @@ func TestSplitTransactionAmount(t *testing.T) {
 	require.Equal(t, amount, so.TargetUnits[0].Amount)
 	require.EqualValues(t, templates.NewP2pkh256BytesFromKeyHash(receiverPubKeyHash), so.TargetUnits[0].OwnerCondition)
 	require.EqualValues(t, 350, so.RemainingValue)
-	require.EqualValues(t, b.TxHash, so.Backlink)
+	require.EqualValues(t, b.Backlink(), so.Backlink)
 }
 
 func TestCreateTransactions(t *testing.T) {
 	tests := []struct {
 		name        string
-		bills       []*wallet.Bill
+		bills       []*mtypes.Bill
 		amount      uint64
 		txCount     int
 		verify      func(t *testing.T, systemID types.SystemID, txs []*types.TransactionOrder)
@@ -66,7 +68,7 @@ func TestCreateTransactions(t *testing.T) {
 	}{
 		{
 			name:   "have more bills than target amount",
-			bills:  []*wallet.Bill{createBill(5), createBill(3), createBill(1)},
+			bills:  []*mtypes.Bill{createBill(5), createBill(3), createBill(1)},
 			amount: uint64(7),
 			verify: func(t *testing.T, systemID types.SystemID, txs []*types.TransactionOrder) {
 				// verify tx count
@@ -92,7 +94,7 @@ func TestCreateTransactions(t *testing.T) {
 		},
 		{
 			name:   "have less bills than target amount",
-			bills:  []*wallet.Bill{createBill(5), createBill(1)},
+			bills:  []*mtypes.Bill{createBill(5), createBill(1)},
 			amount: uint64(7),
 			verify: func(t *testing.T, systemID types.SystemID, txs []*types.TransactionOrder) {
 				require.Empty(t, txs)
@@ -101,7 +103,7 @@ func TestCreateTransactions(t *testing.T) {
 		},
 		{
 			name:   "have exact amount of bills than target amount",
-			bills:  []*wallet.Bill{createBill(5), createBill(5)},
+			bills:  []*mtypes.Bill{createBill(5), createBill(5)},
 			amount: uint64(10),
 			verify: func(t *testing.T, systemID types.SystemID, txs []*types.TransactionOrder) {
 				// verify tx count
@@ -119,7 +121,7 @@ func TestCreateTransactions(t *testing.T) {
 		},
 		{
 			name:   "have exactly one bill with equal target amount",
-			bills:  []*wallet.Bill{createBill(5)},
+			bills:  []*mtypes.Bill{createBill(5)},
 			amount: uint64(5),
 			verify: func(t *testing.T, systemID types.SystemID, txs []*types.TransactionOrder) {
 				// verify tx count
@@ -150,10 +152,12 @@ func TestCreateTransactions(t *testing.T) {
 	}
 }
 
-func createBill(value uint64) *wallet.Bill {
-	return &wallet.Bill{
-		Value:  value,
-		Id:     util.Uint64ToBytes32(0),
-		TxHash: []byte{},
+func createBill(value uint64) *mtypes.Bill {
+	return &mtypes.Bill{
+		ID: util.Uint64ToBytes32(0),
+		BillData: &money.BillData{
+			V:        value,
+			Backlink: []byte{},
+		},
 	}
 }

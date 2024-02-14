@@ -4,33 +4,31 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
-	"strconv"
-	"strings"
 
-	"github.com/alphabill-org/alphabill/types"
+	"github.com/alphabill-org/alphabill/txsystem/evm"
+	"github.com/alphabill-org/alphabill/txsystem/money"
+	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/spf13/cobra"
 
 	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
+	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	evmwallet "github.com/alphabill-org/alphabill-wallet/wallet/evm"
-	evmclient "github.com/alphabill-org/alphabill-wallet/wallet/evm/client"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	moneywallet "github.com/alphabill-org/alphabill-wallet/wallet/money"
-	moneyclient "github.com/alphabill-org/alphabill-wallet/wallet/money/backend/client"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	tokenswallet "github.com/alphabill-org/alphabill-wallet/wallet/tokens"
-	tokensclient "github.com/alphabill-org/alphabill-wallet/wallet/tokens/client"
 )
 
 // NewFeesCmd creates a new cobra command for the wallet fees component.
 func NewFeesCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 	var config = &feesConfig{
-		walletConfig:  walletConfig,
-		partitionType: clitypes.MoneyType, // shows default value in help context
+		walletConfig:        walletConfig,
+		targetPartitionType: clitypes.MoneyType, // shows default value in help context
 	}
 	var cmd = &cobra.Command{
 		Use:   "fees",
@@ -45,11 +43,11 @@ func NewFeesCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 	cmd.AddCommand(lockFeeCreditCmd(config))
 	cmd.AddCommand(unlockFeeCreditCmd(config))
 
-	cmd.PersistentFlags().VarP(&config.partitionType, args.PartitionCmdName, "n", "partition name for which to manage fees [money|tokens|evm]")
-	cmd.PersistentFlags().StringVarP(&config.moneyBackendURL, args.AlphabillApiURLCmdName, "r", args.DefaultAlphabillApiURL, "wallet backend API URL")
+	cmd.PersistentFlags().VarP(&config.targetPartitionType, args.PartitionCmdName, "n", "partition name for which to manage fees [money|tokens|evm]")
+	cmd.PersistentFlags().StringVarP(&config.moneyPartitionNodeUrl, args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "money rpc node url")
 
-	usage := fmt.Sprintf("partition backend url for which to manage fees (default: [%s|%s|%s] based on --partition flag)", args.DefaultAlphabillApiURL, args.DefaultTokensBackendApiURL, args.DefaultEvmNodeRestURL)
-	cmd.PersistentFlags().StringVarP(&config.partitionBackendURL, args.PartitionBackendUrlCmdName, "m", "", usage)
+	usage := fmt.Sprintf("partition rpc node url for which to manage fees (default: [%s|%s|%s] based on --partition flag)", args.DefaultMoneyRpcUrl, args.DefaultTokensRpcUrl, args.DefaultEvmRpcUrl)
+	cmd.PersistentFlags().StringVarP(&config.targetPartitionNodeUrl, args.PartitionRpcUrlCmdName, "m", "", usage)
 	return cmd
 }
 
@@ -89,7 +87,7 @@ func addFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, config.moneyBackendURL, walletConfig.Base.Observe)
+	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Observe)
 	if err != nil {
 		return fmt.Errorf("failed to create fee credit manager: %w", err)
 	}
@@ -129,7 +127,7 @@ func listFeesCmdExec(cmd *cobra.Command, config *feesConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, config.moneyBackendURL, walletConfig.Base.Observe)
+	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Observe)
 	if err != nil {
 		return err
 	}
@@ -169,7 +167,7 @@ func reclaimFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, config.moneyBackendURL, walletConfig.Base.Observe)
+	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Observe)
 	if err != nil {
 		return err
 	}
@@ -192,7 +190,7 @@ func lockFeeCreditCmd(config *feesConfig) *cobra.Command {
 }
 
 func lockFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
-	if config.partitionType == clitypes.EvmType {
+	if config.targetPartitionType == clitypes.EvmType {
 		return errors.New("locking fee credit is not supported for EVM partition")
 	}
 	accountNumber, err := cmd.Flags().GetUint64(args.KeyCmdName)
@@ -216,7 +214,7 @@ func lockFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, config.moneyBackendURL, walletConfig.Base.Observe)
+	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Observe)
 	if err != nil {
 		return err
 	}
@@ -244,7 +242,7 @@ func unlockFeeCreditCmd(config *feesConfig) *cobra.Command {
 }
 
 func unlockFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
-	if config.partitionType == clitypes.EvmType {
+	if config.targetPartitionType == clitypes.EvmType {
 		return errors.New("locking fee credit is not supported for EVM partition")
 	}
 	accountNumber, err := cmd.Flags().GetUint64(args.KeyCmdName)
@@ -268,7 +266,7 @@ func unlockFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, config.moneyBackendURL, walletConfig.Base.Observe)
+	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Observe)
 	if err != nil {
 		return err
 	}
@@ -283,7 +281,7 @@ func unlockFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
 }
 
 type FeeCreditManager interface {
-	GetFeeCredit(ctx context.Context, cmd fees.GetFeeCreditCmd) (*wallet.Bill, error)
+	GetFeeCredit(ctx context.Context, cmd fees.GetFeeCreditCmd) (*api.FeeCreditBill, error)
 	AddFeeCredit(ctx context.Context, cmd fees.AddFeeCmd) (*fees.AddFeeCmdResponse, error)
 	ReclaimFeeCredit(ctx context.Context, cmd fees.ReclaimFeeCmd) (*fees.ReclaimFeeCmdResponse, error)
 	LockFeeCredit(ctx context.Context, cmd fees.LockFeeCreditCmd) (*wallet.Proof, error)
@@ -297,14 +295,14 @@ func listFees(ctx context.Context, accountNumber uint64, am account.Manager, c *
 		if err != nil {
 			return err
 		}
-		consoleWriter.Println("Partition: " + c.partitionType)
+		consoleWriter.Println("Partition: " + c.targetPartitionType)
 		for accountIndex := range pubKeys {
 			fcb, err := w.GetFeeCredit(ctx, fees.GetFeeCreditCmd{AccountIndex: uint64(accountIndex)})
 			if err != nil {
 				return err
 			}
 			accNum := accountIndex + 1
-			amountString := util.AmountToString(fcb.GetValue(), 8)
+			amountString := util.AmountToString(fcb.Balance(), 8)
 			consoleWriter.Println(fmt.Sprintf("Account #%d %s%s", accNum, amountString, getLockedReasonString(fcb)))
 		}
 	} else {
@@ -313,8 +311,8 @@ func listFees(ctx context.Context, accountNumber uint64, am account.Manager, c *
 		if err != nil {
 			return err
 		}
-		amountString := util.AmountToString(fcb.GetValue(), 8)
-		consoleWriter.Println("Partition: " + c.partitionType)
+		amountString := util.AmountToString(fcb.Balance(), 8)
+		consoleWriter.Println("Partition: " + c.targetPartitionType)
 		consoleWriter.Println(fmt.Sprintf("Account #%d %s%s", accountNumber, amountString, getLockedReasonString(fcb)))
 	}
 	return nil
@@ -328,7 +326,7 @@ func addFees(ctx context.Context, accountNumber uint64, amountString string, c *
 	rsp, err := w.AddFeeCredit(ctx, fees.AddFeeCmd{
 		Amount:         amount,
 		AccountIndex:   accountNumber - 1,
-		DisableLocking: c.partitionType == clitypes.EvmType,
+		DisableLocking: c.targetPartitionType == clitypes.EvmType,
 	})
 	if err != nil {
 		if errors.Is(err, fees.ErrMinimumFeeAmount) {
@@ -346,7 +344,7 @@ func addFees(ctx context.Context, accountNumber uint64, amountString string, c *
 	for _, proof := range rsp.Proofs {
 		feeSum += proof.GetFees()
 	}
-	consoleWriter.Println("Successfully created", amountString, "fee credits on", c.partitionType, "partition.")
+	consoleWriter.Println("Successfully created", amountString, "fee credits on", c.targetPartitionType, "partition.")
 	consoleWriter.Println("Paid", util.AmountToString(feeSum, 8), "ALPHA fee for transactions.")
 	return nil
 }
@@ -364,152 +362,156 @@ func reclaimFees(ctx context.Context, accountNumber uint64, c *feesConfig, w Fee
 		}
 		return err
 	}
-	consoleWriter.Println("Successfully reclaimed fee credits on", c.partitionType, "partition.")
+	consoleWriter.Println("Successfully reclaimed fee credits on", c.targetPartitionType, "partition.")
 	consoleWriter.Println("Paid", util.AmountToString(rsp.Proofs.GetFees(), 8), "ALPHA fee for transactions.")
 	return nil
 }
 
 type feesConfig struct {
-	walletConfig        *clitypes.WalletConfig
-	moneyBackendURL     string
-	partitionType       clitypes.PartitionType
-	partitionBackendURL string
+	walletConfig           *clitypes.WalletConfig
+	moneyPartitionNodeUrl  string
+	targetPartitionType    clitypes.PartitionType
+	targetPartitionNodeUrl string
 }
 
-func (c *feesConfig) parsePartitionBackendURL() (*url.URL, error) {
-	backendURL := c.getPartitionBackendURL()
-	if !strings.HasPrefix(backendURL, "http://") && !strings.HasPrefix(backendURL, "https://") {
-		backendURL = "http://" + backendURL
-	}
-	return url.Parse(backendURL)
+func (c *feesConfig) getMoneyRpcUrl() string {
+	return args.BuildRpcUrl(c.moneyPartitionNodeUrl)
 }
 
-func (c *feesConfig) getPartitionBackendURL() string {
-	if c.partitionBackendURL != "" {
-		return c.partitionBackendURL
+func (c *feesConfig) getTargetPartitionRpcUrl() string {
+	return args.BuildRpcUrl(c.getTargetPartitionUrl())
+}
+
+func (c *feesConfig) getTargetPartitionUrl() string {
+	if c.targetPartitionNodeUrl != "" {
+		return c.targetPartitionNodeUrl
 	}
-	switch c.partitionType {
+	switch c.targetPartitionType {
 	case clitypes.MoneyType:
-		return args.DefaultAlphabillApiURL
+		return args.DefaultMoneyRpcUrl
 	case clitypes.TokensType:
-		return args.DefaultTokensBackendApiURL
+		return args.DefaultTokensRpcUrl
 	case clitypes.EvmType:
-		return args.DefaultEvmNodeRestURL // evm does not use backend and instead talks to an actual evm node
+		return args.DefaultEvmRpcUrl
 	default:
-		panic("invalid \"partition\" flag value: " + c.partitionType)
+		panic("invalid \"partition\" flag value: " + c.targetPartitionType)
 	}
 }
 
 // Creates a fees.FeeManager that needs to be closed with the Close() method.
 // Does not close the account.Manager passed as an argument.
-func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager, feeManagerDB fees.FeeManagerDB, moneyBackendURL string, obs clitypes.Observability) (FeeCreditManager, error) {
-	moneyBackendClient, err := moneyclient.New(moneyBackendURL, obs)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create money backend client: %w", err)
-	}
-	moneySystemInfo, err := moneyBackendClient.GetInfo(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch money system info: %w", err)
-	}
-	moneyTypeVar := clitypes.MoneyType
-	if !strings.HasPrefix(moneySystemInfo.Name, moneyTypeVar.String()) {
-		return nil, errors.New("invalid wallet backend API URL provided for money partition")
-	}
-	// the info response is expected to have system ID as hex, max 4 bytes
-	mSysID, err := strconv.ParseUint(moneySystemInfo.SystemID, 16, 32)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode money system identifier hex: %w", err)
-	}
-	moneySystemID := types.SystemID(mSysID)
-	moneyTxPublisher := moneywallet.NewTxPublisher(moneyBackendClient, obs.Logger())
+func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager, feeManagerDB fees.FeeManagerDB, obs clitypes.Observability) (FeeCreditManager, error) {
+	// TODO add info endpoint to rpc client?
+	//moneyBackendClient, err := moneyclient.New(moneyPartitionRpcUrl, obs)
+	//if err != nil {
+	//	return nil, fmt.Errorf("failed to create money backend client: %w", err)
+	//}
+	//moneySystemInfo, err := moneyBackendClient.GetInfo(ctx)
+	//if err != nil {
+	//	return nil, fmt.Errorf("failed to fetch money system info: %w", err)
+	//}
+	//moneyTypeVar := clitypes.MoneyType
+	//if !strings.HasPrefix(moneySystemInfo.Name, moneyTypeVar.String()) {
+	//	return nil, errors.New("invalid wallet backend API URL provided for money partition")
+	//}
+	//// the info response is expected to have system ID as hex, max 4 bytes
+	//mSysID, err := strconv.ParseUint(moneySystemInfo.SystemID, 16, 32)
+	//if err != nil {
+	//	return nil, fmt.Errorf("failed to decode money system identifier hex: %w", err)
+	//}
+	//moneySystemID := types.SystemID(mSysID)
+	//moneyTxPublisher := moneywallet.NewTxPublisher(moneyBackendClient, obs.Logger())
+	moneySystemID := money.DefaultSystemIdentifier
 
-	switch c.partitionType {
+	moneyClient, err := rpc.DialContext(ctx, c.getMoneyRpcUrl())
+	if err != nil {
+		return nil, fmt.Errorf("failed to dial money rpc url: %w", err)
+	}
+
+	switch c.targetPartitionType {
 	case clitypes.MoneyType:
 		return fees.NewFeeManager(
 			am,
 			feeManagerDB,
 			moneySystemID,
-			moneyTxPublisher,
-			moneyBackendClient,
+			moneyClient,
 			moneywallet.FeeCreditRecordIDFormPublicKey,
 			moneySystemID,
-			moneyTxPublisher,
-			moneyBackendClient,
+			moneyClient,
 			moneywallet.FeeCreditRecordIDFormPublicKey,
 			obs.Logger(),
 		), nil
 	case clitypes.TokensType:
-		backendURL, err := c.parsePartitionBackendURL()
+		// TODO add info endpoint to rpc client?
+		//tokenInfo, err := tokenBackendClient.GetInfo(ctx)
+		//if err != nil {
+		//	return nil, fmt.Errorf("failed to fetch tokens system info: %w", err)
+		//}
+		//tokenTypeVar := clitypes.TokensType
+		//if !strings.HasPrefix(tokenInfo.Name, tokenTypeVar.String()) {
+		//	return nil, errors.New("invalid wallet backend API URL provided for tokens partition")
+		//}
+		//tokenSystemID, err := strconv.ParseUint(tokenInfo.SystemID, 16, 32)
+		//if err != nil {
+		//	return nil, fmt.Errorf("failed to decode tokens system identifier hex: %w", err)
+		//}
+		tokensRpcUrl := c.getTargetPartitionRpcUrl()
+		tokensClient, err := rpc.DialContext(ctx, tokensRpcUrl)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse partition backend url: %w", err)
+			return nil, fmt.Errorf("failed to dial tokens rpc url: %w", err)
 		}
-		tokenBackendClient := tokensclient.New(*backendURL, obs)
-		tokenTxPublisher := tokenswallet.NewTxPublisher(tokenBackendClient, obs.Logger())
-		tokenInfo, err := tokenBackendClient.GetInfo(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch tokens system info: %w", err)
-		}
-		tokenTypeVar := clitypes.TokensType
-		if !strings.HasPrefix(tokenInfo.Name, tokenTypeVar.String()) {
-			return nil, errors.New("invalid wallet backend API URL provided for tokens partition")
-		}
-		tokenSystemID, err := strconv.ParseUint(tokenInfo.SystemID, 16, 32)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode tokens system identifier hex: %w", err)
-		}
+		tokenSystemID := tokens.DefaultSystemIdentifier
 		return fees.NewFeeManager(
 			am,
 			feeManagerDB,
 			moneySystemID,
-			moneyTxPublisher,
-			moneyBackendClient,
+			moneyClient,
 			moneywallet.FeeCreditRecordIDFormPublicKey,
-			types.SystemID(tokenSystemID),
-			tokenTxPublisher,
-			tokenBackendClient,
+			tokenSystemID,
+			tokensClient,
 			tokenswallet.FeeCreditRecordIDFromPublicKey,
 			obs.Logger(),
 		), nil
 	case clitypes.EvmType:
-		evmNodeURL, err := c.parsePartitionBackendURL()
+		evmRpcUrl := c.getTargetPartitionRpcUrl()
+		evmClient, err := rpc.DialContext(ctx, evmRpcUrl)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to dial evm rpc url: %w", err)
 		}
-		evmClient := evmclient.New(*evmNodeURL)
-		evmTxPublisher := evmwallet.NewTxPublisher(evmClient)
-		evmInfo, err := evmClient.GetInfo(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch evm system info: %w", err)
-		}
-		evmTypeVar := clitypes.EvmType
-		if !strings.HasPrefix(evmInfo.Name, evmTypeVar.String()) {
-			return nil, errors.New("invalid validator node URL provided for evm partition")
-		}
-		evmSystemID, err := strconv.ParseUint(evmInfo.SystemID, 16, 32)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode evm system identifier hex: %w", err)
-		}
+		// TODO add info endpoint to rpc client?
+		//evmTxPublisher := evmwallet.NewTxPublisher(evmClient)
+		//evmInfo, err := evmClient.GetInfo(ctx)
+		//if err != nil {
+		//	return nil, fmt.Errorf("failed to fetch evm system info: %w", err)
+		//}
+		//evmTypeVar := clitypes.EvmType
+		//if !strings.HasPrefix(evmInfo.Name, evmTypeVar.String()) {
+		//	return nil, errors.New("invalid validator node URL provided for evm partition")
+		//}
+		//evmSystemID, err := strconv.ParseUint(evmInfo.SystemID, 16, 32)
+		//if err != nil {
+		//	return nil, fmt.Errorf("failed to decode evm system identifier hex: %w", err)
+		//}
+		evmSystemID := evm.DefaultEvmTxSystemIdentifier
 		return fees.NewFeeManager(
 			am,
 			feeManagerDB,
 			moneySystemID,
-			moneyTxPublisher,
-			moneyBackendClient,
+			moneyClient,
 			moneywallet.FeeCreditRecordIDFormPublicKey,
-			types.SystemID(evmSystemID),
-			evmTxPublisher,
+			evmSystemID,
 			evmClient,
 			evmwallet.FeeCreditRecordIDFromPublicKey,
 			obs.Logger(),
 		), nil
 	default:
-		panic(`invalid "partition" flag value: ` + c.partitionType)
+		panic(`invalid "partition" flag value: ` + c.targetPartitionType)
 	}
 }
 
-func getLockedReasonString(bill *wallet.Bill) string {
-	if bill.IsLocked() {
-		return fmt.Sprintf(" (%s)", bill.Locked.String())
+func getLockedReasonString(fcb *api.FeeCreditBill) string {
+	if fcb.IsLocked() {
+		return fmt.Sprintf(" (%s)", wallet.LockReason(fcb.FeeCreditRecord.Locked).String())
 	}
 	return ""
 }

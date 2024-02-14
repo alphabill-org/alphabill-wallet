@@ -34,7 +34,7 @@ func TestMoneyBackendCLI(t *testing.T) {
 	}
 	moneyPartition := testutils.CreateMoneyPartition(t, genesisConfig, 1)
 	abNet := testutils.StartAlphabill(t, []*testpartition.NodePartition{moneyPartition})
-	testutils.StartPartitionRPCServers(t, moneyPartition)
+	testutils.StartPartitionGRPCServers(t, moneyPartition)
 	alphabillNodeAddr := moneyPartition.Nodes[0].AddrGRPC
 
 	// transfer initial bill to wallet pubkey

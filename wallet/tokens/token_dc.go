@@ -14,7 +14,7 @@ import (
 	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	twb "github.com/alphabill-org/alphabill-wallet/wallet/tokens/backend"
-	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
+	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/txsubmitter"
 )
 
 const maxBurnBatchSize = 100
@@ -105,7 +105,7 @@ func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, typedTokens [
 }
 
 func (w *Wallet) joinTokenForDC(ctx context.Context, acc *account.AccountKey, burnProofs []*sdk.Proof, targetTokenBacklink sdk.TxHash, targetTokenID types.UnitID, invariantPredicateArgs []*PredicateInput) (sdk.TxHash, uint64, error) {
-	// explicitly sort proofs by unit ids in increasing order, even though backend already returns tokens ordered by id
+	// explicitly sort proofs by unit ids in increasing order
 	sort.Slice(burnProofs, func(i, j int) bool {
 		a := burnProofs[i].TxRecord.TransactionOrder.UnitID()
 		b := burnProofs[j].TxRecord.TransactionOrder.UnitID()

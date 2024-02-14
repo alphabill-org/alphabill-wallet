@@ -42,16 +42,23 @@ func TestNFTs_Integration(t *testing.T) {
 	w2.Shutdown()
 
 	// send money to w1k2 to create fee credits
-	wallet := loadMoneyWallet(t, network.walletHomeDir, network.moneyBackendClient)
+	wallet := loadMoneyWallet(t, network.walletHomeDir, network.moneyRpcClient)
 	_, err = wallet.Send(context.Background(), moneywallet.SendCmd{Receivers: []moneywallet.ReceiverData{{PubKey: w1key2.PubKey, Amount: 100 * 1e8}}, WaitForConfirmation: true})
 	require.NoError(t, err)
 	wallet.Close()
 
 	// create fee credit for w1k2
-	tokensWallet := loadTokensWallet(t, network.walletHomeDir, network.moneyBackendClient, network.tokenBackendClient)
+	tokensWallet := loadTokensWallet(t, network.walletHomeDir, network.moneyRpcClient, network.tokensRpcClient, network.tokenBackendClient)
 	_, err = tokensWallet.AddFeeCredit(context.Background(), fees.AddFeeCmd{AccountIndex: 1, Amount: 50 * 1e8, DisableLocking: true})
 	require.NoError(t, err)
 	tokensWallet.Shutdown()
+
+	// wait for fees on token backend
+	require.Eventually(t, func() bool {
+		fcb, err := network.tokenBackendClient.GetFeeCreditBill(context.Background(), tokens.NewFeeCreditRecordID(nil, w1key2.PubKeyHash.Sha256))
+		require.NoError(t, err)
+		return fcb.GetValue() > 0
+	}, test.WaitDuration, test.WaitTick, "failed to register tokens fee credit on backend")
 
 	// non-fungible token types
 	typeID := randomNonFungibleTokenTypeID(t)
@@ -86,16 +93,23 @@ func TestNFTs_Integration(t *testing.T) {
 	testutils.VerifyStdout(t, execTokensCmd(t, homedirW1, fmt.Sprintf("list-types non-fungible -r %s", backendURL)), "symbol=ABNFT (nft)")
 
 	// send money to w2 to create fee credits
-	wallet = loadMoneyWallet(t, network.walletHomeDir, network.moneyBackendClient)
+	wallet = loadMoneyWallet(t, network.walletHomeDir, network.moneyRpcClient)
 	_, err = wallet.Send(context.Background(), moneywallet.SendCmd{Receivers: []moneywallet.ReceiverData{{PubKey: w2key.PubKey, Amount: 100 * 1e8}}, WaitForConfirmation: true})
 	require.NoError(t, err)
 	wallet.Close()
 
 	// create fee credit for w2
-	tokensWallet = loadTokensWallet(t, filepath.Join(homedirW2, "wallet"), network.moneyBackendClient, network.tokenBackendClient)
+	tokensWallet = loadTokensWallet(t, filepath.Join(homedirW2, "wallet"), network.moneyRpcClient, network.tokensRpcClient, network.tokenBackendClient)
 	_, err = tokensWallet.AddFeeCredit(context.Background(), fees.AddFeeCmd{Amount: 50 * 1e8, DisableLocking: true})
 	require.NoError(t, err)
 	tokensWallet.Shutdown()
+
+	// wait for fees on token backend
+	require.Eventually(t, func() bool {
+		fcb, err := network.tokenBackendClient.GetFeeCreditBill(context.Background(), tokens.NewFeeCreditRecordID(nil, w2key.PubKeyHash.Sha256))
+		require.NoError(t, err)
+		return fcb.GetValue() > 0
+	}, test.WaitDuration, test.WaitTick, "failed to register tokens fee credit on backend")
 
 	// transfer back
 	execTokensCmd(t, homedirW2, fmt.Sprintf("send non-fungible -r %s --token-identifier %s --address 0x%X -k 1", backendURL, nftID, w1key2.PubKey))

@@ -14,14 +14,14 @@ import (
 )
 
 type TxPublisher struct {
-	backend BackendAPI
-	log     *slog.Logger
+	rpcClient RpcClient
+	log       *slog.Logger
 }
 
-func NewTxPublisher(backend BackendAPI, log *slog.Logger) *TxPublisher {
+func NewTxPublisher(rpcClient RpcClient, log *slog.Logger) *TxPublisher {
 	return &TxPublisher{
-		backend: backend,
-		log:     log,
+		rpcClient: rpcClient,
+		log:       log,
 	}
 }
 
@@ -33,7 +33,7 @@ func (w *TxPublisher) SendTx(ctx context.Context, tx *types.TransactionOrder, se
 		Transaction: tx,
 	}
 	w.log.InfoContext(ctx, fmt.Sprintf("Sending tx '%s' with hash: '%X'", tx.PayloadType(), tx.Hash(crypto.SHA256)), logger.UnitID(tx.UnitID()))
-	txBatch := txSub.ToBatch(w.backend, senderPubKey, w.log)
+	txBatch := txSub.ToBatch(w.rpcClient, senderPubKey, w.log)
 	err := txBatch.SendTx(ctx, true)
 	if err != nil {
 		return nil, err

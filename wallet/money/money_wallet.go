@@ -18,7 +18,7 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/dc"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
@@ -33,21 +33,21 @@ const (
 type (
 	Wallet struct {
 		am            account.Manager
-		backend       BackendAPI
+		rpcClient     RpcClient
 		feeManager    *fees.FeeManager
 		TxPublisher   *TxPublisher
 		dustCollector *dc.DustCollector
 		log           *slog.Logger
 	}
 
-	BackendAPI interface {
-		GetBalance(ctx context.Context, pubKey []byte, includeDCBills bool) (uint64, error)
-		ListBills(ctx context.Context, pubKey []byte, includeDCBills bool, offsetKey string, limit int) (*backend.ListBillsResponse, error)
-		GetBills(ctx context.Context, pubKey []byte) ([]*wallet.Bill, error)
-		GetRoundNumber(ctx context.Context) (*wallet.RoundNumber, error)
-		GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*wallet.Bill, error)
-		PostTransactions(ctx context.Context, pubKey wallet.PubKey, txs *wallet.Transactions) error
-		GetTxProof(ctx context.Context, unitID types.UnitID, txHash wallet.TxHash) (*wallet.Proof, error)
+	RpcClient interface {
+		GetRoundNumber(ctx context.Context) (uint64, error)
+		GetBill(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.Bill, error)
+		GetFeeCreditRecord(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error)
+		GetUnitsByOwnerID(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error)
+		SendTransaction(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
+		GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TransactionRecord, *types.TxProof, error)
+		GetBlock(ctx context.Context, roundNumber uint64) (*types.Block, error)
 	}
 
 	SendCmd struct {
@@ -63,6 +63,9 @@ type (
 
 	GetBalanceCmd struct {
 		AccountIndex uint64
+
+		// TODO deprecated: if transferDC is sent then the owner of bill becomes dust collector,
+		// wallet needs to locally keep track of unswapped bills
 		CountDCBills bool
 	}
 
@@ -87,14 +90,14 @@ func CreateNewWallet(am account.Manager, mnemonic string) error {
 	return createMoneyWallet(mnemonic, am)
 }
 
-func LoadExistingWallet(am account.Manager, unitLocker UnitLocker, feeManagerDB fees.FeeManagerDB, backend BackendAPI, log *slog.Logger) (*Wallet, error) {
+func LoadExistingWallet(am account.Manager, unitLocker UnitLocker, feeManagerDB fees.FeeManagerDB, rpcClient RpcClient, log *slog.Logger) (*Wallet, error) {
 	moneySystemID := money.DefaultSystemIdentifier
-	moneyTxPublisher := NewTxPublisher(backend, log)
-	feeManager := fees.NewFeeManager(am, feeManagerDB, moneySystemID, moneyTxPublisher, backend, FeeCreditRecordIDFormPublicKey, moneySystemID, moneyTxPublisher, backend, FeeCreditRecordIDFormPublicKey, log)
-	dustCollector := dc.NewDustCollector(moneySystemID, maxBillsForDustCollection, txTimeoutBlockCount, backend, unitLocker, log)
+	moneyTxPublisher := NewTxPublisher(rpcClient, log)
+	feeManager := fees.NewFeeManager(am, feeManagerDB, moneySystemID, rpcClient, FeeCreditRecordIDFormPublicKey, moneySystemID, rpcClient, FeeCreditRecordIDFormPublicKey, log)
+	dustCollector := dc.NewDustCollector(moneySystemID, maxBillsForDustCollection, txTimeoutBlockCount, rpcClient, unitLocker, log)
 	return &Wallet{
 		am:            am,
-		backend:       backend,
+		rpcClient:     rpcClient,
 		TxPublisher:   moneyTxPublisher,
 		feeManager:    feeManager,
 		dustCollector: dustCollector,
@@ -119,36 +122,48 @@ func (w *Wallet) Close() {
 	_ = w.dustCollector.Close()
 }
 
-// GetBalance returns sum value of all bills currently owned by the wallet, for given account.
-// The value returned is the smallest denomination of alphabills.
+// GetBalance returns the total value of all bills currently held in the wallet, for the given account,
+// in Tema denomination. Does not count fee credit bills.
 func (w *Wallet) GetBalance(ctx context.Context, cmd GetBalanceCmd) (uint64, error) {
-	pubKey, err := w.am.GetPublicKey(cmd.AccountIndex)
+	accountKey, err := w.am.GetAccountKey(cmd.AccountIndex)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to load account key: %w", err)
 	}
-	return w.backend.GetBalance(ctx, pubKey, cmd.CountDCBills)
+	ownerID := accountKey.PubKeyHash.Sha256
+	bills, err := api.FetchBills(ctx, w.rpcClient, ownerID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to fetch bills: %w", err)
+	}
+	var sum uint64
+	for _, bill := range bills {
+		sum += bill.Value()
+	}
+	return sum, nil
 }
 
-// GetBalances returns sum value of all bills currently owned by the wallet, for all accounts.
-// The value returned is the smallest denomination of alphabills.
+// GetBalances returns the total value of all bills currently held in the wallet, for all accounts,
+// in Tema denomination. Does not count fee credit bills.
 func (w *Wallet) GetBalances(ctx context.Context, cmd GetBalanceCmd) ([]uint64, uint64, error) {
-	pubKeys, err := w.am.GetPublicKeys()
-	totals := make([]uint64, len(pubKeys))
-	sum := uint64(0)
-	for accountIndex, pubKey := range pubKeys {
-		balance, err := w.backend.GetBalance(ctx, pubKey, cmd.CountDCBills)
+	accountKeys, err := w.am.GetAccountKeys()
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to load account keys: %w", err)
+	}
+	accountTotals := make([]uint64, len(accountKeys))
+	var total uint64
+	for accountIndex := range accountKeys {
+		balance, err := w.GetBalance(ctx, GetBalanceCmd{AccountIndex: uint64(accountIndex), CountDCBills: cmd.CountDCBills})
 		if err != nil {
 			return nil, 0, err
 		}
-		sum += balance
-		totals[accountIndex] = balance
+		total += balance
+		accountTotals[accountIndex] = balance
 	}
-	return totals, sum, err
+	return accountTotals, total, err
 }
 
-// GetRoundNumber returns the latest round number in node and backend.
-func (w *Wallet) GetRoundNumber(ctx context.Context) (*wallet.RoundNumber, error) {
-	return w.backend.GetRoundNumber(ctx)
+// GetRoundNumber returns the latest round number in node.
+func (w *Wallet) GetRoundNumber(ctx context.Context) (uint64, error) {
+	return w.rpcClient.GetRoundNumber(ctx)
 }
 
 // Send creates, signs and broadcasts transactions, in total for the given amount,
@@ -166,7 +181,7 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*wallet.Proof, error)
 		return nil, fmt.Errorf("failed to load public key: %w", err)
 	}
 
-	rnr, err := w.backend.GetRoundNumber(ctx)
+	roundNumber, err := w.rpcClient.GetRoundNumber(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -184,33 +199,33 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*wallet.Proof, error)
 		return nil, errors.New("no fee credit in money wallet")
 	}
 
-	bills, err := w.getUnlockedBills(ctx, pubKey)
+	bills, err := w.getUnlockedBills(ctx, hash.Sum256(pubKey))
 	if err != nil {
 		return nil, err
 	}
 	var balance uint64
 	for _, b := range bills {
-		balance += b.Value
+		balance += b.Value()
 	}
 	totalAmount := cmd.totalAmount()
 	if totalAmount > balance {
 		return nil, errors.New("insufficient balance for transaction")
 	}
-	timeout := rnr.RoundNumber + txTimeoutBlockCount
-	batch := txsubmitter.NewBatch(k.PubKey, w.backend, w.log)
+	timeout := roundNumber + txTimeoutBlockCount
+	batch := txsubmitter.NewBatch(k.PubKey, w.rpcClient, w.log)
 
 	var txs []*types.TransactionOrder
 	if len(cmd.Receivers) > 1 {
 		// if more than one receiver then perform transaction as N-way split and require sufficiently large bill
 		largestBill := bills[0]
-		if largestBill.Value < totalAmount {
+		if largestBill.Value() < totalAmount {
 			return nil, fmt.Errorf("sending to multiple addresses is performed using N-way split transaction which "+
 				"requires a single sufficiently large bill, wallet needs a bill with at least %s tema value, "+
 				"largest bill in wallet currently is %s tema",
 				util.AmountToString(totalAmount+1, 8), // +1 because 0 remaining value is not allowed
-				util.AmountToString(largestBill.Value, 8))
+				util.AmountToString(largestBill.Value(), 8))
 		}
-		if largestBill.Value == totalAmount {
+		if largestBill.Value() == totalAmount {
 			return nil, errors.New("sending to multiple addresses is performed using N-way split transaction " +
 				"which requires a single sufficiently large bill and cannot result in a bill with 0 value after the " +
 				"transaction")
@@ -223,15 +238,15 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*wallet.Proof, error)
 				OwnerCondition: templates.NewP2pkh256BytesFromKeyHash(hash.Sum256(r.PubKey)),
 			})
 		}
-		remainingValue := largestBill.Value - totalAmount
-		tx, err := tx_builder.NewSplitTx(targetUnits, remainingValue, k, w.SystemID(), largestBill, timeout, fcb.Id)
+		remainingValue := largestBill.Value() - totalAmount
+		tx, err := tx_builder.NewSplitTx(targetUnits, remainingValue, k, w.SystemID(), largestBill, timeout, fcb.ID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create N-way split tx: %w", err)
 		}
 		txs = append(txs, tx)
 	} else {
 		// if single receiver then perform up to N transfers (until target amount is reached)
-		txs, err = tx_builder.CreateTransactions(cmd.Receivers[0].PubKey, cmd.Receivers[0].Amount, w.SystemID(), bills, k, timeout, fcb.Id)
+		txs, err = tx_builder.CreateTransactions(cmd.Receivers[0].PubKey, cmd.Receivers[0].Amount, w.SystemID(), bills, k, timeout, fcb.ID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create transactions: %w", err)
 		}
@@ -246,7 +261,7 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*wallet.Proof, error)
 	}
 
 	txsCost := tx_builder.MaxFee * uint64(len(batch.Submissions()))
-	if fcb.Value < txsCost {
+	if fcb.Balance() < txsCost {
 		return nil, errors.New("insufficient fee credit balance for transaction(s)")
 	}
 
@@ -282,18 +297,18 @@ func (w *Wallet) ReclaimFeeCredit(ctx context.Context, cmd fees.ReclaimFeeCmd) (
 
 // GetFeeCredit returns fee credit bill for given account,
 // can return nil if fee credit bill has not been created yet.
-func (w *Wallet) GetFeeCredit(ctx context.Context, cmd fees.GetFeeCreditCmd) (*wallet.Bill, error) {
+func (w *Wallet) GetFeeCredit(ctx context.Context, cmd fees.GetFeeCreditCmd) (*api.FeeCreditBill, error) {
 	accountKey, err := w.am.GetAccountKey(cmd.AccountIndex)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load account key: %w", err)
 	}
 	return w.GetFeeCreditBill(ctx, money.NewFeeCreditRecordID(nil, accountKey.PubKeyHash.Sha256))
 }
 
-// GetFeeCreditBill returns fee credit bill for given unitID
-// can return nil if fee credit bill has not been created yet.
-func (w *Wallet) GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*wallet.Bill, error) {
-	return w.backend.GetFeeCreditBill(ctx, unitID)
+// GetFeeCreditBill returns fee credit bill for given unitID,
+// returns nil if fee credit bill has not been created yet.
+func (w *Wallet) GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*api.FeeCreditBill, error) {
+	return api.FetchFeeCreditBill(ctx, w.rpcClient, unitID)
 }
 
 // CollectDust starts the dust collector process for the requested accounts in the wallet.
@@ -331,15 +346,15 @@ func (w *Wallet) CollectDust(ctx context.Context, accountNumber uint64) ([]*Dust
 	return res, nil
 }
 
-func (w *Wallet) getUnlockedBills(ctx context.Context, pubKey []byte) ([]*wallet.Bill, error) {
-	var unlockedBills []*wallet.Bill
-	bills, err := w.backend.GetBills(ctx, pubKey)
+func (w *Wallet) getUnlockedBills(ctx context.Context, ownerID []byte) ([]*api.Bill, error) {
+	var unlockedBills []*api.Bill
+	bills, err := api.FetchBills(ctx, w.rpcClient, ownerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch bills: %w", err)
 	}
 	// sort bills by value largest first
 	sort.Slice(bills, func(i, j int) bool {
-		return bills[i].Value > bills[j].Value
+		return bills[i].Value() > bills[j].Value()
 	})
 	// filter locked bills
 	for _, b := range bills {

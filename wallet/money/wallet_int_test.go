@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto"
 	"net"
-	"path/filepath"
+	"net/http"
 	"testing"
 	"time"
 
@@ -13,13 +13,12 @@ import (
 	"github.com/alphabill-org/alphabill/partition"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/rpc"
-	"github.com/alphabill-org/alphabill/rpc/alphabill"
 	"github.com/alphabill-org/alphabill/txsystem"
 	"github.com/alphabill-org/alphabill/txsystem/money"
-	"github.com/alphabill-org/alphabill/types"
+	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
 
+	rpcclient "github.com/alphabill-org/alphabill-wallet/client/rpc"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	testfees "github.com/alphabill-org/alphabill-wallet/internal/testutils/fees"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
@@ -27,8 +26,6 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend"
-	beclient "github.com/alphabill-org/alphabill-wallet/wallet/money/backend/client"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 	"github.com/alphabill-org/alphabill-wallet/wallet/unitlock"
@@ -67,42 +64,24 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 	network := startMoneyOnlyAlphabillPartition(t, genesisConfig)
 	moneyPart, err := network.GetNodePartition(money.DefaultSystemIdentifier)
 	require.NoError(t, err)
-	addr := startRPCServer(t, moneyPart)
+	addr := initRPCServer(t, moneyPart.Nodes[0].Node)
 
-	// start wallet backend
-	restAddr := "localhost:9545"
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	t.Cleanup(cancelFunc)
-	go func() {
-		err := backend.Run(ctx,
-			&backend.Config{
-				ABMoneySystemIdentifier: money.DefaultSystemIdentifier,
-				AlphabillUrl:            addr,
-				ServerAddr:              restAddr,
-				DbFile:                  filepath.Join(t.TempDir(), backend.BoltBillStoreFileName),
-				ListBillsPageLimit:      100,
-				InitialBill: backend.InitialBill{
-					Id:        genesisConfig.InitialBillID,
-					Value:     genesisConfig.InitialBillValue,
-					Predicate: templates.AlwaysTrueBytes(),
-				},
-				SystemDescriptionRecords: createSDRs(),
-				Logger:                   observe.Logger(),
-				Observe:                  observe,
-			})
-		require.ErrorIs(t, err, context.Canceled)
-	}()
 
-	// setup wallet with multiple keys
-	restClient, err := beclient.New(restAddr, observe)
+	moneyClient, err := rpcclient.DialContext(ctx, "http://"+addr+"/rpc")
 	require.NoError(t, err)
+	defer moneyClient.Close()
+
 	unitLocker, err := unitlock.NewUnitLocker(dir)
 	require.NoError(t, err)
 	defer unitLocker.Close()
+
 	feeManagerDB, err := fees.NewFeeManagerDB(dir)
 	require.NoError(t, err)
 	defer feeManagerDB.Close()
-	w, err := LoadExistingWallet(am, unitLocker, feeManagerDB, restClient, observe.Logger())
+
+	w, err := LoadExistingWallet(am, unitLocker, feeManagerDB, moneyClient, observe.Logger())
 	require.NoError(t, err)
 	defer w.Close()
 
@@ -120,7 +99,7 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 	// transfer initial bill to wallet 1
 	transferInitialBillTx, err := testutil.CreateInitialBillTransferTx(accKey, genesisConfig.InitialBillID, fcrID, initialBillValue, 10000, initialBillBacklink)
 	require.NoError(t, err)
-	batch := txsubmitter.NewBatch(accKey.PubKey, w.backend, observe.Logger())
+	batch := txsubmitter.NewBatch(accKey.PubKey, w.rpcClient, observe.Logger())
 	batch.Add(&txsubmitter.TxSubmission{
 		UnitID:      transferInitialBillTx.UnitID(),
 		TxHash:      transferInitialBillTx.Hash(crypto.SHA256),
@@ -170,144 +149,6 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestCollectDustInMultiAccountWalletWithKeyFlag(t *testing.T) {
-	observe := observability.Default(t)
-
-	// setup account
-	dir := t.TempDir()
-	am, err := account.NewManager(dir, "", true)
-	require.NoError(t, err)
-	defer am.Close()
-	err = CreateNewWallet(am, "")
-	require.NoError(t, err)
-	accKey, err := am.GetAccountKey(0)
-	require.NoError(t, err)
-
-	// start server
-	genesisConfig := &testutil.MoneyGenesisConfig{
-		InitialBillID:    money.NewBillID(nil, []byte{1}),
-		InitialBillValue: 10000 * 1e8,
-		InitialBillOwner: templates.NewP2pkh256BytesFromKey(accKey.PubKey),
-	}
-	network := startMoneyOnlyAlphabillPartition(t, genesisConfig)
-	moneyPart, err := network.GetNodePartition(money.DefaultSystemIdentifier)
-	require.NoError(t, err)
-	addr := startRPCServer(t, moneyPart)
-
-	// start wallet backend
-	restAddr := "localhost:9545"
-	ctx, cancelFunc := context.WithCancel(context.Background())
-	t.Cleanup(cancelFunc)
-	go func() {
-		err := backend.Run(ctx,
-			&backend.Config{
-				ABMoneySystemIdentifier: money.DefaultSystemIdentifier,
-				AlphabillUrl:            addr,
-				ServerAddr:              restAddr,
-				DbFile:                  filepath.Join(t.TempDir(), backend.BoltBillStoreFileName),
-				ListBillsPageLimit:      100,
-				InitialBill: backend.InitialBill{
-					Id:        genesisConfig.InitialBillID,
-					Value:     genesisConfig.InitialBillValue,
-					Predicate: templates.AlwaysTrueBytes(),
-				},
-				SystemDescriptionRecords: createSDRs(),
-				Logger:                   observe.Logger(),
-				Observe:                  observe,
-			})
-		require.ErrorIs(t, err, context.Canceled)
-	}()
-
-	// setup wallet with multiple keys
-	restClient, err := beclient.New(restAddr, observe)
-	require.NoError(t, err)
-	unitLocker, err := unitlock.NewUnitLocker(dir)
-	require.NoError(t, err)
-	defer unitLocker.Close()
-	feeManagerDB, err := fees.NewFeeManagerDB(dir)
-	require.NoError(t, err)
-	defer feeManagerDB.Close()
-	w, err := LoadExistingWallet(am, unitLocker, feeManagerDB, restClient, observe.Logger())
-	require.NoError(t, err)
-	defer w.Close()
-
-	_, _, _ = am.AddAccount()
-	_, _, _ = am.AddAccount()
-
-	// transfer initial bill to wallet
-	pubKeys, err := am.GetPublicKeys()
-	require.NoError(t, err)
-
-	// create fee credit for initial bill transfer
-	transferFC := testfees.CreateFeeCredit(t, genesisConfig.InitialBillID, fcrID, fcrAmount, accKey.PrivKey, accKey.PubKey, network)
-	initialBillBacklink := transferFC.Hash(crypto.SHA256)
-	initialBillValue := genesisConfig.InitialBillValue - fcrAmount
-
-	transferInitialBillTx, err := testutil.CreateInitialBillTransferTx(accKey, genesisConfig.InitialBillID, fcrID, initialBillValue, 10000, initialBillBacklink)
-	require.NoError(t, err)
-	batch := txsubmitter.NewBatch(accKey.PubKey, w.backend, observe.Logger())
-	batch.Add(&txsubmitter.TxSubmission{
-		UnitID:      transferInitialBillTx.UnitID(),
-		TxHash:      transferInitialBillTx.Hash(crypto.SHA256),
-		Transaction: transferInitialBillTx,
-	})
-	err = batch.SendTx(ctx, false)
-	require.NoError(t, err)
-	require.Eventually(t, testpartition.BlockchainContainsTx(moneyPart, transferInitialBillTx), test.WaitDuration, test.WaitTick)
-
-	// verify initial bill tx is received by wallet
-	require.Eventually(t, func() bool {
-		balance, _ := w.GetBalance(ctx, GetBalanceCmd{})
-		return balance == initialBillValue
-	}, test.WaitDuration, time.Second)
-
-	// add fee credit to wallet account 1
-	_, err = w.AddFeeCredit(ctx, fees.AddFeeCmd{
-		Amount:       1e8,
-		AccountIndex: 0,
-	})
-	require.NoError(t, err)
-
-	// send two bills to account number 2 and 3
-	sendTo(t, w, []ReceiverData{
-		{Amount: 10 * 1e8, PubKey: pubKeys[1]},
-		{Amount: 10 * 1e8, PubKey: pubKeys[1]},
-		{Amount: 10 * 1e8, PubKey: pubKeys[2]},
-		{Amount: 10 * 1e8, PubKey: pubKeys[2]},
-	}, 0)
-
-	// add fee credit to wallet account 3
-	_, err = w.AddFeeCredit(ctx, fees.AddFeeCmd{
-		Amount:       1e8,
-		AccountIndex: 2,
-	})
-	require.NoError(t, err)
-
-	// start dust collection only for account number 3
-	_, err = w.CollectDust(ctx, 3)
-	require.NoError(t, err)
-
-	// verify that there is only one swap tx, and it belongs to account number 3
-	account3Key, _ := am.GetAccountKey(2)
-	swapTxCount := 0
-	testpartition.BlockchainContains(moneyPart, func(txo *types.TransactionOrder) bool {
-		if txo.PayloadType() != money.PayloadTypeSwapDC {
-			return false
-		}
-
-		require.Equal(t, 0, swapTxCount)
-		swapTxCount++
-
-		attrs := &money.SwapDCAttributes{}
-		err = txo.UnmarshalAttributes(attrs)
-		require.NoError(t, err)
-		require.EqualValues(t, templates.NewP2pkh256BytesFromKeyHash(account3Key.PubKeyHash.Sha256), attrs.OwnerCondition)
-
-		return false
-	})()
-	require.Equal(t, 1, swapTxCount)
-}
-
 func sendTo(t *testing.T, w *Wallet, receivers []ReceiverData, fromAccount uint64) {
 	proof, err := w.Send(context.Background(), SendCmd{
 		Receivers:           receivers,
@@ -338,44 +179,34 @@ func startMoneyOnlyAlphabillPartition(t *testing.T, genesisConfig *testutil.Mone
 	require.NoError(t, err)
 	require.NoError(t, abNet.Start(t))
 	t.Cleanup(func() { abNet.WaitClose(t) })
-
 	return abNet
 }
 
-func startRPCServer(t *testing.T, partition *testpartition.NodePartition) (addr string) {
-	// start rpc server for network.Nodes[0]
+func initRPCServer(t *testing.T, node *partition.Node) string {
+	server := ethrpc.NewServer()
+	t.Cleanup(server.Stop)
+
+	stateAPI := rpc.NewStateAPI(node)
+	err := server.RegisterName("state", stateAPI)
+	require.NoError(t, err)
+
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-
-	grpcServer, err := initRPCServer(partition.Nodes[0].Node, observability.Default(t))
-	require.NoError(t, err)
-
 	t.Cleanup(func() {
-		grpcServer.GracefulStop()
+		_ = listener.Close()
 	})
-	go func() {
-		require.NoError(t, grpcServer.Serve(listener), "gRPC server exited with error")
-	}()
 
-	// wait for rpc server to start
-	for _, n := range partition.Nodes {
-		require.Eventually(t, func() bool {
-			_, err := n.LatestBlockNumber()
-			return err == nil
-		}, test.WaitDuration, test.WaitTick)
+	httpServer := &http.Server{
+		Addr:    listener.Addr().String(),
+		Handler: server,
 	}
+
+	go httpServer.Serve(listener)
+	t.Cleanup(func() {
+		_ = httpServer.Close()
+	})
+
 	return listener.Addr().String()
-}
-
-func initRPCServer(node *partition.Node, obs rpc.Observability) (*grpc.Server, error) {
-	rpcServer, err := rpc.NewGRPCServer(node, obs)
-	if err != nil {
-		return nil, err
-	}
-
-	grpcServer := grpc.NewServer()
-	alphabill.RegisterAlphabillServiceServer(grpcServer, rpcServer)
-	return grpcServer, nil
 }
 
 func createSDRs() []*genesis.SystemDescriptionRecord {

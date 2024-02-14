@@ -27,6 +27,7 @@ type (
 	}
 
 	LockedUnit struct {
+		_            struct{}       `cbor:",toarray"`
 		AccountID    []byte         `json:"accountId"`    // account id of the unit e.g. a public key
 		UnitID       []byte         `json:"unitId"`       // id of the locked unit
 		TxHash       []byte         `json:"txHash"`       // state hash of the locked unit
@@ -36,6 +37,7 @@ type (
 	}
 
 	Transaction struct {
+		_       struct{}                `cbor:",toarray"`
 		TxOrder *types.TransactionOrder `json:"txOrder"`
 		TxHash  []byte                  `json:"txHash"`
 	}

@@ -1,16 +1,18 @@
 package testutils
 
 import (
+	"context"
 	"crypto"
 	"log/slog"
 	"net"
+	"net/http"
 	"testing"
 
 	abcrypto "github.com/alphabill-org/alphabill/crypto"
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/partition"
 	"github.com/alphabill-org/alphabill/predicates/templates"
-	"github.com/alphabill-org/alphabill/rpc"
+	abrpc "github.com/alphabill-org/alphabill/rpc"
 	"github.com/alphabill-org/alphabill/rpc/alphabill"
 	"github.com/alphabill-org/alphabill/state"
 	"github.com/alphabill-org/alphabill/txsystem"
@@ -22,6 +24,7 @@ import (
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
 
+	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	testblock "github.com/alphabill-org/alphabill-wallet/internal/testutils/block"
 	testlogger "github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
@@ -66,9 +69,9 @@ func StartAlphabill(t *testing.T, partitions []*testpartition.NodePartition) *te
 	return abNetwork
 }
 
-func StartPartitionRPCServers(t *testing.T, partition *testpartition.NodePartition) {
+func StartPartitionGRPCServers(t *testing.T, partition *testpartition.NodePartition) {
 	for _, n := range partition.Nodes {
-		n.AddrGRPC = startRPCServer(t, n.Node, testlogger.NOP())
+		n.AddrGRPC = startGRPCServer(t, n.Node, testlogger.NOP())
 	}
 	// wait for partition servers to start
 	for _, n := range partition.Nodes {
@@ -79,11 +82,11 @@ func StartPartitionRPCServers(t *testing.T, partition *testpartition.NodePartiti
 	}
 }
 
-func startRPCServer(t *testing.T, node *partition.Node, log *slog.Logger) string {
+func startGRPCServer(t *testing.T, node *partition.Node, log *slog.Logger) string {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 
-	grpcServer, err := initRPCServer(node, &grpcServerConfiguration{
+	grpcServer, err := initGRPCServer(node, &grpcServerConfiguration{
 		address:               listener.Addr().String(),
 		maxGetBlocksBatchSize: defaultMaxGetBlocksBatchSize,
 		maxRecvMsgSize:        defaultMaxRecvMsgSize,
@@ -102,17 +105,17 @@ func startRPCServer(t *testing.T, node *partition.Node, log *slog.Logger) string
 	return listener.Addr().String()
 }
 
-func initRPCServer(node *partition.Node, cfg *grpcServerConfiguration, obs partition.Observability, log *slog.Logger) (*grpc.Server, error) {
+func initGRPCServer(node *partition.Node, cfg *grpcServerConfiguration, obs partition.Observability, log *slog.Logger) (*grpc.Server, error) {
 	grpcServer := grpc.NewServer(
 		grpc.MaxSendMsgSize(cfg.maxSendMsgSize),
 		grpc.MaxRecvMsgSize(cfg.maxRecvMsgSize),
 		grpc.KeepaliveParams(cfg.grpcKeepAliveServerParameters()),
-		grpc.UnaryInterceptor(rpc.InstrumentMetricsUnaryServerInterceptor(obs.Meter(rpc.MetricsScopeGRPCAPI), log)),
+		grpc.UnaryInterceptor(abrpc.InstrumentMetricsUnaryServerInterceptor(obs.Meter(abrpc.MetricsScopeGRPCAPI), log)),
 		grpc.StatsHandler(otelgrpc.NewServerHandler(otelgrpc.WithTracerProvider(obs.TracerProvider()))),
 	)
 	grpc_health_v1.RegisterHealthServer(grpcServer, health.NewServer())
 
-	rpcServer, err := rpc.NewGRPCServer(node, obs, rpc.WithMaxGetBlocksBatchSize(cfg.maxGetBlocksBatchSize))
+	rpcServer, err := abrpc.NewGRPCServer(node, obs, abrpc.WithMaxGetBlocksBatchSize(cfg.maxGetBlocksBatchSize))
 	if err != nil {
 		return nil, err
 	}
@@ -137,4 +140,78 @@ func CreateTokensPartition(t *testing.T) *testpartition.NodePartition {
 	)
 	require.NoError(t, err)
 	return network
+}
+
+func StartRpcServers(t *testing.T, partition *testpartition.NodePartition) {
+	for _, n := range partition.Nodes {
+		n.AddrRPC = StartRpcServer(t, n.Node)
+	}
+	// wait for rpc servers to start
+	for _, n := range partition.Nodes {
+		require.Eventually(t, func() bool {
+			rpcClient, err := rpc.DialContext(context.Background(), "http://"+n.AddrRPC+"/rpc")
+			if err != nil {
+				return false
+			}
+			defer rpcClient.Close()
+			roundNumber, _ := rpcClient.GetRoundNumber(context.Background())
+			return roundNumber > 0
+		}, test.WaitDuration, test.WaitTick)
+	}
+}
+
+func StartRpcServer(t *testing.T, node *partition.Node) string {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = listener.Close()
+	})
+
+	rpcServer, err := InitRpcServer(node, &abrpc.ServerConfiguration{
+		Address: listener.Addr().String(),
+		// defaults from ab repo
+		MaxHeaderBytes:         http.DefaultMaxHeaderBytes,
+		MaxBodyBytes:           4194304, // 4MB,
+		BatchItemLimit:         1000,
+		BatchResponseSizeLimit: 4194304, // 4MB
+	}, testobserve.Default(t))
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		_ = rpcServer.Close()
+	})
+
+	go func() {
+		err := rpcServer.Serve(listener)
+		require.ErrorIs(t, err, http.ErrServerClosed, "rpc server exited with error")
+	}()
+
+	return listener.Addr().String()
+}
+
+func InitRpcServer(node *partition.Node, cfg *abrpc.ServerConfiguration, obs partition.Observability) (*http.Server, error) {
+	cfg.APIs = []abrpc.API{{
+		Namespace: "state",
+		Service:   abrpc.NewStateAPI(node),
+	}}
+	httpServer, err := abrpc.NewHTTPServer(cfg, obs)
+	if err != nil {
+		return nil, err
+	}
+	return httpServer, nil
+}
+
+// SetupNetwork starts alphabill network.
+// Starts money partition, and optionally any other partitions, with rpc servers up and running.
+// Returns money node url and reference to the network object.
+func SetupNetwork(t *testing.T, genesisConfig *testutil.MoneyGenesisConfig, otherPartitions []*testpartition.NodePartition) (string, *testpartition.AlphabillNetwork) {
+	moneyPartition := CreateMoneyPartition(t, genesisConfig, 1)
+	nodePartitions := []*testpartition.NodePartition{moneyPartition}
+	nodePartitions = append(nodePartitions, otherPartitions...)
+	abNet := StartAlphabill(t, nodePartitions)
+
+	for _, nodePartition := range nodePartitions {
+		StartRpcServers(t, nodePartition)
+	}
+	return moneyPartition.Nodes[0].AddrRPC, abNet
 }

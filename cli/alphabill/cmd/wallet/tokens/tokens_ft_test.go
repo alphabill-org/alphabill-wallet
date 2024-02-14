@@ -16,6 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
+	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
 	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
@@ -23,7 +25,6 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	moneywallet "github.com/alphabill-org/alphabill-wallet/wallet/money"
-	moneyclient "github.com/alphabill-org/alphabill-wallet/wallet/money/backend/client"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 	tokenswallet "github.com/alphabill-org/alphabill-wallet/wallet/tokens"
 	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/client"
@@ -181,16 +182,23 @@ func TestFungibleTokens_Sending_Integration(t *testing.T) {
 	}, "amount='2'")
 
 	// send money to w2 to create fee credits
-	wallet := loadMoneyWallet(t, network.walletHomeDir, network.moneyBackendClient)
+	wallet := loadMoneyWallet(t, network.walletHomeDir, network.moneyRpcClient)
 	_, err = wallet.Send(context.Background(), moneywallet.SendCmd{Receivers: []moneywallet.ReceiverData{{PubKey: w2key.PubKey, Amount: 100 * 1e8}}, WaitForConfirmation: true})
 	require.NoError(t, err)
 	wallet.Close()
 
 	// add fee credit w2
-	tokensWallet := loadTokensWallet(t, filepath.Join(homedirW2, "wallet"), network.moneyBackendClient, network.tokenBackendClient)
+	tokensWallet := loadTokensWallet(t, filepath.Join(homedirW2, "wallet"), network.moneyRpcClient, network.tokensRpcClient, network.tokenBackendClient)
 	_, err = tokensWallet.AddFeeCredit(context.Background(), fees.AddFeeCmd{Amount: 50 * 1e8, DisableLocking: true})
 	require.NoError(t, err)
 	tokensWallet.Shutdown()
+
+	// wait for fees on token backend
+	require.Eventually(t, func() bool {
+		fcb, err := network.tokenBackendClient.GetFeeCreditBill(context.Background(), tokens.NewFeeCreditRecordID(nil, w2key.PubKeyHash.Sha256))
+		require.NoError(t, err)
+		return fcb.GetValue() > 0
+	}, test.WaitDuration, test.WaitTick, "failed to register tokens fee credit on backend")
 
 	// transfer back w2->w1 (AB-513)
 	execTokensCmd(t, homedirW2, fmt.Sprintf("send fungible -r %s --type %s --amount 6 --address 0x%X -k 1", backendUrl, typeID1, w1key.PubKey))
@@ -358,12 +366,13 @@ func extractID(input string) string {
 }
 
 type AlphabillNetwork struct {
-	abNetwork          *testpartition.AlphabillNetwork
-	moneyBackendClient *moneyclient.MoneyBackendClient
-	moneyBackendURL    string
+	abNetwork *testpartition.AlphabillNetwork
 
 	tokenBackendClient *client.TokenBackend
 	tokenBackendURL    string
+
+	moneyRpcClient  *rpc.Client
+	tokensRpcClient *rpc.Client
 
 	homeDir       string
 	walletHomeDir string
@@ -403,11 +412,16 @@ func NewAlphabillNetwork(t *testing.T) *AlphabillNetwork {
 	moneyPartition := testutils.CreateMoneyPartition(t, genesisConfig, 1)
 	tokensPartition := testutils.CreateTokensPartition(t)
 	abNet := testutils.StartAlphabill(t, []*testpartition.NodePartition{moneyPartition, tokensPartition})
-	testutils.StartPartitionRPCServers(t, moneyPartition)
-	testutils.StartPartitionRPCServers(t, tokensPartition)
-
-	moneyBackendURL, moneyBackendClient := testutils.StartMoneyBackend(t, moneyPartition, genesisConfig)
+	testutils.StartPartitionGRPCServers(t, tokensPartition)
 	tokenBackendURL, tokenBackendClient := testutils.StartTokensBackend(t, tokensPartition.Nodes[0].AddrGRPC)
+
+	testutils.StartRpcServers(t, moneyPartition)
+	moneyRpcClient, err := rpc.DialContext(ctx, args.BuildRpcUrl(moneyPartition.Nodes[0].AddrRPC))
+	require.NoError(t, err)
+
+	testutils.StartRpcServers(t, tokensPartition)
+	tokensRpcClient, err := rpc.DialContext(ctx, args.BuildRpcUrl(tokensPartition.Nodes[0].AddrRPC))
+	require.NoError(t, err)
 
 	unitLocker, err := unitlock.NewUnitLocker(walletDir)
 	require.NoError(t, err)
@@ -417,12 +431,11 @@ func NewAlphabillNetwork(t *testing.T) *AlphabillNetwork {
 	require.NoError(t, err)
 	defer feeManagerDB.Close()
 
-	moneyWallet, err := moneywallet.LoadExistingWallet(am, unitLocker, feeManagerDB, moneyBackendClient, log)
+	moneyWallet, err := moneywallet.LoadExistingWallet(am, unitLocker, feeManagerDB, moneyRpcClient, log)
 	require.NoError(t, err)
 	defer moneyWallet.Close()
 
-	tokenTxPublisher := tokenswallet.NewTxPublisher(tokenBackendClient, log)
-	tokenFeeManager := fees.NewFeeManager(am, feeManagerDB, money.DefaultSystemIdentifier, moneyWallet, moneyBackendClient, moneywallet.FeeCreditRecordIDFormPublicKey, tokens.DefaultSystemIdentifier, tokenTxPublisher, tokenBackendClient, tokenswallet.FeeCreditRecordIDFromPublicKey, log)
+	tokenFeeManager := fees.NewFeeManager(am, feeManagerDB, money.DefaultSystemIdentifier, moneyRpcClient, moneywallet.FeeCreditRecordIDFormPublicKey, tokens.DefaultSystemIdentifier, tokensRpcClient, tokenswallet.FeeCreditRecordIDFromPublicKey, log)
 	defer tokenFeeManager.Close()
 
 	backendURL, err := url.Parse(tokenBackendURL)
@@ -442,12 +455,19 @@ func NewAlphabillNetwork(t *testing.T) *AlphabillNetwork {
 	_, err = tokensWallet.AddFeeCredit(ctx, fees.AddFeeCmd{Amount: 1000})
 	require.NoError(t, err)
 
+	// wait for fees on token backend
+	require.Eventually(t, func() bool {
+		fcb, err := tokenBackendClient.GetFeeCreditBill(ctx, tokens.NewFeeCreditRecordID(nil, w1key.PubKeyHash.Sha256))
+		require.NoError(t, err)
+		return fcb.GetValue() > 0
+	}, test.WaitDuration, test.WaitTick, "failed to register tokens fee credit on backend")
+
 	return &AlphabillNetwork{
 		abNetwork:          abNet,
-		moneyBackendClient: moneyBackendClient,
-		moneyBackendURL:    moneyBackendURL,
 		tokenBackendClient: tokenBackendClient,
 		tokenBackendURL:    tokenBackendURL,
+		moneyRpcClient:     moneyRpcClient,
+		tokensRpcClient:    tokensRpcClient,
 		homeDir:            homedirW1,
 		walletHomeDir:      walletDir,
 		walletKey1:         w1key,
@@ -456,7 +476,7 @@ func NewAlphabillNetwork(t *testing.T) *AlphabillNetwork {
 	}
 }
 
-func loadMoneyWallet(t *testing.T, walletDir string, moneyBackendClient *moneyclient.MoneyBackendClient) *moneywallet.Wallet {
+func loadMoneyWallet(t *testing.T, walletDir string, moneyRpcClient *rpc.Client) *moneywallet.Wallet {
 	am, err := account.NewManager(walletDir, "", false)
 	require.NoError(t, err)
 	t.Cleanup(am.Close)
@@ -469,32 +489,23 @@ func loadMoneyWallet(t *testing.T, walletDir string, moneyBackendClient *moneycl
 	require.NoError(t, err)
 	t.Cleanup(func() { feeManagerDB.Close() })
 
-	moneyWallet, err := moneywallet.LoadExistingWallet(am, unitLocker, feeManagerDB, moneyBackendClient, testobserve.Default(t).Logger())
+	moneyWallet, err := moneywallet.LoadExistingWallet(am, unitLocker, feeManagerDB, moneyRpcClient, testobserve.Default(t).Logger())
 	require.NoError(t, err)
 	t.Cleanup(moneyWallet.Close)
 
 	return moneyWallet
 }
 
-func loadTokensWallet(t *testing.T, walletDir string, moneyBackendClient *moneyclient.MoneyBackendClient, tokensBackendClient *client.TokenBackend) *tokenswallet.Wallet {
+func loadTokensWallet(t *testing.T, walletDir string, moneyRpcClient *rpc.Client, tokensRpcClient *rpc.Client, tokensBackendClient *client.TokenBackend) *tokenswallet.Wallet {
 	am, err := account.NewManager(walletDir, "", false)
 	require.NoError(t, err)
 	t.Cleanup(am.Close)
-
-	unitLocker, err := unitlock.NewUnitLocker(walletDir)
-	require.NoError(t, err)
-	t.Cleanup(func() { unitLocker.Close() })
 
 	feeManagerDB, err := fees.NewFeeManagerDB(walletDir)
 	require.NoError(t, err)
 	t.Cleanup(func() { feeManagerDB.Close() })
 
-	moneyWallet, err := moneywallet.LoadExistingWallet(am, unitLocker, feeManagerDB, moneyBackendClient, testobserve.Default(t).Logger())
-	require.NoError(t, err)
-	t.Cleanup(moneyWallet.Close)
-
-	tokenTxPublisher := tokenswallet.NewTxPublisher(tokensBackendClient, testobserve.Default(t).Logger())
-	tokenFeeManager := fees.NewFeeManager(am, feeManagerDB, money.DefaultSystemIdentifier, moneyWallet, moneyBackendClient, moneywallet.FeeCreditRecordIDFormPublicKey, tokens.DefaultSystemIdentifier, tokenTxPublisher, tokensBackendClient, tokenswallet.FeeCreditRecordIDFromPublicKey, testobserve.Default(t).Logger())
+	tokenFeeManager := fees.NewFeeManager(am, feeManagerDB, money.DefaultSystemIdentifier, moneyRpcClient, moneywallet.FeeCreditRecordIDFormPublicKey, tokens.DefaultSystemIdentifier, tokensRpcClient, tokenswallet.FeeCreditRecordIDFromPublicKey, testobserve.Default(t).Logger())
 	t.Cleanup(tokenFeeManager.Close)
 
 	tokensWallet, err := tokenswallet.New(tokens.DefaultSystemIdentifier, tokensBackendClient, am, true, tokenFeeManager, testobserve.Default(t).Logger())

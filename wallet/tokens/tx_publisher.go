@@ -6,22 +6,21 @@ import (
 	"log/slog"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet"
-	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/client"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 	"github.com/alphabill-org/alphabill/types"
 )
 
 type (
 	TxPublisher struct {
-		backend *client.TokenBackend
-		log     *slog.Logger
+		rpcClient txsubmitter.RpcClient
+		log       *slog.Logger
 	}
 )
 
-func NewTxPublisher(backendClient *client.TokenBackend, log *slog.Logger) *TxPublisher {
+func NewTxPublisher(rpcClient txsubmitter.RpcClient, log *slog.Logger) *TxPublisher {
 	return &TxPublisher{
-		backend: backendClient,
-		log:     log,
+		rpcClient: rpcClient,
+		log:       log,
 	}
 }
 
@@ -32,9 +31,8 @@ func (w *TxPublisher) SendTx(ctx context.Context, tx *types.TransactionOrder, se
 		Transaction: tx,
 		TxHash:      tx.Hash(crypto.SHA256),
 	}
-	txBatch := txSub.ToBatch(w.backend, senderPubKey, w.log)
-	err := txBatch.SendTx(ctx, true)
-	if err != nil {
+	txBatch := txSub.ToBatch(w.rpcClient, senderPubKey, w.log)
+	if err := txBatch.SendTx(ctx, true); err != nil {
 		return nil, err
 	}
 	return txBatch.Submissions()[0].Proof, nil
