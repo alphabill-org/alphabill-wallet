@@ -9,6 +9,7 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	twb "github.com/alphabill-org/alphabill-wallet/wallet/tokens/backend"
+	"github.com/alphabill-org/alphabill/predicates"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/alphabill-org/alphabill/types"
@@ -29,7 +30,7 @@ const (
 type (
 	PredicateInput struct {
 		// first priority
-		Argument types.PredicateBytes
+		Argument predicates.PredicateBytes
 		// if Argument empty, check AccountNumber
 		AccountNumber uint64
 	}

@@ -50,7 +50,7 @@ func (s *Summary) Summary() []byte {
 	return s.summary
 }
 
-func (m *CounterTxSystem) State() *state.State {
+func (m *CounterTxSystem) State() txsystem.StateReader {
 	return state.NewEmptyState().Clone()
 }
 

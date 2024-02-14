@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
+	"github.com/alphabill-org/alphabill/predicates"
 	"github.com/alphabill-org/alphabill/state"
 	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/stretchr/testify/require"
@@ -20,7 +21,7 @@ import (
 type MoneyGenesisConfig struct {
 	InitialBillID      types.UnitID
 	InitialBillValue   uint64
-	InitialBillOwner   types.PredicateBytes
+	InitialBillOwner   predicates.PredicateBytes
 	DCMoneySupplyValue uint64
 	SDRs               []*genesis.SystemDescriptionRecord
 }
