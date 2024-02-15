@@ -358,6 +358,35 @@ func TestReclaimFeeCredit_WalletContainsLockedBillForDustCollection(t *testing.T
 	require.Equal(t, []byte{1}, attr.TargetUnitID)
 }
 
+func TestReclaimFeeCredit_TokensPartitionOK(t *testing.T) {
+	// create fee manager
+	am := newAccountManager(t)
+	txPublisher := &mockMoneyTxPublisher{}
+	backendClient := &mockMoneyClient{
+		bills: []*wallet.Bill{{
+			Id:     []byte{1},
+			Value:  100000000,
+			TxHash: []byte{2},
+		}},
+		fcb: &wallet.Bill{Id: []byte{2}, Value: 1e8, TxHash: []byte{3}},
+	}
+	db := createFeeManagerDB(t)
+	feeManager := NewFeeManager(am, db, moneySystemID, txPublisher, backendClient, testFeeCreditRecordIDFromPublicKey, tokensSystemID, txPublisher, backendClient, testFeeCreditRecordIDFromPublicKey, logger.New(t))
+
+	// reclaim fee credit
+	res, err := feeManager.ReclaimFeeCredit(context.Background(), ReclaimFeeCmd{})
+	require.NoError(t, err)
+	require.NotNil(t, res)
+	require.NotNil(t, res.Proofs)
+	require.NotNil(t, res.Proofs.Lock)
+	require.NotNil(t, res.Proofs.CloseFC)
+	require.NotNil(t, res.Proofs.ReclaimFC)
+
+	// verify lock transaction was sent with correct system id
+	systemID := res.Proofs.Lock.TxRecord.TransactionOrder.SystemID()
+	require.Equal(t, moneySystemID, systemID)
+}
+
 func TestAddAndReclaimWithInsufficientCredit(t *testing.T) {
 	// create fee manager
 	am := newAccountManager(t)
