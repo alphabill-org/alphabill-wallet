@@ -1,13 +1,13 @@
 package unitlock
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/fxamacker/cbor/v2"
 	bolt "go.etcd.io/bbolt"
 
 	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
@@ -50,7 +50,7 @@ func (s *BoltStore) GetUnit(accountID, unitID []byte) (*LockedUnit, error) {
 		if unitBytes == nil {
 			return nil
 		}
-		if err := json.Unmarshal(unitBytes, &unit); err != nil {
+		if err := cbor.Unmarshal(unitBytes, &unit); err != nil {
 			return fmt.Errorf("failed to deserialize unit data: %w", err)
 		}
 		return nil
@@ -73,7 +73,7 @@ func (s *BoltStore) GetUnits(accountID []byte) ([]*LockedUnit, error) {
 		}
 		return unitsBucket.ForEach(func(k, v []byte) error {
 			var unit *LockedUnit
-			if err := json.Unmarshal(v, &unit); err != nil {
+			if err := cbor.Unmarshal(v, &unit); err != nil {
 				return fmt.Errorf("failed to deserialize unit data: %w", err)
 			}
 			units = append(units, unit)
@@ -99,9 +99,9 @@ func (s *BoltStore) PutUnit(unit *LockedUnit) error {
 		if err != nil {
 			return fmt.Errorf("failed to load units bucket for account %x: %w", unit.AccountID, err)
 		}
-		unitBytes, err := json.Marshal(unit)
+		unitBytes, err := cbor.Marshal(unit)
 		if err != nil {
-			return fmt.Errorf("failed to serialize unit to json: %w", err)
+			return fmt.Errorf("failed to serialize unit: %w", err)
 		}
 		return unitsBucket.Put(unit.UnitID, unitBytes)
 	})

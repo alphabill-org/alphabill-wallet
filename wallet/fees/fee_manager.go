@@ -8,14 +8,15 @@ import (
 	"fmt"
 	"log/slog"
 	"sort"
-	"time"
 
 	"github.com/alphabill-org/alphabill/txsystem/fc/transactions"
 	"github.com/alphabill-org/alphabill/types"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	txbuilder "github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
+	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 	"github.com/alphabill-org/alphabill-wallet/wallet/unitlock"
 )
 
@@ -32,20 +33,13 @@ var (
 )
 
 type (
-	TxPublisher interface {
-		SendTx(ctx context.Context, tx *types.TransactionOrder, senderPubKey []byte) (*wallet.Proof, error)
-		Close()
-	}
-
-	PartitionDataProvider interface {
-		GetRoundNumber(ctx context.Context) (*wallet.RoundNumber, error)
-		GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*wallet.Bill, error)
-		GetTxProof(ctx context.Context, unitID types.UnitID, txHash wallet.TxHash) (*wallet.Proof, error)
-	}
-
-	MoneyClient interface {
-		GetBills(ctx context.Context, pubKey []byte) ([]*wallet.Bill, error)
-		PartitionDataProvider
+	RpcClient interface {
+		GetRoundNumber(ctx context.Context) (uint64, error)
+		GetBill(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.Bill, error)
+		GetFeeCreditRecord(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error)
+		GetUnitsByOwnerID(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error)
+		SendTransaction(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
+		GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TransactionRecord, *types.TxProof, error)
 	}
 
 	// GenerateFcrIDFromPublicKey function to generate fee credit UnitID from shard number nad public key
@@ -68,15 +62,13 @@ type (
 
 		// money partition fields
 		moneySystemID         types.SystemID
-		moneyTxPublisher      TxPublisher
-		moneyBackendClient    MoneyClient
+		moneyClient           RpcClient
 		moneyPartitionFcrIDFn GenerateFcrIDFromPublicKey
 
 		// target partition fields
-		targetPartitionSystemID      types.SystemID
-		targetPartitionTxPublisher   TxPublisher
-		targetPartitionBackendClient PartitionDataProvider
-		targetPartitionFcrIDFn       GenerateFcrIDFromPublicKey
+		targetPartitionSystemID types.SystemID
+		targetPartitionClient   RpcClient
+		targetPartitionFcrIDFn  GenerateFcrIDFromPublicKey
 	}
 
 	GetFeeCreditCmd struct {
@@ -86,12 +78,12 @@ type (
 	AddFeeCmd struct {
 		AccountIndex   uint64
 		Amount         uint64
-		DisableLocking bool // if true then lockFC transaction is not send before adding fee credit
+		DisableLocking bool // if true then lockFC transaction is not sent before adding fee credit
 	}
 
 	ReclaimFeeCmd struct {
 		AccountIndex   uint64
-		DisableLocking bool // if true then lock transaction is not send before reclaiming fee credit
+		DisableLocking bool // if true then lock transaction is not sent before reclaiming fee credit
 	}
 
 	LockFeeCreditCmd struct {
@@ -158,38 +150,34 @@ type (
 //
 // - money partition:
 //   - systemID
-//   - tx publisher with proof confirmation
-//   - money backend client
+//   - rpc node client
+//   - fee credit record id generation function
 //
 // - target partition:
 //   - systemID
-//   - tx publisher with proof confirmation
-//   - partition data provider e.g. backend client
+//   - rpc node client
+//   - fee credit record id generation function
 func NewFeeManager(
 	am account.Manager,
 	db FeeManagerDB,
 	moneySystemID types.SystemID,
-	moneyTxPublisher TxPublisher,
-	moneyBackendClient MoneyClient,
+	moneyClient RpcClient,
 	moneyPartitionFcrIDFn GenerateFcrIDFromPublicKey,
 	targetPartitionSystemID types.SystemID,
-	targetPartitionTxPublisher TxPublisher,
-	targetPartitionBackendClient PartitionDataProvider,
+	targetPartitionClient RpcClient,
 	fcrIDFn GenerateFcrIDFromPublicKey,
 	log *slog.Logger,
 ) *FeeManager {
 	return &FeeManager{
-		am:                           am,
-		db:                           db,
-		moneySystemID:                moneySystemID,
-		moneyTxPublisher:             moneyTxPublisher,
-		moneyBackendClient:           moneyBackendClient,
-		moneyPartitionFcrIDFn:        moneyPartitionFcrIDFn,
-		targetPartitionSystemID:      targetPartitionSystemID,
-		targetPartitionTxPublisher:   targetPartitionTxPublisher,
-		targetPartitionBackendClient: targetPartitionBackendClient,
-		targetPartitionFcrIDFn:       fcrIDFn,
-		log:                          log,
+		am:                      am,
+		db:                      db,
+		moneySystemID:           moneySystemID,
+		moneyClient:             moneyClient,
+		moneyPartitionFcrIDFn:   moneyPartitionFcrIDFn,
+		targetPartitionSystemID: targetPartitionSystemID,
+		targetPartitionClient:   targetPartitionClient,
+		targetPartitionFcrIDFn:  fcrIDFn,
+		log:                     log,
 	}
 }
 
@@ -294,7 +282,7 @@ func (w *FeeManager) ReclaimFeeCredit(ctx context.Context, cmd ReclaimFeeCmd) (*
 }
 
 // GetFeeCredit returns fee credit bill for given account, returns nil if fee credit bill has not been created yet.
-func (w *FeeManager) GetFeeCredit(ctx context.Context, cmd GetFeeCreditCmd) (*wallet.Bill, error) {
+func (w *FeeManager) GetFeeCredit(ctx context.Context, cmd GetFeeCreditCmd) (*api.FeeCreditBill, error) {
 	accountKey, err := w.am.GetAccountKey(cmd.AccountIndex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load account key: %w", err)
@@ -316,7 +304,7 @@ func (w *FeeManager) LockFeeCredit(ctx context.Context, cmd LockFeeCreditCmd) (*
 	if fcb == nil {
 		return nil, errors.New("fee credit bill does not exist")
 	}
-	if fcb.GetValue() < 2*txbuilder.MaxFee {
+	if fcb.Balance() < 2*txbuilder.MaxFee {
 		return nil, errors.New("not enough fee credit in wallet")
 	}
 	if fcb.IsLocked() {
@@ -330,7 +318,7 @@ func (w *FeeManager) LockFeeCredit(ctx context.Context, cmd LockFeeCreditCmd) (*
 	if err != nil {
 		return nil, fmt.Errorf("failed to create lockFC transaction: %w", err)
 	}
-	proof, err := w.targetPartitionTxPublisher.SendTx(ctx, tx, accountKey.PubKey)
+	proof, err := sendTx(ctx, tx, accountKey.PubKey, w.targetPartitionClient, w.log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send lockFC transaction: %w", err)
 	}
@@ -348,7 +336,7 @@ func (w *FeeManager) UnlockFeeCredit(ctx context.Context, cmd UnlockFeeCreditCmd
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch fee credit: %w", err)
 	}
-	if fcb.GetValue() == 0 {
+	if fcb.Balance() == 0 {
 		return nil, errors.New("no fee credit in wallet")
 	}
 	if !fcb.IsLocked() {
@@ -362,7 +350,7 @@ func (w *FeeManager) UnlockFeeCredit(ctx context.Context, cmd UnlockFeeCreditCmd
 	if err != nil {
 		return nil, fmt.Errorf("failed to create unlockFC transaction: %w", err)
 	}
-	proof, err := w.targetPartitionTxPublisher.SendTx(ctx, tx, accountKey.PubKey)
+	proof, err := sendTx(ctx, tx, accountKey.PubKey, w.targetPartitionClient, w.log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send unlockFC transaction: %w", err)
 	}
@@ -371,8 +359,7 @@ func (w *FeeManager) UnlockFeeCredit(ctx context.Context, cmd UnlockFeeCreditCmd
 
 // Close propagates call to all dependencies
 func (w *FeeManager) Close() {
-	w.moneyTxPublisher.Close()
-	w.targetPartitionTxPublisher.Close()
+	// TODO close clients?
 	_ = w.db.Close()
 }
 
@@ -398,13 +385,13 @@ func (w *FeeManager) addFees(ctx context.Context, accountKey *account.AccountKey
 	}
 
 	// filter locked bills
-	bills, _ = filterSlice(bills, func(b *wallet.Bill) (bool, error) {
+	bills, _ = filterSlice(bills, func(b *api.Bill) (bool, error) {
 		return !b.IsLocked(), nil
 	})
 
 	// filter bills of too small value
-	bills, _ = filterSlice(bills, func(b *wallet.Bill) (bool, error) {
-		return b.Value >= MinimumFeeAmount, nil
+	bills, _ = filterSlice(bills, func(b *api.Bill) (bool, error) {
+		return b.Value() >= MinimumFeeAmount, nil
 	})
 
 	// sum bill values i.e. calculate effective balance
@@ -424,13 +411,13 @@ func (w *FeeManager) addFees(ctx context.Context, accountKey *account.AccountKey
 			break
 		}
 		// send fee credit transactions
-		amount := min(targetBill.Value, targetAmount-totalTransferredAmount)
+		amount := min(targetBill.Value(), targetAmount-totalTransferredAmount)
 		totalTransferredAmount += amount
 
 		feeCtx := &AddFeeCreditCtx{
 			TargetPartitionID:  w.targetPartitionSystemID,
-			TargetBillID:       targetBill.Id,
-			TargetBillBacklink: targetBill.TxHash,
+			TargetBillID:       targetBill.ID,
+			TargetBillBacklink: targetBill.Backlink(),
 			TargetAmount:       amount,
 			LockingDisabled:    cmd.DisableLocking,
 		}
@@ -480,7 +467,7 @@ func (w *FeeManager) sendLockFCTx(ctx context.Context, accountKey *account.Accou
 	// if confirmed => store proof
 	// if not confirmed => create new transaction
 	if feeCtx.LockFCTx != nil {
-		proof, err := w.waitForConf(ctx, feeCtx.LockFCTx, w.targetPartitionBackendClient)
+		proof, err := api.WaitForConf(ctx, w.targetPartitionClient, feeCtx.LockFCTx)
 		if err != nil {
 			return fmt.Errorf("failed to wait for confirmation: %w", err)
 		}
@@ -502,7 +489,7 @@ func (w *FeeManager) sendLockFCTx(ctx context.Context, accountKey *account.Accou
 		return nil
 	}
 	// do not lock 0 value fee credit bill
-	if fcb.Value == 0 {
+	if fcb.Balance() == 0 {
 		return nil
 	}
 	// verify fee credit bill is not locked
@@ -536,7 +523,7 @@ func (w *FeeManager) sendLockFCTx(ctx context.Context, accountKey *account.Accou
 	}
 
 	// send lockFC transaction
-	proof, err := w.targetPartitionTxPublisher.SendTx(ctx, tx, accountKey.PubKey)
+	proof, err := sendTx(ctx, tx, accountKey.PubKey, w.targetPartitionClient, w.log)
 	if err != nil {
 		return fmt.Errorf("failed to send lockFC transaction: %w", err)
 	}
@@ -558,7 +545,7 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 	//   if confirmed => store proof
 	//   if not confirmed => verify target bill and create new transaction, or return error
 	if feeCtx.TransferFCTx != nil {
-		proof, err := w.waitForConf(ctx, feeCtx.TransferFCTx, w.moneyBackendClient)
+		proof, err := api.WaitForConf(ctx, w.moneyClient, feeCtx.TransferFCTx)
 		if err != nil {
 			return fmt.Errorf("failed to wait for confirmation: %w", err)
 		}
@@ -599,12 +586,12 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 	if err != nil {
 		return err
 	}
-	rnr, err := w.targetPartitionBackendClient.GetRoundNumber(ctx)
+	roundNumber, err := w.moneyClient.GetRoundNumber(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to fetch target partition round number: %w", err)
 	}
-	earliestAdditionTime := rnr.RoundNumber
-	latestAdditionTime := rnr.RoundNumber + transferFCLatestAdditionTime
+	earliestAdditionTime := roundNumber
+	latestAdditionTime := roundNumber + transferFCLatestAdditionTime
 
 	// create transferFC transaction
 	w.log.InfoContext(ctx, "sending transfer fee credit transaction")
@@ -616,7 +603,7 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 	tx, err := txbuilder.NewTransferFCTx(
 		feeCtx.TargetAmount,
 		fcrID,
-		fcb.GetTxHash(),
+		fcb.Backlink(),
 		accountKey,
 		w.moneySystemID,
 		w.targetPartitionSystemID,
@@ -637,7 +624,7 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 	}
 
 	// send transferFC transaction to money partition
-	proof, err := w.moneyTxPublisher.SendTx(ctx, tx, accountKey.PubKey)
+	proof, err := sendTx(ctx, tx, accountKey.PubKey, w.moneyClient, w.log)
 	if err != nil {
 		return fmt.Errorf("failed to send transferFC transaction: %w", err)
 	}
@@ -662,7 +649,7 @@ func (w *FeeManager) sendAddFCTx(ctx context.Context, accountKey *account.Accoun
 	//     if yes => create new addFC with existing transferFC proof
 	//     if not => unlock remote fee credit record and delete fee context
 	if feeCtx.AddFCTx != nil {
-		proof, err := w.waitForConf(ctx, feeCtx.AddFCTx, w.targetPartitionBackendClient)
+		proof, err := api.WaitForConf(ctx, w.targetPartitionClient, feeCtx.AddFCTx)
 		if err != nil {
 			return fmt.Errorf("failed to wait for confirmation: %w", err)
 		}
@@ -677,11 +664,11 @@ func (w *FeeManager) sendAddFCTx(ctx context.Context, accountKey *account.Accoun
 		if err := feeCtx.TransferFCProof.TxRecord.TransactionOrder.UnmarshalAttributes(transferFCAttr); err != nil {
 			return fmt.Errorf("failed to unmarshal transferFC attributes: %w", err)
 		}
-		rnr, err := w.targetPartitionBackendClient.GetRoundNumber(ctx)
+		roundNumber, err := w.targetPartitionClient.GetRoundNumber(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to fetch target partition round number: %w", err)
 		}
-		if rnr.LastIndexedRoundNumber >= transferFCAttr.LatestAdditionTime {
+		if roundNumber >= transferFCAttr.LatestAdditionTime {
 			_, err := w.unlockFeeCreditRecord(ctx, accountKey)
 			if err != nil {
 				return fmt.Errorf("failed to unlock remote fee credit record: %w", err)
@@ -716,7 +703,7 @@ func (w *FeeManager) sendAddFCTx(ctx context.Context, accountKey *account.Accoun
 
 	// send addFC transaction
 	w.log.InfoContext(ctx, "sending add fee credit transaction")
-	proof, err := w.targetPartitionTxPublisher.SendTx(ctx, addFCTx, accountKey.PubKey)
+	proof, err := sendTx(ctx, addFCTx, accountKey.PubKey, w.targetPartitionClient, w.log)
 	if err != nil {
 		return fmt.Errorf("failed to send addFC transaction: %w", err)
 	}
@@ -740,7 +727,7 @@ func (w *FeeManager) reclaimFees(ctx context.Context, accountKey *account.Accoun
 	if fcb.IsLocked() {
 		return nil, errors.New("fee credit bill is locked")
 	}
-	if fcb.GetValue() < MinimumFeeAmount {
+	if fcb.Balance() < MinimumFeeAmount {
 		return nil, ErrMinimumFeeAmount
 	}
 
@@ -749,7 +736,7 @@ func (w *FeeManager) reclaimFees(ctx context.Context, accountKey *account.Accoun
 	if err != nil {
 		return nil, err
 	}
-	bills, _ = filterSlice(bills, func(b *wallet.Bill) (bool, error) {
+	bills, _ = filterSlice(bills, func(b *api.Bill) (bool, error) {
 		return !b.IsLocked(), nil
 	})
 	if len(bills) == 0 {
@@ -760,8 +747,8 @@ func (w *FeeManager) reclaimFees(ctx context.Context, accountKey *account.Accoun
 	// create fee ctx to track reclaim process
 	feeCtx := &ReclaimFeeCreditCtx{
 		TargetPartitionID:  w.targetPartitionSystemID,
-		TargetBillID:       targetBill.Id,
-		TargetBillBacklink: targetBill.TxHash,
+		TargetBillID:       targetBill.ID,
+		TargetBillBacklink: targetBill.Backlink(),
 		LockingDisabled:    cmd.DisableLocking,
 	}
 	if err := w.db.SetReclaimFeeContext(accountKey.PubKey, feeCtx); err != nil {
@@ -806,7 +793,7 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 	}
 	// if lock tx already exists then wait for confirmation => if confirmed store proof else create new transaction
 	if feeCtx.LockTx != nil {
-		proof, err := w.waitForConf(ctx, feeCtx.LockTx, w.moneyBackendClient)
+		proof, err := api.WaitForConf(ctx, w.moneyClient, feeCtx.LockTx)
 		if err != nil {
 			return fmt.Errorf("failed to wait for confirmation: %w", err)
 		}
@@ -826,7 +813,7 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 		return fmt.Errorf("failed to fetch money fee credit bill: %w", err)
 	}
 	// do not lock target bill if there's not enough fee credit on money partition
-	if moneyFCB.GetValue() == 0 {
+	if moneyFCB.Balance() == 0 {
 		return nil
 	}
 
@@ -855,7 +842,7 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 
 	// send lock transaction
 	w.log.InfoContext(ctx, "sending lock transaction")
-	proof, err := w.moneyTxPublisher.SendTx(ctx, tx, accountKey.PubKey)
+	proof, err := sendTx(ctx, tx, accountKey.PubKey, w.moneyClient, w.log)
 	if err != nil {
 		return fmt.Errorf("failed to send lock transaction: %w", err)
 	}
@@ -878,7 +865,7 @@ func (w *FeeManager) sendCloseFCTx(ctx context.Context, accountKey *account.Acco
 	// if confirmed => store proof
 	// if not confirmed => create new transaction
 	if feeCtx.CloseFCTx != nil {
-		proof, err := w.waitForConf(ctx, feeCtx.CloseFCTx, w.targetPartitionBackendClient)
+		proof, err := api.WaitForConf(ctx, w.targetPartitionClient, feeCtx.CloseFCTx)
 		if err != nil {
 			return fmt.Errorf("failed to wait for confirmation: %w", err)
 		}
@@ -905,7 +892,7 @@ func (w *FeeManager) sendCloseFCTx(ctx context.Context, accountKey *account.Acco
 
 	// create closeFC transaction
 	tx, err := txbuilder.NewCloseFCTx(
-		w.targetPartitionSystemID, fcb.GetID(), targetPartitionTimeout, fcb.GetValue(),
+		w.targetPartitionSystemID, fcb.ID, targetPartitionTimeout, fcb.Balance(),
 		feeCtx.TargetBillID, feeCtx.TargetBillBacklink, accountKey)
 	if err != nil {
 		return fmt.Errorf("failed to create closeFC transaction: %w", err)
@@ -919,7 +906,7 @@ func (w *FeeManager) sendCloseFCTx(ctx context.Context, accountKey *account.Acco
 
 	// send closeFC transaction to target partition
 	w.log.InfoContext(ctx, "sending close fee credit transaction")
-	proof, err := w.targetPartitionTxPublisher.SendTx(ctx, tx, accountKey.PubKey)
+	proof, err := sendTx(ctx, tx, accountKey.PubKey, w.targetPartitionClient, w.log)
 	if err != nil {
 		return fmt.Errorf("failed to send closeFC transaction: %w", err)
 	}
@@ -944,7 +931,7 @@ func (w *FeeManager) sendReclaimFCTx(ctx context.Context, accountKey *account.Ac
 	//     if yes => create new reclaimFC with existing closeFC proof
 	//     if not => unlock target bill and delete fee context
 	if feeCtx.ReclaimFCTx != nil {
-		proof, err := w.waitForConf(ctx, feeCtx.ReclaimFCTx, w.moneyBackendClient)
+		proof, err := api.WaitForConf(ctx, w.moneyClient, feeCtx.ReclaimFCTx)
 		if err != nil {
 			return fmt.Errorf("failed to wait for confirmation: %w", err)
 		}
@@ -967,8 +954,7 @@ func (w *FeeManager) sendReclaimFCTx(ctx context.Context, accountKey *account.Ac
 			if err := w.db.DeleteReclaimFeeContext(accountKey.PubKey); err != nil {
 				return fmt.Errorf("failed to delete reclaim fee context: %w", err)
 			}
-			return fmt.Errorf("reclaimFC target bill is no longer usable" +
-				"")
+			return errors.New("reclaimFC target bill is no longer usable")
 		}
 		w.log.InfoContext(ctx, "reclaimFC timed out, but closeFC is still valid, sending new reclaimFC transaction")
 	}
@@ -991,7 +977,7 @@ func (w *FeeManager) sendReclaimFCTx(ctx context.Context, accountKey *account.Ac
 
 	// send reclaimFC transaction
 	w.log.InfoContext(ctx, "sending reclaim fee credit transaction")
-	proof, err := w.moneyTxPublisher.SendTx(ctx, reclaimFC, accountKey.PubKey)
+	proof, err := sendTx(ctx, reclaimFC, accountKey.PubKey, w.moneyClient, w.log)
 	if err != nil {
 		return fmt.Errorf("failed to send reclaimFC transaction: %w", err)
 	}
@@ -999,96 +985,68 @@ func (w *FeeManager) sendReclaimFCTx(ctx context.Context, accountKey *account.Ac
 	// store reclaimFC proof
 	feeCtx.ReclaimFCProof = proof
 	if err := w.db.SetReclaimFeeContext(accountKey.PubKey, feeCtx); err != nil {
-		return err
+		return fmt.Errorf("failed to store reclaimFC proof: %w", err)
 	}
 	return nil
 }
 
 func (w *FeeManager) getMoneyPartitionTimeout(ctx context.Context) (uint64, error) {
-	rnr, err := w.moneyBackendClient.GetRoundNumber(ctx)
+	roundNumber, err := w.moneyClient.GetRoundNumber(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("failed to fetch money partition round number: %w", err)
 	}
-	return rnr.RoundNumber + txTimeoutBlockCount, nil
+	return roundNumber + txTimeoutBlockCount, nil
 }
 
 func (w *FeeManager) getTargetPartitionTimeout(ctx context.Context) (uint64, error) {
-	rnr, err := w.targetPartitionBackendClient.GetRoundNumber(ctx)
+	roundNumber, err := w.targetPartitionClient.GetRoundNumber(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("failed to fetch target partition round number: %w", err)
 	}
-	return rnr.RoundNumber + txTimeoutBlockCount, nil
+	return roundNumber + txTimeoutBlockCount, nil
 }
 
 // fetchBills fetches bills from backend and sorts them by value (descending, largest first)
-func (w *FeeManager) fetchBills(ctx context.Context, k *account.AccountKey) ([]*wallet.Bill, error) {
-	bills, err := w.moneyBackendClient.GetBills(ctx, k.PubKey)
+func (w *FeeManager) fetchBills(ctx context.Context, k *account.AccountKey) ([]*api.Bill, error) {
+	bills, err := api.FetchBills(ctx, w.moneyClient, k.PubKeyHash.Sha256)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch bills: %w", err)
 	}
 	sort.Slice(bills, func(i, j int) bool {
-		return bills[i].Value > bills[j].Value
+		return bills[i].Value() > bills[j].Value()
 	})
 	return bills, nil
 }
 
-func (w *FeeManager) fetchBillByIdAndHash(ctx context.Context, accountKey *account.AccountKey, unitID []byte, txHash []byte) (*wallet.Bill, error) {
-	bills, err := w.moneyBackendClient.GetBills(ctx, accountKey.PubKey)
+func (w *FeeManager) fetchBillByIdAndHash(ctx context.Context, accountKey *account.AccountKey, unitID []byte, txHash []byte) (*api.Bill, error) {
+	bills, err := api.FetchBills(ctx, w.moneyClient, accountKey.PubKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch bills: %w", err)
 	}
 	for _, b := range bills {
-		if bytes.Equal(b.Id, unitID) && bytes.Equal(b.TxHash, txHash) {
+		if bytes.Equal(b.ID, unitID) && bytes.Equal(b.Backlink(), txHash) {
 			return b, nil
 		}
 	}
 	return nil, nil
 }
 
-func (w *FeeManager) sumValues(bills []*wallet.Bill) uint64 {
+func (w *FeeManager) sumValues(bills []*api.Bill) uint64 {
 	var sum uint64
 	for _, b := range bills {
-		sum += b.Value
+		sum += b.Value()
 	}
 	return sum
 }
 
-func (w *FeeManager) waitForConf(ctx context.Context, tx *types.TransactionOrder, api PartitionDataProvider) (*wallet.Proof, error) {
-	txHash := tx.Hash(crypto.SHA256)
-	for {
-		// fetch round number before proof to ensure that we cannot miss the proof
-		rnr, err := api.GetRoundNumber(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch target partition round number: %w", err)
-		}
-		proof, err := api.GetTxProof(ctx, tx.UnitID(), txHash)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch tx proof: %w", err)
-		}
-		if proof != nil {
-			return proof, nil
-		}
-		if rnr.LastIndexedRoundNumber >= tx.Timeout() {
-			w.log.InfoContext(ctx, fmt.Sprintf("tx not confirmed txHash=%x", txHash))
-			break
-		}
-		select {
-		case <-time.After(time.Second):
-		case <-ctx.Done():
-			return nil, errors.New("context canceled")
-		}
-	}
-	return nil, nil
-}
-
-func (w *FeeManager) fetchTargetPartitionFCB(ctx context.Context, accountKey *account.AccountKey) (*wallet.Bill, error) {
+func (w *FeeManager) fetchTargetPartitionFCB(ctx context.Context, accountKey *account.AccountKey) (*api.FeeCreditBill, error) {
 	fcrID := w.targetPartitionFcrIDFn(nil, accountKey.PubKey)
-	return w.targetPartitionBackendClient.GetFeeCreditBill(ctx, fcrID)
+	return api.FetchFeeCreditBill(ctx, w.targetPartitionClient, fcrID)
 }
 
-func (w *FeeManager) fetchMoneyPartitionFCB(ctx context.Context, accountKey *account.AccountKey) (*wallet.Bill, error) {
+func (w *FeeManager) fetchMoneyPartitionFCB(ctx context.Context, accountKey *account.AccountKey) (*api.FeeCreditBill, error) {
 	fcrID := w.moneyPartitionFcrIDFn(nil, accountKey.PubKey)
-	return w.moneyBackendClient.GetFeeCreditBill(ctx, fcrID)
+	return api.FetchFeeCreditBill(ctx, w.moneyClient, fcrID)
 }
 
 func (w *FeeManager) unlockFeeCreditRecord(ctx context.Context, accountKey *account.AccountKey) (*wallet.Proof, error) {
@@ -1107,7 +1065,11 @@ func (w *FeeManager) unlockFeeCreditRecord(ctx context.Context, accountKey *acco
 	if err != nil {
 		return nil, fmt.Errorf("failed to create unlockFC transaction: %w", err)
 	}
-	return w.targetPartitionTxPublisher.SendTx(ctx, tx, accountKey.PubKey)
+	proof, err := sendTx(ctx, tx, accountKey.PubKey, w.targetPartitionClient, w.log)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send unlockFC tx: %w", err)
+	}
+	return proof, nil
 }
 
 func (w *FeeManager) unlockBill(ctx context.Context, accountKey *account.AccountKey, unitID types.UnitID) (*wallet.Proof, error) {
@@ -1116,7 +1078,7 @@ func (w *FeeManager) unlockBill(ctx context.Context, accountKey *account.Account
 		return nil, err
 	}
 	for _, b := range bills {
-		if bytes.Equal(b.Id, unitID) {
+		if bytes.Equal(b.ID, unitID) {
 			if b.IsLocked() {
 				timeout, err := w.getMoneyPartitionTimeout(ctx)
 				if err != nil {
@@ -1126,7 +1088,11 @@ func (w *FeeManager) unlockBill(ctx context.Context, accountKey *account.Account
 				if err != nil {
 					return nil, fmt.Errorf("failed to create unlock tx: %w", err)
 				}
-				return w.moneyTxPublisher.SendTx(ctx, unlockTx, accountKey.PubKey)
+				proof, err := sendTx(ctx, unlockTx, accountKey.PubKey, w.moneyClient, w.log)
+				if err != nil {
+					return nil, fmt.Errorf("failed to send unlock tx: %w", err)
+				}
+				return proof, nil
 			}
 			return nil, nil
 		}
@@ -1168,4 +1134,18 @@ func (p *ReclaimFeeTxProofs) GetFees() uint64 {
 		return 0
 	}
 	return p.Lock.GetActualFee() + p.CloseFC.GetActualFee() + p.ReclaimFC.GetActualFee()
+}
+
+func sendTx(ctx context.Context, tx *types.TransactionOrder, senderPubKey wallet.PubKey, c RpcClient, log *slog.Logger) (*wallet.Proof, error) {
+	batch := txsubmitter.NewBatch(senderPubKey, c, log)
+	txSubmission := &txsubmitter.TxSubmission{
+		UnitID:      tx.UnitID(),
+		TxHash:      tx.Hash(crypto.SHA256),
+		Transaction: tx,
+	}
+	batch.Add(txSubmission)
+	if err := batch.SendTx(ctx, true); err != nil {
+		return nil, err
+	}
+	return txSubmission.Proof, nil
 }

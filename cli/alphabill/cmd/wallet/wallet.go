@@ -25,11 +25,11 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/evm"
 	clifees "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/tokens"
+	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend/client"
 	"github.com/alphabill-org/alphabill-wallet/wallet/unitlock"
 )
 
@@ -145,7 +145,7 @@ func SendCmd(config *types.WalletConfig) *cobra.Command {
 		"amounts")
 	cmd.Flags().StringSliceP(args.AmountCmdName, "v", nil, "the amount(s) to send to the "+
 		"receiver(s), must match with addresses")
-	cmd.Flags().StringP(args.AlphabillApiURLCmdName, "r", args.DefaultAlphabillApiURL, "alphabill API uri to connect to")
+	cmd.Flags().StringP(args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "rpc node url")
 	cmd.Flags().Uint64P(args.KeyCmdName, "k", 1, "which key to use for sending the transaction")
 	// use string instead of boolean as boolean requires equals sign between name and value e.g. w=[true|false]
 	cmd.Flags().StringP(args.WaitForConfCmdName, "w", "true", "waits for transaction confirmation "+
@@ -163,14 +163,16 @@ func ExecSendCmd(ctx context.Context, cmd *cobra.Command, config *types.WalletCo
 	ctx, span := config.Tracer().Start(ctx, "execSendCmd")
 	defer span.End()
 
-	apiUri, err := cmd.Flags().GetString(args.AlphabillApiURLCmdName)
+	rpcUrl, err := cmd.Flags().GetString(args.RpcUrl)
 	if err != nil {
 		return err
 	}
-	restClient, err := client.New(apiUri, config.Base.Observe)
+	rpcClient, err := rpc.DialContext(ctx, args.BuildRpcUrl(rpcUrl))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to dial rpc url: %w", err)
 	}
+	defer rpcClient.Close()
+
 	am, err := cliaccount.LoadExistingAccountManager(config)
 	if err != nil {
 		return err
@@ -186,7 +188,7 @@ func ExecSendCmd(ctx context.Context, cmd *cobra.Command, config *types.WalletCo
 	}
 	defer feeManagerDB.Close()
 
-	w, err := money.LoadExistingWallet(am, unitLocker, feeManagerDB, restClient, config.Base.Observe.Logger())
+	w, err := money.LoadExistingWallet(am, unitLocker, feeManagerDB, rpcClient, config.Base.Observe.Logger())
 	if err != nil {
 		return err
 	}
@@ -244,7 +246,7 @@ func GetBalanceCmd(config *types.WalletConfig) *cobra.Command {
 			return ExecGetBalanceCmd(cmd, config)
 		},
 	}
-	cmd.Flags().StringP(args.AlphabillApiURLCmdName, "r", args.DefaultAlphabillApiURL, "alphabill API uri to connect to")
+	cmd.Flags().StringP(args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "rpc node url")
 	cmd.Flags().Uint64P(args.KeyCmdName, "k", 0, "specifies which key balance to query "+
 		"(by default returns all key balances including total balance over all keys)")
 	cmd.Flags().BoolP(args.TotalCmdName, "t", false,
@@ -252,6 +254,7 @@ func GetBalanceCmd(config *types.WalletConfig) *cobra.Command {
 	cmd.Flags().BoolP(args.QuietCmdName, "q", false, "hides info irrelevant for scripting, "+
 		"e.g. account key numbers, can only be used together with key or total flag")
 	cmd.Flags().BoolP(args.ShowUnswappedCmdName, "s", false, "includes unswapped dust bills in balance output")
+	cmd.Flags().MarkHidden(args.ShowUnswappedCmdName)
 	return cmd
 }
 
@@ -259,14 +262,16 @@ func ExecGetBalanceCmd(cmd *cobra.Command, config *types.WalletConfig) error {
 	ctx, span := config.Tracer().Start(cmd.Context(), "execGetBalanceCmd")
 	defer span.End()
 
-	uri, err := cmd.Flags().GetString(args.AlphabillApiURLCmdName)
+	rpcUrl, err := cmd.Flags().GetString(args.RpcUrl)
 	if err != nil {
 		return err
 	}
-	restClient, err := client.New(uri, config.Base.Observe)
+	rpcClient, err := rpc.DialContext(ctx, args.BuildRpcUrl(rpcUrl))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to dial rpc url: %w", err)
 	}
+	defer rpcClient.Close()
+
 	am, err := cliaccount.LoadExistingAccountManager(config)
 	if err != nil {
 		return err
@@ -285,7 +290,7 @@ func ExecGetBalanceCmd(cmd *cobra.Command, config *types.WalletConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	w, err := money.LoadExistingWallet(am, unitLocker, feeManagerDB, restClient, config.Base.Observe.Logger())
+	w, err := money.LoadExistingWallet(am, unitLocker, feeManagerDB, rpcClient, config.Base.Observe.Logger())
 	if err != nil {
 		return err
 	}
@@ -383,24 +388,27 @@ func CollectDustCmd(config *types.WalletConfig) *cobra.Command {
 			return ExecCollectDust(cmd, config)
 		},
 	}
-	cmd.Flags().StringP(args.AlphabillApiURLCmdName, "r", args.DefaultAlphabillApiURL, "alphabill API uri to connect to")
+	cmd.Flags().StringP(args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "rpc node url")
 	cmd.Flags().Uint64P(args.KeyCmdName, "k", 0, "which key to use for dust collection, 0 for all bills from all accounts")
 	return cmd
 }
 
 func ExecCollectDust(cmd *cobra.Command, config *types.WalletConfig) error {
-	apiUri, err := cmd.Flags().GetString(args.AlphabillApiURLCmdName)
-	if err != nil {
-		return err
-	}
 	accountNumber, err := cmd.Flags().GetUint64(args.KeyCmdName)
 	if err != nil {
 		return err
 	}
-	restClient, err := client.New(apiUri, config.Base.Observe)
+
+	rpcUrl, err := cmd.Flags().GetString(args.RpcUrl)
 	if err != nil {
 		return err
 	}
+	rpcClient, err := rpc.DialContext(cmd.Context(), args.BuildRpcUrl(rpcUrl))
+	if err != nil {
+		return fmt.Errorf("failed to dial rpc url: %w", err)
+	}
+	defer rpcClient.Close()
+
 	am, err := cliaccount.LoadExistingAccountManager(config)
 	if err != nil {
 		return err
@@ -419,7 +427,7 @@ func ExecCollectDust(cmd *cobra.Command, config *types.WalletConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	w, err := money.LoadExistingWallet(am, unitLocker, feeManagerDB, restClient, config.Base.Observe.Logger())
+	w, err := money.LoadExistingWallet(am, unitLocker, feeManagerDB, rpcClient, config.Base.Observe.Logger())
 	if err != nil {
 		return err
 	}

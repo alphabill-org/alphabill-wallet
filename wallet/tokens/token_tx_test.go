@@ -8,7 +8,7 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
-	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
+	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/txsubmitter"
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/stretchr/testify/require"
 )
