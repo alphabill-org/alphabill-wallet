@@ -1,25 +1,23 @@
 package tokens
 
 import (
+	"crypto"
 	"encoding/hex"
 	"fmt"
 	"strconv"
 	"strings"
 
-	"github.com/alphabill-org/alphabill-wallet/wallet"
-	"github.com/alphabill-org/alphabill-wallet/wallet/account"
-	twb "github.com/alphabill-org/alphabill-wallet/wallet/tokens/backend"
 	"github.com/alphabill-org/alphabill/predicates"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+
+	"github.com/alphabill-org/alphabill-wallet/wallet"
+	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 )
 
 const (
-	txTimeoutRoundCount        = 10
-	AllAccounts         uint64 = 0
-
 	predicateEmpty = "empty"
 	predicateTrue  = "true"
 	predicateFalse = "false"
@@ -40,7 +38,7 @@ type (
 		Name                     string
 		Icon                     *Icon
 		DecimalPlaces            uint32
-		ParentTypeId             twb.TokenTypeID
+		ParentTypeId             TokenTypeID
 		SubTypeCreationPredicate wallet.Predicate
 		TokenCreationPredicate   wallet.Predicate
 		InvariantPredicate       wallet.Predicate
@@ -55,7 +53,7 @@ type (
 		Symbol                   string
 		Name                     string
 		Icon                     *Icon
-		ParentTypeId             twb.TokenTypeID
+		ParentTypeId             TokenTypeID
 		SubTypeCreationPredicate wallet.Predicate
 		TokenCreationPredicate   wallet.Predicate
 		InvariantPredicate       wallet.Predicate
@@ -64,7 +62,7 @@ type (
 
 	MintNonFungibleTokenAttributes struct {
 		Name                string
-		NftType             twb.TokenTypeID
+		NftType             TokenTypeID
 		Uri                 string
 		Data                []byte
 		Bearer              wallet.Predicate
@@ -184,7 +182,7 @@ func ParsePredicateClause(clause string, keyNr uint64, am account.Manager) ([]by
 	return nil, fmt.Errorf("invalid predicate clause: '%s'", clause)
 }
 
-func (c *CreateFungibleTokenTypeAttributes) toCBOR() *tokens.CreateFungibleTokenTypeAttributes {
+func (c *CreateFungibleTokenTypeAttributes) ToCBOR() *tokens.CreateFungibleTokenTypeAttributes {
 	var icon *tokens.Icon
 	if c.Icon != nil {
 		icon = &tokens.Icon{Type: c.Icon.Type, Data: c.Icon.Data}
@@ -201,7 +199,7 @@ func (c *CreateFungibleTokenTypeAttributes) toCBOR() *tokens.CreateFungibleToken
 	}
 }
 
-func (c *CreateNonFungibleTokenTypeAttributes) toCBOR() *tokens.CreateNonFungibleTokenTypeAttributes {
+func (c *CreateNonFungibleTokenTypeAttributes) ToCBOR() *tokens.CreateNonFungibleTokenTypeAttributes {
 	var icon *tokens.Icon
 	if c.Icon != nil {
 		icon = &tokens.Icon{Type: c.Icon.Type, Data: c.Icon.Data}
@@ -218,7 +216,7 @@ func (c *CreateNonFungibleTokenTypeAttributes) toCBOR() *tokens.CreateNonFungibl
 	}
 }
 
-func (a *MintNonFungibleTokenAttributes) toCBOR() *tokens.MintNonFungibleTokenAttributes {
+func (a *MintNonFungibleTokenAttributes) ToCBOR() *tokens.MintNonFungibleTokenAttributes {
 	return &tokens.MintNonFungibleTokenAttributes{
 		Name:                a.Name,
 		NFTTypeID:           a.NftType,
@@ -241,4 +239,90 @@ func DecodeHexOrEmpty(input string) ([]byte, error) {
 		return nil, nil
 	}
 	return decoded, nil
+}
+
+// =========================
+// == backend types below ==
+// =========================
+
+type (
+	TokenUnitType struct {
+		// common
+		ID                       TokenTypeID      `json:"id"`
+		ParentTypeID             TokenTypeID      `json:"parentTypeId"`
+		Symbol                   string           `json:"symbol"`
+		Name                     string           `json:"name,omitempty"`
+		Icon                     *tokens.Icon     `json:"icon,omitempty"`
+		SubTypeCreationPredicate wallet.Predicate `json:"subTypeCreationPredicate,omitempty"`
+		TokenCreationPredicate   wallet.Predicate `json:"tokenCreationPredicate,omitempty"`
+		InvariantPredicate       wallet.Predicate `json:"invariantPredicate,omitempty"`
+
+		// fungible only
+		DecimalPlaces uint32 `json:"decimalPlaces,omitempty"`
+
+		// nft only
+		NftDataUpdatePredicate wallet.Predicate `json:"nftDataUpdatePredicate,omitempty"`
+
+		// meta
+		Kind   Kind          `json:"kind"`
+		TxHash wallet.TxHash `json:"txHash"`
+	}
+
+	TokenUnit struct {
+		// common
+		ID       TokenID     `json:"id"`
+		Symbol   string      `json:"symbol"`
+		TypeID   TokenTypeID `json:"typeId"`
+		TypeName string      `json:"typeName"`
+		Owner    types.Bytes `json:"owner"`
+		Locked   uint64      `json:"locked"`
+
+		// fungible only
+		Amount   uint64 `json:"amount,omitempty,string"`
+		Decimals uint32 `json:"decimals,omitempty"`
+		Burned   bool   `json:"burned,omitempty"`
+
+		// nft only
+		NftName                string           `json:"nftName,omitempty"`
+		NftURI                 string           `json:"nftUri,omitempty"`
+		NftData                []byte           `json:"nftData,omitempty"`
+		NftDataUpdatePredicate wallet.Predicate `json:"nftDataUpdatePredicate,omitempty"`
+
+		// meta
+		Kind   Kind          `json:"kind"`
+		TxHash wallet.TxHash `json:"txHash"`
+	}
+
+	TokenID     = types.UnitID
+	TokenTypeID = types.UnitID
+	Kind        byte
+)
+
+const (
+	Any Kind = 1 << iota
+	Fungible
+	NonFungible
+)
+
+var (
+	NoParent = TokenTypeID(make([]byte, crypto.SHA256.Size()))
+)
+
+func (tu *TokenUnit) IsLocked() bool {
+	if tu != nil {
+		return tu.Locked > 0
+	}
+	return false
+}
+
+func (kind Kind) String() string {
+	switch kind {
+	case Any:
+		return "all"
+	case Fungible:
+		return "fungible"
+	case NonFungible:
+		return "nft"
+	}
+	return "unknown"
 }
