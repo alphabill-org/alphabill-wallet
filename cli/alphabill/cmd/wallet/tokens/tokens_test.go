@@ -1,14 +1,12 @@
 package tokens
 
 import (
-	"bytes"
 	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/spf13/cobra"
@@ -16,10 +14,11 @@ import (
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
 	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
+	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
-	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/backend"
-	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/client"
+	tokenswallet "github.com/alphabill-org/alphabill-wallet/wallet/tokens"
 )
 
 func TestListTokensCommandInputs(t *testing.T) {
@@ -27,7 +26,7 @@ func TestListTokensCommandInputs(t *testing.T) {
 		name          string
 		args          []string
 		accountNumber uint64
-		expectedKind  backend.Kind
+		expectedKind  tokenswallet.Kind
 		expectedPass  string
 		expectedFlags []string
 	}{
@@ -35,82 +34,82 @@ func TestListTokensCommandInputs(t *testing.T) {
 			name:          "list all tokens",
 			args:          []string{},
 			accountNumber: 0, // all tokens
-			expectedKind:  backend.Any,
+			expectedKind:  tokenswallet.Any,
 		},
 		{
 			name:          "list all tokens with flags",
 			args:          []string{"--with-all", "--with-type-name", "--with-token-uri", "--with-token-data"},
-			expectedKind:  backend.Any,
+			expectedKind:  tokenswallet.Any,
 			expectedFlags: []string{cmdFlagWithAll, cmdFlagWithTypeName, cmdFlagWithTokenURI, cmdFlagWithTokenData},
 		},
 		{
 			name:          "list all tokens, encrypted wallet",
 			args:          []string{"--pn", "some pass phrase"},
 			accountNumber: 0, // all tokens
-			expectedKind:  backend.Any,
+			expectedKind:  tokenswallet.Any,
 			expectedPass:  "some pass phrase",
 		},
 		{
 			name:          "list account tokens",
 			args:          []string{"--key", "3"},
 			accountNumber: 3,
-			expectedKind:  backend.Any,
+			expectedKind:  tokenswallet.Any,
 		},
 		{
 			name:          "list all fungible tokens",
 			args:          []string{"fungible"},
 			accountNumber: 0,
-			expectedKind:  backend.Fungible,
+			expectedKind:  tokenswallet.Fungible,
 		},
 		{
 			name:          "list account fungible tokens",
 			args:          []string{"fungible", "--key", "4"},
 			accountNumber: 4,
-			expectedKind:  backend.Fungible,
+			expectedKind:  tokenswallet.Fungible,
 		},
 		{
 			name:          "list account fungible tokens, encrypted wallet",
 			args:          []string{"fungible", "--key", "4", "--pn", "some pass phrase"},
 			accountNumber: 4,
-			expectedKind:  backend.Fungible,
+			expectedKind:  tokenswallet.Fungible,
 			expectedPass:  "some pass phrase",
 		},
 		{
 			name:          "list all fungible tokens with falgs",
 			args:          []string{"fungible", "--with-all", "--with-type-name"},
-			expectedKind:  backend.Fungible,
+			expectedKind:  tokenswallet.Fungible,
 			expectedFlags: []string{cmdFlagWithAll, cmdFlagWithTypeName},
 		},
 		{
 			name:          "list all non-fungible tokens",
 			args:          []string{"non-fungible"},
 			accountNumber: 0,
-			expectedKind:  backend.NonFungible,
+			expectedKind:  tokenswallet.NonFungible,
 		},
 		{
 			name:          "list all non-fungible tokens with flags",
 			args:          []string{"non-fungible", "--with-all", "--with-type-name", "--with-token-uri", "--with-token-data"},
-			expectedKind:  backend.NonFungible,
+			expectedKind:  tokenswallet.NonFungible,
 			expectedFlags: []string{cmdFlagWithAll, cmdFlagWithTypeName, cmdFlagWithTokenURI, cmdFlagWithTokenData},
 		},
 		{
 			name:          "list account non-fungible tokens",
 			args:          []string{"non-fungible", "--key", "5"},
 			accountNumber: 5,
-			expectedKind:  backend.NonFungible,
+			expectedKind:  tokenswallet.NonFungible,
 		},
 		{
 			name:          "list account non-fungible tokens, encrypted wallet",
 			args:          []string{"non-fungible", "--key", "5", "--pn", "some pass phrase"},
 			accountNumber: 5,
-			expectedKind:  backend.NonFungible,
+			expectedKind:  tokenswallet.NonFungible,
 			expectedPass:  "some pass phrase",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			exec := false
-			cmd := tokenCmdList(&clitypes.WalletConfig{}, func(cmd *cobra.Command, config *clitypes.WalletConfig, accountNumber *uint64, kind backend.Kind) error {
+			cmd := tokenCmdList(&clitypes.WalletConfig{}, func(cmd *cobra.Command, config *clitypes.WalletConfig, accountNumber *uint64, kind tokenswallet.Kind) error {
 				require.Equal(t, tt.accountNumber, *accountNumber)
 				require.Equal(t, tt.expectedKind, kind)
 				if len(tt.expectedPass) > 0 {
@@ -141,43 +140,43 @@ func TestListTokensTypesCommandInputs(t *testing.T) {
 		name          string
 		args          []string
 		expectedAccNr uint64
-		expectedKind  backend.Kind
+		expectedKind  tokenswallet.Kind
 		expectedPass  string
 	}{
 		{
 			name:         "list all tokens",
 			args:         []string{},
-			expectedKind: backend.Any,
+			expectedKind: tokenswallet.Any,
 		},
 		{
 			name:         "list all tokens, encrypted wallet",
 			args:         []string{"--pn", "test pass phrase"},
-			expectedKind: backend.Any,
+			expectedKind: tokenswallet.Any,
 			expectedPass: "test pass phrase",
 		},
 		{
 			name:          "list all fungible tokens",
 			args:          []string{"fungible", "-k", "0"},
-			expectedKind:  backend.Fungible,
+			expectedKind:  tokenswallet.Fungible,
 			expectedAccNr: 0,
 		},
 		{
 			name:          "list all fungible tokens, encrypted wallet",
 			args:          []string{"fungible", "--pn", "test pass phrase"},
-			expectedKind:  backend.Fungible,
+			expectedKind:  tokenswallet.Fungible,
 			expectedPass:  "test pass phrase",
 			expectedAccNr: 0,
 		},
 		{
 			name:          "list all non-fungible tokens",
 			args:          []string{"non-fungible", "--key", "1"},
-			expectedKind:  backend.NonFungible,
+			expectedKind:  tokenswallet.NonFungible,
 			expectedAccNr: 1,
 		},
 		{
 			name:          "list all non-fungible tokens, encrypted wallet",
 			args:          []string{"non-fungible", "--pn", "test pass phrase", "-k", "2"},
-			expectedKind:  backend.NonFungible,
+			expectedKind:  tokenswallet.NonFungible,
 			expectedPass:  "test pass phrase",
 			expectedAccNr: 2,
 		},
@@ -185,7 +184,7 @@ func TestListTokensTypesCommandInputs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			exec := false
-			cmd := tokenCmdListTypes(&clitypes.WalletConfig{}, func(cmd *cobra.Command, config *clitypes.WalletConfig, accountNumber *uint64, kind backend.Kind) error {
+			cmd := tokenCmdListTypes(&clitypes.WalletConfig{}, func(cmd *cobra.Command, config *clitypes.WalletConfig, accountNumber *uint64, kind tokenswallet.Kind) error {
 				require.Equal(t, tt.expectedAccNr, *accountNumber)
 				require.Equal(t, tt.expectedKind, kind)
 				if len(tt.expectedPass) != 0 {
@@ -388,47 +387,19 @@ func TestWalletUpdateNonFungibleTokenDataCmd_Flags(t *testing.T) {
 }
 
 // tokenID == nil means first token will be considered as success
-func ensureTokenIndexed(t *testing.T, ctx context.Context, api *client.TokenBackend, ownerPubKey []byte, tokenID backend.TokenID) *backend.TokenUnit {
-	var res *backend.TokenUnit
+func ensureTokenIndexed(t *testing.T, ctx context.Context, api *rpc.TokensClient, ownerID []byte, tokenID tokenswallet.TokenID) *tokenswallet.TokenUnit {
+	var res *tokenswallet.TokenUnit
 	require.Eventually(t, func() bool {
-		offset := ""
-		for {
-			tokens, offset, err := api.GetTokens(ctx, backend.Any, ownerPubKey, offset, 0)
-			require.NoError(t, err)
-			for _, token := range tokens {
-				if tokenID == nil {
-					res = token
-					return true
-				}
-				if bytes.Equal(token.ID, tokenID) {
-					res = token
-					return true
-				}
+		tokenz, err := api.GetTokens(ctx, tokenswallet.Any, ownerID)
+		require.NoError(t, err)
+		for _, token := range tokenz {
+			if tokenID == nil {
+				res = token
+				return true
 			}
-			if offset == "" {
-				break
-			}
-		}
-		return false
-	}, 2*test.WaitDuration, test.WaitTick)
-	return res
-}
-
-func ensureTokenTypeIndexed(t *testing.T, ctx context.Context, api *client.TokenBackend, creatorPubKey []byte, typeID backend.TokenTypeID) *backend.TokenUnitType {
-	var res *backend.TokenUnitType
-	require.Eventually(t, func() bool {
-		offset := ""
-		for {
-			types, offset, err := api.GetTokenTypes(ctx, backend.Any, creatorPubKey, offset, 0)
-			require.NoError(t, err)
-			for _, t := range types {
-				if bytes.Equal(t.ID, typeID) {
-					res = t
-					return true
-				}
-			}
-			if offset == "" {
-				break
+			if tokenID.Eq(token.ID) {
+				res = token
+				return true
 			}
 		}
 		return false

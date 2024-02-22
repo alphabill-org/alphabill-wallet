@@ -78,7 +78,7 @@ func TestWalletCreateCmd_invalidSeed(t *testing.T) {
 func TestWalletGetBalanceCmd(t *testing.T) {
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
 	rpcUrl := mocksrv.StartServer(t, mocksrv.NewRpcServerMock(
-		mocksrv.WithOwnerBill(&abrpc.Unit[any]{
+		mocksrv.WithOwnerUnit(&abrpc.Unit[any]{
 			UnitID:         money.NewBillID(nil, []byte{1}),
 			Data:           money.BillData{V: 15 * 1e8},
 			OwnerPredicate: testutils.TestPubKey0Hash(t),
@@ -92,7 +92,7 @@ func TestWalletGetBalanceCmd(t *testing.T) {
 
 func TestWalletGetBalanceKeyCmdKeyFlag(t *testing.T) {
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic(), testutils.WithNumberOfAccounts(2))
-	rpcUrl := mocksrv.StartServer(t, mocksrv.NewRpcServerMock(mocksrv.WithOwnerBill(&abrpc.Unit[any]{
+	rpcUrl := mocksrv.StartServer(t, mocksrv.NewRpcServerMock(mocksrv.WithOwnerUnit(&abrpc.Unit[any]{
 		UnitID:         money.NewBillID(nil, []byte{1}),
 		Data:           money.BillData{V: 15 * 1e8},
 		OwnerPredicate: testutils.TestPubKey1Hash(t),
@@ -107,7 +107,7 @@ func TestWalletGetBalanceKeyCmdKeyFlag(t *testing.T) {
 
 func TestWalletGetBalanceCmdTotalFlag(t *testing.T) {
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
-	rpcUrl := mocksrv.StartServer(t, mocksrv.NewRpcServerMock(mocksrv.WithOwnerBill(&abrpc.Unit[any]{
+	rpcUrl := mocksrv.StartServer(t, mocksrv.NewRpcServerMock(mocksrv.WithOwnerUnit(&abrpc.Unit[any]{
 		UnitID:         money.NewBillID(nil, []byte{1}),
 		Data:           money.BillData{V: 15 * 1e8},
 		OwnerPredicate: testutils.TestPubKey0Hash(t),
@@ -120,7 +120,7 @@ func TestWalletGetBalanceCmdTotalFlag(t *testing.T) {
 
 func TestWalletGetBalanceCmdTotalWithKeyFlag(t *testing.T) {
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
-	rpcUrl := mocksrv.StartServer(t, mocksrv.NewRpcServerMock(mocksrv.WithOwnerBill(&abrpc.Unit[any]{
+	rpcUrl := mocksrv.StartServer(t, mocksrv.NewRpcServerMock(mocksrv.WithOwnerUnit(&abrpc.Unit[any]{
 		UnitID:         money.NewBillID(nil, []byte{1}),
 		Data:           money.BillData{V: 15 * 1e8},
 		OwnerPredicate: testutils.TestPubKey0Hash(t),
@@ -134,7 +134,7 @@ func TestWalletGetBalanceCmdTotalWithKeyFlag(t *testing.T) {
 func TestWalletGetBalanceCmdQuietFlag(t *testing.T) {
 	obsF := observability.NewFactory(t)
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
-	rpcUrl := mocksrv.StartServer(t, mocksrv.NewRpcServerMock(mocksrv.WithOwnerBill(&abrpc.Unit[any]{
+	rpcUrl := mocksrv.StartServer(t, mocksrv.NewRpcServerMock(mocksrv.WithOwnerUnit(&abrpc.Unit[any]{
 		UnitID:         money.NewBillID(nil, []byte{1}),
 		Data:           money.BillData{V: 15 * 1e8},
 		OwnerPredicate: testutils.TestPubKey0Hash(t),
@@ -174,12 +174,12 @@ func TestPubKeysCmd(t *testing.T) {
 func TestSendingFailsWithInsufficientBalance(t *testing.T) {
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
 	rpcUrl := mocksrv.StartServer(t, mocksrv.NewRpcServerMock(
-		mocksrv.WithOwnerBill(&abrpc.Unit[any]{
+		mocksrv.WithOwnerUnit(&abrpc.Unit[any]{
 			UnitID:         money.NewBillID(nil, []byte{8}),
 			Data:           money.BillData{V: 5 * 1e8},
 			OwnerPredicate: testutils.TestPubKey0Hash(t),
 		}),
-		mocksrv.WithOwnerBill(&abrpc.Unit[any]{
+		mocksrv.WithOwnerUnit(&abrpc.Unit[any]{
 			UnitID:         money.NewFeeCreditRecordID(nil, testutils.TestPubKey0Hash(t)),
 			Data:           unit.FeeCreditRecord{Balance: 1e8},
 			OwnerPredicate: testutils.TestPubKey0Hash(t),

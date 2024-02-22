@@ -3,6 +3,7 @@ package mocksrv
 import (
 	"context"
 	"crypto"
+	"errors"
 	"net"
 	"net/http"
 	"testing"
@@ -82,10 +83,24 @@ func NewRpcServerMock(opts ...Option) *MockService {
 	}
 }
 
-func WithOwnerBill(unit *abrpc.Unit[any]) Option {
+func WithOwnerUnit(unit *abrpc.Unit[any]) Option {
 	return func(o *Options) {
 		o.Units[string(unit.UnitID)] = unit
 		o.OwnerUnits[string(unit.OwnerPredicate)] = append(o.OwnerUnits[string(unit.OwnerPredicate)], unit.UnitID)
+	}
+}
+
+func WithUnit(unit *abrpc.Unit[any]) Option {
+	return func(o *Options) {
+		o.Units[string(unit.UnitID)] = unit
+	}
+}
+
+func WithUnits(units ...*abrpc.Unit[any]) Option {
+	return func(o *Options) {
+		for _, unit := range units {
+			o.Units[string(unit.UnitID)] = unit
+		}
 	}
 }
 
@@ -118,7 +133,11 @@ func (s *MockService) GetUnit(unitID types.UnitID, includeStateProof bool) (*abr
 	if s.Err != nil {
 		return nil, s.Err
 	}
-	return s.Units[string(unitID)], nil
+	u, ok := s.Units[string(unitID)]
+	if !ok {
+		return nil, errors.New("not found") // todo type safe error
+	}
+	return u, nil
 }
 
 func (s *MockService) GetUnitsByOwnerID(ownerID types.Bytes) ([]types.UnitID, error) {

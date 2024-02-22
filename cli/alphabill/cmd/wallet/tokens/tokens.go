@@ -1,15 +1,12 @@
 package tokens
 
 import (
-	"errors"
 	"fmt"
 	"mime"
-	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
-	"strings"
 
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/spf13/cobra"
@@ -17,12 +14,11 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
+	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	"github.com/alphabill-org/alphabill-wallet/util"
-	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
+	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
-	wallet "github.com/alphabill-org/alphabill-wallet/wallet/tokens"
-	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/backend"
-	tokensclient "github.com/alphabill-org/alphabill-wallet/wallet/tokens/client"
+	tokenswallet "github.com/alphabill-org/alphabill-wallet/wallet/tokens"
 )
 
 const (
@@ -62,8 +58,8 @@ const (
 	maxDecimalPlaces   = 8
 )
 
-type runTokenListTypesCmd func(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind backend.Kind) error
-type runTokenListCmd func(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind backend.Kind) error
+type runTokenListTypesCmd func(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind tokenswallet.Kind) error
+type runTokenListCmd func(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind tokenswallet.Kind) error
 
 func NewTokenCmd(config *types.WalletConfig) *cobra.Command {
 	cmd := &cobra.Command{
@@ -79,7 +75,7 @@ func NewTokenCmd(config *types.WalletConfig) *cobra.Command {
 	cmd.AddCommand(tokenCmdListTypes(config, execTokenCmdListTypes))
 	cmd.AddCommand(tokenCmdLock(config))
 	cmd.AddCommand(tokenCmdUnlock(config))
-	cmd.PersistentFlags().StringP(args.AlphabillApiURLCmdName, "r", args.DefaultTokensBackendApiURL, "alphabill tokens backend API uri to connect to")
+	cmd.PersistentFlags().StringP(args.RpcUrl, "r", args.DefaultTokensRpcUrl, "rpc node url")
 	cmd.PersistentFlags().StringP(args.WaitForConfCmdName, "w", "true", "waits for transaction confirmation on the blockchain, otherwise just broadcasts the transaction")
 	return cmd
 }
@@ -191,7 +187,7 @@ func execTokenCmdNewTypeFungible(cmd *cobra.Command, config *types.WalletConfig)
 	if err != nil {
 		return err
 	}
-	a := wallet.CreateFungibleTokenTypeAttributes{
+	a := tokenswallet.CreateFungibleTokenTypeAttributes{
 		Symbol:                   symbol,
 		Name:                     name,
 		Icon:                     icon,
@@ -277,7 +273,7 @@ func execTokenCmdNewTypeNonFungible(cmd *cobra.Command, config *types.WalletConf
 	if err != nil {
 		return err
 	}
-	a := wallet.CreateNonFungibleTokenTypeAttributes{
+	a := tokenswallet.CreateNonFungibleTokenTypeAttributes{
 		Symbol:                   symbol,
 		Name:                     name,
 		Icon:                     icon,
@@ -416,7 +412,7 @@ func execTokenCmdNewTokenNonFungible(cmd *cobra.Command, config *types.WalletCon
 	if err != nil {
 		return err
 	}
-	tokenId, err := getHexFlag(cmd, cmdFlagTokenId)
+	tokenID, err := getHexFlag(cmd, cmdFlagTokenId)
 	if err != nil {
 		return err
 	}
@@ -450,7 +446,7 @@ func execTokenCmdNewTokenNonFungible(cmd *cobra.Command, config *types.WalletCon
 	if err != nil {
 		return err
 	}
-	a := wallet.MintNonFungibleTokenAttributes{
+	a := tokenswallet.MintNonFungibleTokenAttributes{
 		Bearer:              bearerPredicate,
 		Name:                name,
 		NftType:             typeId,
@@ -458,7 +454,7 @@ func execTokenCmdNewTokenNonFungible(cmd *cobra.Command, config *types.WalletCon
 		Data:                data,
 		DataUpdatePredicate: dataUpdatePredicate,
 	}
-	result, err := tw.NewNFT(cmd.Context(), accountNumber, a, tokenId, ci)
+	result, err := tw.NewNFT(cmd.Context(), accountNumber, a, tokenID, ci)
 	if err != nil {
 		return err
 	}
@@ -613,7 +609,7 @@ func execTokenCmdSendNonFungible(cmd *cobra.Command, config *types.WalletConfig)
 	}
 	defer tw.Shutdown()
 
-	tokenId, err := getHexFlag(cmd, cmdFlagTokenId)
+	tokenID, err := getHexFlag(cmd, cmdFlagTokenId)
 	if err != nil {
 		return err
 	}
@@ -628,7 +624,7 @@ func execTokenCmdSendNonFungible(cmd *cobra.Command, config *types.WalletConfig)
 		return err
 	}
 
-	result, err := tw.TransferNFT(cmd.Context(), accountNumber, tokenId, pubKey, ib)
+	result, err := tw.TransferNFT(cmd.Context(), accountNumber, tokenID, pubKey, ib)
 	if err != nil {
 		return err
 	}
@@ -667,14 +663,14 @@ func execTokenCmdDC(cmd *cobra.Command, config *types.WalletConfig, accountNumbe
 	if err != nil {
 		return err
 	}
-	var types []backend.TokenTypeID
+	var typez []tokenswallet.TokenTypeID
 	for _, tokenType := range typeIDStrs {
-		typeBytes, err := wallet.DecodeHexOrEmpty(tokenType)
+		typeBytes, err := tokenswallet.DecodeHexOrEmpty(tokenType)
 		if err != nil {
 			return err
 		}
 		if len(typeBytes) > 0 {
-			types = append(types, typeBytes)
+			typez = append(typez, typeBytes)
 		}
 	}
 	ib, err := readPredicateInput(cmd, cmdFlagInheritBearerClauseInput, *accountNumber, tw.GetAccountManager())
@@ -682,7 +678,7 @@ func execTokenCmdDC(cmd *cobra.Command, config *types.WalletConfig, accountNumbe
 		return err
 	}
 
-	results, err := tw.CollectDust(cmd.Context(), *accountNumber, types, ib)
+	results, err := tw.CollectDust(cmd.Context(), *accountNumber, typez, ib)
 	if err != nil {
 		return err
 	}
@@ -718,7 +714,7 @@ func execTokenCmdUpdateNFTData(cmd *cobra.Command, config *types.WalletConfig) e
 		return err
 	}
 
-	tokenId, err := getHexFlag(cmd, cmdFlagTokenId)
+	tokenID, err := getHexFlag(cmd, cmdFlagTokenId)
 	if err != nil {
 		return err
 	}
@@ -739,7 +735,7 @@ func execTokenCmdUpdateNFTData(cmd *cobra.Command, config *types.WalletConfig) e
 		return err
 	}
 
-	result, err := tw.UpdateNFTData(cmd.Context(), accountNumber, tokenId, data, du)
+	result, err := tw.UpdateNFTData(cmd.Context(), accountNumber, tokenID, data, du)
 	if err != nil {
 		return err
 	}
@@ -755,7 +751,7 @@ func tokenCmdList(config *types.WalletConfig, runner runTokenListCmd) *cobra.Com
 		Use:   "list",
 		Short: "lists all available tokens",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runner(cmd, config, &accountNumber, backend.Any)
+			return runner(cmd, config, &accountNumber, tokenswallet.Any)
 		},
 	}
 	// add persistent password flags
@@ -779,7 +775,7 @@ func tokenCmdListFungible(config *types.WalletConfig, runner runTokenListCmd, ac
 		Use:   "fungible",
 		Short: "lists fungible tokens",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runner(cmd, config, accountNumber, backend.Fungible)
+			return runner(cmd, config, accountNumber, tokenswallet.Fungible)
 		},
 	}
 
@@ -794,7 +790,7 @@ func tokenCmdListNonFungible(config *types.WalletConfig, runner runTokenListCmd,
 		Use:   "non-fungible",
 		Short: "lists non-fungible tokens",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runner(cmd, config, accountNumber, backend.NonFungible)
+			return runner(cmd, config, accountNumber, tokenswallet.NonFungible)
 		},
 	}
 
@@ -806,7 +802,7 @@ func tokenCmdListNonFungible(config *types.WalletConfig, runner runTokenListCmd,
 	return cmd
 }
 
-func execTokenCmdList(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind backend.Kind) error {
+func execTokenCmdList(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind tokenswallet.Kind) error {
 	tw, err := initTokensWallet(cmd, config)
 	if err != nil {
 		return err
@@ -829,7 +825,7 @@ func execTokenCmdList(cmd *cobra.Command, config *types.WalletConfig, accountNum
 		if err != nil {
 			return err
 		}
-		if kind == backend.Any || kind == backend.NonFungible {
+		if kind == tokenswallet.Any || kind == tokenswallet.NonFungible {
 			withTokenURI, err = cmd.Flags().GetBool(cmdFlagWithTokenURI)
 			if err != nil {
 				return err
@@ -877,13 +873,13 @@ func execTokenCmdList(cmd *cobra.Command, config *types.WalletConfig, accountNum
 			}
 			kind := fmt.Sprintf(" (%v)", tok.Kind)
 
-			if tok.Kind == backend.Fungible {
+			if tok.Kind == tokenswallet.Fungible {
 				amount := util.AmountToString(tok.Amount, tok.Decimals)
 				config.Base.ConsoleWriter.Println(fmt.Sprintf("ID='%s', symbol='%s', amount='%v', token-type='%s', locked='%s'",
-					tok.ID, tok.Symbol, amount, tok.TypeID, sdk.LockReason(tok.Locked).String()) + typeName + kind)
+					tok.ID, tok.Symbol, amount, tok.TypeID, wallet.LockReason(tok.Locked).String()) + typeName + kind)
 			} else {
 				config.Base.ConsoleWriter.Println(fmt.Sprintf("ID='%s', symbol='%s', name='%s', token-type='%s', locked='%s'",
-					tok.ID, tok.Symbol, tok.NftName, tok.TypeID, sdk.LockReason(tok.Locked).String()) + typeName + nftURI + nftData + kind)
+					tok.ID, tok.Symbol, tok.NftName, tok.TypeID, wallet.LockReason(tok.Locked).String()) + typeName + nftURI + nftData + kind)
 			}
 		}
 	}
@@ -899,7 +895,7 @@ func tokenCmdListTypes(config *types.WalletConfig, runner runTokenListTypesCmd) 
 		Use:   "list-types",
 		Short: "lists token types",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runner(cmd, config, &accountNumber, backend.Any)
+			return runner(cmd, config, &accountNumber, tokenswallet.Any)
 		},
 	}
 	// add password flags as persistent
@@ -911,20 +907,20 @@ func tokenCmdListTypes(config *types.WalletConfig, runner runTokenListTypesCmd) 
 		Use:   "fungible",
 		Short: "lists fungible types",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runner(cmd, config, &accountNumber, backend.Fungible)
+			return runner(cmd, config, &accountNumber, tokenswallet.Fungible)
 		},
 	})
 	cmd.AddCommand(&cobra.Command{
 		Use:   "non-fungible",
 		Short: "lists non-fungible types",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runner(cmd, config, &accountNumber, backend.NonFungible)
+			return runner(cmd, config, &accountNumber, tokenswallet.NonFungible)
 		},
 	})
 	return cmd
 }
 
-func execTokenCmdListTypes(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind backend.Kind) error {
+func execTokenCmdListTypes(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind tokenswallet.Kind) error {
 	tw, err := initTokensWallet(cmd, config)
 	if err != nil {
 		return err
@@ -1040,8 +1036,8 @@ func execTokenCmdUnlock(cmd *cobra.Command, config *types.WalletConfig) error {
 	return err
 }
 
-func initTokensWallet(cmd *cobra.Command, config *types.WalletConfig) (*wallet.Wallet, error) {
-	backendURL, err := cmd.Flags().GetString(args.AlphabillApiURLCmdName)
+func initTokensWallet(cmd *cobra.Command, config *types.WalletConfig) (*tokenswallet.Wallet, error) {
+	rpcUrl, err := cmd.Flags().GetString(args.RpcUrl)
 	if err != nil {
 		return nil, err
 	}
@@ -1057,33 +1053,31 @@ func initTokensWallet(cmd *cobra.Command, config *types.WalletConfig) (*wallet.W
 	if err != nil {
 		return nil, err
 	}
-	if !strings.HasPrefix(backendURL, "http://") && !strings.HasPrefix(backendURL, "https://") {
-		backendURL = "http://" + backendURL
-	}
-	addr, err := url.Parse(backendURL)
+	rpcClient, err := rpc.DialContext(cmd.Context(), args.BuildRpcUrl(rpcUrl))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to dial rpc client: %w", err)
 	}
-	backendClient := tokensclient.New(*addr, config.Base.Observe)
-	infoResponse, err := backendClient.GetInfo(cmd.Context())
-	if err != nil {
-		return nil, err
-	}
-	tokensTypeVar := types.TokensType
-	if !strings.HasPrefix(infoResponse.Name, tokensTypeVar.String()) {
-		return nil, errors.New("invalid wallet backend API URL provided for tokens partition")
-	}
-	return wallet.New(tokens.DefaultSystemIdentifier, backendClient, am, confirmTx, nil, config.Base.Observe.Logger())
+	tokensClient := rpc.NewTokensClient(rpcClient)
+	// TODO add info endpoint to rpc client?
+	//infoResponse, err := backendClient.GetInfo(cmd.Context())
+	//if err != nil {
+	//	return nil, err
+	//}
+	//tokensTypeVar := types.TokensType
+	//if !strings.HasPrefix(infoResponse.Name, tokensTypeVar.String()) {
+	//	return nil, errors.New("invalid wallet backend API URL provided for tokens partition")
+	//}
+	return tokenswallet.New(tokens.DefaultSystemIdentifier, tokensClient, am, confirmTx, nil, config.Base.Observe.Logger())
 }
 
-func readParentTypeInfo(cmd *cobra.Command, keyNr uint64, am account.Manager) (backend.TokenTypeID, []*wallet.PredicateInput, error) {
+func readParentTypeInfo(cmd *cobra.Command, keyNr uint64, am account.Manager) (tokenswallet.TokenTypeID, []*tokenswallet.PredicateInput, error) {
 	parentType, err := getHexFlag(cmd, cmdFlagParentType)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	if len(parentType) == 0 {
-		return nil, []*wallet.PredicateInput{{Argument: nil}}, nil
+		return nil, []*tokenswallet.PredicateInput{{Argument: nil}}, nil
 	}
 
 	creationInputs, err := readPredicateInput(cmd, cmdFlagSybTypeClauseInput, keyNr, am)
@@ -1094,15 +1088,15 @@ func readParentTypeInfo(cmd *cobra.Command, keyNr uint64, am account.Manager) (b
 	return parentType, creationInputs, nil
 }
 
-func readPredicateInput(cmd *cobra.Command, flag string, keyNr uint64, am account.Manager) ([]*wallet.PredicateInput, error) {
+func readPredicateInput(cmd *cobra.Command, flag string, keyNr uint64, am account.Manager) ([]*tokenswallet.PredicateInput, error) {
 	creationInputStrs, err := cmd.Flags().GetStringSlice(flag)
 	if err != nil {
 		return nil, err
 	}
 	if len(creationInputStrs) == 0 {
-		return []*wallet.PredicateInput{{Argument: nil}}, nil
+		return []*tokenswallet.PredicateInput{{Argument: nil}}, nil
 	}
-	creationInputs, err := wallet.ParsePredicates(creationInputStrs, keyNr, am)
+	creationInputs, err := tokenswallet.ParsePredicates(creationInputStrs, keyNr, am)
 	if err != nil {
 		return nil, err
 	}
@@ -1121,7 +1115,7 @@ func parsePredicateClauseCmd(cmd *cobra.Command, flag string, keyNr uint64, am a
 	if err != nil {
 		return nil, err
 	}
-	return wallet.ParsePredicateClause(clause, keyNr, am)
+	return tokenswallet.ParsePredicateClause(clause, keyNr, am)
 }
 
 func readNFTData(cmd *cobra.Command, required bool) ([]byte, error) {
@@ -1156,11 +1150,11 @@ func setHexFlag(cmd *cobra.Command, name string, value []byte, usage string) {
 	cmd.Flags().Var(&hexFlag, name, usage)
 }
 
-func readIconFile(iconFilePath string) (*wallet.Icon, error) {
+func readIconFile(iconFilePath string) (*tokenswallet.Icon, error) {
 	if len(iconFilePath) == 0 {
 		return nil, nil
 	}
-	icon := &wallet.Icon{}
+	icon := &tokenswallet.Icon{}
 
 	ext := filepath.Ext(iconFilePath)
 	if len(ext) == 0 {

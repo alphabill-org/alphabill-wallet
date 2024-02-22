@@ -1,8 +1,8 @@
 package testutils
 
 import (
+	"context"
 	"encoding/hex"
-	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -11,10 +11,11 @@ import (
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/stretchr/testify/require"
 
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
+	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	tokenswallet "github.com/alphabill-org/alphabill-wallet/wallet/tokens"
-	tokensclient "github.com/alphabill-org/alphabill-wallet/wallet/tokens/client"
 )
 
 const (
@@ -64,12 +65,14 @@ func CreateNewTokenWallet(t *testing.T, addr string) (*tokenswallet.Wallet, stri
 	require.NoError(t, am.CreateKeys(""))
 
 	o := testobserve.NewFactory(t)
-	clientURL, err := url.Parse(addr)
+	rpcClient, err := rpc.DialContext(context.Background(), args.BuildRpcUrl(addr))
 	require.NoError(t, err)
-	backendClient := tokensclient.New(*clientURL, o.DefaultObserver())
-	w, err := tokenswallet.New(tokens.DefaultSystemIdentifier, backendClient, am, false, nil, o.DefaultLogger())
+	t.Cleanup(rpcClient.Close)
+	tokensRpcClient := rpc.NewTokensClient(rpcClient)
+	w, err := tokenswallet.New(tokens.DefaultSystemIdentifier, tokensRpcClient, am, false, nil, o.DefaultLogger())
 	require.NoError(t, err)
 	require.NotNil(t, w)
+	t.Cleanup(w.Shutdown)
 
 	return w, homeDir
 }
