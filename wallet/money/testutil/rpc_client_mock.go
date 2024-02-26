@@ -88,64 +88,64 @@ func WithError(err error) Option {
 	}
 }
 
-func (b *RpcClientMock) GetRoundNumber(ctx context.Context) (uint64, error) {
-	if b.Err != nil {
-		return 0, b.Err
+func (c *RpcClientMock) GetRoundNumber(ctx context.Context) (uint64, error) {
+	if c.Err != nil {
+		return 0, c.Err
 	}
-	return b.RoundNumber, nil
+	return c.RoundNumber, nil
 }
 
-func (b *RpcClientMock) GetBill(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.Bill, error) {
-	if b.Err != nil {
-		return nil, b.Err
+func (c *RpcClientMock) GetBill(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.Bill, error) {
+	if c.Err != nil {
+		return nil, c.Err
 	}
-	bill, ok := b.Bills[string(unitID)]
+	bill, ok := c.Bills[string(unitID)]
 	if ok {
 		return bill, nil
 	}
 	return nil, api.ErrNotFound
 }
 
-func (b *RpcClientMock) GetFeeCreditRecord(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
-	if b.Err != nil {
-		return nil, b.Err
+func (c *RpcClientMock) GetFeeCreditRecord(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
+	if c.Err != nil {
+		return nil, c.Err
 	}
-	fcb, ok := b.FeeCreditBills[string(unitID)]
+	fcb, ok := c.FeeCreditBills[string(unitID)]
 	if ok {
 		return fcb, nil
 	}
 	return nil, api.ErrNotFound
 }
 
-func (b *RpcClientMock) GetUnitsByOwnerID(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
-	if b.Err != nil {
-		return nil, b.Err
+func (c *RpcClientMock) GetUnitsByOwnerID(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
+	if c.Err != nil {
+		return nil, c.Err
 	}
-	if b.OwnerUnits != nil {
-		return b.OwnerUnits, nil
+	if c.OwnerUnits != nil {
+		return c.OwnerUnits, nil
 	}
 	return nil, nil
 }
 
-func (b *RpcClientMock) SendTransaction(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
-	if b.Err != nil {
-		return nil, b.Err
+func (c *RpcClientMock) SendTransaction(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
+	if c.Err != nil {
+		return nil, c.Err
 	}
-	b.RecordedTxs = append(b.RecordedTxs, tx)
+	c.RecordedTxs = append(c.RecordedTxs, tx)
 	return tx.Hash(crypto.SHA256), nil
 }
 
-func (b *RpcClientMock) GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TransactionRecord, *types.TxProof, error) {
-	if b.Err != nil {
-		return nil, nil, b.Err
+func (c *RpcClientMock) GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TransactionRecord, *types.TxProof, error) {
+	if c.Err != nil {
+		return nil, nil, c.Err
 	}
-	txProofs, ok := b.TxProofs[string(txHash)]
+	txProofs, ok := c.TxProofs[string(txHash)]
 	if ok {
 		return txProofs.TxRecord, txProofs.TxProof, nil
 	}
 	// return proof for sent tx if one exists
-	if len(b.RecordedTxs) > 0 {
-		for _, tx := range b.RecordedTxs {
+	if len(c.RecordedTxs) > 0 {
+		for _, tx := range c.RecordedTxs {
 			if bytes.Equal(txHash, tx.Hash(crypto.SHA256)) {
 				txr := &types.TransactionRecord{
 					TransactionOrder: tx,
@@ -158,9 +158,9 @@ func (b *RpcClientMock) GetTransactionProof(ctx context.Context, txHash types.By
 	return nil, nil, api.ErrNotFound
 }
 
-func (b *RpcClientMock) GetBlock(ctx context.Context, blockNumber uint64) (*types.Block, error) {
-	if b.Err != nil {
-		return nil, b.Err
+func (c *RpcClientMock) GetBlock(ctx context.Context, blockNumber uint64) (*types.Block, error) {
+	if c.Err != nil {
+		return nil, c.Err
 	}
 	return &types.Block{}, nil
 }

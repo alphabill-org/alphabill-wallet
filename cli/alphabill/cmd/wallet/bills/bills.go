@@ -3,6 +3,7 @@ package bills
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	moneytx "github.com/alphabill-org/alphabill/txsystem/money"
@@ -163,7 +164,7 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 
 	fcrID := money.FeeCreditRecordIDFormPublicKey(nil, accountKey.PubKey)
 	fcb, err := moneyClient.GetFeeCreditRecord(cmd.Context(), fcrID, false)
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "not found") { // TODO type safe err check
 		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
 	}
 	if fcb.Balance() < txbuilder.MaxFee {
@@ -238,7 +239,7 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	}
 	fcrID := money.FeeCreditRecordIDFormPublicKey(nil, accountKey.PubKey)
 	fcb, err := moneyClient.GetFeeCreditRecord(cmd.Context(), fcrID, false)
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "not found") { // TODO type safe err check
 		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
 	}
 	if fcb.Balance() < txbuilder.MaxFee {
