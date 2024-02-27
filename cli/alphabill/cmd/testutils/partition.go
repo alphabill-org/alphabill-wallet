@@ -35,7 +35,7 @@ func CreateMoneyPartition(t *testing.T, genesisConfig *testutil.MoneyGenesisConf
 	moneyPart, err := testpartition.NewPartition(t, nodeCount, func(tb map[string]abcrypto.Verifier) txsystem.TransactionSystem {
 		genesisState = genesisState.Clone()
 		system, err := money.NewTxSystem(
-			testlogger.New(t),
+			testobserve.Default(t),
 			money.WithSystemIdentifier(money.DefaultSystemIdentifier),
 			money.WithHashAlgorithm(crypto.SHA256),
 			money.WithSystemDescriptionRecords([]*genesis.SystemDescriptionRecord{
@@ -127,7 +127,7 @@ func CreateTokensPartition(t *testing.T) *testpartition.NodePartition {
 		func(tb map[string]abcrypto.Verifier) txsystem.TransactionSystem {
 			tokensState = tokensState.Clone()
 			system, err := tokens.NewTxSystem(
-				testlogger.New(t),
+				testobserve.Default(t),
 				tokens.WithState(tokensState),
 				tokens.WithTrustBase(tb),
 			)
