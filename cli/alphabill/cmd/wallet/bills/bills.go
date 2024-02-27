@@ -146,20 +146,19 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 		return fmt.Errorf("failed to load account key: %w", err)
 	}
 
-	//// TODO add info endpoint to rpc client?
-	//restClient, err := client.New(config.RpcUrl, config.WalletConfig.Base.Observe)
-	//infoResponse, err := restClient.GetInfo(cmd.Context())
-	//if err != nil {
-	//	return err
-	//}
-	//moneyTypeVar := clitypes.MoneyType
-	//if !strings.HasPrefix(infoResponse.Name, moneyTypeVar.String()) {
-	//	return errors.New("invalid wallet backend API URL provided for money partition")
-	//}
-
 	moneyClient, err := rpc.DialContext(cmd.Context(), config.GetRpcUrl())
 	if err != nil {
 		return fmt.Errorf("failed to dial money rpc: %w", err)
+	}
+
+	adminClient := rpc.NewAdminClient(moneyClient.Client())
+	infoResponse, err := adminClient.GetNodeInfo(cmd.Context())
+	if err != nil {
+		return fmt.Errorf("failed to fetch node info rpc: %w", err)
+	}
+	moneyTypeVar := clitypes.MoneyType
+	if !strings.HasPrefix(infoResponse.Name, moneyTypeVar.String()) {
+		return errors.New("invalid rpc url provided for money partition")
 	}
 
 	fcrID := money.FeeCreditRecordIDFormPublicKey(nil, accountKey.PubKey)
@@ -222,21 +221,21 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 		return fmt.Errorf("failed to load account key: %w", err)
 	}
 
-	//// TODO add info endpoint to rpc client?
-	//restClient, err := client.New(config.RpcUrl, config.WalletConfig.Base.Observe)
-	//infoResponse, err := restClient.GetInfo(cmd.Context())
-	//if err != nil {
-	//	return err
-	//}
-	//moneyTypeVar := clitypes.MoneyType
-	//if !strings.HasPrefix(infoResponse.Name, moneyTypeVar.String()) {
-	//	return errors.New("invalid wallet backend API URL provided for money partition")
-	//}
-
 	moneyClient, err := rpc.DialContext(cmd.Context(), config.GetRpcUrl())
 	if err != nil {
 		return fmt.Errorf("failed to dial money rpc: %w", err)
 	}
+
+	adminClient := rpc.NewAdminClient(moneyClient.Client())
+	infoResponse, err := adminClient.GetNodeInfo(cmd.Context())
+	if err != nil {
+		return fmt.Errorf("failed to fetch node info rpc: %w", err)
+	}
+	moneyTypeVar := clitypes.MoneyType
+	if !strings.HasPrefix(infoResponse.Name, moneyTypeVar.String()) {
+		return errors.New("invalid rpc url provided for money partition")
+	}
+
 	fcrID := money.FeeCreditRecordIDFormPublicKey(nil, accountKey.PubKey)
 	fcb, err := moneyClient.GetFeeCreditRecord(cmd.Context(), fcrID, false)
 	if err != nil && !strings.Contains(err.Error(), "not found") { // TODO type safe err check

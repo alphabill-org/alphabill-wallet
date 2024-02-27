@@ -163,7 +163,7 @@ func startMoneyOnlyAlphabillPartition(t *testing.T, genesisConfig *testutil.Mone
 	genesisConfig.DCMoneySupplyValue = 10000 * 1e8
 	genesisConfig.SDRs = createSDRs()
 	genesisState := testutil.MoneyGenesisState(t, genesisConfig)
-	mPart, err := testpartition.NewPartition(t, 1, func(tb map[string]abcrypto.Verifier) txsystem.TransactionSystem {
+	mPart, err := testpartition.NewPartition(t, "money node", 1, func(tb map[string]abcrypto.Verifier) txsystem.TransactionSystem {
 		system, err := money.NewTxSystem(
 			logger.New(t),
 			money.WithSystemIdentifier(money.DefaultSystemIdentifier),

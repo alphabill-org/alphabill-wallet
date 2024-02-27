@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -125,41 +124,6 @@ func (e *EvmClient) GetTxProof(ctx context.Context, _ types.UnitID, txHash sdk.T
 		TxRecord: proof.TxRecord,
 		TxProof:  proof.TxProof,
 	}, nil
-}
-
-func (e *EvmClient) GetInfo(ctx context.Context) (*sdk.InfoResponse, error) {
-	var infoResponse *sdk.InfoResponse
-	addr := e.getURL(apiPathPrefix, "info")
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, addr.String(), nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to build http request: %w", err)
-	}
-	req.Header.Set("User-Agent", clientUserAgent)
-	rsp, err := e.hc.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("request to backend failed: %w", err)
-	}
-	if err = decodeJsonResponse(rsp, http.StatusOK, &infoResponse, false); err != nil {
-		return nil, err
-	}
-	return infoResponse, nil
-}
-
-func decodeJsonResponse(rsp *http.Response, successStatus int, data any, allowEmptyResponse bool) error {
-	defer rsp.Body.Close()
-	if rsp.StatusCode == successStatus {
-		err := json.NewDecoder(rsp.Body).Decode(data)
-		if err != nil && (!errors.Is(err, io.EOF) || !allowEmptyResponse) {
-			return fmt.Errorf("failed to decode response body: %w", err)
-		}
-		return nil
-	}
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to read response body: %s", rsp.Status)
-	}
-	msg := fmt.Sprintf("node responded %s: %s", rsp.Status, string(bodyBytes))
-	return errors.New(msg)
 }
 
 // GetBalance - reads account balance

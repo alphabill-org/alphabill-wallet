@@ -17,8 +17,8 @@ import (
 )
 
 func TestRpcClient(t *testing.T) {
-	service := mocksrv.NewRpcServerMock()
-	client := startServerAndClient(t, service)
+	service := mocksrv.NewStateServiceMock()
+	client := startStateServer(t, service)
 
 	t.Run("GetRoundNumber_OK", func(t *testing.T) {
 		service.Reset()
@@ -192,8 +192,8 @@ func TestRpcClient(t *testing.T) {
 	})
 }
 
-func startServerAndClient(t *testing.T, service *mocksrv.MockService) *Client {
-	srv := mocksrv.StartServer(t, service)
+func startStateServer(t *testing.T, service *mocksrv.StateServiceMock) *Client {
+	srv := mocksrv.StartServer(t, map[string]interface{}{"state": service})
 
 	client, err := DialContext(context.Background(), "http://"+srv)
 	require.NoError(t, err)

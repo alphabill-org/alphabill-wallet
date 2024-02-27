@@ -55,6 +55,7 @@ type RootPartition struct {
 
 type NodePartition struct {
 	systemId         types.SystemID
+	SystemName       string
 	partitionGenesis *genesis.PartitionGenesis
 	genesisState     *state.State
 	txSystemFunc     func(trustBase map[string]abcrypto.Verifier) txsystem.TransactionSystem
@@ -256,12 +257,13 @@ func (r *RootPartition) start(ctx context.Context) error {
 	return nil
 }
 
-func NewPartition(t *testing.T, nodeCount uint8, txSystemProvider func(trustBase map[string]abcrypto.Verifier) txsystem.TransactionSystem, systemIdentifier types.SystemID, state *state.State) (abPartition *NodePartition, err error) {
+func NewPartition(t *testing.T, systemName string, nodeCount uint8, txSystemProvider func(trustBase map[string]abcrypto.Verifier) txsystem.TransactionSystem, systemIdentifier types.SystemID, state *state.State) (abPartition *NodePartition, err error) {
 	if nodeCount < 1 {
 		return nil, fmt.Errorf("invalid count of partition Nodes: %d", nodeCount)
 	}
 	abPartition = &NodePartition{
 		systemId:     systemIdentifier,
+		SystemName:   systemName,
 		txSystemFunc: txSystemProvider,
 		genesisState: state,
 		Nodes:        make([]*partitionNode, nodeCount),
