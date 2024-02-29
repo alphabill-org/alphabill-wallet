@@ -12,12 +12,12 @@ import (
 	"github.com/alphabill-org/alphabill/txsystem/fc/transactions"
 	"github.com/alphabill-org/alphabill/types"
 
+	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	txbuilder "github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
-	"github.com/alphabill-org/alphabill-wallet/wallet/unitlock"
 )
 
 const (
@@ -385,12 +385,12 @@ func (w *FeeManager) addFees(ctx context.Context, accountKey *account.AccountKey
 	}
 
 	// filter locked bills
-	bills, _ = filterSlice(bills, func(b *api.Bill) (bool, error) {
+	bills, _ = util.FilterSlice(bills, func(b *api.Bill) (bool, error) {
 		return !b.IsLocked(), nil
 	})
 
 	// filter bills of too small value
-	bills, _ = filterSlice(bills, func(b *api.Bill) (bool, error) {
+	bills, _ = util.FilterSlice(bills, func(b *api.Bill) (bool, error) {
 		return b.Value() >= MinimumFeeAmount, nil
 	})
 
@@ -509,7 +509,7 @@ func (w *FeeManager) sendLockFCTx(ctx context.Context, accountKey *account.Accou
 		accountKey,
 		w.targetPartitionSystemID,
 		fcb,
-		unitlock.LockReasonAddFees,
+		wallet.LockReasonAddFees,
 		targetPartitionTimeout,
 	)
 	if err != nil {
@@ -736,7 +736,7 @@ func (w *FeeManager) reclaimFees(ctx context.Context, accountKey *account.Accoun
 	if err != nil {
 		return nil, err
 	}
-	bills, _ = filterSlice(bills, func(b *api.Bill) (bool, error) {
+	bills, _ = util.FilterSlice(bills, func(b *api.Bill) (bool, error) {
 		return !b.IsLocked(), nil
 	})
 	if len(bills) == 0 {
@@ -827,7 +827,7 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 		w.targetPartitionSystemID,
 		feeCtx.TargetBillID,
 		feeCtx.TargetBillBacklink,
-		unitlock.LockReasonReclaimFees,
+		wallet.LockReasonReclaimFees,
 		timeout,
 	)
 	if err != nil {
@@ -1105,21 +1105,6 @@ func (c AddFeeCmd) isValid() error {
 		return ErrMinimumFeeAmount
 	}
 	return nil
-}
-
-// filterSlice generic function for filtering a slice
-func filterSlice[T any](src []*T, filterFn func(*T) (bool, error)) ([]*T, error) {
-	var res []*T
-	for _, b := range src {
-		ok, err := filterFn(b)
-		if err != nil {
-			return nil, err
-		}
-		if ok {
-			res = append(res, b)
-		}
-	}
-	return res, nil
 }
 
 func (p *AddFeeTxProofs) GetFees() uint64 {

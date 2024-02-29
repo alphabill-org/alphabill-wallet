@@ -28,7 +28,6 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
-	"github.com/alphabill-org/alphabill-wallet/wallet/unitlock"
 )
 
 var (
@@ -73,15 +72,11 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 	require.NoError(t, err)
 	defer moneyClient.Close()
 
-	unitLocker, err := unitlock.NewUnitLocker(dir)
-	require.NoError(t, err)
-	defer unitLocker.Close()
-
 	feeManagerDB, err := fees.NewFeeManagerDB(dir)
 	require.NoError(t, err)
 	defer feeManagerDB.Close()
 
-	w, err := LoadExistingWallet(am, unitLocker, feeManagerDB, moneyClient, observe.Logger())
+	w, err := LoadExistingWallet(am, feeManagerDB, moneyClient, observe.Logger())
 	require.NoError(t, err)
 	defer w.Close()
 

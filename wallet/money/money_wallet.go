@@ -22,7 +22,6 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/dc"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
-	"github.com/alphabill-org/alphabill-wallet/wallet/unitlock"
 )
 
 const (
@@ -69,14 +68,6 @@ type (
 		CountDCBills bool
 	}
 
-	UnitLocker interface {
-		LockUnit(lockedBill *unitlock.LockedUnit) error
-		UnlockUnit(accountID, unitID []byte) error
-		GetUnit(accountID, unitID []byte) (*unitlock.LockedUnit, error)
-		GetUnits(accountID []byte) ([]*unitlock.LockedUnit, error)
-		Close() error
-	}
-
 	DustCollectionResult struct {
 		AccountIndex         uint64
 		DustCollectionResult *dc.DustCollectionResult // NB! can be nil
@@ -90,11 +81,11 @@ func CreateNewWallet(am account.Manager, mnemonic string) error {
 	return createMoneyWallet(mnemonic, am)
 }
 
-func LoadExistingWallet(am account.Manager, unitLocker UnitLocker, feeManagerDB fees.FeeManagerDB, rpcClient RpcClient, log *slog.Logger) (*Wallet, error) {
+func LoadExistingWallet(am account.Manager, feeManagerDB fees.FeeManagerDB, rpcClient RpcClient, log *slog.Logger) (*Wallet, error) {
 	moneySystemID := money.DefaultSystemIdentifier
 	moneyTxPublisher := NewTxPublisher(rpcClient, log)
 	feeManager := fees.NewFeeManager(am, feeManagerDB, moneySystemID, rpcClient, FeeCreditRecordIDFormPublicKey, moneySystemID, rpcClient, FeeCreditRecordIDFormPublicKey, log)
-	dustCollector := dc.NewDustCollector(moneySystemID, maxBillsForDustCollection, txTimeoutBlockCount, rpcClient, unitLocker, log)
+	dustCollector := dc.NewDustCollector(moneySystemID, maxBillsForDustCollection, txTimeoutBlockCount, rpcClient, log)
 	return &Wallet{
 		am:            am,
 		rpcClient:     rpcClient,
