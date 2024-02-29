@@ -7,12 +7,13 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-wallet/wallet/tokens"
 	"github.com/alphabill-org/alphabill/rpc"
 	tokentxs "github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/client/rpc/mocksrv"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
+	"github.com/alphabill-org/alphabill-wallet/wallet/tokens"
 )
 
 func TestTokensRpcClient(t *testing.T) {
@@ -69,6 +70,14 @@ func TestTokensRpcClient(t *testing.T) {
 
 		tokenUnit, err := client.GetToken(context.Background(), tokenID)
 		require.ErrorContains(t, err, "some error")
+		require.Nil(t, tokenUnit)
+	})
+	t.Run("GetToken_NotFound", func(t *testing.T) {
+		*service = *mocksrv.NewStateServiceMock()
+		tokenID := tokentxs.NewFungibleTokenID(nil, []byte{1})
+
+		tokenUnit, err := client.GetToken(context.Background(), tokenID)
+		require.ErrorIs(t, err, api.ErrNotFound)
 		require.Nil(t, tokenUnit)
 	})
 

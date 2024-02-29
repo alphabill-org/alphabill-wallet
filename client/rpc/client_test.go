@@ -65,6 +65,13 @@ func TestRpcClient(t *testing.T) {
 		_, err := client.GetBill(context.Background(), unitID, false)
 		require.ErrorContains(t, err, "some error")
 	})
+	t.Run("GetBill_NotFound", func(t *testing.T) {
+		service.Reset()
+
+		b, err := client.GetBill(context.Background(), []byte{}, false)
+		require.ErrorIs(t, err, api.ErrNotFound)
+		require.Nil(t, b)
+	})
 
 	t.Run("GetFeeCreditRecord_OK", func(t *testing.T) {
 		service.Reset()
@@ -92,8 +99,16 @@ func TestRpcClient(t *testing.T) {
 		service.Err = errors.New("some error")
 		unitID := []byte{1}
 
-		_, err := client.GetFeeCreditRecord(context.Background(), unitID, false)
+		fcr, err := client.GetFeeCreditRecord(context.Background(), unitID, false)
 		require.ErrorContains(t, err, "some error")
+		require.Nil(t, fcr)
+	})
+	t.Run("GetFeeCreditRecord_NotFound", func(t *testing.T) {
+		service.Reset()
+
+		fcr, err := client.GetFeeCreditRecord(context.Background(), []byte{1}, false)
+		require.ErrorIs(t, err, api.ErrNotFound)
+		require.Nil(t, fcr)
 	})
 
 	t.Run("GetUnitsByOwnerID_OK", func(t *testing.T) {
@@ -168,6 +183,14 @@ func TestRpcClient(t *testing.T) {
 		require.Nil(t, txr)
 		require.Nil(t, txp)
 	})
+	t.Run("GetTransactionProof_NotFound", func(t *testing.T) {
+		service.Reset()
+
+		txr, txp, err := client.GetTransactionProof(context.Background(), []byte{1})
+		require.ErrorIs(t, err, api.ErrNotFound)
+		require.Nil(t, txr)
+		require.Nil(t, txp)
+	})
 
 	t.Run("GetBlock_OK", func(t *testing.T) {
 		service.Reset()
@@ -188,6 +211,13 @@ func TestRpcClient(t *testing.T) {
 
 		block, err := client.GetBlock(context.Background(), 1)
 		require.ErrorContains(t, err, "some error")
+		require.Nil(t, block)
+	})
+	t.Run("GetBlock_NotFound", func(t *testing.T) {
+		service.Reset()
+
+		block, err := client.GetBlock(context.Background(), 1)
+		require.ErrorIs(t, err, api.ErrNotFound)
 		require.Nil(t, block)
 	})
 }

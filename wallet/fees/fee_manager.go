@@ -333,7 +333,7 @@ func (w *FeeManager) UnlockFeeCredit(ctx context.Context, cmd UnlockFeeCreditCmd
 		return nil, fmt.Errorf("failed to load account key: %w", err)
 	}
 	fcb, err := w.fetchTargetPartitionFCB(ctx, accountKey)
-	if err != nil {
+	if err != nil && !errors.Is(err, api.ErrNotFound) {
 		return nil, fmt.Errorf("failed to fetch fee credit: %w", err)
 	}
 	if fcb.Balance() == 0 {

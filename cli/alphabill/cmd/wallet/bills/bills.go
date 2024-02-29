@@ -163,7 +163,7 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 
 	fcrID := money.FeeCreditRecordIDFormPublicKey(nil, accountKey.PubKey)
 	fcb, err := moneyClient.GetFeeCreditRecord(cmd.Context(), fcrID, false)
-	if err != nil && !strings.Contains(err.Error(), "not found") { // TODO type safe err check
+	if err != nil && !errors.Is(err, api.ErrNotFound) {
 		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
 	}
 	if fcb.Balance() < txbuilder.MaxFee {
@@ -238,7 +238,7 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 
 	fcrID := money.FeeCreditRecordIDFormPublicKey(nil, accountKey.PubKey)
 	fcb, err := moneyClient.GetFeeCreditRecord(cmd.Context(), fcrID, false)
-	if err != nil && !strings.Contains(err.Error(), "not found") { // TODO type safe err check
+	if err != nil && !errors.Is(err, api.ErrNotFound) {
 		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
 	}
 	if fcb.Balance() < txbuilder.MaxFee {
