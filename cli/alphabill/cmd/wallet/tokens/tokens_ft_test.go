@@ -26,7 +26,6 @@ import (
 	moneywallet "github.com/alphabill-org/alphabill-wallet/wallet/money"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 	tokenswallet "github.com/alphabill-org/alphabill-wallet/wallet/tokens"
-	"github.com/alphabill-org/alphabill-wallet/wallet/unitlock"
 )
 
 var defaultInitialBillID = money.NewBillID(nil, []byte{1})
@@ -427,15 +426,11 @@ func NewAlphabillNetwork(t *testing.T) *AlphabillNetwork {
 	require.NoError(t, err)
 	tokensRpcClient := rpc.NewTokensClient(rpcClient)
 
-	unitLocker, err := unitlock.NewUnitLocker(walletDir)
-	require.NoError(t, err)
-	defer unitLocker.Close()
-
 	feeManagerDB, err := fees.NewFeeManagerDB(walletDir)
 	require.NoError(t, err)
 	defer feeManagerDB.Close()
 
-	moneyWallet, err := moneywallet.LoadExistingWallet(am, unitLocker, feeManagerDB, moneyRpcClient, log)
+	moneyWallet, err := moneywallet.LoadExistingWallet(am, feeManagerDB, moneyRpcClient, log)
 	require.NoError(t, err)
 	defer moneyWallet.Close()
 
@@ -472,15 +467,11 @@ func loadMoneyWallet(t *testing.T, walletDir string, moneyRpcClient *rpc.Client)
 	require.NoError(t, err)
 	t.Cleanup(am.Close)
 
-	unitLocker, err := unitlock.NewUnitLocker(walletDir)
-	require.NoError(t, err)
-	t.Cleanup(func() { unitLocker.Close() })
-
 	feeManagerDB, err := fees.NewFeeManagerDB(walletDir)
 	require.NoError(t, err)
 	t.Cleanup(func() { feeManagerDB.Close() })
 
-	moneyWallet, err := moneywallet.LoadExistingWallet(am, unitLocker, feeManagerDB, moneyRpcClient, testobserve.Default(t).Logger())
+	moneyWallet, err := moneywallet.LoadExistingWallet(am, feeManagerDB, moneyRpcClient, testobserve.Default(t).Logger())
 	require.NoError(t, err)
 	t.Cleanup(moneyWallet.Close)
 
