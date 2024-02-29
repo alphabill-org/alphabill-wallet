@@ -313,17 +313,15 @@ func TestReclaimFeeCredit_WalletContainsLockedBillForDustCollection(t *testing.T
 func TestReclaimFeeCredit_TokensPartitionOK(t *testing.T) {
 	// create fee manager
 	am := newAccountManager(t)
-	txPublisher := &mockMoneyTxPublisher{}
-	backendClient := &mockMoneyClient{
-		bills: []*wallet.Bill{{
-			Id:     []byte{1},
-			Value:  100000000,
-			TxHash: []byte{2},
-		}},
-		fcb: &wallet.Bill{Id: []byte{2}, Value: 1e8, TxHash: []byte{3}},
-	}
+	accountKey, err := am.GetAccountKey(0)
+	require.NoError(t, err)
+
+	moneyClient := testutil.NewRpcClientMock(
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 100000000, Backlink: []byte{2}})),
+		testutil.WithOwnerFeeCreditBill(newMoneyFCB(accountKey, &unit.FeeCreditRecord{Balance: 1e8, Backlink: []byte{111}})),
+	)
 	db := createFeeManagerDB(t)
-	feeManager := NewFeeManager(am, db, moneySystemID, txPublisher, backendClient, testFeeCreditRecordIDFromPublicKey, tokensSystemID, txPublisher, backendClient, testFeeCreditRecordIDFromPublicKey, logger.New(t))
+	feeManager := newMoneyPartitionFeeManager(am, db, moneyClient, logger.New(t))
 
 	// reclaim fee credit
 	res, err := feeManager.ReclaimFeeCredit(context.Background(), ReclaimFeeCmd{})
