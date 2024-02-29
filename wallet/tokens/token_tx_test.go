@@ -5,21 +5,21 @@ import (
 	"context"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
-	"github.com/alphabill-org/alphabill-wallet/wallet"
-	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/stretchr/testify/require"
+
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
+	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 )
 
 func TestConfirmUnitsTx_skip(t *testing.T) {
-	backend := &mockTokenBackend{
-		postTransactions: func(ctx context.Context, pubKey wallet.PubKey, txs *wallet.Transactions) error {
-			return nil
+	rpcClient := &mockTokensRpcClient{
+		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
+			return nil, nil
 		},
 	}
-	batch := txsubmitter.NewBatch(nil, backend, logger.New(t))
+	batch := txsubmitter.NewBatch(nil, rpcClient, logger.New(t))
 	batch.Add(&txsubmitter.TxSubmission{Transaction: &types.TransactionOrder{Payload: &types.Payload{ClientMetadata: &types.ClientMetadata{Timeout: 1}}}})
 	err := batch.SendTx(context.Background(), false)
 	require.NoError(t, err)
@@ -29,20 +29,20 @@ func TestConfirmUnitsTx_skip(t *testing.T) {
 func TestConfirmUnitsTx_ok(t *testing.T) {
 	getRoundNumberCalled := false
 	getTxProofCalled := false
-	backend := &mockTokenBackend{
-		postTransactions: func(ctx context.Context, pubKey wallet.PubKey, txs *wallet.Transactions) error {
-			return nil
+	rpcClient := &mockTokensRpcClient{
+		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
+			return nil, nil
 		},
-		getRoundNumber: func(ctx context.Context) (*wallet.RoundNumber, error) {
+		getRoundNumber: func(ctx context.Context) (uint64, error) {
 			getRoundNumberCalled = true
-			return &wallet.RoundNumber{RoundNumber: 100, LastIndexedRoundNumber: 100}, nil
+			return 100, nil
 		},
-		getTxProof: func(ctx context.Context, unitID types.UnitID, txHash wallet.TxHash) (*wallet.Proof, error) {
+		getTransactionProof: func(ctx context.Context, txHash types.Bytes) (*types.TransactionRecord, *types.TxProof, error) {
 			getTxProofCalled = true
-			return &wallet.Proof{}, nil
+			return &types.TransactionRecord{}, &types.TxProof{}, nil
 		},
 	}
-	batch := txsubmitter.NewBatch(nil, backend, logger.New(t))
+	batch := txsubmitter.NewBatch(nil, rpcClient, logger.New(t))
 	batch.Add(&txsubmitter.TxSubmission{Transaction: &types.TransactionOrder{Payload: &types.Payload{ClientMetadata: &types.ClientMetadata{Timeout: 101}}}})
 	err := batch.SendTx(context.Background(), true)
 	require.NoError(t, err)
@@ -53,28 +53,28 @@ func TestConfirmUnitsTx_ok(t *testing.T) {
 func TestConfirmUnitsTx_timeout(t *testing.T) {
 	getRoundNumberCalled := 0
 	getTxProofCalled := 0
-	randomID1 := test.RandomBytes(32)
-	backend := &mockTokenBackend{
-		postTransactions: func(ctx context.Context, pubKey wallet.PubKey, txs *wallet.Transactions) error {
-			return nil
-		},
-		getRoundNumber: func(ctx context.Context) (*wallet.RoundNumber, error) {
-			getRoundNumberCalled++
-			if getRoundNumberCalled == 1 {
-				return &wallet.RoundNumber{RoundNumber: 100, LastIndexedRoundNumber: 100}, nil
-			}
-			return &wallet.RoundNumber{RoundNumber: 103, LastIndexedRoundNumber: 103}, nil
-		},
-		getTxProof: func(ctx context.Context, unitID types.UnitID, txHash wallet.TxHash) (*wallet.Proof, error) {
-			getTxProofCalled++
-			if bytes.Equal(unitID, randomID1) {
-				return &wallet.Proof{}, nil
-			}
+	randomTxHash1 := test.RandomBytes(32)
+	rpcClient := &mockTokensRpcClient{
+		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
 			return nil, nil
 		},
+		getRoundNumber: func(ctx context.Context) (uint64, error) {
+			getRoundNumberCalled++
+			if getRoundNumberCalled == 1 {
+				return 100, nil
+			}
+			return 103, nil
+		},
+		getTransactionProof: func(ctx context.Context, txHash types.Bytes) (*types.TransactionRecord, *types.TxProof, error) {
+			getTxProofCalled++
+			if bytes.Equal(txHash, randomTxHash1) {
+				return &types.TransactionRecord{}, &types.TxProof{}, nil
+			}
+			return nil, nil, nil
+		},
 	}
-	batch := txsubmitter.NewBatch(nil, backend, logger.New(t))
-	sub1 := &txsubmitter.TxSubmission{Transaction: &types.TransactionOrder{Payload: &types.Payload{ClientMetadata: &types.ClientMetadata{Timeout: 101}}}, UnitID: randomID1}
+	batch := txsubmitter.NewBatch(nil, rpcClient, logger.New(t))
+	sub1 := &txsubmitter.TxSubmission{Transaction: &types.TransactionOrder{Payload: &types.Payload{ClientMetadata: &types.ClientMetadata{Timeout: 101}}}, TxHash: randomTxHash1}
 	batch.Add(sub1)
 	sub2 := &txsubmitter.TxSubmission{Transaction: &types.TransactionOrder{Payload: &types.Payload{ClientMetadata: &types.ClientMetadata{Timeout: 102}}}}
 	batch.Add(sub2)
@@ -88,21 +88,19 @@ func TestConfirmUnitsTx_timeout(t *testing.T) {
 
 func TestCachingRoundNumberFetcher(t *testing.T) {
 	getRoundNumberCalled := 0
-	backend := &mockTokenBackend{
-		getRoundNumber: func(ctx context.Context) (*wallet.RoundNumber, error) {
+	rpcClient := &mockTokensRpcClient{
+		getRoundNumber: func(ctx context.Context) (uint64, error) {
 			getRoundNumberCalled++
-			return &wallet.RoundNumber{RoundNumber: 100, LastIndexedRoundNumber: 100}, nil
+			return 100, nil
 		},
 	}
-	fetcher := &cachingRoundNumberFetcher{delegate: backend.GetRoundNumber}
-	rnr, err := fetcher.getRoundNumber(context.Background())
+	fetcher := &cachingRoundNumberFetcher{delegate: rpcClient.GetRoundNumber}
+	roundNumber, err := fetcher.getRoundNumber(context.Background())
 	require.NoError(t, err)
-	require.EqualValues(t, 100, rnr.RoundNumber)
-	require.EqualValues(t, 100, rnr.LastIndexedRoundNumber)
+	require.EqualValues(t, 100, roundNumber)
 	require.EqualValues(t, 1, getRoundNumberCalled)
-	rnr, err = fetcher.getRoundNumber(context.Background())
+	roundNumber, err = fetcher.getRoundNumber(context.Background())
 	require.NoError(t, err)
-	require.EqualValues(t, 100, rnr.RoundNumber)
-	require.EqualValues(t, 100, rnr.LastIndexedRoundNumber)
+	require.EqualValues(t, 100, roundNumber)
 	require.EqualValues(t, 1, getRoundNumberCalled)
 }

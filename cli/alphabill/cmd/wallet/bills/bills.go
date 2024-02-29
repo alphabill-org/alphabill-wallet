@@ -1,8 +1,6 @@
 package bills
 
 import (
-	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -15,12 +13,11 @@ import (
 	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
+	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
-	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/backend/client"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	txbuilder "github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
 )
 
@@ -52,19 +49,22 @@ func listCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 			return execListCmd(cmd, config)
 		},
 	}
-	cmd.Flags().StringVarP(&config.NodeURL, args.AlphabillApiURLCmdName, "r", args.DefaultAlphabillApiURL, "alphabill API uri to connect to")
+	cmd.Flags().StringVarP(&config.RpcUrl, args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "rpc node url")
 	cmd.Flags().Uint64VarP(&config.Key, args.KeyCmdName, "k", 0, "specifies which account bills to list (default: all accounts)")
 	cmd.Flags().BoolVarP(&config.ShowUnswapped, args.ShowUnswappedCmdName, "s", false, "includes unswapped dust bills in output")
+	cmd.Flags().MarkHidden(args.ShowUnswappedCmdName)
 	return cmd
 }
 
 func execListCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
-	restClient, err := client.New(config.NodeURL, config.WalletConfig.Base.Observe)
+	moneyClient, err := rpc.DialContext(cmd.Context(), config.GetRpcUrl())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to dial money rpc: %w", err)
 	}
+
 	accountNumber := config.Key
-	showUnswapped := config.ShowUnswapped
+	// TODO unswapped bills are not available from node
+	// showUnswapped := config.ShowUnswapped
 
 	am, err := cliaccount.LoadExistingAccountManager(config.WalletConfig)
 	if err != nil {
@@ -75,43 +75,44 @@ func execListCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	type accountBillGroup struct {
 		accountIndex uint64
 		pubKey       []byte
-		bills        *backend.ListBillsResponse
+		bills        []*api.Bill
 	}
 	var accountBillGroups []*accountBillGroup
 	if accountNumber == 0 {
-		pubKeys, err := am.GetPublicKeys()
+		accountKeys, err := am.GetAccountKeys()
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to load account keys: %w", err)
 		}
-		for accountIndex, pubKey := range pubKeys {
-			bills, err := restClient.ListBills(cmd.Context(), pubKey, showUnswapped, "", 100)
+		for accountIndex, accountKey := range accountKeys {
+			pubKey := accountKey.PubKey
+			bills, err := api.FetchBills(cmd.Context(), moneyClient, accountKey.PubKeyHash.Sha256)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to fetch bills: %w", err)
 			}
 			accountBillGroups = append(accountBillGroups, &accountBillGroup{pubKey: pubKey, accountIndex: uint64(accountIndex), bills: bills})
 		}
 	} else {
 		accountIndex := accountNumber - 1
-		pubKey, err := am.GetPublicKey(accountIndex)
+		accountKey, err := am.GetAccountKey(accountIndex)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to load account key: %w", err)
 		}
-		accountBills, err := restClient.ListBills(cmd.Context(), pubKey, showUnswapped, "", 100)
+		accountBills, err := api.FetchBills(cmd.Context(), moneyClient, accountKey.PubKeyHash.Sha256)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to fetch bills: %w", err)
 		}
-		accountBillGroups = append(accountBillGroups, &accountBillGroup{pubKey: pubKey, accountIndex: accountIndex, bills: accountBills})
+		accountBillGroups = append(accountBillGroups, &accountBillGroup{pubKey: accountKey.PubKey, accountIndex: accountIndex, bills: accountBills})
 	}
 
 	for _, group := range accountBillGroups {
-		if len(group.bills.Bills) == 0 {
+		if len(group.bills) == 0 {
 			config.WalletConfig.Base.ConsoleWriter.Println(fmt.Sprintf("Account #%d - empty", group.accountIndex+1))
 		} else {
 			config.WalletConfig.Base.ConsoleWriter.Println(fmt.Sprintf("Account #%d", group.accountIndex+1))
 		}
-		for j, bill := range group.bills.Bills {
-			billValueStr := util.AmountToString(bill.Value, 8)
-			config.WalletConfig.Base.ConsoleWriter.Println(fmt.Sprintf("#%d 0x%X %s%s", j+1, bill.Id, billValueStr, getLockedReasonString(bill)))
+		for j, bill := range group.bills {
+			billValueStr := util.AmountToString(bill.Value(), 8)
+			config.WalletConfig.Base.ConsoleWriter.Println(fmt.Sprintf("#%d 0x%s %s%s", j+1, bill.ID.String(), billValueStr, getLockedReasonString(bill)))
 		}
 	}
 	return nil
@@ -126,7 +127,7 @@ func lockCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 			return execLockCmd(cmd, config)
 		},
 	}
-	cmd.Flags().StringVarP(&config.NodeURL, args.AlphabillApiURLCmdName, "r", args.DefaultAlphabillApiURL, "alphabill API uri to connect to")
+	cmd.Flags().StringVarP(&config.RpcUrl, args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "rpc node url")
 	cmd.Flags().Uint64VarP(&config.Key, args.KeyCmdName, "k", 1, "account number of the bill to lock")
 	cmd.Flags().Var(&config.BillID, args.BillIdCmdName, "id of the bill to lock")
 	cmd.Flags().Uint32Var(&config.SystemID, args.SystemIdentifierCmdName, uint32(moneytx.DefaultSystemIdentifier), "system identifier")
@@ -134,7 +135,6 @@ func lockCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 }
 
 func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
-	restClient, err := client.New(config.NodeURL, config.WalletConfig.Base.Observe)
 	accountNumber := config.Key
 	am, err := cliaccount.LoadExistingAccountManager(config.WalletConfig)
 	if err != nil {
@@ -145,38 +145,47 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to load account key: %w", err)
 	}
-	infoResponse, err := restClient.GetInfo(cmd.Context())
+
+	//// TODO add info endpoint to rpc client?
+	//restClient, err := client.New(config.RpcUrl, config.WalletConfig.Base.Observe)
+	//infoResponse, err := restClient.GetInfo(cmd.Context())
+	//if err != nil {
+	//	return err
+	//}
+	//moneyTypeVar := clitypes.MoneyType
+	//if !strings.HasPrefix(infoResponse.Name, moneyTypeVar.String()) {
+	//	return errors.New("invalid wallet backend API URL provided for money partition")
+	//}
+
+	moneyClient, err := rpc.DialContext(cmd.Context(), config.GetRpcUrl())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to dial money rpc: %w", err)
 	}
-	moneyTypeVar := clitypes.MoneyType
-	if !strings.HasPrefix(infoResponse.Name, moneyTypeVar.String()) {
-		return errors.New("invalid wallet backend API URL provided for money partition")
-	}
+
 	fcrID := money.FeeCreditRecordIDFormPublicKey(nil, accountKey.PubKey)
-	fcb, err := restClient.GetFeeCreditBill(cmd.Context(), fcrID)
-	if err != nil {
+	fcb, err := moneyClient.GetFeeCreditRecord(cmd.Context(), fcrID, false)
+	if err != nil && !strings.Contains(err.Error(), "not found") { // TODO type safe err check
 		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
 	}
-	if fcb.GetValue() < txbuilder.MaxFee {
+	if fcb.Balance() < txbuilder.MaxFee {
 		return errors.New("not enough fee credit in wallet")
 	}
-	bill, err := fetchBillByID(cmd.Context(), config.BillID, restClient, accountKey)
+	bill, err := moneyClient.GetBill(cmd.Context(), types.UnitID(config.BillID), false)
 	if err != nil {
-		return fmt.Errorf("failed to fetch bill by id: %w", err)
+		return fmt.Errorf("failed to fetch bill: %w", err)
 	}
 	if bill.IsLocked() {
 		return errors.New("bill is already locked")
 	}
-	rnr, err := restClient.GetRoundNumber(cmd.Context())
+	roundNumber, err := moneyClient.GetRoundNumber(cmd.Context())
 	if err != nil {
 		return fmt.Errorf("failed to fetch round number: %w", err)
 	}
-	tx, err := txbuilder.NewLockTx(accountKey, types.SystemID(config.SystemID), bill.Id, bill.TxHash, wallet.LockReasonManual, rnr.RoundNumber+10)
+	tx, err := txbuilder.NewLockTx(accountKey, types.SystemID(config.SystemID), bill.ID, bill.Backlink(), wallet.LockReasonManual, roundNumber+10)
 	if err != nil {
 		return fmt.Errorf("failed to create lock tx: %w", err)
 	}
-	moneyTxPublisher := money.NewTxPublisher(restClient, config.WalletConfig.Base.Observe.Logger())
+	moneyTxPublisher := money.NewTxPublisher(moneyClient, config.WalletConfig.Base.Observe.Logger())
 	_, err = moneyTxPublisher.SendTx(cmd.Context(), tx, accountKey.PubKey)
 	if err != nil {
 		return fmt.Errorf("failed to send lock tx: %w", err)
@@ -194,58 +203,66 @@ func unlockCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 			return execUnlockCmd(cmd, config)
 		},
 	}
-	cmd.Flags().StringVarP(&config.NodeURL, args.AlphabillApiURLCmdName, "r", args.DefaultAlphabillApiURL, "alphabill API uri to connect to")
+	cmd.Flags().StringVarP(&config.RpcUrl, args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "rpc node url")
 	cmd.Flags().Uint64VarP(&config.Key, args.KeyCmdName, "k", 1, "account number of the bill to unlock")
-	cmd.Flags().Var(&config.BillID, args.BillIdCmdName, "id of the bill to lock")
+	cmd.Flags().Var(&config.BillID, args.BillIdCmdName, "id of the bill to unlock")
 	cmd.Flags().Uint32Var(&config.SystemID, args.SystemIdentifierCmdName, uint32(moneytx.DefaultSystemIdentifier), "system identifier")
 	return cmd
 }
 
 func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
-	restClient, err := client.New(config.NodeURL, config.WalletConfig.Base.Observe)
 	accountNumber := config.Key
 	am, err := cliaccount.LoadExistingAccountManager(config.WalletConfig)
 	if err != nil {
 		return fmt.Errorf("failed to load account manager: %w", err)
 	}
 	defer am.Close()
-
-	infoResponse, err := restClient.GetInfo(cmd.Context())
-	if err != nil {
-		return err
-	}
-	moneyTypeVar := clitypes.MoneyType
-	if !strings.HasPrefix(infoResponse.Name, moneyTypeVar.String()) {
-		return errors.New("invalid wallet backend API URL provided for money partition")
-	}
 	accountKey, err := am.GetAccountKey(accountNumber - 1)
 	if err != nil {
 		return fmt.Errorf("failed to load account key: %w", err)
 	}
-	fcrID := money.FeeCreditRecordIDFormPublicKey(nil, accountKey.PubKey)
-	fcb, err := restClient.GetFeeCreditBill(cmd.Context(), fcrID)
+
+	//// TODO add info endpoint to rpc client?
+	//restClient, err := client.New(config.RpcUrl, config.WalletConfig.Base.Observe)
+	//infoResponse, err := restClient.GetInfo(cmd.Context())
+	//if err != nil {
+	//	return err
+	//}
+	//moneyTypeVar := clitypes.MoneyType
+	//if !strings.HasPrefix(infoResponse.Name, moneyTypeVar.String()) {
+	//	return errors.New("invalid wallet backend API URL provided for money partition")
+	//}
+
+	moneyClient, err := rpc.DialContext(cmd.Context(), config.GetRpcUrl())
 	if err != nil {
+		return fmt.Errorf("failed to dial money rpc: %w", err)
+	}
+	fcrID := money.FeeCreditRecordIDFormPublicKey(nil, accountKey.PubKey)
+	fcb, err := moneyClient.GetFeeCreditRecord(cmd.Context(), fcrID, false)
+	if err != nil && !strings.Contains(err.Error(), "not found") { // TODO type safe err check
 		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
 	}
-	if fcb.GetValue() < txbuilder.MaxFee {
+	if fcb.Balance() < txbuilder.MaxFee {
 		return errors.New("not enough fee credit in wallet")
 	}
-	bill, err := fetchBillByID(cmd.Context(), config.BillID, restClient, accountKey)
+
+	bill, err := moneyClient.GetBill(cmd.Context(), types.UnitID(config.BillID), false)
 	if err != nil {
-		return fmt.Errorf("failed to fetch bill by id: %w", err)
+		return fmt.Errorf("failed to fetch bill: %w", err)
 	}
 	if !bill.IsLocked() {
 		return errors.New("bill is already unlocked")
 	}
-	rnr, err := restClient.GetRoundNumber(cmd.Context())
+
+	roundNumber, err := moneyClient.GetRoundNumber(cmd.Context())
 	if err != nil {
 		return fmt.Errorf("failed to fetch round number: %w", err)
 	}
-	tx, err := txbuilder.NewUnlockTx(accountKey, types.SystemID(config.SystemID), bill, rnr.RoundNumber+10)
+	tx, err := txbuilder.NewUnlockTx(accountKey, types.SystemID(config.SystemID), bill, roundNumber+10)
 	if err != nil {
 		return fmt.Errorf("failed to create unlock tx: %w", err)
 	}
-	moneyTxPublisher := money.NewTxPublisher(restClient, config.WalletConfig.Base.Observe.Logger())
+	moneyTxPublisher := money.NewTxPublisher(moneyClient, config.WalletConfig.Base.Observe.Logger())
 	_, err = moneyTxPublisher.SendTx(cmd.Context(), tx, accountKey.PubKey)
 	if err != nil {
 		return fmt.Errorf("failed to send unlock tx: %w", err)
@@ -254,22 +271,9 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	return nil
 }
 
-func fetchBillByID(ctx context.Context, billID []byte, restClient *client.MoneyBackendClient, accountKey *account.AccountKey) (*wallet.Bill, error) {
-	bills, err := restClient.GetBills(ctx, accountKey.PubKey)
-	if err != nil {
-		return nil, err
-	}
-	for _, b := range bills {
-		if bytes.Equal(b.Id, billID) {
-			return b, nil
-		}
-	}
-	return nil, errors.New("bill not found")
-}
-
-func getLockedReasonString(bill *wallet.Bill) string {
+func getLockedReasonString(bill *api.Bill) string {
 	if bill.IsLocked() {
-		return fmt.Sprintf(" (%s)", bill.Locked.String())
+		return fmt.Sprintf(" (%s)", wallet.LockReason(bill.BillData.Locked).String())
 	}
 	return ""
 }
