@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alphabill-org/alphabill/predicates"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/alphabill-org/alphabill/types"
@@ -28,7 +27,7 @@ const (
 type (
 	PredicateInput struct {
 		// first priority
-		Argument predicates.PredicateBytes
+		Argument types.PredicateBytes
 		// if Argument empty, check AccountNumber
 		AccountNumber uint64
 	}

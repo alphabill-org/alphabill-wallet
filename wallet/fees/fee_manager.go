@@ -824,7 +824,7 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 	}
 	tx, err := txbuilder.NewLockTx(
 		accountKey,
-		w.targetPartitionSystemID,
+		w.moneySystemID,
 		feeCtx.TargetBillID,
 		feeCtx.TargetBillBacklink,
 		unitlock.LockReasonReclaimFees,
