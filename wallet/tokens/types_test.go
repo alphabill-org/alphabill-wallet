@@ -3,8 +3,8 @@ package tokens
 import (
 	"testing"
 
-	"github.com/alphabill-org/alphabill/predicates"
 	"github.com/alphabill-org/alphabill/predicates/templates"
+	"github.com/alphabill-org/alphabill/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
@@ -15,7 +15,7 @@ func TestParsePredicateArgument(t *testing.T) {
 	tests := []struct {
 		input string
 		// expectations:
-		result    predicates.PredicateBytes
+		result    types.PredicateBytes
 		accNumber uint64
 		err       string
 	}{

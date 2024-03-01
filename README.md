@@ -13,7 +13,8 @@ Client side software to interface with Alphabill network. This repository contai
 
 ## Building the source
 
-Requires `golang` version 1.21. (https://go.dev/doc/install)
+* Requires `golang` version 1.21. (https://go.dev/doc/install)
+* Requires `C` compiler, recent versions of [GCC](https://gcc.gnu.org/) are recommended. In Debian and Ubuntu repositories, GCC is part of the build-essential package. On macOS, GCC can be installed with [Homebrew](https://formulae.brew.sh/formula/gcc).
 
 Run `make build` to build the application. Executable will be built to `build/abwallet`. 
 
