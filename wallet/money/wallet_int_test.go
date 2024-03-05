@@ -27,7 +27,6 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
-	"github.com/alphabill-org/alphabill-wallet/wallet/unitlock"
 )
 
 var (
@@ -72,15 +71,11 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 	require.NoError(t, err)
 	defer moneyClient.Close()
 
-	unitLocker, err := unitlock.NewUnitLocker(dir)
-	require.NoError(t, err)
-	defer unitLocker.Close()
-
 	feeManagerDB, err := fees.NewFeeManagerDB(dir)
 	require.NoError(t, err)
 	defer feeManagerDB.Close()
 
-	w, err := LoadExistingWallet(am, unitLocker, feeManagerDB, moneyClient, observe.Logger())
+	w, err := LoadExistingWallet(am, feeManagerDB, moneyClient, observe.Logger())
 	require.NoError(t, err)
 	defer w.Close()
 
@@ -162,7 +157,7 @@ func startMoneyOnlyAlphabillPartition(t *testing.T, genesisConfig *testutil.Mone
 	genesisConfig.DCMoneySupplyValue = 10000 * 1e8
 	genesisConfig.SDRs = createSDRs()
 	genesisState := testutil.MoneyGenesisState(t, genesisConfig)
-	mPart, err := testpartition.NewPartition(t, 1, func(tb map[string]abcrypto.Verifier) txsystem.TransactionSystem {
+	mPart, err := testpartition.NewPartition(t, "money node", 1, func(tb map[string]abcrypto.Verifier) txsystem.TransactionSystem {
 		system, err := money.NewTxSystem(
 			testobserve.Default(t),
 			money.WithSystemIdentifier(money.DefaultSystemIdentifier),

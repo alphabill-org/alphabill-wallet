@@ -35,7 +35,7 @@ import (
 
 func CreateMoneyPartition(t *testing.T, genesisConfig *testutil.MoneyGenesisConfig, nodeCount uint8) *testpartition.NodePartition {
 	genesisState := testutil.MoneyGenesisState(t, genesisConfig)
-	moneyPart, err := testpartition.NewPartition(t, nodeCount, func(tb map[string]abcrypto.Verifier) txsystem.TransactionSystem {
+	moneyPart, err := testpartition.NewPartition(t, "money node", nodeCount, func(tb map[string]abcrypto.Verifier) txsystem.TransactionSystem {
 		genesisState = genesisState.Clone()
 		system, err := money.NewTxSystem(
 			testobserve.Default(t),
@@ -126,7 +126,7 @@ func initGRPCServer(node *partition.Node, cfg *grpcServerConfiguration, obs part
 
 func CreateTokensPartition(t *testing.T) *testpartition.NodePartition {
 	tokensState := state.NewEmptyState()
-	network, err := testpartition.NewPartition(t, 1,
+	network, err := testpartition.NewPartition(t, "tokens node", 1,
 		func(tb map[string]abcrypto.Verifier) txsystem.TransactionSystem {
 			tokensState = tokensState.Clone()
 			system, err := tokens.NewTxSystem(
@@ -144,7 +144,7 @@ func CreateTokensPartition(t *testing.T) *testpartition.NodePartition {
 
 func StartRpcServers(t *testing.T, partition *testpartition.NodePartition) {
 	for _, n := range partition.Nodes {
-		n.AddrRPC = StartRpcServer(t, n.Node)
+		n.AddrRPC = StartRpcServer(t, n.Node, partition.SystemName)
 	}
 	// wait for rpc servers to start
 	for _, n := range partition.Nodes {
@@ -160,14 +160,14 @@ func StartRpcServers(t *testing.T, partition *testpartition.NodePartition) {
 	}
 }
 
-func StartRpcServer(t *testing.T, node *partition.Node) string {
+func StartRpcServer(t *testing.T, node *partition.Node, nodeName string) string {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = listener.Close()
 	})
 
-	rpcServer, err := InitRpcServer(node, &abrpc.ServerConfiguration{
+	rpcServer, err := InitRpcServer(node, nodeName, &abrpc.ServerConfiguration{
 		Address: listener.Addr().String(),
 		// defaults from ab repo
 		MaxHeaderBytes:         http.DefaultMaxHeaderBytes,
@@ -189,11 +189,17 @@ func StartRpcServer(t *testing.T, node *partition.Node) string {
 	return listener.Addr().String()
 }
 
-func InitRpcServer(node *partition.Node, cfg *abrpc.ServerConfiguration, obs partition.Observability) (*http.Server, error) {
-	cfg.APIs = []abrpc.API{{
-		Namespace: "state",
-		Service:   abrpc.NewStateAPI(node),
-	}}
+func InitRpcServer(node *partition.Node, nodeName string, cfg *abrpc.ServerConfiguration, obs partition.Observability) (*http.Server, error) {
+	cfg.APIs = []abrpc.API{
+		{
+			Namespace: "state",
+			Service:   abrpc.NewStateAPI(node),
+		},
+		{
+			Namespace: "admin",
+			Service:   abrpc.NewAdminAPI(node, nodeName, node.GetPeer(), obs.Logger()),
+		},
+	}
 	httpServer, err := abrpc.NewHTTPServer(cfg, obs)
 	if err != nil {
 		return nil, err

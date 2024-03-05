@@ -12,7 +12,6 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
-	"github.com/alphabill-org/alphabill-wallet/wallet/unitlock"
 )
 
 const (
@@ -28,11 +27,9 @@ func TestExistingWalletCanBeLoaded(t *testing.T) {
 	am, err := account.NewManager(homedir, "", true)
 	require.NoError(t, err)
 	rpcClient := testutil.NewRpcClientMock()
-	unitLocker, err := unitlock.NewUnitLocker(homedir)
-	require.NoError(t, err)
 	feeManagerDB, err := fees.NewFeeManagerDB(homedir)
 	require.NoError(t, err)
-	_, err = LoadExistingWallet(am, unitLocker, feeManagerDB, rpcClient, logger.New(t))
+	_, err = LoadExistingWallet(am, feeManagerDB, rpcClient, logger.New(t))
 	require.NoError(t, err)
 }
 
@@ -105,13 +102,10 @@ func createTestWallet(t *testing.T, rpcClient RpcClient) *Wallet {
 	err = CreateNewWallet(am, testMnemonic)
 	require.NoError(t, err)
 
-	unitLocker, err := unitlock.NewUnitLocker(dir)
-	require.NoError(t, err)
-
 	feeManagerDB, err := fees.NewFeeManagerDB(dir)
 	require.NoError(t, err)
 
-	w, err := LoadExistingWallet(am, unitLocker, feeManagerDB, rpcClient, logger.New(t))
+	w, err := LoadExistingWallet(am, feeManagerDB, rpcClient, logger.New(t))
 	require.NoError(t, err)
 
 	return w

@@ -3,47 +3,14 @@ package mocksrv
 import (
 	"context"
 	"crypto"
-	"errors"
-	"net"
-	"net/http"
-	"testing"
 
 	abrpc "github.com/alphabill-org/alphabill/rpc"
 	"github.com/alphabill-org/alphabill/types"
-	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/fxamacker/cbor/v2"
-	"github.com/stretchr/testify/require"
-
-	"github.com/alphabill-org/alphabill-wallet/wallet/evm/client"
 )
 
-func StartServer(t *testing.T, service *MockService) string {
-	server := ethrpc.NewServer()
-	t.Cleanup(server.Stop)
-
-	err := server.RegisterName("state", service)
-	require.NoError(t, err)
-
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		_ = listener.Close()
-	})
-
-	httpServer := &http.Server{
-		Addr:    listener.Addr().String(),
-		Handler: server,
-	}
-
-	go httpServer.Serve(listener)
-	t.Cleanup(func() {
-		_ = httpServer.Close()
-	})
-	return httpServer.Addr
-}
-
 type (
-	MockService struct {
+	StateServiceMock struct {
 		RoundNumber  uint64
 		Units        map[string]*abrpc.Unit[any]
 		OwnerUnitIDs map[string][]types.UnitID
@@ -54,17 +21,18 @@ type (
 	}
 
 	Options struct {
-		Err         error
-		RoundNumber uint64
-		TxProofs    map[string]*abrpc.TransactionRecordAndProof
-		Units       map[string]*abrpc.Unit[any]
-		OwnerUnits  map[string][]types.UnitID
+		Err          error
+		RoundNumber  uint64
+		TxProofs     map[string]*abrpc.TransactionRecordAndProof
+		Units        map[string]*abrpc.Unit[any]
+		OwnerUnits   map[string][]types.UnitID
+		InfoResponse *abrpc.NodeInfoResponse
 	}
 
 	Option func(*Options)
 )
 
-func NewRpcServerMock(opts ...Option) *MockService {
+func NewStateServiceMock(opts ...Option) *StateServiceMock {
 	options := &Options{
 		TxProofs:   map[string]*abrpc.TransactionRecordAndProof{},
 		Units:      map[string]*abrpc.Unit[any]{},
@@ -73,7 +41,7 @@ func NewRpcServerMock(opts ...Option) *MockService {
 	for _, option := range opts {
 		option(options)
 	}
-	return &MockService{
+	return &StateServiceMock{
 		Err:          options.Err,
 		RoundNumber:  options.RoundNumber,
 		Units:        options.Units,
@@ -122,32 +90,32 @@ func WithError(err error) Option {
 	}
 }
 
-func (s *MockService) GetRoundNumber(ctx context.Context) (uint64, error) {
+func (s *StateServiceMock) GetRoundNumber(ctx context.Context) (uint64, error) {
 	if s.Err != nil {
 		return 0, s.Err
 	}
 	return s.RoundNumber, nil
 }
 
-func (s *MockService) GetUnit(unitID types.UnitID, includeStateProof bool) (*abrpc.Unit[any], error) {
+func (s *StateServiceMock) GetUnit(unitID types.UnitID, includeStateProof bool) (*abrpc.Unit[any], error) {
 	if s.Err != nil {
 		return nil, s.Err
 	}
 	u, ok := s.Units[string(unitID)]
 	if !ok {
-		return nil, errors.New("not found") // todo type safe error
+		return nil, nil
 	}
 	return u, nil
 }
 
-func (s *MockService) GetUnitsByOwnerID(ownerID types.Bytes) ([]types.UnitID, error) {
+func (s *StateServiceMock) GetUnitsByOwnerID(ownerID types.Bytes) ([]types.UnitID, error) {
 	if s.Err != nil {
 		return nil, s.Err
 	}
 	return s.OwnerUnitIDs[string(ownerID)], nil
 }
 
-func (s *MockService) SendTransaction(ctx context.Context, tx types.Bytes) (types.Bytes, error) {
+func (s *StateServiceMock) SendTransaction(ctx context.Context, tx types.Bytes) (types.Bytes, error) {
 	if s.Err != nil {
 		return nil, s.Err
 	}
@@ -160,7 +128,7 @@ func (s *MockService) SendTransaction(ctx context.Context, tx types.Bytes) (type
 	return txHash, nil
 }
 
-func (s *MockService) GetTransactionProof(ctx context.Context, txHash types.Bytes) (*abrpc.TransactionRecordAndProof, error) {
+func (s *StateServiceMock) GetTransactionProof(ctx context.Context, txHash types.Bytes) (*abrpc.TransactionRecordAndProof, error) {
 	if s.Err != nil {
 		return nil, s.Err
 	}
@@ -185,20 +153,21 @@ func (s *MockService) GetTransactionProof(ctx context.Context, txHash types.Byte
 			TxProof:  txProofBytes,
 		}, nil
 	}
-	return nil, client.ErrNotFound
+	return nil, nil
 }
 
-func (s *MockService) GetBlock(ctx context.Context, roundNumber uint64) (types.Bytes, error) {
+func (s *StateServiceMock) GetBlock(ctx context.Context, roundNumber uint64) (types.Bytes, error) {
 	if s.Err != nil {
 		return nil, s.Err
 	}
 	return s.Block, nil
 }
 
-func (s *MockService) Reset() {
+func (s *StateServiceMock) Reset() {
 	s.RoundNumber = 0
 	s.Units = nil
 	s.OwnerUnitIDs = nil
 	s.TxProofs = nil
 	s.Err = nil
+	s.Block = nil
 }
