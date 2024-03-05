@@ -3,13 +3,10 @@ package mocksrv
 import (
 	"context"
 	"crypto"
-	"errors"
 
 	abrpc "github.com/alphabill-org/alphabill/rpc"
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/fxamacker/cbor/v2"
-
-	"github.com/alphabill-org/alphabill-wallet/wallet/evm/client"
 )
 
 type (
@@ -106,7 +103,7 @@ func (s *StateServiceMock) GetUnit(unitID types.UnitID, includeStateProof bool) 
 	}
 	u, ok := s.Units[string(unitID)]
 	if !ok {
-		return nil, errors.New("not found") // todo type safe error
+		return nil, nil
 	}
 	return u, nil
 }
@@ -156,7 +153,7 @@ func (s *StateServiceMock) GetTransactionProof(ctx context.Context, txHash types
 			TxProof:  txProofBytes,
 		}, nil
 	}
-	return nil, client.ErrNotFound
+	return nil, nil
 }
 
 func (s *StateServiceMock) GetBlock(ctx context.Context, roundNumber uint64) (types.Bytes, error) {
@@ -172,4 +169,5 @@ func (s *StateServiceMock) Reset() {
 	s.OwnerUnitIDs = nil
 	s.TxProofs = nil
 	s.Err = nil
+	s.Block = nil
 }

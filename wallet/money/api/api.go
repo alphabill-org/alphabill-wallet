@@ -5,20 +5,20 @@ import (
 	"crypto"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
-	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill/txsystem/fc/unit"
 	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/types"
+
+	"github.com/alphabill-org/alphabill-wallet/wallet"
 )
 
 // code extracted from backend->node refactor
 // TODO organize and write unit tests
 
-// TODO type safe error check
-var ErrNotFound = errors.New("not found") // error if unit does not exist
+// ErrNotFound is returned by API methods if the requested item does not exist.
+var ErrNotFound = errors.New("not found")
 
 type (
 	Bill struct {
@@ -116,8 +116,7 @@ func FetchBills(ctx context.Context, c RpcClient, ownerID []byte) ([]*Bill, erro
 func FetchBill(ctx context.Context, c RpcClient, unitID types.UnitID) (*Bill, error) {
 	bill, err := c.GetBill(ctx, unitID, false)
 	if err != nil {
-		// TODO type safe error check
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, ErrNotFound) {
 			return nil, nil
 		}
 		return nil, err
@@ -127,11 +126,7 @@ func FetchBill(ctx context.Context, c RpcClient, unitID types.UnitID) (*Bill, er
 
 func FetchFeeCreditBill(ctx context.Context, c RpcClient, fcrID types.UnitID) (*FeeCreditBill, error) {
 	fcr, err := c.GetFeeCreditRecord(ctx, fcrID, false)
-	if err != nil {
-		// TODO type safe error check
-		if strings.Contains(err.Error(), "not found") {
-			return nil, nil
-		}
+	if err != nil && !errors.Is(err, ErrNotFound) {
 		return nil, err
 	}
 	return fcr, nil
