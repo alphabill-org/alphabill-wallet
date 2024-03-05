@@ -6,7 +6,7 @@ replace github.com/multiformats/go-multistream v0.5.0 => github.com/multiformats
 
 require (
 	github.com/ainvaltin/httpsrv v0.1.2
-	github.com/alphabill-org/alphabill v0.3.1-0.20240304100057-620a3e085f1e
+	github.com/alphabill-org/alphabill v0.3.1-0.20240305123934-e987be34b69f
 	github.com/btcsuite/btcd v0.23.2
 	github.com/btcsuite/btcd/btcutil v1.1.2
 	github.com/ethereum/go-ethereum v1.12.2

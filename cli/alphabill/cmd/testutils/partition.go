@@ -26,12 +26,13 @@ import (
 
 	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
-	testblock "github.com/alphabill-org/alphabill-wallet/internal/testutils/block"
 	testlogger "github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
 	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
 	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 )
+
+const DefaultT2Timeout = uint32(2500)
 
 func CreateMoneyPartition(t *testing.T, genesisConfig *testutil.MoneyGenesisConfig, nodeCount uint8) *testpartition.NodePartition {
 	genesisState := testutil.MoneyGenesisState(t, genesisConfig)
@@ -44,7 +45,7 @@ func CreateMoneyPartition(t *testing.T, genesisConfig *testutil.MoneyGenesisConf
 			money.WithSystemDescriptionRecords([]*genesis.SystemDescriptionRecord{
 				{
 					SystemIdentifier: money.DefaultSystemIdentifier,
-					T2Timeout:        testblock.DefaultT2Timeout,
+					T2Timeout:        DefaultT2Timeout,
 					FeeCreditBill: &genesis.FeeCreditBill{
 						UnitID:         money.NewBillID(nil, []byte{2}),
 						OwnerPredicate: templates.AlwaysTrueBytes(),
