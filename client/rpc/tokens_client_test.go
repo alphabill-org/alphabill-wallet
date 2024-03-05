@@ -7,16 +7,17 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-wallet/wallet/tokens"
 	"github.com/alphabill-org/alphabill/rpc"
 	tokentxs "github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/client/rpc/mocksrv"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
+	"github.com/alphabill-org/alphabill-wallet/wallet/tokens"
 )
 
 func TestTokensRpcClient(t *testing.T) {
-	service := mocksrv.NewRpcServerMock()
+	service := mocksrv.NewStateServiceMock()
 	client := startServerAndTokensClient(t, service)
 
 	t.Run("GetToken_OK", func(t *testing.T) {
@@ -39,7 +40,7 @@ func TestTokensRpcClient(t *testing.T) {
 			Kind:     tokens.Fungible,
 			TxHash:   []byte{1, 2, 3},
 		}
-		*service = *mocksrv.NewRpcServerMock(
+		*service = *mocksrv.NewStateServiceMock(
 			mocksrv.WithUnit(&rpc.Unit[any]{
 				UnitID: tokenTypeID,
 				Data: tokentxs.FungibleTokenTypeData{
@@ -64,11 +65,19 @@ func TestTokensRpcClient(t *testing.T) {
 		require.Equal(t, tokenUnit, actualTokenUnit)
 	})
 	t.Run("GetToken_NOK", func(t *testing.T) {
-		*service = *mocksrv.NewRpcServerMock(mocksrv.WithError(errors.New("some error")))
+		*service = *mocksrv.NewStateServiceMock(mocksrv.WithError(errors.New("some error")))
 		tokenID := tokentxs.NewFungibleTokenID(nil, []byte{1})
 
 		tokenUnit, err := client.GetToken(context.Background(), tokenID)
 		require.ErrorContains(t, err, "some error")
+		require.Nil(t, tokenUnit)
+	})
+	t.Run("GetToken_NotFound", func(t *testing.T) {
+		*service = *mocksrv.NewStateServiceMock()
+		tokenID := tokentxs.NewFungibleTokenID(nil, []byte{1})
+
+		tokenUnit, err := client.GetToken(context.Background(), tokenID)
+		require.ErrorIs(t, err, api.ErrNotFound)
 		require.Nil(t, tokenUnit)
 	})
 
@@ -116,7 +125,7 @@ func TestTokensRpcClient(t *testing.T) {
 		}
 
 		// mock two tokens - one nft one ft
-		*service = *mocksrv.NewRpcServerMock(
+		*service = *mocksrv.NewStateServiceMock(
 			// fungible token type
 			mocksrv.WithUnit(&rpc.Unit[any]{
 				UnitID: ftTokenTypeID,
@@ -186,7 +195,7 @@ func TestTokensRpcClient(t *testing.T) {
 
 	})
 	t.Run("GetTokens_NOK", func(t *testing.T) {
-		*service = *mocksrv.NewRpcServerMock(mocksrv.WithError(errors.New("some error")))
+		*service = *mocksrv.NewStateServiceMock(mocksrv.WithError(errors.New("some error")))
 		tokenID := tokentxs.NewFungibleTokenID(nil, []byte{1})
 
 		tokenUnit, err := client.GetToken(context.Background(), tokenID)
@@ -222,7 +231,7 @@ func TestTokensRpcClient(t *testing.T) {
 			})
 		}
 
-		*service = *mocksrv.NewRpcServerMock(
+		*service = *mocksrv.NewStateServiceMock(
 			mocksrv.WithUnits(units...),
 		)
 
@@ -239,7 +248,7 @@ func TestTokensRpcClient(t *testing.T) {
 		require.Equal(t, typeHierarchy[2].ParentTypeID, tokens.NoParent)
 	})
 	t.Run("GetTypeHierarchy_NOK", func(t *testing.T) {
-		*service = *mocksrv.NewRpcServerMock(mocksrv.WithError(errors.New("some error")))
+		*service = *mocksrv.NewStateServiceMock(mocksrv.WithError(errors.New("some error")))
 		typeID := tokentxs.NewFungibleTokenTypeID(nil, []byte{1})
 
 		typeHierarchy, err := client.GetTypeHierarchy(context.Background(), typeID)
@@ -248,8 +257,8 @@ func TestTokensRpcClient(t *testing.T) {
 	})
 }
 
-func startServerAndTokensClient(t *testing.T, service *mocksrv.MockService) *TokensClient {
-	srv := mocksrv.StartServer(t, service)
+func startServerAndTokensClient(t *testing.T, service *mocksrv.StateServiceMock) *TokensClient {
+	srv := mocksrv.StartStateApiServer(t, service)
 
 	client, err := DialContext(context.Background(), "http://"+srv)
 	require.NoError(t, err)

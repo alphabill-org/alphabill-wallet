@@ -18,7 +18,7 @@ const systemIdentifier types.SystemID = 0x1020401
 
 func TestNewNetwork_Ok(t *testing.T) {
 	genesisState := state.NewEmptyState()
-	counterPartition, err := NewPartition(t, 3,
+	counterPartition, err := NewPartition(t, "counter node", 3,
 		func(_ map[string]crypto.Verifier) txsystem.TransactionSystem {
 			txs := &testtxsystem.CounterTxSystem{}
 			txs.Commit(genesisState.CommittedUC())

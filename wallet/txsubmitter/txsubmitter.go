@@ -5,13 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/alphabill-org/alphabill/logger"
 	"github.com/alphabill-org/alphabill/types"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 )
 
 type (
@@ -113,7 +113,7 @@ func (t *TxSubmissionBatch) confirmUnitsTx(ctx context.Context) error {
 			}
 			if roundNumber <= sub.Transaction.Timeout() {
 				txRecord, txProof, err := t.rpcClient.GetTransactionProof(ctx, sub.TxHash)
-				if err != nil && !strings.Contains(err.Error(), "index not found") { // TODO type safe error check
+				if err != nil && !errors.Is(err, api.ErrNotFound) {
 					return err
 				}
 				if txRecord != nil && txProof != nil {

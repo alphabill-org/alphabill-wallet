@@ -22,7 +22,7 @@ import (
 )
 
 func TestWalletBillsListCmd_EmptyWallet(t *testing.T) {
-	rpcUrl := mocksrv.StartServer(t, mocksrv.NewRpcServerMock())
+	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock())
 	homedir := testutils.CreateNewTestWallet(t)
 
 	stdout, err := execBillsCommand(t, homedir, "list --rpc-url "+rpcUrl)
@@ -31,7 +31,7 @@ func TestWalletBillsListCmd_EmptyWallet(t *testing.T) {
 }
 
 func TestWalletBillsListCmd_Single(t *testing.T) {
-	rpcUrl := mocksrv.StartServer(t, mocksrv.NewRpcServerMock(mocksrv.WithOwnerUnit(&abrpc.Unit[any]{
+	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(&abrpc.Unit[any]{
 		UnitID:         money.NewBillID(nil, []byte{1}),
 		Data:           money.BillData{V: 1e8},
 		OwnerPredicate: testutils.TestPubKey0Hash(t),
@@ -44,7 +44,7 @@ func TestWalletBillsListCmd_Single(t *testing.T) {
 }
 
 func TestWalletBillsListCmd_Multiple(t *testing.T) {
-	addr := mocksrv.StartServer(t, mocksrv.NewRpcServerMock(
+	addr := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(
 		mocksrv.WithOwnerUnit(&abrpc.Unit[any]{UnitID: money.NewBillID(nil, []byte{1}), Data: money.BillData{V: 1}, OwnerPredicate: testutils.TestPubKey0Hash(t)}),
 		mocksrv.WithOwnerUnit(&abrpc.Unit[any]{UnitID: money.NewBillID(nil, []byte{2}), Data: money.BillData{V: 2}, OwnerPredicate: testutils.TestPubKey0Hash(t)}),
 		mocksrv.WithOwnerUnit(&abrpc.Unit[any]{UnitID: money.NewBillID(nil, []byte{3}), Data: money.BillData{V: 3}, OwnerPredicate: testutils.TestPubKey0Hash(t)}),
@@ -63,7 +63,7 @@ func TestWalletBillsListCmd_Multiple(t *testing.T) {
 }
 
 func TestWalletBillsListCmd_ExtraAccount(t *testing.T) {
-	rpcUrl := mocksrv.StartServer(t, mocksrv.NewRpcServerMock(
+	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(
 		mocksrv.WithOwnerUnit(&abrpc.Unit[any]{UnitID: money.NewBillID(nil, []byte{1}), Data: money.BillData{V: 1}, OwnerPredicate: testutils.TestPubKey1Hash(t)}),
 	))
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic(), testutils.WithNumberOfAccounts(2))
@@ -78,7 +78,7 @@ func TestWalletBillsListCmd_ExtraAccount(t *testing.T) {
 }
 
 func TestWalletBillsListCmd_ExtraAccountTotal(t *testing.T) {
-	rpcUrl := mocksrv.StartServer(t, mocksrv.NewRpcServerMock(
+	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(
 		mocksrv.WithOwnerUnit(&abrpc.Unit[any]{UnitID: money.NewBillID(nil, []byte{1}), Data: money.BillData{V: 1e9}, OwnerPredicate: testutils.TestPubKey0Hash(t)}),
 	))
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic(), testutils.WithNumberOfAccounts(2))
@@ -118,7 +118,7 @@ func TestWalletBillsListCmd_ShowUnswappedFlag(t *testing.T) {
 
 func TestWalletBillsListCmd_ShowLockedBills(t *testing.T) {
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
-	rpcUrl := mocksrv.StartServer(t, mocksrv.NewRpcServerMock(
+	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(
 		mocksrv.WithOwnerUnit(&abrpc.Unit[any]{UnitID: money.NewBillID(nil, []byte{1}), Data: money.BillData{V: 1e8, Locked: wallet.LockReasonAddFees}, OwnerPredicate: testutils.TestPubKey0Hash(t)}),
 		mocksrv.WithOwnerUnit(&abrpc.Unit[any]{UnitID: money.NewBillID(nil, []byte{2}), Data: money.BillData{V: 1e8, Locked: wallet.LockReasonReclaimFees}, OwnerPredicate: testutils.TestPubKey0Hash(t)}),
 		mocksrv.WithOwnerUnit(&abrpc.Unit[any]{UnitID: money.NewBillID(nil, []byte{3}), Data: money.BillData{V: 1e8, Locked: wallet.LockReasonCollectDust}, OwnerPredicate: testutils.TestPubKey0Hash(t)}),
@@ -161,7 +161,10 @@ func TestWalletBillsLockUnlockCmd_Ok(t *testing.T) {
 }
 
 func TestWalletBillsLockUnlockCmd_Nok(t *testing.T) {
-	rpcUrl := mocksrv.StartServer(t, mocksrv.NewRpcServerMock())
+	rpcUrl := mocksrv.StartServer(t, map[string]interface{}{
+		"state": mocksrv.NewStateServiceMock(),
+		"admin": mocksrv.NewAdminServiceMock(),
+	})
 	homedir := testutils.CreateNewTestWallet(t)
 
 	// lock bill

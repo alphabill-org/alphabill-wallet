@@ -30,7 +30,6 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money"
-	"github.com/alphabill-org/alphabill-wallet/wallet/unitlock"
 )
 
 type Factory interface {
@@ -177,18 +176,13 @@ func ExecSendCmd(ctx context.Context, cmd *cobra.Command, config *types.WalletCo
 	if err != nil {
 		return err
 	}
-	unitLocker, err := unitlock.NewUnitLocker(config.WalletHomeDir)
-	if err != nil {
-		return err
-	}
-	defer unitLocker.Close()
 	feeManagerDB, err := fees.NewFeeManagerDB(config.WalletHomeDir)
 	if err != nil {
 		return err
 	}
 	defer feeManagerDB.Close()
 
-	w, err := money.LoadExistingWallet(am, unitLocker, feeManagerDB, rpcClient, config.Base.Observe.Logger())
+	w, err := money.LoadExistingWallet(am, feeManagerDB, rpcClient, config.Base.Observe.Logger())
 	if err != nil {
 		return err
 	}
@@ -278,19 +272,13 @@ func ExecGetBalanceCmd(cmd *cobra.Command, config *types.WalletConfig) error {
 	}
 	defer am.Close()
 
-	unitLocker, err := unitlock.NewUnitLocker(config.WalletHomeDir)
-	if err != nil {
-		return err
-	}
-	defer unitLocker.Close()
-
 	feeManagerDB, err := fees.NewFeeManagerDB(config.WalletHomeDir)
 	if err != nil {
 		return err
 	}
 	defer feeManagerDB.Close()
 
-	w, err := money.LoadExistingWallet(am, unitLocker, feeManagerDB, rpcClient, config.Base.Observe.Logger())
+	w, err := money.LoadExistingWallet(am, feeManagerDB, rpcClient, config.Base.Observe.Logger())
 	if err != nil {
 		return err
 	}
@@ -415,19 +403,13 @@ func ExecCollectDust(cmd *cobra.Command, config *types.WalletConfig) error {
 	}
 	defer am.Close()
 
-	unitLocker, err := unitlock.NewUnitLocker(config.WalletHomeDir)
-	if err != nil {
-		return err
-	}
-	defer unitLocker.Close()
-
 	feeManagerDB, err := fees.NewFeeManagerDB(config.WalletHomeDir)
 	if err != nil {
 		return err
 	}
 	defer feeManagerDB.Close()
 
-	w, err := money.LoadExistingWallet(am, unitLocker, feeManagerDB, rpcClient, config.Base.Observe.Logger())
+	w, err := money.LoadExistingWallet(am, feeManagerDB, rpcClient, config.Base.Observe.Logger())
 	if err != nil {
 		return err
 	}

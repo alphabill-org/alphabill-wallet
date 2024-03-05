@@ -1,14 +1,15 @@
 package tokens
 
 import (
+	"errors"
 	"fmt"
 	"mime"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 
-	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/spf13/cobra"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
@@ -1058,16 +1059,16 @@ func initTokensWallet(cmd *cobra.Command, config *types.WalletConfig) (*tokenswa
 		return nil, fmt.Errorf("failed to dial rpc client: %w", err)
 	}
 	tokensClient := rpc.NewTokensClient(rpcClient)
-	// TODO add info endpoint to rpc client?
-	//infoResponse, err := backendClient.GetInfo(cmd.Context())
-	//if err != nil {
-	//	return nil, err
-	//}
-	//tokensTypeVar := types.TokensType
-	//if !strings.HasPrefix(infoResponse.Name, tokensTypeVar.String()) {
-	//	return nil, errors.New("invalid wallet backend API URL provided for tokens partition")
-	//}
-	return tokenswallet.New(tokens.DefaultSystemIdentifier, tokensClient, am, confirmTx, nil, config.Base.Observe.Logger())
+	adminClient := rpc.NewAdminClient(rpcClient.Client())
+	infoResponse, err := adminClient.GetNodeInfo(cmd.Context())
+	if err != nil {
+		return nil, err
+	}
+	tokensTypeVar := types.TokensType
+	if !strings.HasPrefix(infoResponse.Name, tokensTypeVar.String()) {
+		return nil, errors.New("invalid rpc url provided for tokens partition")
+	}
+	return tokenswallet.New(infoResponse.SystemID, tokensClient, am, confirmTx, nil, config.Base.Observe.Logger())
 }
 
 func readParentTypeInfo(cmd *cobra.Command, keyNr uint64, am account.Manager) (tokenswallet.TokenTypeID, []*tokenswallet.PredicateInput, error) {

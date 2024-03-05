@@ -21,7 +21,6 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
-	"github.com/alphabill-org/alphabill-wallet/wallet/unitlock"
 )
 
 const (
@@ -196,7 +195,7 @@ func TestAddFeeCredit_WalletContainsLockedBillForDustCollection(t *testing.T) {
 	am := newAccountManager(t)
 	moneyClient := testutil.NewRpcClientMock(
 		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 100000001, Backlink: []byte{1}})),
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 100000002, Backlink: []byte{2}, Locked: unitlock.LockReasonCollectDust})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 100000002, Backlink: []byte{2}, Locked: wallet.LockReasonCollectDust})),
 	)
 	feeManagerDB := createFeeManagerDB(t)
 	feeManager := newMoneyPartitionFeeManager(am, feeManagerDB, moneyClient, logger.New(t))
@@ -290,7 +289,7 @@ func TestReclaimFeeCredit_WalletContainsLockedBillForDustCollection(t *testing.T
 
 	moneyClient := testutil.NewRpcClientMock(
 		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 100000001, Backlink: []byte{1}})),
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 100000002, Backlink: []byte{2}, Locked: unitlock.LockReasonCollectDust})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 100000002, Backlink: []byte{2}, Locked: wallet.LockReasonCollectDust})),
 		testutil.WithOwnerFeeCreditBill(newMoneyFCB(accountKey, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{111}})),
 	)
 	feeManagerDB := createFeeManagerDB(t)
@@ -815,7 +814,7 @@ func TestReclaimFeeCredit_ExistingLock(t *testing.T) {
 
 		// mock locked fee credit bill
 		moneyClient := testutil.NewRpcClientMock(
-			testutil.WithOwnerFeeCreditBill(newMoneyFCB(accountKey, &unit.FeeCreditRecord{Balance: 100, Backlink: lockTxHash, Locked: unitlock.LockReasonReclaimFees})),
+			testutil.WithOwnerFeeCreditBill(newMoneyFCB(accountKey, &unit.FeeCreditRecord{Balance: 100, Backlink: lockTxHash, Locked: wallet.LockReasonReclaimFees})),
 			testutil.WithTxProof(lockTxHash, lockTxProof),
 		)
 		feeManager := newMoneyPartitionFeeManager(am, feeManagerDB, moneyClient, logger.New(t))

@@ -49,11 +49,15 @@ func (c *Client) GetRoundNumber(ctx context.Context) (uint64, error) {
 	return num, err
 }
 
-// GetBill returns the unit data for given unitID.
+// GetBill returns bill for the given bill id.
+// Returns api.ErrNotFound if the bill does not exist.
 func (c *Client) GetBill(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.Bill, error) {
-	var u rpc.Unit[money.BillData]
+	var u *rpc.Unit[money.BillData]
 	if err := c.c.CallContext(ctx, &u, "state_getUnit", unitID, includeStateProof); err != nil {
 		return nil, err
+	}
+	if u == nil {
+		return nil, api.ErrNotFound
 	}
 
 	return &api.Bill{
@@ -62,13 +66,16 @@ func (c *Client) GetBill(ctx context.Context, unitID types.UnitID, includeStateP
 	}, nil
 }
 
-// GetFeeCreditRecord returns the unit data for given unitID.
+// GetFeeCreditRecord returns fee credit bill for the given bill id.
+// Returns api.ErrNotFound if the fee credit bill does not exist.
 func (c *Client) GetFeeCreditRecord(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
-	var u rpc.Unit[unit.FeeCreditRecord]
+	var u *rpc.Unit[unit.FeeCreditRecord]
 	if err := c.c.CallContext(ctx, &u, "state_getUnit", unitID, includeStateProof); err != nil {
 		return nil, err
 	}
-
+	if u == nil {
+		return nil, api.ErrNotFound
+	}
 	return &api.FeeCreditBill{
 		ID:              u.UnitID,
 		FeeCreditRecord: &u.Data,
@@ -94,11 +101,15 @@ func (c *Client) SendTransaction(ctx context.Context, tx *types.TransactionOrder
 }
 
 // GetTransactionProof returns transaction record and proof for the given transaction hash.
+// Returns api.ErrNotFound if proof was not found.
 func (c *Client) GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TransactionRecord, *types.TxProof, error) {
 	var res *rpc.TransactionRecordAndProof
 	err := c.c.CallContext(ctx, &res, "state_getTransactionProof", txHash)
 	if err != nil {
 		return nil, nil, err
+	}
+	if res == nil {
+		return nil, nil, api.ErrNotFound
 	}
 	var txRecord *types.TransactionRecord
 	if err = cbor.Unmarshal(res.TxRecord, &txRecord); err != nil {
@@ -111,11 +122,15 @@ func (c *Client) GetTransactionProof(ctx context.Context, txHash types.Bytes) (*
 	return txRecord, txProof, nil
 }
 
-// GetBlock returns block for given round number.
+// GetBlock returns block for the given round number.
+// Returns ErrNotFound if the block does not exist.
 func (c *Client) GetBlock(ctx context.Context, roundNumber uint64) (*types.Block, error) {
 	var res types.Bytes
 	if err := c.c.CallContext(ctx, &res, "state_getBlock", roundNumber); err != nil {
 		return nil, err
+	}
+	if res == nil {
+		return nil, api.ErrNotFound
 	}
 	var block *types.Block
 	if err := cbor.Unmarshal(res, &block); err != nil {

@@ -4,10 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
-	"github.com/alphabill-org/alphabill/txsystem/evm"
-	"github.com/alphabill-org/alphabill/txsystem/money"
-	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/spf13/cobra"
 
 	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
@@ -400,32 +398,19 @@ func (c *feesConfig) getTargetPartitionUrl() string {
 
 // Creates a fees.FeeManager that needs to be closed with the Close() method.
 // Does not close the account.Manager passed as an argument.
-func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager, feeManagerDB fees.FeeManagerDB, obs clitypes.Observability) (FeeCreditManager, error) {
-	// TODO add info endpoint to rpc client?
-	//moneyBackendClient, err := moneyclient.New(moneyPartitionRpcUrl, obs)
-	//if err != nil {
-	//	return nil, fmt.Errorf("failed to create money backend client: %w", err)
-	//}
-	//moneySystemInfo, err := moneyBackendClient.GetInfo(ctx)
-	//if err != nil {
-	//	return nil, fmt.Errorf("failed to fetch money system info: %w", err)
-	//}
-	//moneyTypeVar := clitypes.MoneyType
-	//if !strings.HasPrefix(moneySystemInfo.Name, moneyTypeVar.String()) {
-	//	return nil, errors.New("invalid wallet backend API URL provided for money partition")
-	//}
-	//// the info response is expected to have system ID as hex, max 4 bytes
-	//mSysID, err := strconv.ParseUint(moneySystemInfo.SystemID, 16, 32)
-	//if err != nil {
-	//	return nil, fmt.Errorf("failed to decode money system identifier hex: %w", err)
-	//}
-	//moneySystemID := types.SystemID(mSysID)
-	//moneyTxPublisher := moneywallet.NewTxPublisher(moneyBackendClient, obs.Logger())
-	moneySystemID := money.DefaultSystemIdentifier
-
+func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager, feeManagerDB fees.FeeManagerDB, obs clitypes.Observability) (*fees.FeeManager, error) {
 	moneyClient, err := rpc.DialContext(ctx, c.getMoneyRpcUrl())
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial money rpc url: %w", err)
+	}
+	moneyAdminClient := rpc.NewAdminClient(moneyClient.Client())
+	moneyInfo, err := moneyAdminClient.GetNodeInfo(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch money system info: %w", err)
+	}
+	moneyTypeVar := clitypes.MoneyType
+	if !strings.HasPrefix(moneyInfo.Name, moneyTypeVar.String()) {
+		return nil, errors.New("invalid wallet backend API URL provided for money partition")
 	}
 
 	switch c.targetPartitionType {
@@ -433,41 +418,36 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 		return fees.NewFeeManager(
 			am,
 			feeManagerDB,
-			moneySystemID,
+			moneyInfo.SystemID,
 			moneyClient,
 			moneywallet.FeeCreditRecordIDFormPublicKey,
-			moneySystemID,
+			moneyInfo.SystemID,
 			moneyClient,
 			moneywallet.FeeCreditRecordIDFormPublicKey,
 			obs.Logger(),
 		), nil
 	case clitypes.TokensType:
-		// TODO add info endpoint to rpc client?
-		//tokenInfo, err := tokenBackendClient.GetInfo(ctx)
-		//if err != nil {
-		//	return nil, fmt.Errorf("failed to fetch tokens system info: %w", err)
-		//}
-		//tokenTypeVar := clitypes.TokensType
-		//if !strings.HasPrefix(tokenInfo.Name, tokenTypeVar.String()) {
-		//	return nil, errors.New("invalid wallet backend API URL provided for tokens partition")
-		//}
-		//tokenSystemID, err := strconv.ParseUint(tokenInfo.SystemID, 16, 32)
-		//if err != nil {
-		//	return nil, fmt.Errorf("failed to decode tokens system identifier hex: %w", err)
-		//}
 		tokensRpcUrl := c.getTargetPartitionRpcUrl()
 		tokensClient, err := rpc.DialContext(ctx, tokensRpcUrl)
 		if err != nil {
 			return nil, fmt.Errorf("failed to dial tokens rpc url: %w", err)
 		}
-		tokenSystemID := tokens.DefaultSystemIdentifier
+		tokensAdminClient := rpc.NewAdminClient(tokensClient.Client())
+		tokenInfo, err := tokensAdminClient.GetNodeInfo(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch tokens system info: %w", err)
+		}
+		tokenTypeVar := clitypes.TokensType
+		if !strings.HasPrefix(tokenInfo.Name, tokenTypeVar.String()) {
+			return nil, errors.New("invalid wallet backend API URL provided for tokens partition")
+		}
 		return fees.NewFeeManager(
 			am,
 			feeManagerDB,
-			moneySystemID,
+			moneyInfo.SystemID,
 			moneyClient,
 			moneywallet.FeeCreditRecordIDFormPublicKey,
-			tokenSystemID,
+			tokenInfo.SystemID,
 			tokensClient,
 			tokenswallet.FeeCreditRecordIDFromPublicKey,
 			obs.Logger(),
@@ -478,28 +458,22 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 		if err != nil {
 			return nil, fmt.Errorf("failed to dial evm rpc url: %w", err)
 		}
-		// TODO add info endpoint to rpc client?
-		//evmTxPublisher := evmwallet.NewTxPublisher(evmClient)
-		//evmInfo, err := evmClient.GetInfo(ctx)
-		//if err != nil {
-		//	return nil, fmt.Errorf("failed to fetch evm system info: %w", err)
-		//}
-		//evmTypeVar := clitypes.EvmType
-		//if !strings.HasPrefix(evmInfo.Name, evmTypeVar.String()) {
-		//	return nil, errors.New("invalid validator node URL provided for evm partition")
-		//}
-		//evmSystemID, err := strconv.ParseUint(evmInfo.SystemID, 16, 32)
-		//if err != nil {
-		//	return nil, fmt.Errorf("failed to decode evm system identifier hex: %w", err)
-		//}
-		evmSystemID := evm.DefaultEvmTxSystemIdentifier
+		evmAdminClient := rpc.NewAdminClient(evmClient.Client())
+		evmInfo, err := evmAdminClient.GetNodeInfo(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch evm system info: %w", err)
+		}
+		evmTypeVar := clitypes.EvmType
+		if !strings.HasPrefix(evmInfo.Name, evmTypeVar.String()) {
+			return nil, errors.New("invalid validator node URL provided for evm partition")
+		}
 		return fees.NewFeeManager(
 			am,
 			feeManagerDB,
-			moneySystemID,
+			moneyInfo.SystemID,
 			moneyClient,
 			moneywallet.FeeCreditRecordIDFormPublicKey,
-			evmSystemID,
+			evmInfo.SystemID,
 			evmClient,
 			evmwallet.FeeCreditRecordIDFromPublicKey,
 			obs.Logger(),
