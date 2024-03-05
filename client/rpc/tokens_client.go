@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/alphabill-org/alphabill-wallet/wallet"
-	"github.com/alphabill-org/alphabill-wallet/wallet/tokens"
 	"github.com/alphabill-org/alphabill/rpc"
 	tokentxs "github.com/alphabill-org/alphabill/txsystem/tokens"
+
+	"github.com/alphabill-org/alphabill-wallet/wallet"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
+	"github.com/alphabill-org/alphabill-wallet/wallet/tokens"
 )
 
 // TokensClient defines typed wrappers for the Alphabill RPC API.
@@ -20,10 +22,13 @@ func NewTokensClient(c *Client) *TokensClient {
 	return &TokensClient{Client: c}
 }
 
+// GetToken returns token for the given token id.
+// Returns api.ErrNotFound if the token does not exist.
 func (c *TokensClient) GetToken(ctx context.Context, id tokens.TokenID) (*tokens.TokenUnit, error) {
 	return c.getTokenUnit(ctx, id)
 }
 
+// GetTokens returns tokens for the given owner id.
 func (c *TokensClient) GetTokens(ctx context.Context, kind tokens.Kind, ownerID []byte) ([]*tokens.TokenUnit, error) {
 	unitIds, err := c.GetUnitsByOwnerID(ctx, ownerID)
 	if err != nil {
@@ -50,6 +55,7 @@ func (c *TokensClient) GetTokenTypes(ctx context.Context, kind tokens.Kind, crea
 	return nil, nil
 }
 
+// GetTypeHierarchy returns type hierarchy for given token type id where the root type is the last element (no parent).
 func (c *TokensClient) GetTypeHierarchy(ctx context.Context, typeID tokens.TokenTypeID) ([]*tokens.TokenUnitType, error) {
 	var tokenTypes []*tokens.TokenUnitType
 	for len(typeID) > 0 && !typeID.Eq(tokens.NoParent) {
@@ -65,14 +71,22 @@ func (c *TokensClient) GetTypeHierarchy(ctx context.Context, typeID tokens.Token
 
 func (c *TokensClient) getTokenUnit(ctx context.Context, tokenID tokens.TokenID) (*tokens.TokenUnit, error) {
 	if tokenID.HasType(tokentxs.FungibleTokenUnitType) {
-		var ft rpc.Unit[tokentxs.FungibleTokenData]
+		var ft *rpc.Unit[tokentxs.FungibleTokenData]
 		if err := c.c.CallContext(ctx, &ft, "state_getUnit", tokenID, false); err != nil {
 			return nil, err
 		}
-		var ftType rpc.Unit[tokentxs.FungibleTokenTypeData]
+		if ft == nil {
+			return nil, api.ErrNotFound
+		}
+
+		var ftType *rpc.Unit[tokentxs.FungibleTokenTypeData]
 		if err := c.c.CallContext(ctx, &ftType, "state_getUnit", ft.Data.TokenType, false); err != nil {
 			return nil, err
 		}
+		if ftType == nil {
+			return nil, api.ErrNotFound
+		}
+
 		return &tokens.TokenUnit{
 			// common
 			ID:       ft.UnitID,
@@ -91,14 +105,22 @@ func (c *TokensClient) getTokenUnit(ctx context.Context, tokenID tokens.TokenID)
 			TxHash: ft.Data.Backlink,
 		}, nil
 	} else if tokenID.HasType(tokentxs.NonFungibleTokenUnitType) {
-		var nft rpc.Unit[tokentxs.NonFungibleTokenData]
+		var nft *rpc.Unit[tokentxs.NonFungibleTokenData]
 		if err := c.c.CallContext(ctx, &nft, "state_getUnit", tokenID, false); err != nil {
 			return nil, err
 		}
-		var nftType rpc.Unit[tokentxs.NonFungibleTokenTypeData]
+		if nft == nil {
+			return nil, api.ErrNotFound
+		}
+
+		var nftType *rpc.Unit[tokentxs.NonFungibleTokenTypeData]
 		if err := c.c.CallContext(ctx, &nftType, "state_getUnit", nft.Data.NftType, false); err != nil {
 			return nil, err
 		}
+		if nftType == nil {
+			return nil, api.ErrNotFound
+		}
+
 		return &tokens.TokenUnit{
 			// common
 			ID:       nft.UnitID,
@@ -125,9 +147,12 @@ func (c *TokensClient) getTokenUnit(ctx context.Context, tokenID tokens.TokenID)
 
 func (c *TokensClient) getTokenType(ctx context.Context, typeID tokens.TokenTypeID) (*tokens.TokenUnitType, error) {
 	if typeID.HasType(tokentxs.FungibleTokenTypeUnitType) {
-		var ftType rpc.Unit[tokentxs.FungibleTokenTypeData]
+		var ftType *rpc.Unit[tokentxs.FungibleTokenTypeData]
 		if err := c.c.CallContext(ctx, &ftType, "state_getUnit", typeID, false); err != nil {
 			return nil, err
+		}
+		if ftType == nil {
+			return nil, api.ErrNotFound
 		}
 		return &tokens.TokenUnitType{
 			ID:                       ftType.UnitID,
@@ -142,9 +167,12 @@ func (c *TokensClient) getTokenType(ctx context.Context, typeID tokens.TokenType
 			Kind:                     tokens.Fungible,
 		}, nil
 	} else if typeID.HasType(tokentxs.NonFungibleTokenTypeUnitType) {
-		var nftType rpc.Unit[tokentxs.NonFungibleTokenTypeData]
+		var nftType *rpc.Unit[tokentxs.NonFungibleTokenTypeData]
 		if err := c.c.CallContext(ctx, &nftType, "state_getUnit", typeID, false); err != nil {
 			return nil, err
+		}
+		if nftType == nil {
+			return nil, api.ErrNotFound
 		}
 		return &tokens.TokenUnitType{
 			ID:                       nftType.UnitID,
