@@ -1078,7 +1078,7 @@ func readParentTypeInfo(cmd *cobra.Command, keyNr uint64, am account.Manager) (t
 	}
 
 	if len(parentType) == 0 {
-		return nil, []*tokenswallet.PredicateInput{{Argument: nil}}, nil
+		return nil, []*tokenswallet.PredicateInput{}, nil
 	}
 
 	creationInputs, err := readPredicateInput(cmd, cmdFlagSybTypeClauseInput, keyNr, am)

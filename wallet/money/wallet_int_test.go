@@ -21,8 +21,7 @@ import (
 	rpcclient "github.com/alphabill-org/alphabill-wallet/client/rpc"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	testfees "github.com/alphabill-org/alphabill-wallet/internal/testutils/fees"
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
+	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
@@ -42,7 +41,7 @@ wallet runs dust collection
 wallet account 2 and 3 should have only single bill
 */
 func TestCollectDustInMultiAccountWallet(t *testing.T) {
-	observe := observability.Default(t)
+	observe := testobserve.Default(t)
 
 	// setup account
 	dir := t.TempDir()
@@ -160,7 +159,7 @@ func startMoneyOnlyAlphabillPartition(t *testing.T, genesisConfig *testutil.Mone
 	genesisState := testutil.MoneyGenesisState(t, genesisConfig)
 	mPart, err := testpartition.NewPartition(t, "money node", 1, func(tb map[string]abcrypto.Verifier) txsystem.TransactionSystem {
 		system, err := money.NewTxSystem(
-			logger.New(t),
+			testobserve.Default(t),
 			money.WithSystemIdentifier(money.DefaultSystemIdentifier),
 			money.WithSystemDescriptionRecords(createSDRs()),
 			money.WithTrustBase(tb),
