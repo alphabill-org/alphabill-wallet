@@ -41,6 +41,32 @@ func Test_GetRoundNumber_OK(t *testing.T) {
 	require.EqualValues(t, 42, roundNumber)
 }
 
+func Test_GetFeeCreditBill_OK(t *testing.T) {
+	t.Parallel()
+
+	observe := observability.NewFactory(t)
+	expectedFCB := &api.FeeCreditBill{ID: []byte{1}, FeeCreditRecord: &unit.FeeCreditRecord{Balance: 100}}
+	rpcClient := &mockTokensRpcClient{}
+	w, err := New(tokens.DefaultSystemIdentifier, rpcClient, nil, false, nil, observe.DefaultLogger())
+	require.NoError(t, err)
+
+	// verify that correct fee credit bill is returned
+	rpcClient.getFeeCreditRecord = func(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
+		return expectedFCB, nil
+	}
+	actualFCB, err := w.GetFeeCreditBill(context.Background(), []byte{1})
+	require.NoError(t, err)
+	require.Equal(t, expectedFCB, actualFCB)
+
+	// verify that no error is returned when api returns not found error
+	rpcClient.getFeeCreditRecord = func(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
+		return nil, api.ErrNotFound
+	}
+	actualFCB, err = w.GetFeeCreditBill(context.Background(), []byte{1})
+	require.NoError(t, err)
+	require.Nil(t, actualFCB)
+}
+
 func Test_ListTokens(t *testing.T) {
 	rpcClient := &mockTokensRpcClient{
 		getTokens: func(ctx context.Context, kind Kind, ownerID []byte) ([]*TokenUnit, error) {

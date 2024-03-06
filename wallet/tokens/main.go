@@ -485,7 +485,11 @@ func (w *Wallet) GetFeeCredit(ctx context.Context, cmd fees.GetFeeCreditCmd) (*a
 // GetFeeCreditBill returns fee credit bill for given unitID
 // can return nil if fee credit bill has not been created yet.
 func (w *Wallet) GetFeeCreditBill(ctx context.Context, unitID []byte) (*api.FeeCreditBill, error) {
-	return w.rpcClient.GetFeeCreditRecord(ctx, unitID, false)
+	fcb, err := w.rpcClient.GetFeeCreditRecord(ctx, unitID, false)
+	if err != nil && !errors.Is(err, api.ErrNotFound) {
+		return nil, err
+	}
+	return fcb, nil
 }
 
 func (w *Wallet) GetRoundNumber(ctx context.Context) (uint64, error) {
