@@ -484,12 +484,9 @@ func (w *FeeManager) sendLockFCTx(ctx context.Context, accountKey *account.Accou
 	if err != nil {
 		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
 	}
-	// cannot lock fee credit bill if it does not exist
-	if fcb == nil {
-		return nil
-	}
-	// do not lock 0 value fee credit bill
+	// cannot lock fee credit bill if it does not exist, or value is 0
 	if fcb.Balance() == 0 {
+		w.log.Info("skipping lockFC transaction, target partition fee credit bill does not exist or has zero value")
 		return nil
 	}
 	// verify fee credit bill is not locked
@@ -814,6 +811,7 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 	}
 	// do not lock target bill if there's not enough fee credit on money partition
 	if moneyFCB.Balance() == 0 {
+		w.log.Info("skipping lock transaction, not enough fee credit in money partition")
 		return nil
 	}
 
