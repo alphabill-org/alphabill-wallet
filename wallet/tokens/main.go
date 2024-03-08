@@ -48,11 +48,17 @@ type (
 		log        *slog.Logger
 	}
 
+	// SubmissionResult dust collection result for single token type.
 	SubmissionResult struct {
-		TokenTypeID   TokenTypeID
-		TokenID       TokenID
-		AccountNumber uint64
-		FeeSum        uint64
+		TokenTypeID TokenTypeID
+		TokenID     TokenID
+		FeeSum      uint64
+	}
+
+	// AccountDcResult dust collection results for single account.
+	AccountDcResult struct {
+		AccountNumber     uint64
+		SubmissionResults []*SubmissionResult
 	}
 
 	RpcClient interface {
