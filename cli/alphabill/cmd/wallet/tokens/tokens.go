@@ -684,8 +684,12 @@ func execTokenCmdDC(cmd *cobra.Command, config *types.WalletConfig, accountNumbe
 		return err
 	}
 	for _, result := range results {
-		if result.FeeSum > 0 {
-			config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for dust collection on Account number %d.", util.AmountToString(result.FeeSum, 8), result.AccountNumber))
+		if len(result.SubmissionResults) == 0 {
+			config.Base.ConsoleWriter.Println(fmt.Sprintf("Nothing to swap on account #%d", result.AccountNumber))
+		} else {
+			for _, dcResult := range result.SubmissionResults {
+				config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for dust collection on Account number %d.", util.AmountToString(dcResult.FeeSum, 8), result.AccountNumber))
+			}
 		}
 	}
 	return err
