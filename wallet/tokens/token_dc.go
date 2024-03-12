@@ -18,27 +18,32 @@ import (
 
 const maxBurnBatchSize = 100
 
-func (w *Wallet) CollectDust(ctx context.Context, accountNumber uint64, allowedTokenTypes []TokenTypeID, invariantPredicateArgs []*PredicateInput) ([]*SubmissionResult, error) {
+func (w *Wallet) CollectDust(ctx context.Context, accountNumber uint64, allowedTokenTypes []TokenTypeID, invariantPredicateArgs []*PredicateInput) ([]*AccountDcResult, error) {
 	keys, err := w.getAccounts(accountNumber)
 	if err != nil {
 		return nil, err
 	}
-	results := make([]*SubmissionResult, 0, len(keys))
+	results := make([]*AccountDcResult, 0, len(keys))
 
 	for _, key := range keys {
 		tokensByTypes, err := w.getTokensForDC(ctx, key.PubKey, allowedTokenTypes)
 		if err != nil {
 			return nil, err
 		}
+		var subResults []*SubmissionResult
 		for _, tokenz := range tokensByTypes {
-			result, err := w.collectDust(ctx, key, tokenz, invariantPredicateArgs)
+			subResult, err := w.collectDust(ctx, key, tokenz, invariantPredicateArgs)
 			if err != nil {
 				return results, err
 			}
-			if result != nil {
-				results = append(results, result)
+			if subResult != nil {
+				subResults = append(subResults, subResult)
 			}
 		}
+		results = append(results, &AccountDcResult{
+			AccountNumber:     key.idx + 1,
+			SubmissionResults: subResults,
+		})
 	}
 	return results, nil
 }
@@ -73,7 +78,7 @@ func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, typedTokens [
 				w.log.WarnContext(ctx, fmt.Sprintf("unable to join tokens of type '%X', account key '0x%X': %v", token.TypeID, acc.PubKey, err))
 				// just stop without returning error, so that we can continue with other token types
 				if totalFees > 0 {
-					return &SubmissionResult{FeeSum: totalFees, AccountNumber: acc.idx + 1}, nil
+					return &SubmissionResult{FeeSum: totalFees}, nil
 				}
 				return nil, nil
 			}
@@ -100,7 +105,7 @@ func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, typedTokens [
 		totalAmountJoined += burnBatchAmount
 		totalFees += lockFee + burnFee + joinFee
 	}
-	return &SubmissionResult{FeeSum: totalFees, AccountNumber: acc.idx + 1}, nil
+	return &SubmissionResult{FeeSum: totalFees}, nil
 }
 
 func (w *Wallet) joinTokenForDC(ctx context.Context, acc *account.AccountKey, burnProofs []*wallet.Proof, targetTokenBacklink wallet.TxHash, targetTokenID types.UnitID, invariantPredicateArgs []*PredicateInput) (wallet.TxHash, uint64, error) {
