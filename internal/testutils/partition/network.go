@@ -61,11 +61,11 @@ type NodePartition struct {
 	txSystemFunc     func(trustBase map[string]abcrypto.Verifier) txsystem.TransactionSystem
 	ctx              context.Context
 	tb               map[string]abcrypto.Verifier
-	Nodes            []*partitionNode
+	Nodes            []*PartitionNode
 	obs              testobserve.Factory
 }
 
-type partitionNode struct {
+type PartitionNode struct {
 	*partition.Node
 	dbFile       string
 	idxFile      string
@@ -77,6 +77,7 @@ type partitionNode struct {
 	AddrGRPC     string
 	AddrRPC      string
 	proofDB      keyvaluedb.KeyValueDB
+	OwnerIndexer *partition.OwnerIndexer
 	cancel       context.CancelFunc
 	done         chan error
 }
@@ -93,7 +94,7 @@ type rootNode struct {
 	done   chan error
 }
 
-func (pn *partitionNode) Stop() error {
+func (pn *PartitionNode) Stop() error {
 	pn.cancel()
 	return <-pn.done
 }
@@ -266,7 +267,7 @@ func NewPartition(t *testing.T, systemName string, nodeCount uint8, txSystemProv
 		SystemName:   systemName,
 		txSystemFunc: txSystemProvider,
 		genesisState: state,
-		Nodes:        make([]*partitionNode, nodeCount),
+		Nodes:        make([]*PartitionNode, nodeCount),
 		obs:          testobserve.NewFactory(t),
 	}
 	// create peer configurations
@@ -296,12 +297,17 @@ func NewPartition(t *testing.T, systemName string, nodeCount uint8, txSystemProv
 			return nil, fmt.Errorf("failed to create node genesis, %w", err)
 		}
 		tmpDir := t.TempDir()
-		abPartition.Nodes[i] = &partitionNode{
-			genesis:  nodeGenesis,
-			peerConf: peerConf,
-			signer:   signer,
-			dbFile:   filepath.Join(tmpDir, "blocks.db"),
-			idxFile:  filepath.Join(tmpDir, "tx.db"),
+		ownerIndexer := partition.NewOwnerIndexer(abPartition.obs.DefaultLogger())
+		if err := ownerIndexer.LoadState(state); err != nil {
+			return nil, fmt.Errorf("failed to update owner indexer from genesis state: %w", err)
+		}
+		abPartition.Nodes[i] = &PartitionNode{
+			genesis:      nodeGenesis,
+			peerConf:     peerConf,
+			signer:       signer,
+			OwnerIndexer: ownerIndexer,
+			dbFile:       filepath.Join(tmpDir, "blocks.db"),
+			idxFile:      filepath.Join(tmpDir, "tx.db"),
 		}
 	}
 	return abPartition, nil
@@ -337,7 +343,8 @@ func (n *NodePartition) start(t *testing.T, ctx context.Context, bootNodes []pee
 		nd.confOpts = append(nd.confOpts,
 			partition.WithEventHandler(nd.EventHandler.HandleEvent, 100),
 			partition.WithBlockStore(blockStore),
-			partition.WithProofIndex(nd.proofDB, 0, true),
+			partition.WithProofIndex(nd.proofDB, 0),
+			partition.WithOwnerIndex(nd.OwnerIndexer),
 		)
 		if err = n.startNode(ctx, nd); err != nil {
 			return err
@@ -354,7 +361,7 @@ func (n *NodePartition) start(t *testing.T, ctx context.Context, bootNodes []pee
 	return nil
 }
 
-func (n *NodePartition) startNode(ctx context.Context, pn *partitionNode) error {
+func (n *NodePartition) startNode(ctx context.Context, pn *PartitionNode) error {
 	log := n.obs.DefaultLogger().With(logger.NodeID(pn.peerConf.ID))
 	node, err := partition.NewNode(
 		ctx,

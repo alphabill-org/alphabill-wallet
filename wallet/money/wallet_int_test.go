@@ -10,7 +10,6 @@ import (
 
 	abcrypto "github.com/alphabill-org/alphabill/crypto"
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
-	"github.com/alphabill-org/alphabill/partition"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/rpc"
 	"github.com/alphabill-org/alphabill/txsystem"
@@ -62,7 +61,7 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 	network := startMoneyOnlyAlphabillPartition(t, genesisConfig)
 	moneyPart, err := network.GetNodePartition(money.DefaultSystemIdentifier)
 	require.NoError(t, err)
-	addr := initRPCServer(t, moneyPart.Nodes[0].Node)
+	addr := initRPCServer(t, moneyPart.Nodes[0])
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	t.Cleanup(cancelFunc)
@@ -176,11 +175,12 @@ func startMoneyOnlyAlphabillPartition(t *testing.T, genesisConfig *testutil.Mone
 	return abNet
 }
 
-func initRPCServer(t *testing.T, node *partition.Node) string {
+func initRPCServer(t *testing.T, partitionNode *testpartition.PartitionNode) string {
+	node := partitionNode.Node
 	server := ethrpc.NewServer()
 	t.Cleanup(server.Stop)
 
-	stateAPI := rpc.NewStateAPI(node)
+	stateAPI := rpc.NewStateAPI(node, partitionNode.OwnerIndexer)
 	err := server.RegisterName("state", stateAPI)
 	require.NoError(t, err)
 

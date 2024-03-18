@@ -145,7 +145,7 @@ func CreateTokensPartition(t *testing.T) *testpartition.NodePartition {
 
 func StartRpcServers(t *testing.T, partition *testpartition.NodePartition) {
 	for _, n := range partition.Nodes {
-		n.AddrRPC = StartRpcServer(t, n.Node, partition.SystemName)
+		n.AddrRPC = StartRpcServer(t, n.Node, partition.SystemName, n.OwnerIndexer)
 	}
 	// wait for rpc servers to start
 	for _, n := range partition.Nodes {
@@ -161,21 +161,27 @@ func StartRpcServers(t *testing.T, partition *testpartition.NodePartition) {
 	}
 }
 
-func StartRpcServer(t *testing.T, node *partition.Node, nodeName string) string {
+func StartRpcServer(t *testing.T, node *partition.Node, nodeName string, ownerIndexer partition.IndexReader) string {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = listener.Close()
 	})
 
-	rpcServer, err := InitRpcServer(node, nodeName, &abrpc.ServerConfiguration{
-		Address: listener.Addr().String(),
-		// defaults from ab repo
-		MaxHeaderBytes:         http.DefaultMaxHeaderBytes,
-		MaxBodyBytes:           4194304, // 4MB,
-		BatchItemLimit:         1000,
-		BatchResponseSizeLimit: 4194304, // 4MB
-	}, testobserve.Default(t))
+	rpcServer, err := InitRpcServer(
+		node,
+		nodeName,
+		&abrpc.ServerConfiguration{
+			Address: listener.Addr().String(),
+			// defaults from ab repo
+			MaxHeaderBytes:         http.DefaultMaxHeaderBytes,
+			MaxBodyBytes:           4194304, // 4MB,
+			BatchItemLimit:         1000,
+			BatchResponseSizeLimit: 4194304, // 4MB
+		},
+		ownerIndexer,
+		testobserve.Default(t),
+	)
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
@@ -190,11 +196,11 @@ func StartRpcServer(t *testing.T, node *partition.Node, nodeName string) string 
 	return listener.Addr().String()
 }
 
-func InitRpcServer(node *partition.Node, nodeName string, cfg *abrpc.ServerConfiguration, obs partition.Observability) (*http.Server, error) {
+func InitRpcServer(node *partition.Node, nodeName string, cfg *abrpc.ServerConfiguration, ownerIndexer partition.IndexReader, obs partition.Observability) (*http.Server, error) {
 	cfg.APIs = []abrpc.API{
 		{
 			Namespace: "state",
-			Service:   abrpc.NewStateAPI(node),
+			Service:   abrpc.NewStateAPI(node, ownerIndexer),
 		},
 		{
 			Namespace: "admin",
