@@ -472,7 +472,7 @@ func (w *FeeManager) sendLockFCTx(ctx context.Context, accountKey *account.Accou
 			return fmt.Errorf("failed to wait for confirmation: %w", err)
 		}
 		if proof != nil {
-			w.log.InfoContext(ctx, fmt.Sprintf("lockFC tx '%s' confirmed", feeCtx.LockFCTx.Hash(crypto.SHA256)))
+			w.log.InfoContext(ctx, fmt.Sprintf("lockFC tx '%x' confirmed", feeCtx.LockFCTx.Hash(crypto.SHA256)))
 			feeCtx.LockFCProof = proof
 			if err := w.db.SetAddFeeContext(accountKey.PubKey, feeCtx); err != nil {
 				return fmt.Errorf("failed to store lockFC proof: %w", err)
@@ -556,7 +556,7 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 
 		// if transferFC failed then verify the source bill is still valid,
 		// if not valid then return error to user and delete fee context and remote lock
-		sourceBill, err := w.fetchBillByIdAndHash(ctx, accountKey, feeCtx.TargetBillID, feeCtx.TargetBillBacklink)
+		sourceBill, err := w.fetchBillByIdAndHash(ctx, feeCtx.TargetBillID, feeCtx.TargetBillBacklink)
 		if err != nil {
 			return err
 		}
@@ -795,7 +795,7 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 			return fmt.Errorf("failed to wait for confirmation: %w", err)
 		}
 		if proof != nil {
-			w.log.InfoContext(ctx, fmt.Sprintf("lock tx '%s' confirmed", feeCtx.LockTx.Hash(crypto.SHA256)))
+			w.log.InfoContext(ctx, fmt.Sprintf("lock tx '%x' confirmed", feeCtx.LockTx.Hash(crypto.SHA256)))
 			feeCtx.LockTxProof = proof
 			feeCtx.TargetBillBacklink = proof.TxRecord.TransactionOrder.Hash(crypto.SHA256)
 			if err := w.db.SetReclaimFeeContext(accountKey.PubKey, feeCtx); err != nil {
@@ -940,7 +940,7 @@ func (w *FeeManager) sendReclaimFCTx(ctx context.Context, accountKey *account.Ac
 			}
 			return nil
 		}
-		actualTargetBill, err := w.fetchBillByIdAndHash(ctx, accountKey, feeCtx.TargetBillID, feeCtx.TargetBillBacklink)
+		actualTargetBill, err := w.fetchBillByIdAndHash(ctx, feeCtx.TargetBillID, feeCtx.TargetBillBacklink)
 		if err != nil {
 			return err
 		}
@@ -1016,15 +1016,13 @@ func (w *FeeManager) fetchBills(ctx context.Context, k *account.AccountKey) ([]*
 	return bills, nil
 }
 
-func (w *FeeManager) fetchBillByIdAndHash(ctx context.Context, accountKey *account.AccountKey, unitID []byte, txHash []byte) (*api.Bill, error) {
-	bills, err := api.FetchBills(ctx, w.moneyClient, accountKey.PubKey)
+func (w *FeeManager) fetchBillByIdAndHash(ctx context.Context, unitID []byte, txHash []byte) (*api.Bill, error) {
+	b, err := api.FetchBill(ctx, w.moneyClient, unitID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch bills: %w", err)
+		return nil, fmt.Errorf("failed to fetch bill: %w", err)
 	}
-	for _, b := range bills {
-		if bytes.Equal(b.ID, unitID) && bytes.Equal(b.Backlink(), txHash) {
-			return b, nil
-		}
+	if b != nil && bytes.Equal(b.Backlink(), txHash) {
+		return b, nil
 	}
 	return nil, nil
 }
