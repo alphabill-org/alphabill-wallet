@@ -1,8 +1,6 @@
 ## Alphabill Wallet
 
 Client side software to interface with Alphabill network. This repository contains the following components:
-* Money partition indexing backend
-* User Token partition indexing backend
 * Money partition CLI wallet
 * User Token partition CLI wallet
 * EVM partition client
@@ -17,21 +15,6 @@ Client side software to interface with Alphabill network. This repository contai
 * Requires `C` compiler, recent versions of [GCC](https://gcc.gnu.org/) are recommended. In Debian and Ubuntu repositories, GCC is part of the build-essential package. On macOS, GCC can be installed with [Homebrew](https://formulae.brew.sh/formula/gcc).
 
 Run `make build` to build the application. Executable will be built to `build/abwallet`. 
-
-## Start the indexing backends
-
-Requires Alphabill network to be operational. (https://github.com/alphabill-org/alphabill)
-
-The startup scripts expect `alphabill` directory is sibling to `alphabill-wallet` directory 
-to load system description record files.
-
-1. `./start.sh -b money` to start money backend
-2. `./start.sh -b tokens` to start tokens backend
-3. `./start.sh -b money -b tokens` to start both money and tokens backends 
-
-NB! EVM partition does not have an indexing backend.
-
-`./stop.sh -a` to stop all backends.
 
 ## Configuration
 

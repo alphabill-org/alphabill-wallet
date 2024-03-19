@@ -37,10 +37,10 @@ type (
 	}
 )
 
-func (s *TxSubmission) ToBatch(backend RpcClient, sender wallet.PubKey, log *slog.Logger) *TxSubmissionBatch {
+func (s *TxSubmission) ToBatch(rpcClient RpcClient, sender wallet.PubKey, log *slog.Logger) *TxSubmissionBatch {
 	return &TxSubmissionBatch{
 		sender:      sender,
-		rpcClient:   backend,
+		rpcClient:   rpcClient,
 		submissions: []*TxSubmission{s},
 		maxTimeout:  s.Transaction.Timeout(),
 		log:         log,
@@ -68,14 +68,6 @@ func (t *TxSubmissionBatch) Add(sub *TxSubmission) {
 
 func (t *TxSubmissionBatch) Submissions() []*TxSubmission {
 	return t.submissions
-}
-
-func (t *TxSubmissionBatch) transactions() []*types.TransactionOrder {
-	txs := make([]*types.TransactionOrder, 0, len(t.submissions))
-	for _, sub := range t.submissions {
-		txs = append(txs, sub.Transaction)
-	}
-	return txs
 }
 
 func (t *TxSubmissionBatch) SendTx(ctx context.Context, confirmTx bool) error {

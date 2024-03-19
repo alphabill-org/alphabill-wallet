@@ -18,7 +18,7 @@ import (
 )
 
 /*
-Prep: start network and money backend, send initial bill to wallet-1
+Prep: start money partition, send initial bill to wallet-1
 Test scenario 1: wallet-1 sends two transactions to wallet-2
 Test scenario 1.1: wallet-2 sends transactions back to wallet-1
 Test scenario 2: wallet-1 account 1 sends two transactions to wallet-1 account 2

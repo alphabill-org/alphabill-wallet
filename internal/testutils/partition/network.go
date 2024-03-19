@@ -12,10 +12,6 @@ import (
 	"testing"
 	"time"
 
-	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils/net"
-	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
-	testevent "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition/event"
 	abcrypto "github.com/alphabill-org/alphabill/crypto"
 	"github.com/alphabill-org/alphabill/keyvaluedb"
 	"github.com/alphabill-org/alphabill/keyvaluedb/boltdb"
@@ -37,6 +33,11 @@ import (
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/require"
+
+	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/net"
+	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
+	testevent "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition/event"
 )
 
 // AlphabillNetwork for integration tests

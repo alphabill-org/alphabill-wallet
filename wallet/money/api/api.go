@@ -115,10 +115,7 @@ func FetchBills(ctx context.Context, c RpcClient, ownerID []byte) ([]*Bill, erro
 
 func FetchBill(ctx context.Context, c RpcClient, unitID types.UnitID) (*Bill, error) {
 	bill, err := c.GetBill(ctx, unitID, false)
-	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			return nil, nil
-		}
+	if err != nil && !errors.Is(err, ErrNotFound) {
 		return nil, err
 	}
 	return bill, nil

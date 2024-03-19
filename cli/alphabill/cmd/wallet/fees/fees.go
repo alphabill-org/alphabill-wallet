@@ -410,7 +410,7 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 	}
 	moneyTypeVar := clitypes.MoneyType
 	if !strings.HasPrefix(moneyInfo.Name, moneyTypeVar.String()) {
-		return nil, errors.New("invalid wallet backend API URL provided for money partition")
+		return nil, errors.New("invalid rpc url provided for money partition")
 	}
 
 	switch c.targetPartitionType {
@@ -439,7 +439,7 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 		}
 		tokenTypeVar := clitypes.TokensType
 		if !strings.HasPrefix(tokenInfo.Name, tokenTypeVar.String()) {
-			return nil, errors.New("invalid wallet backend API URL provided for tokens partition")
+			return nil, errors.New("invalid rpc url provided for tokens partition")
 		}
 		return fees.NewFeeManager(
 			am,

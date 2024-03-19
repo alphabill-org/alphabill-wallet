@@ -32,7 +32,7 @@ func TestNFTs_Integration(t *testing.T) {
 	homedirW1 := network.homeDir
 	w1key2 := network.walletKey2
 	rpcUrl := tokenPartition.Nodes[0].AddrRPC
-	backendClient := network.tokensRpcClient
+	rpcClient := network.tokensRpcClient
 	ctx := network.ctx
 
 	// create w2
@@ -67,14 +67,14 @@ func TestNFTs_Integration(t *testing.T) {
 	require.Eventually(t, testpartition.BlockchainContains(tokenPartition, func(tx *types.TransactionOrder) bool {
 		return tx.PayloadType() == tokens.PayloadTypeMintNFT && bytes.Equal(tx.UnitID(), nftID)
 	}), test.WaitDuration, test.WaitTick)
-	ensureTokenIndexed(t, ctx, backendClient, w1key2.PubKeyHash.Sha256, nftID)
+	ensureTokenIndexed(t, ctx, rpcClient, w1key2.PubKeyHash.Sha256, nftID)
 
 	// transfer NFT
 	execTokensCmd(t, homedirW1, fmt.Sprintf("send non-fungible -k 2 -r %s --token-identifier %s --address 0x%X", rpcUrl, nftID, w2key.PubKey))
 	require.Eventually(t, testpartition.BlockchainContains(tokenPartition, func(tx *types.TransactionOrder) bool {
 		return tx.PayloadType() == tokens.PayloadTypeTransferNFT && bytes.Equal(tx.UnitID(), nftID)
 	}), test.WaitDuration, test.WaitTick)
-	ensureTokenIndexed(t, ctx, backendClient, w2key.PubKeyHash.Sha256, nftID)
+	ensureTokenIndexed(t, ctx, rpcClient, w2key.PubKeyHash.Sha256, nftID)
 	testutils.VerifyStdout(t, execTokensCmd(t, homedirW2, fmt.Sprintf("list non-fungible -r %s", rpcUrl)), fmt.Sprintf("ID='%s'", nftID))
 
 	//check what is left in w1, nothing, that is
@@ -99,7 +99,7 @@ func TestNFTs_Integration(t *testing.T) {
 
 	// transfer back
 	execTokensCmd(t, homedirW2, fmt.Sprintf("send non-fungible -r %s --token-identifier %s --address 0x%X -k 1", rpcUrl, nftID, w1key2.PubKey))
-	ensureTokenIndexed(t, ctx, backendClient, w1key2.PubKeyHash.Sha256, nftID)
+	ensureTokenIndexed(t, ctx, rpcClient, w1key2.PubKeyHash.Sha256, nftID)
 
 	// mint nft from w1 and set the owner to w2
 	nftID2 := randomNonFungibleTokenID(t)
@@ -115,7 +115,7 @@ func TestNFTDataUpdateCmd_Integration(t *testing.T) {
 	homedir := network.homeDir
 	w1key := network.walletKey1
 	rpcUrl := tokenPartition.Nodes[0].AddrRPC
-	backendClient := network.tokensRpcClient
+	rpcClient := network.tokensRpcClient
 	ctx := network.ctx
 
 	typeID := randomNonFungibleTokenTypeID(t)
@@ -144,7 +144,7 @@ func TestNFTDataUpdateCmd_Integration(t *testing.T) {
 		}
 		return false
 	}), test.WaitDuration, test.WaitTick)
-	nft := ensureTokenIndexed(t, ctx, backendClient, w1key.PubKeyHash.Sha256, nftID)
+	nft := ensureTokenIndexed(t, ctx, rpcClient, w1key.PubKeyHash.Sha256, nftID)
 	testutils.VerifyStdout(t, execTokensCmd(t, homedir, fmt.Sprintf("list non-fungible -r %s", rpcUrl)), fmt.Sprintf("ID='%s'", nftID))
 	require.Equal(t, data, nft.NftData)
 
@@ -171,15 +171,15 @@ func TestNFTDataUpdateCmd_Integration(t *testing.T) {
 		return false
 	}), test.WaitDuration, test.WaitTick)
 
-	// check that data was updated on the backend
+	// check that data was updated on the rpc node
 	require.Eventually(t, func() bool {
-		return bytes.Equal(data2, ensureTokenIndexed(t, ctx, backendClient, w1key.PubKeyHash.Sha256, nftID).NftData)
+		return bytes.Equal(data2, ensureTokenIndexed(t, ctx, rpcClient, w1key.PubKeyHash.Sha256, nftID).NftData)
 	}, 2*test.WaitDuration, test.WaitTick)
 
 	// create non-updatable nft
 	nftID2 := randomNonFungibleTokenID(t)
 	execTokensCmd(t, homedir, fmt.Sprintf("new non-fungible -r %s --type %s --token-identifier %s --data 01 --data-update-clause false", rpcUrl, typeID, nftID2))
-	nft2 := ensureTokenIndexed(t, ctx, backendClient, w1key.PubKeyHash.Sha256, nftID2)
+	nft2 := ensureTokenIndexed(t, ctx, rpcClient, w1key.PubKeyHash.Sha256, nftID2)
 	require.Equal(t, []byte{0x01}, nft2.NftData)
 
 	// try to update and Observe failure
@@ -194,7 +194,7 @@ func TestNFT_InvariantPredicate_Integration(t *testing.T) {
 	homedirW1 := network.homeDir
 	w1key := network.walletKey1
 	rpcUrl := tokenPartition.Nodes[0].AddrRPC
-	backendClient := network.tokensRpcClient
+	rpcClient := network.tokensRpcClient
 	ctx := network.ctx
 
 	w2, homedirW2 := testutils.CreateNewTokenWallet(t, rpcUrl)
@@ -219,11 +219,11 @@ func TestNFT_InvariantPredicate_Integration(t *testing.T) {
 	//mint
 	id := randomNonFungibleTokenID(t)
 	execTokensCmd(t, homedirW1, fmt.Sprintf("new non-fungible -r %s --type %s --token-identifier %s --mint-input %s,%s", rpcUrl, typeID12, id, predicatePtpkh, predicatePtpkh))
-	ensureTokenIndexed(t, ctx, backendClient, w1key.PubKeyHash.Sha256, id)
+	ensureTokenIndexed(t, ctx, rpcClient, w1key.PubKeyHash.Sha256, id)
 	testutils.VerifyStdout(t, execTokensCmd(t, homedirW1, fmt.Sprintf("list non-fungible -r %s", rpcUrl)), "symbol='ABNFT'")
 	//send to w2
 	execTokensCmd(t, homedirW1, fmt.Sprintf("send non-fungible -r %s --token-identifier %s --address 0x%X -k 1 --inherit-bearer-input %s,%s", rpcUrl, id, w2key.PubKey, predicateTrue, predicatePtpkh))
-	ensureTokenIndexed(t, ctx, backendClient, w2key.PubKeyHash.Sha256, id)
+	ensureTokenIndexed(t, ctx, rpcClient, w2key.PubKeyHash.Sha256, id)
 	testutils.VerifyStdout(t, execTokensCmd(t, homedirW2, fmt.Sprintf("list non-fungible -r %s", rpcUrl)), "symbol='ABNFT'")
 }
 
@@ -235,7 +235,7 @@ func TestNFT_LockUnlock_Integration(t *testing.T) {
 	require.NoError(t, err)
 	homedirW1 := network.homeDir
 	rpcUrl := tokensPartition.Nodes[0].AddrRPC
-	backendClient := network.tokensRpcClient
+	rpcClient := network.tokensRpcClient
 	w1key := network.walletKey1
 	ctx := network.ctx
 
@@ -249,7 +249,7 @@ func TestNFT_LockUnlock_Integration(t *testing.T) {
 	require.Eventually(t, testpartition.BlockchainContains(tokensPartition, func(tx *types.TransactionOrder) bool {
 		return tx.PayloadType() == tokens.PayloadTypeMintNFT && bytes.Equal(tx.UnitID(), nftID)
 	}), test.WaitDuration, test.WaitTick)
-	ensureTokenIndexed(t, ctx, backendClient, w1key.PubKeyHash.Sha256, nftID)
+	ensureTokenIndexed(t, ctx, rpcClient, w1key.PubKeyHash.Sha256, nftID)
 
 	// lock NFT
 	execTokensCmd(t, homedirW1, fmt.Sprintf("lock -r %s --token-identifier %s -k 1", rpcUrl, nftID))
