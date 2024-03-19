@@ -1004,7 +1004,7 @@ func (w *FeeManager) getTargetPartitionTimeout(ctx context.Context) (uint64, err
 	return roundNumber + txTimeoutBlockCount, nil
 }
 
-// fetchBills fetches bills from backend and sorts them by value (descending, largest first)
+// fetchBills fetches bills from money rpc node and sorts them by value (descending, largest first)
 func (w *FeeManager) fetchBills(ctx context.Context, k *account.AccountKey) ([]*api.Bill, error) {
 	bills, err := api.FetchBills(ctx, w.moneyClient, k.PubKeyHash.Sha256)
 	if err != nil {

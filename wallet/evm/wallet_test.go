@@ -38,11 +38,11 @@ func newClientMock() *evmClientMock {
 	return &evmClientMock{}
 }
 
-func (e *evmClientMock) GetRoundNumber(ctx context.Context) (*wallet.RoundNumber, error) {
+func (e *evmClientMock) GetRoundNumber(ctx context.Context) (*evmclient.RoundNumber, error) {
 	if e.SimulateErr != nil {
 		return nil, e.SimulateErr
 	}
-	return &wallet.RoundNumber{RoundNumber: 3, LastIndexedRoundNumber: 3}, nil
+	return &evmclient.RoundNumber{RoundNumber: 3, LastIndexedRoundNumber: 3}, nil
 }
 
 func (e *evmClientMock) PostTransaction(ctx context.Context, tx *types.TransactionOrder) error {
@@ -100,14 +100,14 @@ func (e *evmClientMock) GetBalance(ctx context.Context, ethAddr []byte) (string,
 	return "100000", test.RandomBytes(32), nil
 }
 
-func (e *evmClientMock) GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*wallet.Bill, error) {
+func (e *evmClientMock) GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*evmclient.Bill, error) {
 	if e.SimulateErr != nil {
 		return nil, e.SimulateErr
 	}
 	if e.noFcb {
 		return nil, nil
 	}
-	return &wallet.Bill{
+	return &evmclient.Bill{
 		Id:    unitID,
 		Value: 100 * 1e8,
 	}, nil

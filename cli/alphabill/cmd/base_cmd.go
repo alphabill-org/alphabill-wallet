@@ -10,8 +10,6 @@ import (
 	"github.com/alphabill-org/alphabill/observability"
 	"github.com/spf13/cobra"
 
-	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/money"
-	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/tokens"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet"
 )
@@ -49,8 +47,6 @@ func (a *WalletApp) Execute(ctx context.Context) (err error) {
 
 func (a *WalletApp) AddSubcommands(obsF Factory, opts []interface{}) {
 	a.baseCmd.AddCommand(wallet.NewWalletCmd(a.baseConf, obsF))
-	a.baseCmd.AddCommand(money.NewMoneyBackendCmd(a.baseConf))
-	a.baseCmd.AddCommand(tokens.NewTokensBackendCmd(a.baseConf))
 }
 
 func newBaseCmd(obsF Factory) (*cobra.Command, *types.BaseConfiguration) {

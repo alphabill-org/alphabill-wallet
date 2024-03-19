@@ -83,7 +83,7 @@ func TestFungibleToken_InvariantPredicate_Integration(t *testing.T) {
 	homedirW1 := network.homeDir
 	w1key := network.walletKey1
 	rpcUrl := tokensPartition.Nodes[0].AddrRPC
-	backendClient := network.tokensRpcClient
+	rpcClient := network.tokensRpcClient
 	ctx := network.ctx
 
 	symbol1 := "AB"
@@ -102,7 +102,7 @@ func TestFungibleToken_InvariantPredicate_Integration(t *testing.T) {
 
 	// mint
 	execTokensCmd(t, homedirW1, fmt.Sprintf("new fungible -r %s  --type %s --amount %v --mint-input %s,%s", rpcUrl, typeID12, 1000, predicatePtpkh, predicatePtpkh))
-	ensureTokenIndexed(t, ctx, backendClient, w1key.PubKeyHash.Sha256, nil)
+	ensureTokenIndexed(t, ctx, rpcClient, w1key.PubKeyHash.Sha256, nil)
 	testutils.VerifyStdout(t, execTokensCmd(t, homedirW1, fmt.Sprintf("list fungible -r %s", rpcUrl)), "amount='1'000'")
 
 	// create w2
@@ -113,7 +113,7 @@ func TestFungibleToken_InvariantPredicate_Integration(t *testing.T) {
 
 	// send to w2
 	execTokensCmd(t, homedirW1, fmt.Sprintf("send fungible -r %s --type %s --amount 100 --address 0x%X -k 1 --inherit-bearer-input %s,%s", rpcUrl, typeID12, w2key.PubKey, predicateTrue, predicatePtpkh))
-	ensureTokenIndexed(t, ctx, backendClient, w2key.PubKeyHash.Sha256, nil)
+	ensureTokenIndexed(t, ctx, rpcClient, w2key.PubKeyHash.Sha256, nil)
 	testutils.VerifyStdout(t, execTokensCmd(t, homedirW2, fmt.Sprintf("list fungible -r %s", rpcUrl)), "amount='100'")
 }
 
@@ -385,7 +385,7 @@ type AlphabillNetwork struct {
 	ctx           context.Context
 }
 
-// starts money partition, money backend, ut partition, ut backend
+// starts money and tokens partition
 // sends initial bill to money wallet
 // creates fee credit on money wallet and token wallet
 func NewAlphabillNetwork(t *testing.T) *AlphabillNetwork {

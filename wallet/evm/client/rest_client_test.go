@@ -316,7 +316,7 @@ func TestEvmClient_GetRoundNumber(t *testing.T) {
 		}
 	}
 
-	t.Run("backend returns empty response body", func(t *testing.T) {
+	t.Run("rpc node returns empty response body", func(t *testing.T) {
 		cli := createClient(t, ``)
 		rn, err := cli.GetRoundNumber(context.Background())
 		require.EqualError(t, err, `get round-number request failed: failed to decode response body: cbor: cannot unmarshal UTF-8 text string into Go value of type uint64`)

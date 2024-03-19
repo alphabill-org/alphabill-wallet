@@ -7,7 +7,6 @@ import (
 	"slices"
 	"sort"
 
-	wtypes "github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	"github.com/alphabill-org/alphabill/crypto"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/txsystem/fc/transactions"
@@ -17,6 +16,7 @@ import (
 
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 )
 
 const MaxFee = uint64(1)
@@ -24,8 +24,8 @@ const MaxFee = uint64(1)
 // CreateTransactions creates 1 to N P2PKH transactions from given bills until target amount is reached.
 // If there exists a bill with value equal to the given amount then transfer transaction is created using that bill,
 // otherwise bills are selected in the given order.
-func CreateTransactions(pubKey []byte, amount uint64, systemID types.SystemID, bills []*wtypes.Bill, k *account.AccountKey, timeout uint64, fcrID []byte) ([]*types.TransactionOrder, error) {
-	billIndex := slices.IndexFunc(bills, func(b *wtypes.Bill) bool { return b.Value() == amount })
+func CreateTransactions(pubKey []byte, amount uint64, systemID types.SystemID, bills []*api.Bill, k *account.AccountKey, timeout uint64, fcrID []byte) ([]*types.TransactionOrder, error) {
+	billIndex := slices.IndexFunc(bills, func(b *api.Bill) bool { return b.Value() == amount })
 	if billIndex >= 0 {
 		tx, err := NewTransferTx(pubKey, k, systemID, bills[billIndex], timeout, fcrID)
 		if err != nil {
@@ -51,7 +51,7 @@ func CreateTransactions(pubKey []byte, amount uint64, systemID types.SystemID, b
 }
 
 // CreateTransaction creates a P2PKH transfer or split transaction using the given bill.
-func CreateTransaction(receiverPubKey []byte, k *account.AccountKey, amount uint64, systemID types.SystemID, bill *wtypes.Bill, timeout uint64, fcrID []byte) (*types.TransactionOrder, error) {
+func CreateTransaction(receiverPubKey []byte, k *account.AccountKey, amount uint64, systemID types.SystemID, bill *api.Bill, timeout uint64, fcrID []byte) (*types.TransactionOrder, error) {
 	if bill.Value() <= amount {
 		return NewTransferTx(receiverPubKey, k, systemID, bill, timeout, fcrID)
 	}
@@ -63,7 +63,7 @@ func CreateTransaction(receiverPubKey []byte, k *account.AccountKey, amount uint
 }
 
 // NewTransferTx creates a P2PKH transfer transaction.
-func NewTransferTx(receiverPubKey []byte, k *account.AccountKey, systemID types.SystemID, bill *wtypes.Bill, timeout uint64, fcrID []byte) (*types.TransactionOrder, error) {
+func NewTransferTx(receiverPubKey []byte, k *account.AccountKey, systemID types.SystemID, bill *api.Bill, timeout uint64, fcrID []byte) (*types.TransactionOrder, error) {
 	attr := &money.TransferAttributes{
 		NewBearer:   templates.NewP2pkh256BytesFromKey(receiverPubKey),
 		TargetValue: bill.Value(),
@@ -77,7 +77,7 @@ func NewTransferTx(receiverPubKey []byte, k *account.AccountKey, systemID types.
 }
 
 // NewSplitTx creates a P2PKH split transaction.
-func NewSplitTx(targetUnits []*money.TargetUnit, remainingValue uint64, k *account.AccountKey, systemID types.SystemID, bill *wtypes.Bill, timeout uint64, fcrID []byte) (*types.TransactionOrder, error) {
+func NewSplitTx(targetUnits []*money.TargetUnit, remainingValue uint64, k *account.AccountKey, systemID types.SystemID, bill *api.Bill, timeout uint64, fcrID []byte) (*types.TransactionOrder, error) {
 	attr := &money.SplitAttributes{
 		TargetUnits:    targetUnits,
 		RemainingValue: remainingValue,
@@ -90,14 +90,14 @@ func NewSplitTx(targetUnits []*money.TargetUnit, remainingValue uint64, k *accou
 	return SignPayload(txPayload, k)
 }
 
-func NewDustTx(ac *account.AccountKey, systemID types.SystemID, bill *wallet.Bill, targetBillID []byte, targetBillHash []byte, timeout uint64) (*types.TransactionOrder, error) {
+func NewDustTx(ac *account.AccountKey, systemID types.SystemID, bill *api.Bill, targetBillID []byte, targetBillHash []byte, timeout uint64) (*types.TransactionOrder, error) {
 	attr := &money.TransferDCAttributes{
 		TargetUnitID:       targetBillID,
-		Value:              bill.Value,
+		Value:              bill.Value(),
 		TargetUnitBacklink: targetBillHash,
-		Backlink:           bill.TxHash,
+		Backlink:           bill.Backlink(),
 	}
-	txPayload, err := NewTxPayload(systemID, money.PayloadTypeTransDC, bill.GetID(), timeout, money.NewFeeCreditRecordID(nil, ac.PubKeyHash.Sha256), attr)
+	txPayload, err := NewTxPayload(systemID, money.PayloadTypeTransDC, bill.ID, timeout, money.NewFeeCreditRecordID(nil, ac.PubKeyHash.Sha256), attr)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +153,7 @@ func NewLockTx(ac *account.AccountKey, systemID types.SystemID, targetBillID, ta
 	return SignPayload(txPayload, ac)
 }
 
-func NewUnlockTx(ac *account.AccountKey, systemID types.SystemID, b *wtypes.Bill, timeout uint64) (*types.TransactionOrder, error) {
+func NewUnlockTx(ac *account.AccountKey, systemID types.SystemID, b *api.Bill, timeout uint64) (*types.TransactionOrder, error) {
 	attr := &money.UnlockAttributes{
 		Backlink: b.Backlink(),
 	}
@@ -164,7 +164,7 @@ func NewUnlockTx(ac *account.AccountKey, systemID types.SystemID, b *wtypes.Bill
 	return SignPayload(txPayload, ac)
 }
 
-func NewLockFCTx(ac *account.AccountKey, systemID types.SystemID, fcb *wtypes.FeeCreditBill, lockStatus uint64, timeout uint64) (*types.TransactionOrder, error) {
+func NewLockFCTx(ac *account.AccountKey, systemID types.SystemID, fcb *api.FeeCreditBill, lockStatus uint64, timeout uint64) (*types.TransactionOrder, error) {
 	attr := &transactions.LockFeeCreditAttributes{
 		LockStatus: lockStatus,
 		Backlink:   fcb.Backlink(),
@@ -176,7 +176,7 @@ func NewLockFCTx(ac *account.AccountKey, systemID types.SystemID, fcb *wtypes.Fe
 	return SignPayload(txPayload, ac)
 }
 
-func NewUnlockFCTx(ac *account.AccountKey, systemID types.SystemID, fcb *wtypes.FeeCreditBill, timeout uint64) (*types.TransactionOrder, error) {
+func NewUnlockFCTx(ac *account.AccountKey, systemID types.SystemID, fcb *api.FeeCreditBill, timeout uint64) (*types.TransactionOrder, error) {
 	attr := &transactions.UnlockFeeCreditAttributes{
 		Backlink: fcb.Backlink(),
 	}

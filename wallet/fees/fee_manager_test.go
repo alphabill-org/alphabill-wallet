@@ -250,7 +250,6 @@ func TestReclaimFeeCreditForMoneyPartition_ExistingReclaimProcessForTokensPartit
 	accountKey, err := am.GetAccountKey(0)
 	require.NoError(t, err)
 
-	//moneyBackendClient := &mockMoneyClient{}
 	moneyClient := testutil.NewRpcClientMock()
 	feeManagerDB := createFeeManagerDB(t)
 	feeManager := newMoneyPartitionFeeManager(am, feeManagerDB, moneyClient, logger.New(t))
@@ -490,7 +489,7 @@ func TestAddFeeCredit_ExistingLockFC(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// mock tx confirmed on backend
+		// mock tx confirmed on node
 		moneyClient := testutil.NewRpcClientMock(
 			testutil.WithTxProof(lockFCTxHash, lockFCProof),
 		)
@@ -579,7 +578,7 @@ func TestAddFeeCredit_ExistingTransferFC(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// mock tx confirmed on backend
+		// mock tx confirmed on node
 		moneyClient := testutil.NewRpcClientMock(
 			testutil.WithTxProof(transferFCTxHash, transferFCProof),
 		)
@@ -707,7 +706,7 @@ func TestAddFeeCredit_ExistingAddFC(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// mock tx confirmed on backend
+		// mock tx confirmed on node
 		moneyClient := testutil.NewRpcClientMock(
 			testutil.WithTxProof(addFCTxHash, addFCProof),
 		)
@@ -906,7 +905,7 @@ func TestReclaimFeeCredit_ExistingCloseFC(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// mock tx confirmed on backend
+		// mock tx confirmed on node
 		moneyClient := testutil.NewRpcClientMock(
 			testutil.WithTxProof(closeFCTxHash, closeFCProof),
 		)
@@ -1004,7 +1003,7 @@ func TestReclaimFeeCredit_ExistingReclaimFC(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		// mock tx confirmed on backend
+		// mock tx confirmed on node
 		moneyClient := testutil.NewRpcClientMock(
 			testutil.WithTxProof(reclaimFCTxHash, reclaimFCProof),
 		)

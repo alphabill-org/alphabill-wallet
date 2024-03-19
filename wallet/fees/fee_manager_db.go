@@ -8,8 +8,6 @@ import (
 	"time"
 
 	bolt "go.etcd.io/bbolt"
-
-	"github.com/alphabill-org/alphabill-wallet/wallet"
 )
 
 const (
@@ -42,7 +40,7 @@ func NewBoltStore(dbFile string) (*BoltStore, error) {
 		return nil, fmt.Errorf("failed to open bolt DB %s: %w", dbFile, err)
 	}
 	s := &BoltStore{db: db}
-	if err := wallet.CreateBuckets(db.Update, bucketAccounts); err != nil {
+	if err := createBuckets(db.Update, bucketAccounts); err != nil {
 		return nil, fmt.Errorf("failed to create db buckets: %w", err)
 	}
 	return s, nil
@@ -142,4 +140,16 @@ func (s *BoltStore) DeleteReclaimFeeContext(accountID []byte) error {
 
 func (s *BoltStore) Close() error {
 	return s.db.Close()
+}
+
+func createBuckets(update func(fn func(*bolt.Tx) error) error, buckets ...[]byte) error {
+	return update(func(tx *bolt.Tx) error {
+		for _, bucket := range buckets {
+			_, err := tx.CreateBucketIfNotExists(bucket)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
