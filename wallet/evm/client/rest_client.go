@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
+	"path"
 	"time"
 
 	"github.com/alphabill-org/alphabill/types"
@@ -63,7 +64,7 @@ func WeiToAlpha(wei *big.Int) uint64 {
 }
 
 // GetFeeCreditBill - simulates fee credit bill on EVM
-func (e *EvmClient) GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*sdk.Bill, error) {
+func (e *EvmClient) GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*Bill, error) {
 	balanceStr, backlink, err := e.GetBalance(ctx, unitID)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
@@ -75,7 +76,7 @@ func (e *EvmClient) GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (
 	if !ok {
 		return nil, fmt.Errorf("account %s has invalid balance %v", hexutil.Encode(unitID), balanceStr)
 	}
-	return &sdk.Bill{
+	return &Bill{
 		Id:     unitID,
 		Value:  WeiToAlpha(balanceWei),
 		TxHash: backlink,
@@ -98,12 +99,12 @@ func (e *EvmClient) PostTransaction(ctx context.Context, tx *types.TransactionOr
 }
 
 // GetRoundNumber returns node round number
-func (e *EvmClient) GetRoundNumber(ctx context.Context) (*sdk.RoundNumber, error) {
+func (e *EvmClient) GetRoundNumber(ctx context.Context) (*RoundNumber, error) {
 	var round uint64
 	if err := e.get(ctx, e.getURL(apiPathPrefix, "rounds/latest"), &round, false); err != nil {
 		return nil, fmt.Errorf("get round-number request failed: %w", err)
 	}
-	return &sdk.RoundNumber{RoundNumber: round, LastIndexedRoundNumber: round}, nil
+	return &RoundNumber{RoundNumber: round, LastIndexedRoundNumber: round}, nil
 }
 
 // GetTxProof - get transaction proof for tx hash. NB! node must be configured to run with indexer.
@@ -188,7 +189,12 @@ func (e *EvmClient) GetGasPrice(ctx context.Context) (string, error) {
 }
 
 func (e *EvmClient) getURL(pathElements ...string) *url.URL {
-	return sdk.GetURL(e.addr, pathElements...)
+	return buildURL(e.addr, pathElements...)
+}
+
+func buildURL(url url.URL, pathElements ...string) *url.URL {
+	url.Path = path.Join(pathElements...)
+	return &url
 }
 
 /*
@@ -207,7 +213,7 @@ func (e *EvmClient) get(ctx context.Context, addr *url.URL, data any, allowEmpty
 	req.Header.Set("User-Agent", clientUserAgent)
 	rsp, err := e.hc.Do(req)
 	if err != nil {
-		return fmt.Errorf("request to backend failed: %w", err)
+		return fmt.Errorf("request to rpc node failed: %w", err)
 	}
 	if err = decodeResponse(rsp, http.StatusOK, data, allowEmptyResponse); err != nil {
 		return err

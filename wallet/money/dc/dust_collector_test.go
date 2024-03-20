@@ -43,7 +43,7 @@ func TestDC_OK(t *testing.T) {
 }
 
 func TestDCWontRunForSingleBill(t *testing.T) {
-	// create backend with single bill
+	// create rpc client mock with single bill
 	accountKeys, err := account.NewKeys("dinosaur simple verify deliver bless ridge monkey design venue six problem lucky")
 	require.NoError(t, err)
 	moneyClient := testutil.NewRpcClientMock(
@@ -94,7 +94,7 @@ func TestAllBillsAreSwapped_WhenWalletBillCountEqualToMaxBillCount(t *testing.T)
 }
 
 func TestOnlyFirstNBillsAreSwapped_WhenBillCountOverLimit(t *testing.T) {
-	// create backend with bills = max dust collection bill count
+	// create rpc client mock with bills = max dust collection bill count
 	maxBillsPerDC := 3
 	accountKeys, err := account.NewKeys("dinosaur simple verify deliver bless ridge monkey design venue six problem lucky")
 	require.NoError(t, err)

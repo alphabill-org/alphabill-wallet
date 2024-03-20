@@ -32,8 +32,8 @@ bill-id=6173666166206144464b4b4c494c494c4b4c4b620614b4c1ce72
 output-path=/home/test
 # partition name for which to manage fees [money|tokens]
 partition=money
-# partition backend url for which to manage fees
-partition-backend-url=localhost:27766
+# partition rpc url for which to manage fees
+partition-roc-url=localhost:27766
 # The gRPC server listen address with port.
 server-address=localhost:9543
 # Maximum number of bytes the incoming message may be.

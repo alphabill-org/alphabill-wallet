@@ -13,7 +13,6 @@ import (
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/fxamacker/cbor/v2"
 
-	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	evmclient "github.com/alphabill-org/alphabill-wallet/wallet/evm/client"
 )
@@ -26,7 +25,7 @@ type (
 		Call(ctx context.Context, callAttr *evmclient.CallAttributes) (*evmclient.ProcessingDetails, error)
 		GetTransactionCount(ctx context.Context, ethAddr []byte) (uint64, error)
 		GetBalance(ctx context.Context, ethAddr []byte) (string, []byte, error)
-		GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*sdk.Bill, error)
+		GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*evmclient.Bill, error)
 		GetGasPrice(ctx context.Context) (string, error)
 	}
 	Wallet struct {
