@@ -10,10 +10,8 @@ const (
 	PartitionCmdName       = "partition"
 	PartitionRpcUrlCmdName = "partition-rpc-url"
 
-	DefaultEvmNodeRestURL   = "localhost:29866"
 	PasswordPromptUsage     = "password (interactive from prompt)"
 	PasswordArgUsage        = "password (non-interactive from args)"
-	AlphabillApiURLCmdName  = "alphabill-api-uri"
 	SeedCmdName             = "seed"
 	AddressCmdName          = "address"
 	AmountCmdName           = "amount"

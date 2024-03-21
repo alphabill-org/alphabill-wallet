@@ -25,6 +25,9 @@ const (
 	ScSizeLimit24Kb   = 24 * 1024
 	DefaultEvmAddrLen = 20
 	DefaultCallMaxGas = 50000000
+
+	AlphabillApiURLCmdName = "alphabill-api-uri"
+	DefaultEvmNodeRestURL  = "localhost:29866"
 )
 
 func NewEvmCmd(config *types.WalletConfig) *cobra.Command {
@@ -37,7 +40,7 @@ func NewEvmCmd(config *types.WalletConfig) *cobra.Command {
 	cmd.AddCommand(evmCmdExecute(evmConfig))
 	cmd.AddCommand(evmCmdCall(evmConfig))
 	cmd.AddCommand(evmCmdBalance(evmConfig))
-	cmd.PersistentFlags().StringVarP(&evmConfig.NodeURL, args.AlphabillApiURLCmdName, "r", args.DefaultEvmNodeRestURL, "alphabill EVM partition node REST URI to connect to")
+	cmd.PersistentFlags().StringVarP(&evmConfig.NodeURL, AlphabillApiURLCmdName, "r", DefaultEvmNodeRestURL, "alphabill EVM partition node REST URI to connect to")
 	return cmd
 }
 
@@ -141,7 +144,7 @@ func evmCmdBalance(config *types.EvmConfig) *cobra.Command {
 }
 
 func initEvmWallet(cobraCmd *cobra.Command, config *types.EvmConfig) (*evmwallet.Wallet, error) {
-	uri, err := cobraCmd.Flags().GetString(args.AlphabillApiURLCmdName)
+	uri, err := cobraCmd.Flags().GetString(AlphabillApiURLCmdName)
 	if err != nil {
 		return nil, err
 	}
