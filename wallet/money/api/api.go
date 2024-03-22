@@ -37,6 +37,7 @@ type (
 		GetFeeCreditRecord(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*FeeCreditBill, error)
 		GetUnitsByOwnerID(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error)
 		GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TransactionRecord, *types.TxProof, error)
+		SendTransaction(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
 	}
 )
 
