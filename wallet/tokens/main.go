@@ -8,11 +8,11 @@ import (
 	"log/slog"
 	"math"
 
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/alphabill-org/alphabill/util"
-	"github.com/fxamacker/cbor/v2"
-	"go.opentelemetry.io/otel/trace"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
@@ -342,7 +342,7 @@ func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID 
 			return err
 		}
 		attrs.SetInvariantPredicateSignatures(signatures)
-		tx.Payload.Attributes, err = cbor.Marshal(attrs)
+		tx.Payload.Attributes, err = types.Cbor.Marshal(attrs)
 		return err
 	})
 	if err != nil {
@@ -465,7 +465,7 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 			return err
 		}
 		attrs.SetDataUpdateSignatures(signatures)
-		tx.Payload.Attributes, err = cbor.Marshal(attrs)
+		tx.Payload.Attributes, err = types.Cbor.Marshal(attrs)
 		return err
 	})
 	if err != nil {
@@ -549,7 +549,7 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID []
 			return err
 		}
 		attrs.InvariantPredicateSignatures = signatures
-		tx.Payload.Attributes, err = cbor.Marshal(attrs)
+		tx.Payload.Attributes, err = types.Cbor.Marshal(attrs)
 		return err
 	})
 	if err != nil {
@@ -585,7 +585,7 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 			return err
 		}
 		attrs.InvariantPredicateSignatures = signatures
-		tx.Payload.Attributes, err = cbor.Marshal(attrs)
+		tx.Payload.Attributes, err = types.Cbor.Marshal(attrs)
 		return err
 	})
 	if err != nil {

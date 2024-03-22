@@ -9,7 +9,6 @@ import (
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/alphabill-org/alphabill/util"
-	"github.com/fxamacker/cbor/v2"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
@@ -135,7 +134,7 @@ func (w *Wallet) joinTokenForDC(ctx context.Context, acc *account.AccountKey, bu
 			return err
 		}
 		joinAttrs.SetInvariantPredicateSignatures(signatures)
-		tx.Payload.Attributes, err = cbor.Marshal(joinAttrs)
+		tx.Payload.Attributes, err = types.Cbor.Marshal(joinAttrs)
 		return err
 	})
 	if err != nil {
@@ -161,7 +160,7 @@ func (w *Wallet) burnTokensForDC(ctx context.Context, acc *account.AccountKey, t
 				return err
 			}
 			attrs.SetInvariantPredicateSignatures(signatures)
-			tx.Payload.Attributes, err = cbor.Marshal(attrs)
+			tx.Payload.Attributes, err = types.Cbor.Marshal(attrs)
 			return err
 		})
 		if err != nil {
@@ -226,7 +225,7 @@ func (w *Wallet) lockTokenForDC(ctx context.Context, acc *account.AccountKey, ta
 			return err
 		}
 		attr.InvariantPredicateSignatures = signatures
-		tx.Payload.Attributes, err = cbor.Marshal(attr)
+		tx.Payload.Attributes, err = types.Cbor.Marshal(attr)
 		return err
 	})
 	if err != nil {
