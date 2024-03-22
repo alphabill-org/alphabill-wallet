@@ -11,7 +11,6 @@ import (
 	"github.com/alphabill-org/alphabill/crypto"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/types"
-	"github.com/fxamacker/cbor/v2"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	evmclient "github.com/alphabill-org/alphabill-wallet/wallet/evm/client"
@@ -200,7 +199,7 @@ func (w *Wallet) verifyFeeCreditBalance(ctx context.Context, acc *account.Accoun
 }
 
 func newTxPayload(systemID types.SystemID, txType string, unitID []byte, timeout uint64, attr interface{}) (*types.Payload, error) {
-	attrBytes, err := cbor.Marshal(attr)
+	attrBytes, err := types.Cbor.Marshal(attr)
 	if err != nil {
 		return nil, err
 	}

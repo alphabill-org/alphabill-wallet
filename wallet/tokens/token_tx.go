@@ -11,7 +11,6 @@ import (
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/alphabill-org/alphabill/types"
-	"github.com/fxamacker/cbor/v2"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
@@ -62,7 +61,7 @@ func (w *Wallet) newType(ctx context.Context, accNr uint64, payloadType string, 
 			return err
 		}
 		attrs.SetSubTypeCreationPredicateSignatures(signatures)
-		tx.Payload.Attributes, err = cbor.Marshal(attrs)
+		tx.Payload.Attributes, err = types.Cbor.Marshal(attrs)
 		return err
 	})
 	if err != nil {
@@ -113,7 +112,7 @@ func (w *Wallet) newToken(ctx context.Context, accNr uint64, payloadType string,
 			return err
 		}
 		attrs.SetTokenCreationPredicateSignatures(signatures)
-		tx.Payload.Attributes, err = cbor.Marshal(attrs)
+		tx.Payload.Attributes, err = types.Cbor.Marshal(attrs)
 		return err
 	})
 	if err != nil {
@@ -323,7 +322,7 @@ func (w *Wallet) prepareSplitOrTransferTx(ctx context.Context, acc *account.Acco
 			return err
 		}
 		attrs.SetInvariantPredicateSignatures(signatures)
-		tx.Payload.Attributes, err = cbor.Marshal(attrs)
+		tx.Payload.Attributes, err = types.Cbor.Marshal(attrs)
 		return err
 	})
 	if err != nil {

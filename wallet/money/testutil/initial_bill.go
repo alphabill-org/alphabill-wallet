@@ -4,15 +4,14 @@ import (
 	"crypto"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/network/protocol/genesis"
-	"github.com/alphabill-org/alphabill/state"
-	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/stretchr/testify/require"
 
 	abcrypto "github.com/alphabill-org/alphabill/crypto"
+	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/predicates/templates"
+	"github.com/alphabill-org/alphabill/state"
+	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/types"
-	"github.com/fxamacker/cbor/v2"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 )
@@ -69,7 +68,7 @@ func CreateInitialBillTransferTx(accountKey *account.AccountKey, billID, fcrID t
 		TargetValue: billValue,
 		Backlink:    backlink,
 	}
-	attrBytes, err := cbor.Marshal(attr)
+	attrBytes, err := types.Cbor.Marshal(attr)
 	if err != nil {
 		return nil, err
 	}
