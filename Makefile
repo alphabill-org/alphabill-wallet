@@ -18,6 +18,9 @@ gosec:
 tools:
 	go install github.com/securego/gosec/v2/cmd/gosec@latest
 
+spend-initial-bill:
+	go build -o build/alphabill-spend-initial-bill scripts/money/spend_initial_bill.go
+
 .PHONY: \
 	all \
 	clean \
