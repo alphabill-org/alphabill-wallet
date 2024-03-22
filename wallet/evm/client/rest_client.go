@@ -15,7 +15,6 @@ import (
 
 	"github.com/alphabill-org/alphabill/types"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/fxamacker/cbor/v2"
 	"github.com/shopspring/decimal"
 
 	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
@@ -88,7 +87,7 @@ func (e *EvmClient) GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (
 
 // PostTransaction post node transaction
 func (e *EvmClient) PostTransaction(ctx context.Context, tx *types.TransactionOrder) error {
-	b, err := cbor.Marshal(tx)
+	b, err := types.Cbor.Marshal(tx)
 	if err != nil {
 		return fmt.Errorf("failed to encode transactions: %w", err)
 	}
@@ -159,7 +158,7 @@ func (e *EvmClient) GetTransactionCount(ctx context.Context, ethAddr []byte) (ui
 
 // Call execute smart contract tx without storing the result in blockchain. Can be used to simulate tx or to read state.
 func (e *EvmClient) Call(ctx context.Context, callAttr *CallAttributes) (*ProcessingDetails, error) {
-	b, err := cbor.Marshal(callAttr)
+	b, err := types.Cbor.Marshal(callAttr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode transactions: %w", err)
 	}
@@ -250,7 +249,7 @@ func decodeResponse(rsp *http.Response, successStatus int, data any, allowEmptyR
 		if data == nil {
 			return nil
 		}
-		err := cbor.NewDecoder(rsp.Body).Decode(data)
+		err := types.Cbor.Decode(rsp.Body, data)
 		if err != nil && (!errors.Is(err, io.EOF) || !allowEmptyResponse) {
 			return fmt.Errorf("failed to decode response body: %w", err)
 		}
@@ -264,7 +263,7 @@ func decodeResponse(rsp *http.Response, successStatus int, data any, allowEmptyR
 			_   struct{} `cbor:",toarray"`
 			Err string
 		}{}
-		if err := cbor.NewDecoder(rsp.Body).Decode(errInfo); err != nil {
+		if err := types.Cbor.Decode(rsp.Body, errInfo); err != nil {
 			return fmt.Errorf("%s", rsp.Status)
 		}
 		return fmt.Errorf("%s, %s", rsp.Status, errInfo.Err)

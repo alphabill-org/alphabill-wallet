@@ -14,7 +14,6 @@ import (
 
 	testtransaction "github.com/alphabill-org/alphabill/txsystem/testutils/transaction"
 	"github.com/alphabill-org/alphabill/types"
-	"github.com/fxamacker/cbor/v2"
 	"github.com/stretchr/testify/require"
 
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
@@ -24,7 +23,7 @@ import (
 func writeCBORResponse(t *testing.T, w http.ResponseWriter, response any, statusCode int) {
 	w.Header().Set("Content-Type", "application/cbor")
 	w.WriteHeader(statusCode)
-	if err := cbor.NewEncoder(w).Encode(response); err != nil {
+	if err := types.Cbor.Encode(w, response); err != nil {
 		t.Errorf("Failed to write response body, CBOR error: %v", err)
 	}
 }
@@ -35,7 +34,7 @@ func writeCBORResponse(t *testing.T, w http.ResponseWriter, response any, status
 func writeCBORError(t *testing.T, w http.ResponseWriter, e error, code int) {
 	w.Header().Set("Content-Type", "application/cbor")
 	w.WriteHeader(code)
-	if err := cbor.NewEncoder(w).Encode(struct {
+	if err := types.Cbor.Encode(w, struct {
 		_   struct{} `cbor:",toarray"`
 		Err string
 	}{

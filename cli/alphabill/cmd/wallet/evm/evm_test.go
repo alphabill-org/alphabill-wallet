@@ -14,11 +14,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/alphabill-org/alphabill/txsystem/evm"
 	"github.com/alphabill-org/alphabill/txsystem/evm/api"
 	"github.com/alphabill-org/alphabill/types"
-	"github.com/fxamacker/cbor/v2"
-	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
 	cmdtypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
@@ -53,7 +53,7 @@ func Test_evmCmdDeploy_ok(t *testing.T) {
 	evmDetails := evm.ProcessingDetails{
 		ErrorDetails: "something went wrong",
 	}
-	detailBytes, err := cbor.Marshal(evmDetails)
+	detailBytes, err := types.Cbor.Marshal(evmDetails)
 	require.NoError(t, err)
 	mockConf := &clientMockConf{
 		round:    3,
@@ -118,7 +118,7 @@ func Test_evmCmdExecute_ok(t *testing.T) {
 	evmDetails := evm.ProcessingDetails{
 		ReturnData: []byte{0xDE, 0xAD, 0x00, 0xBE, 0xEF},
 	}
-	detailBytes, err := cbor.Marshal(evmDetails)
+	detailBytes, err := types.Cbor.Marshal(evmDetails)
 	require.NoError(t, err)
 	mockConf := &clientMockConf{
 		round:    3,
@@ -299,7 +299,7 @@ func mockClientCalls(br *clientMockConf, logF func() *slog.Logger) (*httptest.Se
 			}, http.StatusOK, log)
 		case strings.Contains(r.URL.Path, "/api/v1/evm/call"):
 			br.callReq = &api.CallEVMRequest{}
-			if err := cbor.NewDecoder(r.Body).Decode(br.callReq); err != nil {
+			if err := types.Cbor.Decode(r.Body, br.callReq); err != nil {
 				api.WriteCBORError(w, fmt.Errorf("unable to decode request body: %w", err), http.StatusBadRequest, log)
 				return
 			}
@@ -321,7 +321,7 @@ func mockClientCalls(br *clientMockConf, logF func() *slog.Logger) (*httptest.Se
 					return
 				}
 				tx := &types.TransactionOrder{}
-				if err := cbor.Unmarshal(buf.Bytes(), tx); err != nil {
+				if err := types.Cbor.Unmarshal(buf.Bytes(), tx); err != nil {
 					api.WriteCBORError(w, fmt.Errorf("unable to decode request body as transaction: %w", err), http.StatusBadRequest, log)
 					return
 				}

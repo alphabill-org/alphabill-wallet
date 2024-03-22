@@ -12,8 +12,7 @@ import (
 	"github.com/alphabill-org/alphabill/txsystem/fc/transactions"
 	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/types"
-	"github.com/fxamacker/cbor/v2"
-
+	
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
@@ -244,7 +243,7 @@ func NewReclaimFCTx(systemID types.SystemID, unitID []byte, timeout uint64, fcPr
 }
 
 func NewTxPayload(systemID types.SystemID, txType string, unitID types.UnitID, timeout uint64, fcrID []byte, attr interface{}) (*types.Payload, error) {
-	attrBytes, err := cbor.Marshal(attr)
+	attrBytes, err := types.Cbor.Marshal(attr)
 	if err != nil {
 		return nil, err
 	}

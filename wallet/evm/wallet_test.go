@@ -8,7 +8,6 @@ import (
 
 	"github.com/alphabill-org/alphabill/txsystem/evm"
 	"github.com/alphabill-org/alphabill/types"
-	"github.com/fxamacker/cbor/v2"
 	"github.com/stretchr/testify/require"
 
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
@@ -59,7 +58,7 @@ func (e *evmClientMock) GetTxProof(ctx context.Context, unitID types.UnitID, txH
 	details := evmclient.ProcessingDetails{
 		ErrorDetails: "some error string",
 	}
-	encoded, _ := cbor.Marshal(details)
+	encoded, _ := types.Cbor.Marshal(details)
 	return &wallet.Proof{
 		TxRecord: &types.TransactionRecord{
 			TransactionOrder: &types.TransactionOrder{},
