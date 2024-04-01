@@ -89,11 +89,11 @@ func WithError(err error) Option {
 	}
 }
 
-func (s *StateServiceMock) GetRoundNumber(ctx context.Context) (uint64, error) {
+func (s *StateServiceMock) GetRoundNumber(ctx context.Context) (types.Uint64, error) {
 	if s.Err != nil {
 		return 0, s.Err
 	}
-	return s.RoundNumber, nil
+	return types.Uint64(s.RoundNumber), nil
 }
 
 func (s *StateServiceMock) GetUnit(unitID types.UnitID, includeStateProof bool) (*abrpc.Unit[any], error) {
@@ -155,7 +155,7 @@ func (s *StateServiceMock) GetTransactionProof(ctx context.Context, txHash types
 	return nil, nil
 }
 
-func (s *StateServiceMock) GetBlock(ctx context.Context, roundNumber uint64) (types.Bytes, error) {
+func (s *StateServiceMock) GetBlock(ctx context.Context, roundNumber types.Uint64) (types.Bytes, error) {
 	if s.Err != nil {
 		return nil, s.Err
 	}

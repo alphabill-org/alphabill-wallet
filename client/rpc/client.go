@@ -43,9 +43,9 @@ func (c *Client) Client() *ethrpc.Client {
 
 // GetRoundNumber returns the latest round number seen by the rpc node.
 func (c *Client) GetRoundNumber(ctx context.Context) (uint64, error) {
-	var num uint64
+	var num types.Uint64
 	err := c.c.CallContext(ctx, &num, "state_getRoundNumber")
-	return num, err
+	return uint64(num), err
 }
 
 // GetBill returns bill for the given bill id.
@@ -125,7 +125,7 @@ func (c *Client) GetTransactionProof(ctx context.Context, txHash types.Bytes) (*
 // Returns ErrNotFound if the block does not exist.
 func (c *Client) GetBlock(ctx context.Context, roundNumber uint64) (*types.Block, error) {
 	var res types.Bytes
-	if err := c.c.CallContext(ctx, &res, "state_getBlock", roundNumber); err != nil {
+	if err := c.c.CallContext(ctx, &res, "state_getBlock", types.Uint64(roundNumber)); err != nil {
 		return nil, err
 	}
 	if res == nil {

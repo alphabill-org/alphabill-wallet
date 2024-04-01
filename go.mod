@@ -5,7 +5,7 @@ go 1.21
 replace github.com/multiformats/go-multistream v0.5.0 => github.com/multiformats/go-multistream v0.4.1
 
 require (
-	github.com/alphabill-org/alphabill v0.3.1-0.20240321110445-ed6161c8e02e
+	github.com/alphabill-org/alphabill v0.3.1-0.20240401064108-ca16c894f11d
 	github.com/btcsuite/btcd v0.23.2
 	github.com/btcsuite/btcd/btcutil v1.1.2
 	github.com/ethereum/go-ethereum v1.12.2
