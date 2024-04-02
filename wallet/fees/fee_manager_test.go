@@ -69,6 +69,41 @@ func TestAddFeeCredit_OK(t *testing.T) {
 	require.EqualValues(t, 100000000, attr.Amount)
 }
 
+func TestAddFeeCredit_TokensPartitionOK(t *testing.T) {
+	// create fee manager
+	am := newAccountManager(t)
+	accountKey, err := am.GetAccountKey(0)
+	require.NoError(t, err)
+
+	// money client has round number 100, tokens client 1000
+	moneyClient := testutil.NewRpcClientMock(
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 100000000, Backlink: []byte{2}})),
+		testutil.WithOwnerFeeCreditBill(newMoneyFCB(accountKey, &unit.FeeCreditRecord{Balance: 1e8, Backlink: []byte{111}})),
+		testutil.WithRoundNumber(100),
+	)
+	tokensClient := testutil.NewRpcClientMock(
+		testutil.WithOwnerFeeCreditBill(newMoneyFCB(accountKey, &unit.FeeCreditRecord{Balance: 1e8, Backlink: []byte{222}})),
+		testutil.WithRoundNumber(1000),
+	)
+	db := createFeeManagerDB(t)
+	feeManager := newTokensPartitionFeeManager(am, db, moneyClient, tokensClient, logger.New(t))
+
+	// add fees
+	res, err := feeManager.AddFeeCredit(context.Background(), AddFeeCmd{Amount: 100000000, DisableLocking: true})
+	require.NoError(t, err)
+	require.Len(t, res.Proofs, 1)
+	require.Nil(t, res.Proofs[0].LockFC)
+	require.NotNil(t, res.Proofs[0].TransferFC)
+	require.NotNil(t, res.Proofs[0].AddFC)
+
+	// verify tokens partition timeout is used for transferFC
+	var attr *transactions.TransferFeeCreditAttributes
+	err = res.Proofs[0].TransferFC.TxRecord.TransactionOrder.UnmarshalAttributes(&attr)
+	require.NoError(t, err)
+	require.EqualValues(t, 1000, attr.EarliestAdditionTime)
+	require.EqualValues(t, 1000+transferFCLatestAdditionTime, attr.LatestAdditionTime)
+}
+
 /*
 Wallet has single bill and fee credit bill,
 when adding fees LockFCTx, TransferFCTx and AddFCTx transactions should be sent.
@@ -1199,6 +1234,10 @@ func TestUnlockFeeCredit(t *testing.T) {
 
 func newMoneyPartitionFeeManager(am account.Manager, db FeeManagerDB, moneyClient RpcClient, log *slog.Logger) *FeeManager {
 	return NewFeeManager(am, db, moneySystemID, moneyClient, testFeeCreditRecordIDFromPublicKey, moneySystemID, moneyClient, testFeeCreditRecordIDFromPublicKey, log)
+}
+
+func newTokensPartitionFeeManager(am account.Manager, db FeeManagerDB, moneyClient RpcClient, tokensClient RpcClient, log *slog.Logger) *FeeManager {
+	return NewFeeManager(am, db, moneySystemID, moneyClient, testFeeCreditRecordIDFromPublicKey, tokensSystemID, tokensClient, testFeeCreditRecordIDFromPublicKey, log)
 }
 
 func newAccountManager(t *testing.T) account.Manager {

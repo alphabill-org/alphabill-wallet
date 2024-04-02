@@ -583,12 +583,12 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 	if err != nil {
 		return err
 	}
-	roundNumber, err := w.moneyClient.GetRoundNumber(ctx)
+	targetRoundNumber, err := w.targetPartitionClient.GetRoundNumber(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to fetch target partition round number: %w", err)
 	}
-	earliestAdditionTime := roundNumber
-	latestAdditionTime := roundNumber + transferFCLatestAdditionTime
+	earliestAdditionTime := targetRoundNumber
+	latestAdditionTime := targetRoundNumber + transferFCLatestAdditionTime
 
 	// create transferFC transaction
 	w.log.InfoContext(ctx, "sending transfer fee credit transaction")
