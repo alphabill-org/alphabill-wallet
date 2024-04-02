@@ -75,14 +75,14 @@ func (b *Bill) IsLocked() bool {
 	return b.BillData.IsLocked()
 }
 
-func (b *Bill) Backlink() []byte {
+func (b *Bill) Counter() uint64 {
 	if b == nil {
-		return nil
+		return 0
 	}
 	if b.BillData == nil {
-		return nil
+		return 0
 	}
-	return b.BillData.Backlink
+	return b.BillData.Counter
 }
 
 func (b *Bill) Value() uint64 {
