@@ -116,30 +116,30 @@ type (
 	}
 
 	AddFeeCreditCtx struct {
-		TargetPartitionID  types.SystemID          `json:"targetPartitionId"`         // target partition id where the fee is being added to
-		TargetBillID       []byte                  `json:"targetBillId"`              // transferFC target bill id
-		TargetBillBacklink []byte                  `json:"targetBillBacklink"`        // transferFC target bill backlink
-		TargetAmount       uint64                  `json:"targetAmount"`              // the amount to add to the fee credit bill
-		LockingDisabled    bool                    `json:"lockingDisabled,omitempty"` // user defined flag if we should lock fee credit record when adding fees
-		LockFCTx           *types.TransactionOrder `json:"lockFCTx,omitempty"`
-		LockFCProof        *wallet.Proof           `json:"lockFCProof,omitempty"`
-		TransferFCTx       *types.TransactionOrder `json:"transferFCTx,omitempty"`
-		TransferFCProof    *wallet.Proof           `json:"transferFCProof,omitempty"`
-		AddFCTx            *types.TransactionOrder `json:"addFCTx,omitempty"`
-		AddFCProof         *wallet.Proof           `json:"addFCProof,omitempty"`
+		TargetPartitionID types.SystemID          `json:"targetPartitionId"`         // target partition id where the fee is being added to
+		TargetBillID      []byte                  `json:"targetBillId"`              // transferFC target bill id
+		TargetBillCounter uint64                  `json:"targetBillCounter"`         // transferFC target bill counter
+		TargetAmount      uint64                  `json:"targetAmount"`              // the amount to add to the fee credit bill
+		LockingDisabled   bool                    `json:"lockingDisabled,omitempty"` // user defined flag if we should lock fee credit record when adding fees
+		LockFCTx          *types.TransactionOrder `json:"lockFCTx,omitempty"`
+		LockFCProof       *wallet.Proof           `json:"lockFCProof,omitempty"`
+		TransferFCTx      *types.TransactionOrder `json:"transferFCTx,omitempty"`
+		TransferFCProof   *wallet.Proof           `json:"transferFCProof,omitempty"`
+		AddFCTx           *types.TransactionOrder `json:"addFCTx,omitempty"`
+		AddFCProof        *wallet.Proof           `json:"addFCProof,omitempty"`
 	}
 
 	ReclaimFeeCreditCtx struct {
-		TargetPartitionID  types.SystemID          `json:"targetPartitionId"`  // target partition id where the fee credit is being reclaimed from
-		TargetBillID       []byte                  `json:"targetBillId"`       // closeFC target bill id
-		TargetBillBacklink []byte                  `json:"targetBillBacklink"` // closeFC target bill backlink
-		LockingDisabled    bool                    `json:"lockingDisabled,omitempty"`
-		LockTx             *types.TransactionOrder `json:"lockTx,omitempty"`
-		LockTxProof        *wallet.Proof           `json:"lockTxProof,omitempty"`
-		CloseFCTx          *types.TransactionOrder `json:"closeFCTx,omitempty"`
-		CloseFCProof       *wallet.Proof           `json:"closeFCProof,omitempty"`
-		ReclaimFCTx        *types.TransactionOrder `json:"reclaimFCTx,omitempty"`
-		ReclaimFCProof     *wallet.Proof           `json:"reclaimFCProof,omitempty"`
+		TargetPartitionID types.SystemID          `json:"targetPartitionId"` // target partition id where the fee credit is being reclaimed from
+		TargetBillID      []byte                  `json:"targetBillId"`      // closeFC target bill id
+		TargetBillCounter uint64                  `json:"targetBillCounter"` // closeFC target bill counter
+		LockingDisabled   bool                    `json:"lockingDisabled,omitempty"`
+		LockTx            *types.TransactionOrder `json:"lockTx,omitempty"`
+		LockTxProof       *wallet.Proof           `json:"lockTxProof,omitempty"`
+		CloseFCTx         *types.TransactionOrder `json:"closeFCTx,omitempty"`
+		CloseFCProof      *wallet.Proof           `json:"closeFCProof,omitempty"`
+		ReclaimFCTx       *types.TransactionOrder `json:"reclaimFCTx,omitempty"`
+		ReclaimFCProof    *wallet.Proof           `json:"reclaimFCProof,omitempty"`
 	}
 )
 
@@ -415,11 +415,11 @@ func (w *FeeManager) addFees(ctx context.Context, accountKey *account.AccountKey
 		totalTransferredAmount += amount
 
 		feeCtx := &AddFeeCreditCtx{
-			TargetPartitionID:  w.targetPartitionSystemID,
-			TargetBillID:       targetBill.ID,
-			TargetBillBacklink: targetBill.Backlink(),
-			TargetAmount:       amount,
-			LockingDisabled:    cmd.DisableLocking,
+			TargetPartitionID: w.targetPartitionSystemID,
+			TargetBillID:      targetBill.ID,
+			TargetBillCounter: targetBill.Counter(),
+			TargetAmount:      amount,
+			LockingDisabled:   cmd.DisableLocking,
 		}
 		if err := w.db.SetAddFeeContext(accountKey.PubKey, feeCtx); err != nil {
 			return nil, fmt.Errorf("failed to initialise fee context: %w", err)
@@ -556,11 +556,11 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 
 		// if transferFC failed then verify the source bill is still valid,
 		// if not valid then return error to user and delete fee context and remote lock
-		sourceBill, err := w.fetchBillByIdAndHash(ctx, feeCtx.TargetBillID, feeCtx.TargetBillBacklink)
+		sourceBill, err := api.FetchBill(ctx, w.moneyClient, feeCtx.TargetBillID)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to fetch bill: %w", err)
 		}
-		if sourceBill == nil {
+		if sourceBill == nil || sourceBill.Counter() != feeCtx.TargetBillCounter {
 			w.log.WarnContext(ctx, "transferFC target unit no longer usable, unlocking fee credit unit")
 			// unlock remote locked fee credit record if exists
 			if feeCtx.LockFCProof != nil {
@@ -605,7 +605,7 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 		w.moneySystemID,
 		w.targetPartitionSystemID,
 		feeCtx.TargetBillID,
-		feeCtx.TargetBillBacklink,
+		feeCtx.TargetBillCounter,
 		moneyTimeout,
 		earliestAdditionTime,
 		latestAdditionTime,
@@ -743,10 +743,10 @@ func (w *FeeManager) reclaimFees(ctx context.Context, accountKey *account.Accoun
 
 	// create fee ctx to track reclaim process
 	feeCtx := &ReclaimFeeCreditCtx{
-		TargetPartitionID:  w.targetPartitionSystemID,
-		TargetBillID:       targetBill.ID,
-		TargetBillBacklink: targetBill.Backlink(),
-		LockingDisabled:    cmd.DisableLocking,
+		TargetPartitionID: w.targetPartitionSystemID,
+		TargetBillID:      targetBill.ID,
+		TargetBillCounter: targetBill.Counter(),
+		LockingDisabled:   cmd.DisableLocking,
 	}
 	if err := w.db.SetReclaimFeeContext(accountKey.PubKey, feeCtx); err != nil {
 		return nil, fmt.Errorf("failed to store reclaim fee context: %w", err)
@@ -797,7 +797,7 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 		if proof != nil {
 			w.log.InfoContext(ctx, fmt.Sprintf("lock tx '%x' confirmed", feeCtx.LockTx.Hash(crypto.SHA256)))
 			feeCtx.LockTxProof = proof
-			feeCtx.TargetBillBacklink = proof.TxRecord.TransactionOrder.Hash(crypto.SHA256)
+			feeCtx.TargetBillCounter += 1
 			if err := w.db.SetReclaimFeeContext(accountKey.PubKey, feeCtx); err != nil {
 				return fmt.Errorf("failed to store lock tx proof: %w", err)
 			}
@@ -824,7 +824,7 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 		accountKey,
 		w.moneySystemID,
 		feeCtx.TargetBillID,
-		feeCtx.TargetBillBacklink,
+		feeCtx.TargetBillCounter,
 		wallet.LockReasonReclaimFees,
 		timeout,
 	)
@@ -847,7 +847,7 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 
 	// store lock transaction proof in fee context
 	feeCtx.LockTxProof = proof
-	feeCtx.TargetBillBacklink = proof.TxRecord.TransactionOrder.Hash(crypto.SHA256)
+	feeCtx.TargetBillCounter += 1
 	if err = w.db.SetReclaimFeeContext(accountKey.PubKey, feeCtx); err != nil {
 		return fmt.Errorf("failed to store lock transaction fee context: %w", err)
 	}
@@ -891,7 +891,7 @@ func (w *FeeManager) sendCloseFCTx(ctx context.Context, accountKey *account.Acco
 	// create closeFC transaction
 	tx, err := txbuilder.NewCloseFCTx(
 		w.targetPartitionSystemID, fcb.ID, targetPartitionTimeout, fcb.Balance(),
-		feeCtx.TargetBillID, feeCtx.TargetBillBacklink, accountKey)
+		feeCtx.TargetBillID, feeCtx.TargetBillCounter, accountKey)
 	if err != nil {
 		return fmt.Errorf("failed to create closeFC transaction: %w", err)
 	}
@@ -940,11 +940,11 @@ func (w *FeeManager) sendReclaimFCTx(ctx context.Context, accountKey *account.Ac
 			}
 			return nil
 		}
-		actualTargetBill, err := w.fetchBillByIdAndHash(ctx, feeCtx.TargetBillID, feeCtx.TargetBillBacklink)
+		actualTargetBill, err := api.FetchBill(ctx, w.moneyClient, feeCtx.TargetBillID)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to fetch bill: %w", err)
 		}
-		if actualTargetBill == nil {
+		if actualTargetBill == nil || actualTargetBill.Counter() != feeCtx.TargetBillCounter {
 			_, err := w.unlockBill(ctx, accountKey, feeCtx.TargetBillID)
 			if err != nil {
 				return fmt.Errorf("failed to unlock target bill: %w", err)
@@ -962,7 +962,7 @@ func (w *FeeManager) sendReclaimFCTx(ctx context.Context, accountKey *account.Ac
 		return err
 	}
 
-	reclaimFC, err := txbuilder.NewReclaimFCTx(w.moneySystemID, feeCtx.TargetBillID, moneyTimeout, feeCtx.CloseFCProof, feeCtx.TargetBillBacklink, accountKey)
+	reclaimFC, err := txbuilder.NewReclaimFCTx(w.moneySystemID, feeCtx.TargetBillID, moneyTimeout, feeCtx.CloseFCProof, feeCtx.TargetBillCounter, accountKey)
 	if err != nil {
 		return fmt.Errorf("failed to create reclaimFC transaction: %w", err)
 	}
@@ -1014,17 +1014,6 @@ func (w *FeeManager) fetchBills(ctx context.Context, k *account.AccountKey) ([]*
 		return bills[i].Value() > bills[j].Value()
 	})
 	return bills, nil
-}
-
-func (w *FeeManager) fetchBillByIdAndHash(ctx context.Context, unitID []byte, txHash []byte) (*api.Bill, error) {
-	b, err := api.FetchBill(ctx, w.moneyClient, unitID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch bill: %w", err)
-	}
-	if b != nil && bytes.Equal(b.Backlink(), txHash) {
-		return b, nil
-	}
-	return nil, nil
 }
 
 func (w *FeeManager) sumValues(bills []*api.Bill) uint64 {

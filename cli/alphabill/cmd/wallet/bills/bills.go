@@ -180,7 +180,7 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch round number: %w", err)
 	}
-	tx, err := txbuilder.NewLockTx(accountKey, types.SystemID(config.SystemID), bill.ID, bill.Backlink(), wallet.LockReasonManual, roundNumber+10)
+	tx, err := txbuilder.NewLockTx(accountKey, types.SystemID(config.SystemID), bill.ID, bill.Counter(), wallet.LockReasonManual, roundNumber+10)
 	if err != nil {
 		return fmt.Errorf("failed to create lock tx: %w", err)
 	}

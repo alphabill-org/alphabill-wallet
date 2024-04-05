@@ -2,12 +2,10 @@ package main
 
 import (
 	"context"
-	"crypto"
 	"flag"
 	"fmt"
 	"log"
 
-	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
 	"github.com/alphabill-org/alphabill/hash"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/txsystem/fc/transactions"
@@ -17,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/fxamacker/cbor/v2"
 
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
 	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 )
@@ -31,6 +30,7 @@ func main() {
 	billIdUint := flag.Uint64("bill-id", 0, "bill id of the spendable bill")
 	billValue := flag.Uint64("bill-value", 0, "bill value of the spendable bill")
 	timeout := flag.Uint64("timeout", 0, "transaction timeout (block number)")
+	counter := flag.Uint64("counter", 0, "bill counter")
 	rpcServerAddr := flag.String("rpc-server-address", "", "money rpc node url")
 	flag.Parse()
 
@@ -67,13 +67,13 @@ func main() {
 	}
 	defer rpcClient.Close()
 
-	err = execInitialBill(ctx, rpcClient, *timeout, billID, *billValue, pubKey)
+	err = execInitialBill(ctx, rpcClient, *timeout, billID, *billValue, pubKey, *counter)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func execInitialBill(ctx context.Context, rpcClient api.RpcClient, timeout uint64, billID types.UnitID, billValue uint64, pubKey []byte) error {
+func execInitialBill(ctx context.Context, rpcClient api.RpcClient, timeout uint64, billID types.UnitID, billValue uint64, pubKey []byte, counter uint64) error {
 	roundNumber, err := rpcClient.GetRoundNumber(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting round number: %w", err)
@@ -88,7 +88,7 @@ func execInitialBill(ctx context.Context, rpcClient api.RpcClient, timeout uint6
 	fcrID := money.NewFeeCreditRecordID(billID, hash.Sum256(hash.Sum256(pubKey)))
 
 	// create transferFC
-	transferFC, err := createTransferFC(feeAmount+txFee, billID, fcrID, roundNumber, absoluteTimeout)
+	transferFC, err := createTransferFC(feeAmount+txFee, billID, fcrID, roundNumber, absoluteTimeout, counter)
 	if err != nil {
 		return fmt.Errorf("creating transfer FC transaction: %w", err)
 	}
@@ -126,7 +126,7 @@ func execInitialBill(ctx context.Context, rpcClient api.RpcClient, timeout uint6
 	}
 
 	// create transfer tx
-	transferTx, err := createTransferTx(pubKey, billID, billValue-feeAmount-txFee, fcrID, absoluteTimeout, transferFC.Hash(crypto.SHA256))
+	transferTx, err := createTransferTx(pubKey, billID, billValue-feeAmount-txFee, fcrID, absoluteTimeout, counter+1)
 	if err != nil {
 		return fmt.Errorf("creating transfer transaction: %w", err)
 	}
@@ -146,7 +146,7 @@ func execInitialBill(ctx context.Context, rpcClient api.RpcClient, timeout uint6
 	return nil
 }
 
-func createTransferFC(feeAmount uint64, unitID []byte, targetUnitID []byte, t1, t2 uint64) (*types.TransactionOrder, error) {
+func createTransferFC(feeAmount uint64, unitID []byte, targetUnitID []byte, t1, t2, counter uint64) (*types.TransactionOrder, error) {
 	attr, err := cbor.Marshal(
 		&transactions.TransferFeeCreditAttributes{
 			Amount:                 feeAmount,
@@ -154,6 +154,7 @@ func createTransferFC(feeAmount uint64, unitID []byte, targetUnitID []byte, t1, 
 			TargetRecordID:         targetUnitID,
 			EarliestAdditionTime:   t1,
 			LatestAdditionTime:     t2,
+			Counter:                counter,
 		},
 	)
 	if err != nil {
@@ -195,12 +196,12 @@ func createAddFC(unitID []byte, ownerCondition []byte, transferFC *types.Transac
 	}, nil
 }
 
-func createTransferTx(pubKey []byte, unitID []byte, billValue uint64, fcrID []byte, timeout uint64, backlink []byte) (*types.TransactionOrder, error) {
+func createTransferTx(pubKey []byte, unitID []byte, billValue uint64, fcrID []byte, timeout uint64, counter uint64) (*types.TransactionOrder, error) {
 	attr, err := cbor.Marshal(
 		&money.TransferAttributes{
 			NewBearer:   templates.NewP2pkh256BytesFromKeyHash(hash.Sum256(pubKey)),
 			TargetValue: billValue,
-			Backlink:    backlink,
+			Counter:     counter,
 		},
 	)
 	if err != nil {

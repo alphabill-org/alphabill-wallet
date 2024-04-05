@@ -41,9 +41,9 @@ func TestRpcClient(t *testing.T) {
 		bill := &api.Bill{
 			ID: []byte{1},
 			BillData: &money.BillData{
-				V:        192,
-				T:        168,
-				Backlink: []byte{1, 2, 3, 4, 5},
+				V:       192,
+				T:       168,
+				Counter: 123,
 			},
 		}
 		service.Units = map[string]*rpc.Unit[any]{

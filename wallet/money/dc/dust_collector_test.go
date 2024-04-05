@@ -19,9 +19,9 @@ func TestDC_OK(t *testing.T) {
 	require.NoError(t, err)
 	targetBillID := money.NewBillID(nil, []byte{3})
 	moneyClient := testutil.NewRpcClientMock(
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Backlink: []byte{2}})),
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{3}, &money.BillData{V: 3, Backlink: []byte{3}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Counter: 1})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Counter: 2})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{3}, &money.BillData{V: 3, Counter: 3})),
 		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
 	)
 	dc := NewDustCollector(money.DefaultSystemIdentifier, 10, 10, moneyClient, logger.New(t))
@@ -47,7 +47,7 @@ func TestDCWontRunForSingleBill(t *testing.T) {
 	accountKeys, err := account.NewKeys("dinosaur simple verify deliver bless ridge monkey design venue six problem lucky")
 	require.NoError(t, err)
 	moneyClient := testutil.NewRpcClientMock(
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Counter: 1})),
 		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
 	)
 	dc := NewDustCollector(money.DefaultSystemIdentifier, 10, 10, moneyClient, logger.New(t))
@@ -67,9 +67,9 @@ func TestAllBillsAreSwapped_WhenWalletBillCountEqualToMaxBillCount(t *testing.T)
 	require.NoError(t, err)
 	targetBillID := money.NewBillID(nil, []byte{3})
 	moneyClient := testutil.NewRpcClientMock(
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Backlink: []byte{2}})),
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{3}, &money.BillData{V: 3, Backlink: []byte{3}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Counter: 1})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Counter: 2})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{3}, &money.BillData{V: 3, Counter: 3})),
 		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
 	)
 	w := NewDustCollector(money.DefaultSystemIdentifier, maxBillsPerDC, 10, moneyClient, logger.New(t))
@@ -100,10 +100,10 @@ func TestOnlyFirstNBillsAreSwapped_WhenBillCountOverLimit(t *testing.T) {
 	require.NoError(t, err)
 	targetBillID := money.NewBillID(nil, []byte{4})
 	moneyClient := testutil.NewRpcClientMock(
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Backlink: []byte{2}})),
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{3}, &money.BillData{V: 3, Backlink: []byte{3}})),
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{4}, &money.BillData{V: 4, Backlink: []byte{4}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Counter: 1})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Counter: 2})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{3}, &money.BillData{V: 3, Counter: 3})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{4}, &money.BillData{V: 4, Counter: 4})),
 		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
 	)
 	w := NewDustCollector(money.DefaultSystemIdentifier, maxBillsPerDC, 10, moneyClient, logger.New(t))

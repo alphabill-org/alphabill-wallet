@@ -20,11 +20,11 @@ func CreateFeeCredit(t *testing.T, initialBillID, fcrID types.UnitID, fcrAmount 
 	// send transferFC
 	transferFC := testfc.NewTransferFC(t,
 		testfc.NewTransferFCAttr(
-			testfc.WithBacklink(nil),
+			testfc.WithCounter(0),
 			testfc.WithAmount(fcrAmount),
 			testfc.WithTargetRecordID(fcrID),
 		),
-		testtransaction.WithUnitId(initialBillID),
+		testtransaction.WithUnitID(initialBillID),
 		testtransaction.WithPayloadType(transactions.PayloadTypeTransferFeeCredit),
 	)
 
@@ -47,7 +47,7 @@ func CreateFeeCredit(t *testing.T, initialBillID, fcrID types.UnitID, fcrAmount 
 			testfc.WithTransferFCProof(transferFCProof),
 			testfc.WithFCOwnerCondition(templates.NewP2pkh256BytesFromKey(pubKey)),
 		),
-		testtransaction.WithUnitId(fcrID),
+		testtransaction.WithUnitID(fcrID),
 		testtransaction.WithOwnerProof(templates.NewP2pkh256BytesFromKey(pubKey)),
 		testtransaction.WithPayloadType(transactions.PayloadTypeAddFeeCredit),
 	)

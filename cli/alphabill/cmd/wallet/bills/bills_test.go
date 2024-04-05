@@ -137,7 +137,7 @@ func TestWalletBillsLockUnlockCmd_Ok(t *testing.T) {
 	homedir, accountKey, rpcUrl, abNet := setupNetwork(t, nil)
 
 	// add fee credit
-	testutils.AddFeeCredit(t, 1e8, money.DefaultSystemIdentifier, accountKey, testutils.DefaultInitialBillID, nil, money.NewFeeCreditRecordID(nil, accountKey.PubKeyHash.Sha256), nil, abNet.NodePartitions[money.DefaultSystemIdentifier])
+	testutils.AddFeeCredit(t, 1e8, money.DefaultSystemIdentifier, accountKey, testutils.DefaultInitialBillID, 0, money.NewFeeCreditRecordID(nil, accountKey.PubKeyHash.Sha256), nil, abNet.NodePartitions[money.DefaultSystemIdentifier])
 
 	// lock bill
 	stdout, err := execBillsCommand(t, homedir, fmt.Sprintf("lock --rpc-url %s --bill-id %s", rpcUrl, money.NewBillID(nil, []byte{1})))

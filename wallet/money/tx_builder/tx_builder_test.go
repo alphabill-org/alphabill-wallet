@@ -29,8 +29,8 @@ func TestSplitTransactionAmount(t *testing.T) {
 	b := &mtypes.Bill{
 		ID: billID,
 		BillData: &money.BillData{
-			V:        500,
-			Backlink: []byte{1, 2, 3, 4},
+			V:       500,
+			Counter: 1234,
 		},
 	}
 	amount := uint64(150)
@@ -54,7 +54,7 @@ func TestSplitTransactionAmount(t *testing.T) {
 	require.Equal(t, amount, so.TargetUnits[0].Amount)
 	require.EqualValues(t, templates.NewP2pkh256BytesFromKeyHash(receiverPubKeyHash), so.TargetUnits[0].OwnerCondition)
 	require.EqualValues(t, 350, so.RemainingValue)
-	require.EqualValues(t, b.Backlink(), so.Backlink)
+	require.EqualValues(t, b.Counter(), so.Counter)
 }
 
 func TestCreateTransactions(t *testing.T) {
@@ -156,8 +156,8 @@ func createBill(value uint64) *mtypes.Bill {
 	return &mtypes.Bill{
 		ID: util.Uint64ToBytes32(0),
 		BillData: &money.BillData{
-			V:        value,
-			Backlink: []byte{},
+			V:       value,
+			Counter: 0,
 		},
 	}
 }
