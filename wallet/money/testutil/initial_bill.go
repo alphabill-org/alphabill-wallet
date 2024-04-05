@@ -62,11 +62,11 @@ func MoneyGenesisState(t *testing.T, config *MoneyGenesisConfig) *state.State {
 	return s
 }
 
-func CreateInitialBillTransferTx(accountKey *account.AccountKey, billID, fcrID types.UnitID, billValue uint64, timeout uint64, backlink []byte) (*types.TransactionOrder, error) {
+func CreateInitialBillTransferTx(accountKey *account.AccountKey, billID, fcrID types.UnitID, billValue, timeout, counter uint64) (*types.TransactionOrder, error) {
 	attr := &money.TransferAttributes{
 		NewBearer:   templates.NewP2pkh256BytesFromKey(accountKey.PubKey),
 		TargetValue: billValue,
-		Backlink:    backlink,
+		Counter:     counter,
 	}
 	attrBytes, err := types.Cbor.Marshal(attr)
 	if err != nil {

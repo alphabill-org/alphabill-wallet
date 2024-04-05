@@ -17,15 +17,15 @@ var (
 	unitID         = test.RandomBytes(33)
 	targetUnitID   = test.RandomBytes(33)
 	fcrID          = test.RandomBytes(33)
-	backlink       = test.RandomBytes(33)
 	ownerCondition = test.RandomBytes(33)
+	counter        = uint64(0)
 	maxFee         = uint64(10)
 	billValue      = uint64(100)
 	timeout        = uint64(200)
 )
 
 func TestCreateTransferFC(t *testing.T) {
-	tx, err := createTransferFC(maxFee, unitID, targetUnitID, 100, 200)
+	tx, err := createTransferFC(maxFee, unitID, targetUnitID, 100, 200, 0)
 
 	require.NoError(t, err)
 	require.NotNil(t, tx)
@@ -41,7 +41,7 @@ func TestCreateAddFC(t *testing.T) {
 }
 
 func TestCreateTransferTx(t *testing.T) {
-	tx, err := createTransferTx(pubKey, unitID, billValue, fcrID, timeout, backlink)
+	tx, err := createTransferTx(pubKey, unitID, billValue, fcrID, timeout, counter)
 
 	require.NoError(t, err)
 	require.NotNil(t, tx)
@@ -50,13 +50,13 @@ func TestCreateTransferTx(t *testing.T) {
 
 func TestExecBill_OK(t *testing.T) {
 	rpcClientMock := testutil.NewRpcClientMock()
-	require.NoError(t, execInitialBill(context.Background(), rpcClientMock, 10, unitID, billValue, ownerCondition))
+	require.NoError(t, execInitialBill(context.Background(), rpcClientMock, 10, unitID, billValue, ownerCondition, counter))
 }
 
 func TestExecBill_NOK(t *testing.T) {
 	rpcClientMock := testutil.NewRpcClientMock(
 		testutil.WithError(errors.New("some error")),
 	)
-	require.ErrorContains(t, execInitialBill(context.Background(), rpcClientMock, 10, unitID, billValue, ownerCondition), "some error")
+	require.ErrorContains(t, execInitialBill(context.Background(), rpcClientMock, 10, unitID, billValue, ownerCondition, counter), "some error")
 
 }

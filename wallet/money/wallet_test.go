@@ -71,7 +71,7 @@ func TestWallet_AddKey(t *testing.T) {
 
 func TestWallet_GetBalance(t *testing.T) {
 	rpcClient := testutil.NewRpcClientMock(
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 10, Backlink: []byte{1}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 10, Counter: 1})),
 	)
 	w := createTestWallet(t, rpcClient)
 	balance, err := w.GetBalance(context.Background(), GetBalanceCmd{})
@@ -81,7 +81,7 @@ func TestWallet_GetBalance(t *testing.T) {
 
 func TestWallet_GetBalances(t *testing.T) {
 	rpcClient := testutil.NewRpcClientMock(
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 10, Backlink: []byte{1}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 10, Counter: 1})),
 	)
 	w := createTestWallet(t, rpcClient)
 	_, _, err := w.am.AddAccount()

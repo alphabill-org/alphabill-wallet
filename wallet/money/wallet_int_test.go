@@ -85,12 +85,12 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 	require.NoError(t, err)
 
 	// create fee credit for initial bill transfer
-	transferFC := testfees.CreateFeeCredit(t, genesisConfig.InitialBillID, fcrID, fcrAmount, accKey.PrivKey, accKey.PubKey, network)
-	initialBillBacklink := transferFC.Hash(crypto.SHA256)
+	_ = testfees.CreateFeeCredit(t, genesisConfig.InitialBillID, fcrID, fcrAmount, accKey.PrivKey, accKey.PubKey, network)
+	initialBillCounter := uint64(1)
 	initialBillValue := genesisConfig.InitialBillValue - fcrAmount
 
 	// transfer initial bill to wallet 1
-	transferInitialBillTx, err := testutil.CreateInitialBillTransferTx(accKey, genesisConfig.InitialBillID, fcrID, initialBillValue, 10000, initialBillBacklink)
+	transferInitialBillTx, err := testutil.CreateInitialBillTransferTx(accKey, genesisConfig.InitialBillID, fcrID, initialBillValue, 10000, initialBillCounter)
 	require.NoError(t, err)
 	batch := txsubmitter.NewBatch(accKey.PubKey, w.rpcClient, observe.Logger())
 	batch.Add(&txsubmitter.TxSubmission{
