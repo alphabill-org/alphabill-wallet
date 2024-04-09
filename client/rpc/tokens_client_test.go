@@ -38,7 +38,7 @@ func TestTokensRpcClient(t *testing.T) {
 			Amount:   100,
 			Decimals: tokenType.DecimalPlaces,
 			Kind:     tokens.Fungible,
-			TxHash:   []byte{1, 2, 3},
+			Counter:  123,
 		}
 		*service = *mocksrv.NewStateServiceMock(
 			mocksrv.WithUnit(&rpc.Unit[any]{
@@ -55,7 +55,7 @@ func TestTokensRpcClient(t *testing.T) {
 					TokenType: tokenTypeID,
 					Value:     tokenUnit.Amount,
 					T:         168,
-					Backlink:  tokenUnit.TxHash,
+					Counter:   tokenUnit.Counter,
 				},
 			}),
 		)
@@ -102,7 +102,7 @@ func TestTokensRpcClient(t *testing.T) {
 			Amount:   100,
 			Decimals: ftTokenType.DecimalPlaces,
 			Kind:     tokens.Fungible,
-			TxHash:   []byte{1, 2, 3},
+			Counter:  123,
 		}
 
 		nftTokenID := tokentxs.NewNonFungibleTokenID(nil, []byte{3})
@@ -121,7 +121,7 @@ func TestTokensRpcClient(t *testing.T) {
 			Owner:    ownerID,
 			NftName:  "NFT name",
 			Kind:     tokens.NonFungible,
-			TxHash:   []byte{3, 2, 1},
+			Counter:  321,
 		}
 
 		// mock two tokens - one nft one ft
@@ -143,7 +143,7 @@ func TestTokensRpcClient(t *testing.T) {
 					TokenType: ftTokenTypeID,
 					Value:     ftTokenUnit.Amount,
 					T:         100,
-					Backlink:  ftTokenUnit.TxHash,
+					Counter:   ftTokenUnit.Counter,
 				},
 				OwnerPredicate: ownerID,
 			}),
@@ -161,10 +161,10 @@ func TestTokensRpcClient(t *testing.T) {
 			mocksrv.WithOwnerUnit(&rpc.Unit[any]{
 				UnitID: nftTokenID,
 				Data: tokentxs.NonFungibleTokenData{
-					NftType:  nftTokenTypeID,
-					Name:     nftTokenUnit.NftName,
-					T:        100,
-					Backlink: nftTokenUnit.TxHash,
+					NftType: nftTokenTypeID,
+					Name:    nftTokenUnit.NftName,
+					T:       100,
+					Counter: nftTokenUnit.Counter,
 				},
 				OwnerPredicate: ownerID,
 			}),

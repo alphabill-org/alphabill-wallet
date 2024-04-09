@@ -7,13 +7,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-wallet/client/rpc"
-	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
-	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
-	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 	abcrypto "github.com/alphabill-org/alphabill/crypto"
-	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/partition"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	abrpc "github.com/alphabill-org/alphabill/rpc"
@@ -21,7 +15,14 @@ import (
 	"github.com/alphabill-org/alphabill/txsystem"
 	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
+	"github.com/alphabill-org/alphabill/types"
 	"github.com/stretchr/testify/require"
+
+	"github.com/alphabill-org/alphabill-wallet/client/rpc"
+	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
+	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 )
 
 const DefaultT2Timeout = uint32(2500)
@@ -34,11 +35,11 @@ func CreateMoneyPartition(t *testing.T, genesisConfig *testutil.MoneyGenesisConf
 			testobserve.Default(t),
 			money.WithSystemIdentifier(money.DefaultSystemIdentifier),
 			money.WithHashAlgorithm(crypto.SHA256),
-			money.WithSystemDescriptionRecords([]*genesis.SystemDescriptionRecord{
+			money.WithSystemDescriptionRecords([]*types.SystemDescriptionRecord{
 				{
 					SystemIdentifier: money.DefaultSystemIdentifier,
 					T2Timeout:        DefaultT2Timeout,
-					FeeCreditBill: &genesis.FeeCreditBill{
+					FeeCreditBill: &types.FeeCreditBill{
 						UnitID:         money.NewBillID(nil, []byte{2}),
 						OwnerPredicate: templates.AlwaysTrueBytes(),
 					},
