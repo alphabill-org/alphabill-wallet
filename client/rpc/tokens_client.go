@@ -94,6 +94,7 @@ func (c *TokensClient) getTokenUnit(ctx context.Context, tokenID tokens.TokenID)
 			TypeID:   ft.Data.TokenType,
 			TypeName: ftType.Data.Name,
 			Owner:    ft.OwnerPredicate,
+			Counter:  ft.Data.Counter,
 			Locked:   ft.Data.Locked,
 
 			// fungible only
@@ -101,8 +102,7 @@ func (c *TokensClient) getTokenUnit(ctx context.Context, tokenID tokens.TokenID)
 			Decimals: ftType.Data.DecimalPlaces,
 
 			// meta
-			Kind:   tokens.Fungible,
-			TxHash: ft.Data.Backlink,
+			Kind: tokens.Fungible,
 		}, nil
 	} else if tokenID.HasType(tokentxs.NonFungibleTokenUnitType) {
 		var nft *rpc.Unit[tokentxs.NonFungibleTokenData]
@@ -128,6 +128,7 @@ func (c *TokensClient) getTokenUnit(ctx context.Context, tokenID tokens.TokenID)
 			TypeID:   nft.Data.NftType,
 			TypeName: nftType.Data.Name,
 			Owner:    nft.OwnerPredicate,
+			Counter:  nft.Data.Counter,
 			Locked:   nft.Data.Locked,
 
 			// nft only
@@ -137,8 +138,7 @@ func (c *TokensClient) getTokenUnit(ctx context.Context, tokenID tokens.TokenID)
 			NftDataUpdatePredicate: nft.Data.DataUpdatePredicate,
 
 			// meta
-			Kind:   tokens.NonFungible,
-			TxHash: nft.Data.Backlink,
+			Kind: tokens.NonFungible,
 		}, nil
 	} else {
 		return nil, fmt.Errorf("invalid token id: %s", tokenID)

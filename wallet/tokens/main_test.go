@@ -186,7 +186,7 @@ func Test_ListTokenTypes(t *testing.T) {
 func TestNewTypes(t *testing.T) {
 	t.Parallel()
 
-	recTxs := make(map[string]*types.TransactionOrder, 0)
+	recTxs := make(map[string]*types.TransactionOrder)
 	rpcClient := &mockTokensRpcClient{
 		getTypeHierarchy: func(ctx context.Context, id TokenTypeID) ([]*TokenUnitType, error) {
 			tx, found := recTxs[string(id)]
@@ -228,7 +228,7 @@ func TestNewTypes(t *testing.T) {
 	tw := initTestWallet(t, rpcClient)
 
 	t.Run("fungible type", func(t *testing.T) {
-		typeId := tokens.NewFungibleTokenTypeID(nil, test.RandomBytes(32))
+		typeID := tokens.NewFungibleTokenTypeID(nil, test.RandomBytes(32))
 		a := CreateFungibleTokenTypeAttributes{
 			Symbol:                   "AB",
 			Name:                     "Long name for AB",
@@ -239,15 +239,15 @@ func TestNewTypes(t *testing.T) {
 			TokenCreationPredicate:   wallet.Predicate(templates.AlwaysTrueBytes()),
 			InvariantPredicate:       wallet.Predicate(templates.AlwaysTrueBytes()),
 		}
-		result, err := tw.NewFungibleType(context.Background(), 1, a, typeId, nil)
+		result, err := tw.NewFungibleType(context.Background(), 1, a, typeID, nil)
 		require.NoError(t, err)
 		require.NotNil(t, result)
-		require.EqualValues(t, typeId, result.TokenTypeID)
-		tx, found := recTxs[string(typeId)]
+		require.EqualValues(t, typeID, result.TokenTypeID)
+		tx, found := recTxs[string(typeID)]
 		require.True(t, found)
 		newFungibleTx := &tokens.CreateFungibleTokenTypeAttributes{}
 		require.NoError(t, tx.UnmarshalAttributes(newFungibleTx))
-		require.Equal(t, typeId, tx.UnitID())
+		require.Equal(t, typeID, tx.UnitID())
 		require.Equal(t, a.Symbol, newFungibleTx.Symbol)
 		require.Equal(t, a.Name, newFungibleTx.Name)
 		require.Equal(t, a.Icon.Type, newFungibleTx.Icon.Type)
@@ -260,7 +260,7 @@ func TestNewTypes(t *testing.T) {
 			Symbol:                   "AB",
 			Name:                     "Long name for AB",
 			DecimalPlaces:            2,
-			ParentTypeId:             typeId,
+			ParentTypeId:             typeID,
 			SubTypeCreationPredicate: wallet.Predicate(templates.AlwaysFalseBytes()),
 			TokenCreationPredicate:   wallet.Predicate(templates.AlwaysTrueBytes()),
 			InvariantPredicate:       wallet.Predicate(templates.AlwaysTrueBytes()),
@@ -357,20 +357,20 @@ func TestMintFungibleToken(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			typeId := test.RandomBytes(33)
+			typeID := test.RandomBytes(33)
 			amount := uint64(100)
 			key, err := tw.am.GetAccountKey(tt.accNr - 1)
 			require.NoError(t, err)
-			result, err := tw.NewFungibleToken(context.Background(), tt.accNr, typeId, amount, bearerPredicateFromHash(key.PubKeyHash.Sha256), nil)
+			result, err := tw.NewFungibleToken(context.Background(), tt.accNr, typeID, amount, bearerPredicateFromHash(key.PubKeyHash.Sha256), nil)
 			require.NoError(t, err)
 			tx := recTxs[len(recTxs)-1]
 			newToken := &tokens.MintFungibleTokenAttributes{}
 			require.NotNil(t, result)
-			require.EqualValues(t, tx.UnitID(), result.TokenID)
+			require.EqualValues(t, tx.UnitID(), result.TokenTypeID)
+			require.Nil(t, result.TokenID)
 			require.NoError(t, tx.UnmarshalAttributes(newToken))
 			require.NotEqual(t, []byte{0}, tx.UnitID())
 			require.Len(t, tx.UnitID(), 33)
-			require.EqualValues(t, typeId, newToken.TypeID)
 			require.Equal(t, amount, newToken.Value)
 			require.EqualValues(t, templates.NewP2pkh256BytesFromKeyHash(key.PubKeyHash.Sha256), newToken.Bearer)
 		})
@@ -578,8 +578,8 @@ func TestMintNFT_InvalidInputs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			wallet := &Wallet{log: logger.New(t)}
-			got, err := wallet.NewNFT(context.Background(), accNr, tt.attrs, tokenID, nil)
+			w := &Wallet{log: logger.New(t)}
+			got, err := w.NewNFT(context.Background(), accNr, tt.attrs, tokenID, nil)
 			require.ErrorContains(t, err, tt.wantErrStr)
 			require.Nil(t, got)
 		})
@@ -610,12 +610,13 @@ func TestMintNFT(t *testing.T) {
 	tests := []struct {
 		name          string
 		accNr         uint64
-		tokenID       TokenID
+		typeID        TokenTypeID
 		validateOwner func(t *testing.T, accNr uint64, tok *tokens.MintNonFungibleTokenAttributes)
 	}{
 		{
-			name:  "pub key bearer predicate, account 1",
-			accNr: uint64(1),
+			name:   "pub key bearer predicate, account 1",
+			accNr:  uint64(1),
+			typeID: tokens.NewNonFungibleTokenTypeID(nil, test.RandomBytes(32)),
 			validateOwner: func(t *testing.T, accNr uint64, tok *tokens.MintNonFungibleTokenAttributes) {
 				key, err := tw.am.GetAccountKey(accNr - 1)
 				require.NoError(t, err)
@@ -623,9 +624,9 @@ func TestMintNFT(t *testing.T) {
 			},
 		},
 		{
-			name:    "pub key bearer predicate, account 1, predefined token ID",
-			accNr:   uint64(1),
-			tokenID: test.RandomBytes(33),
+			name:   "pub key bearer predicate, account 1, predefined token ID",
+			accNr:  uint64(1),
+			typeID: tokens.NewNonFungibleTokenTypeID(nil, test.RandomBytes(32)),
 			validateOwner: func(t *testing.T, accNr uint64, tok *tokens.MintNonFungibleTokenAttributes) {
 				key, err := tw.am.GetAccountKey(accNr - 1)
 				require.NoError(t, err)
@@ -633,8 +634,9 @@ func TestMintNFT(t *testing.T) {
 			},
 		},
 		{
-			name:  "pub key bearer predicate, account 2",
-			accNr: uint64(2),
+			name:   "pub key bearer predicate, account 2",
+			accNr:  uint64(2),
+			typeID: tokens.NewNonFungibleTokenTypeID(nil, test.RandomBytes(32)),
 			validateOwner: func(t *testing.T, accNr uint64, tok *tokens.MintNonFungibleTokenAttributes) {
 				key, err := tw.am.GetAccountKey(accNr - 1)
 				require.NoError(t, err)
@@ -647,27 +649,21 @@ func TestMintNFT(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			key, err := tw.am.GetAccountKey(tt.accNr - 1)
 			require.NoError(t, err)
-			typeId := []byte{1}
 			a := MintNonFungibleTokenAttributes{
 				Bearer:              bearerPredicateFromHash(key.PubKeyHash.Sha256),
-				NftType:             typeId,
 				Uri:                 "https://alphabill.org",
 				Data:                nil,
 				DataUpdatePredicate: wallet.Predicate(templates.AlwaysTrueBytes()),
 			}
-			result, err := tw.NewNFT(context.Background(), tt.accNr, a, tt.tokenID, nil)
+			result, err := tw.NewNFT(context.Background(), tt.accNr, a, tt.typeID, nil)
 			require.NoError(t, err)
 			tx := recTxs[len(recTxs)-1]
 			newToken := &tokens.MintNonFungibleTokenAttributes{}
 			require.NotNil(t, result)
-			require.EqualValues(t, tx.UnitID(), result.TokenID)
-			require.NoError(t, tx.UnmarshalAttributes(newToken))
-			require.NotEqual(t, []byte{0}, tx.UnitID())
 			require.Len(t, tx.UnitID(), 33)
-			if tt.tokenID != nil {
-				require.EqualValues(t, tt.tokenID, tx.UnitID())
-			}
-			require.EqualValues(t, typeId, newToken.NFTTypeID)
+			require.Equal(t, tx.UnitID(), result.TokenTypeID)
+			require.Equal(t, tx.UnitID(), tt.typeID)
+			require.NoError(t, tx.UnmarshalAttributes(newToken))
 			tt.validateOwner(t, tt.accNr, newToken)
 		})
 	}
@@ -774,7 +770,7 @@ func TestUpdateNFTData(t *testing.T) {
 		return newTransfer
 	}
 
-	tok := &TokenUnit{ID: test.RandomBytes(32), Kind: NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32), TxHash: test.RandomBytes(32)}
+	tok := &TokenUnit{ID: test.RandomBytes(32), Kind: NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32), Counter: 0}
 	tokenz[string(tok.ID)] = tok
 
 	// test data, backlink and predicate inputs are submitted correctly
@@ -787,7 +783,7 @@ func TestUpdateNFTData(t *testing.T) {
 
 	dataUpdate := parseNFTDataUpdate(t, tx)
 	require.Equal(t, data, dataUpdate.Data)
-	require.EqualValues(t, tok.TxHash, dataUpdate.Backlink)
+	require.Equal(t, tok.Counter, dataUpdate.Counter)
 	require.Equal(t, [][]byte{nil}, dataUpdate.DataUpdateSignatures)
 
 	// test that wallet not only sends the tx, but also reads it correctly
@@ -805,7 +801,7 @@ func TestUpdateNFTData(t *testing.T) {
 	require.Len(t, dataUpdate.DataUpdateSignatures[1], 103)
 
 	// test that locked token tx is not sent
-	lockedToken := &TokenUnit{ID: test.RandomBytes(32), Kind: NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32), TxHash: test.RandomBytes(32), Locked: 1}
+	lockedToken := &TokenUnit{ID: test.RandomBytes(32), Kind: NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32), Counter: 0, Locked: 1}
 	tokenz[string(tok.ID)] = lockedToken
 	result, err = tw.UpdateNFTData(context.Background(), 1, tok.ID, data2, []*PredicateInput{{Argument: nil}, {AccountNumber: 1}})
 	require.ErrorContains(t, err, "token is locked")

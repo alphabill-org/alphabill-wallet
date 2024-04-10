@@ -9,11 +9,11 @@ import (
 	"time"
 
 	abcrypto "github.com/alphabill-org/alphabill/crypto"
-	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/rpc"
 	"github.com/alphabill-org/alphabill/txsystem"
 	"github.com/alphabill-org/alphabill/txsystem/money"
+	"github.com/alphabill-org/alphabill/types"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/stretchr/testify/require"
 
@@ -203,11 +203,11 @@ func initRPCServer(t *testing.T, partitionNode *testpartition.PartitionNode) str
 	return listener.Addr().String()
 }
 
-func createSDRs() []*genesis.SystemDescriptionRecord {
-	return []*genesis.SystemDescriptionRecord{{
+func createSDRs() []*types.SystemDescriptionRecord {
+	return []*types.SystemDescriptionRecord{{
 		SystemIdentifier: money.DefaultSystemIdentifier,
 		T2Timeout:        2500,
-		FeeCreditBill: &genesis.FeeCreditBill{
+		FeeCreditBill: &types.FeeCreditBill{
 			UnitID:         money.NewBillID(nil, []byte{2}),
 			OwnerPredicate: templates.AlwaysTrueBytes(),
 		},
