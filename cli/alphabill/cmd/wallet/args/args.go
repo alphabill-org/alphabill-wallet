@@ -25,6 +25,7 @@ const (
 	ShowUnswappedCmdName    = "show-unswapped"
 	BillIdCmdName           = "bill-id"
 	SystemIdentifierCmdName = "system-identifier"
+	ReferenceNumber         = "reference-number"
 )
 
 func BuildRpcUrl(url string) string {

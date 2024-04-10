@@ -35,17 +35,19 @@ func TestSplitTransactionAmount(t *testing.T) {
 	}
 	amount := uint64(150)
 	timeout := uint64(100)
+	refNo := []byte("120543")
 	systemID := money.DefaultSystemIdentifier
 	remainingValue := b.Value() - amount
 
 	tx, err := NewSplitTx([]*money.TargetUnit{
 		{OwnerCondition: templates.NewP2pkh256BytesFromKeyHash(receiverPubKeyHash), Amount: amount},
-	}, remainingValue, keys.AccountKey, systemID, b, timeout, nil)
+	}, remainingValue, keys.AccountKey, systemID, b, timeout, nil, refNo)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 	require.EqualValues(t, systemID, tx.SystemID())
 	require.EqualValues(t, billID, tx.UnitID())
 	require.EqualValues(t, timeout, tx.Timeout())
+	require.Equal(t, refNo, tx.Payload.ClientMetadata.ReferenceNumber)
 	require.NotNil(t, tx.OwnerProof)
 
 	so := &money.SplitAttributes{}
@@ -62,6 +64,7 @@ func TestCreateTransactions(t *testing.T) {
 		name        string
 		bills       []*mtypes.Bill
 		amount      uint64
+		refNo       []byte
 		txCount     int
 		verify      func(t *testing.T, systemID types.SystemID, txs []*types.TransactionOrder)
 		expectedErr string
@@ -70,6 +73,7 @@ func TestCreateTransactions(t *testing.T) {
 			name:   "have more bills than target amount",
 			bills:  []*mtypes.Bill{createBill(5), createBill(3), createBill(1)},
 			amount: uint64(7),
+			refNo:  []byte("invoice 1"),
 			verify: func(t *testing.T, systemID types.SystemID, txs []*types.TransactionOrder) {
 				// verify tx count
 				require.Len(t, txs, 2)
@@ -81,7 +85,7 @@ func TestCreateTransactions(t *testing.T) {
 				err := tx.UnmarshalAttributes(transferAttr)
 				require.NoError(t, err)
 				require.EqualValues(t, 5, transferAttr.TargetValue)
-				require.NoError(t, err)
+				require.Equal(t, []byte("invoice 1"), tx.Payload.ClientMetadata.ReferenceNumber)
 
 				// verify second tx is split order of bill no2
 				tx = txs[1]
@@ -90,6 +94,7 @@ func TestCreateTransactions(t *testing.T) {
 				err = tx.UnmarshalAttributes(splitAttr)
 				require.NoError(t, err)
 				require.EqualValues(t, 2, splitAttr.TargetUnits[0].Amount)
+				require.Equal(t, []byte("invoice 1"), tx.Payload.ClientMetadata.ReferenceNumber)
 			},
 		},
 		{
@@ -123,6 +128,7 @@ func TestCreateTransactions(t *testing.T) {
 			name:   "have exactly one bill with equal target amount",
 			bills:  []*mtypes.Bill{createBill(5)},
 			amount: uint64(5),
+			refNo:  []byte{7, 7, 7},
 			verify: func(t *testing.T, systemID types.SystemID, txs []*types.TransactionOrder) {
 				// verify tx count
 				require.Len(t, txs, 1)
@@ -133,6 +139,7 @@ func TestCreateTransactions(t *testing.T) {
 				err := txs[0].UnmarshalAttributes(transferAttr)
 				require.NoError(t, err)
 				require.EqualValues(t, 5, transferAttr.TargetValue)
+				require.Equal(t, []byte{7, 7, 7}, txs[0].Payload.ClientMetadata.ReferenceNumber)
 			},
 		},
 	}
@@ -141,7 +148,7 @@ func TestCreateTransactions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			txs, err := CreateTransactions(receiverPubKey, tt.amount, systemID, tt.bills, accountKey.AccountKey, 100, nil)
+			txs, err := CreateTransactions(receiverPubKey, tt.amount, systemID, tt.bills, accountKey.AccountKey, 100, nil, tt.refNo)
 			if tt.expectedErr != "" {
 				require.ErrorContains(t, err, tt.expectedErr)
 			} else {

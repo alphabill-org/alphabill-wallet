@@ -2,21 +2,24 @@ package wallet
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
-	"github.com/alphabill-org/alphabill/logger"
-	"github.com/alphabill-org/alphabill/observability"
-	moneytx "github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/spf13/cobra"
 	"github.com/tyler-smith/go-bip39"
 	"go.opentelemetry.io/otel/attribute"
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/alphabill-org/alphabill/logger"
+	"github.com/alphabill-org/alphabill/observability"
+	moneytx "github.com/alphabill-org/alphabill/txsystem/money"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
@@ -144,6 +147,9 @@ func SendCmd(config *types.WalletConfig) *cobra.Command {
 		"amounts")
 	cmd.Flags().StringSliceP(args.AmountCmdName, "v", nil, "the amount(s) to send to the "+
 		"receiver(s), must match with addresses")
+	cmd.Flags().String(args.ReferenceNumber, "", `user defined "reference number" of the transfer, up to 32 bytes. Prefix the value with "0x" `+
+		"to pass hex encoded binary data, without it the value will be treated as (UTF-8 encoded) string and used as-is. "+
+		"If the command results in more than one transaction all of them use the same reference number")
 	cmd.Flags().StringP(args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "rpc node url")
 	cmd.Flags().Uint64P(args.KeyCmdName, "k", 1, "which key to use for sending the transaction")
 	// use string instead of boolean as boolean requires equals sign between name and value e.g. w=[true|false]
@@ -211,11 +217,15 @@ func ExecSendCmd(ctx context.Context, cmd *cobra.Command, config *types.WalletCo
 	if err != nil {
 		return err
 	}
-	receivers, err := GroupPubKeysAndAmounts(receiverPubKeys, receiverAmounts)
+	receivers, err := groupPubKeysAndAmounts(receiverPubKeys, receiverAmounts)
 	if err != nil {
 		return err
 	}
-	proofs, err := w.Send(ctx, money.SendCmd{Receivers: receivers, WaitForConfirmation: waitForConf, AccountIndex: accountNumber - 1})
+	refNumber, err := parseReferenceNumberArg(cmd)
+	if err != nil {
+		return err
+	}
+	proofs, err := w.Send(ctx, money.SendCmd{Receivers: receivers, WaitForConfirmation: waitForConf, AccountIndex: accountNumber - 1, ReferenceNumber: refNumber})
 	if err != nil {
 		return err
 	}
@@ -487,9 +497,9 @@ func InitWalletConfig(cmd *cobra.Command, config *types.WalletConfig) error {
 	return nil
 }
 
-func GroupPubKeysAndAmounts(pubKeys []string, amounts []string) ([]money.ReceiverData, error) {
+func groupPubKeysAndAmounts(pubKeys []string, amounts []string) ([]money.ReceiverData, error) {
 	if len(pubKeys) != len(amounts) {
-		return nil, fmt.Errorf("must specify the same amount of addresses and amounts")
+		return nil, fmt.Errorf("must specify the same amount of addresses and amounts (got %d vs %d)", len(pubKeys), len(amounts))
 	}
 	var receivers []money.ReceiverData
 	for i := 0; i < len(pubKeys); i++ {
@@ -507,4 +517,28 @@ func GroupPubKeysAndAmounts(pubKeys []string, amounts []string) ([]money.Receive
 		})
 	}
 	return receivers, nil
+}
+
+func parseReferenceNumberArg(cmd *cobra.Command) ([]byte, error) {
+	input, err := cmd.Flags().GetString(args.ReferenceNumber)
+	if err != nil {
+		return nil, fmt.Errorf("reading %q flag: %w", args.ReferenceNumber, err)
+	}
+
+	return parseReferenceNumber(input)
+}
+
+func parseReferenceNumber(input string) (ref []byte, err error) {
+	if strings.HasPrefix(input, "0x") {
+		if ref, err = hex.DecodeString(input[2:]); err != nil {
+			return nil, fmt.Errorf("decoding reference number from hex string to binary: %w", err)
+		}
+	} else {
+		ref = []byte(input)
+	}
+
+	if n := len(ref); n > 32 {
+		return nil, fmt.Errorf("maximum allowed length of the reference number is 32 bytes, argument is %d bytes", n)
+	}
+	return ref, nil
 }
