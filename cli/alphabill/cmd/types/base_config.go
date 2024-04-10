@@ -75,7 +75,7 @@ func (c *BaseConfiguration) AddConfigurationFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().StringVar(&c.HomeDir, keyHome, "", fmt.Sprintf("set the AB_HOME for this invocation (default is %s)", alphabillHomeDir()))
 	cmd.PersistentFlags().StringVar(&c.CfgFile, keyConfig, "", fmt.Sprintf("config file URL (default is $AB_HOME/%s)", defaultConfigFile))
 	cmd.PersistentFlags().StringVar(&c.Metrics, keyMetrics, "", "metrics exporter, disabled when not set. One of: stdout, prometheus")
-	cmd.PersistentFlags().StringVar(&c.Tracing, keyTracing, "", "traces exporter, disabled when not set. One of: stdout, otlptracehttp, otlptracegrpc, zipkin")
+	cmd.PersistentFlags().StringVar(&c.Tracing, keyTracing, "", "traces exporter, disabled when not set. One of: stdout, otlptracehttp, zipkin")
 	cmd.PersistentFlags().StringVar(&c.LogCfgFile, flagNameLoggerCfgFile, defaultLoggerConfigFile, "logger config file URL. Considered absolute if starts with '/'. Otherwise relative from $AB_HOME.")
 	// do not set default values for these flags as then we can easily determine whether to load the value from cfg file or not
 	cmd.PersistentFlags().String(flagNameLogOutputFile, "", "log file path or one of the special values: stdout, stderr, discard")

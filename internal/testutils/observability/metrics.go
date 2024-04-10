@@ -15,7 +15,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/exporters/zipkin"
@@ -121,8 +120,6 @@ func newTraceProvider(exporter string, res *resource.Resource) (*sdktrace.Tracer
 		exp, err = stdouttrace.New()
 	case "otlptracehttp":
 		exp, err = otlptracehttp.New(context.Background(), otlptracehttp.WithInsecure())
-	case "otlptracegrpc":
-		exp, err = otlptracegrpc.New(context.Background(), otlptracegrpc.WithInsecure())
 	case "zipkin":
 		exp, err = zipkin.New("")
 	default:
