@@ -45,14 +45,14 @@ To enable trace exporter for test the `AB_TEST_TRACER` environment variable has 
 to desired exporter name, ie
 
 ```sh
-AB_TEST_TRACER=otlptracegrpc go test ./...
+AB_TEST_TRACER=otlptracehttp go test ./...
 ```
 
 The test tracing will pick up the same OTEL environment variables linked above except that
 some parameters are already "hardcoded":
 
 - "always_on" sampler is used (`OTEL_TRACES_SAMPLER`);
-- the `otlptracehttp` and `otlptracegrpc` exporters are created with "insecure client transport"
+- the `otlptracehttp` exporter is created with "insecure client transport"
   (`OTEL_EXPORTER_OTLP_INSECURE`);
 
 ## Tracing wallet commands

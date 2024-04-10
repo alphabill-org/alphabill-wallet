@@ -75,7 +75,6 @@ type PartitionNode struct {
 	genesis      *genesis.PartitionNode
 	EventHandler *testevent.TestEventHandler
 	confOpts     []partition.NodeOption
-	AddrGRPC     string
 	AddrRPC      string
 	proofDB      keyvaluedb.KeyValueDB
 	OwnerIndexer *partition.OwnerIndexer
