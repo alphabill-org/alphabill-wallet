@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	abcrypto "github.com/alphabill-org/alphabill/crypto"
-	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/state"
 	"github.com/alphabill-org/alphabill/txsystem/money"
@@ -21,13 +20,13 @@ type MoneyGenesisConfig struct {
 	InitialBillValue   uint64
 	InitialBillOwner   types.PredicateBytes
 	DCMoneySupplyValue uint64
-	SDRs               []*genesis.SystemDescriptionRecord
+	SDRs               []*types.SystemDescriptionRecord
 }
 
-var defaultMoneySDR = &genesis.SystemDescriptionRecord{
+var defaultMoneySDR = &types.SystemDescriptionRecord{
 	SystemIdentifier: money.DefaultSystemIdentifier,
 	T2Timeout:        2500,
-	FeeCreditBill: &genesis.FeeCreditBill{
+	FeeCreditBill: &types.FeeCreditBill{
 		UnitID:         money.NewBillID(nil, []byte{2}),
 		OwnerPredicate: templates.AlwaysTrueBytes(),
 	},

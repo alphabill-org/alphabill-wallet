@@ -39,7 +39,7 @@ const (
 	cmdFlagTokenDataUpdateClauseInput = "data-update-input"
 	cmdFlagAmount                     = "amount"
 	cmdFlagType                       = "type"
-	cmdFlagTokenId                    = "token-identifier"
+	cmdFlagTokenID                    = "token-identifier"
 	cmdFlagTokenURI                   = "token-uri"
 	cmdFlagTokenData                  = "data"
 	cmdFlagTokenDataFile              = "data-file"
@@ -399,8 +399,6 @@ func tokenCmdNewTokenNonFungible(config *types.WalletConfig) *cobra.Command {
 	cmd.Flags().String(cmdFlagTokenURI, "", "URI to associated resource, ie. jpg file on IPFS")
 	cmd.Flags().String(cmdFlagTokenDataUpdateClause, predicateTrue, "data update predicate, values <true|false|ptpkh>")
 	cmd.Flags().StringSlice(cmdFlagMintClauseInput, []string{predicatePtpkh}, "input to satisfy the type's minting clause")
-	setHexFlag(cmd, cmdFlagTokenId, nil, "token identifier")
-	_ = cmd.Flags().MarkHidden(cmdFlagTokenId)
 	return cmd
 }
 
@@ -409,11 +407,7 @@ func execTokenCmdNewTokenNonFungible(cmd *cobra.Command, config *types.WalletCon
 	if err != nil {
 		return err
 	}
-	typeId, err := getHexFlag(cmd, cmdFlagType)
-	if err != nil {
-		return err
-	}
-	tokenID, err := getHexFlag(cmd, cmdFlagTokenId)
+	typeID, err := getHexFlag(cmd, cmdFlagType)
 	if err != nil {
 		return err
 	}
@@ -448,18 +442,17 @@ func execTokenCmdNewTokenNonFungible(cmd *cobra.Command, config *types.WalletCon
 		return err
 	}
 	a := tokenswallet.MintNonFungibleTokenAttributes{
-		Bearer:              bearerPredicate,
 		Name:                name,
-		NftType:             typeId,
 		Uri:                 uri,
 		Data:                data,
+		Bearer:              bearerPredicate,
 		DataUpdatePredicate: dataUpdatePredicate,
+		Nonce:               0,
 	}
-	result, err := tw.NewNFT(cmd.Context(), accountNumber, a, tokenID, ci)
+	result, err := tw.NewNFT(cmd.Context(), accountNumber, a, typeID, ci)
 	if err != nil {
 		return err
 	}
-
 	config.Base.ConsoleWriter.Println(fmt.Sprintf("Sent request for new non-fungible token with id=%s", result.TokenID))
 	if result.FeeSum > 0 {
 		config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for transaction(s).", util.AmountToString(result.FeeSum, 8)))
@@ -586,8 +579,8 @@ func tokenCmdSendNonFungible(config *types.WalletConfig) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringSlice(cmdFlagInheritBearerClauseInput, []string{predicateTrue}, "input to satisfy the type's invariant clause")
-	setHexFlag(cmd, cmdFlagTokenId, nil, "token identifier")
-	err := cmd.MarkFlagRequired(cmdFlagTokenId)
+	setHexFlag(cmd, cmdFlagTokenID, nil, "token identifier")
+	err := cmd.MarkFlagRequired(cmdFlagTokenID)
 	if err != nil {
 		return nil
 	}
@@ -610,7 +603,7 @@ func execTokenCmdSendNonFungible(cmd *cobra.Command, config *types.WalletConfig)
 	}
 	defer tw.Shutdown()
 
-	tokenID, err := getHexFlag(cmd, cmdFlagTokenId)
+	tokenID, err := getHexFlag(cmd, cmdFlagTokenID)
 	if err != nil {
 		return err
 	}
@@ -703,8 +696,8 @@ func tokenCmdUpdateNFTData(config *types.WalletConfig) *cobra.Command {
 			return execTokenCmdUpdateNFTData(cmd, config)
 		},
 	}
-	setHexFlag(cmd, cmdFlagTokenId, nil, "token identifier")
-	if err := cmd.MarkFlagRequired(cmdFlagTokenId); err != nil {
+	setHexFlag(cmd, cmdFlagTokenID, nil, "token identifier")
+	if err := cmd.MarkFlagRequired(cmdFlagTokenID); err != nil {
 		panic(err)
 	}
 
@@ -719,7 +712,7 @@ func execTokenCmdUpdateNFTData(cmd *cobra.Command, config *types.WalletConfig) e
 		return err
 	}
 
-	tokenID, err := getHexFlag(cmd, cmdFlagTokenId)
+	tokenID, err := getHexFlag(cmd, cmdFlagTokenID)
 	if err != nil {
 		return err
 	}
@@ -955,8 +948,8 @@ func tokenCmdLock(config *types.WalletConfig) *cobra.Command {
 			return execTokenCmdLock(cmd, config)
 		},
 	}
-	setHexFlag(cmd, cmdFlagTokenId, nil, "token identifier")
-	if err := cmd.MarkFlagRequired(cmdFlagTokenId); err != nil {
+	setHexFlag(cmd, cmdFlagTokenID, nil, "token identifier")
+	if err := cmd.MarkFlagRequired(cmdFlagTokenID); err != nil {
 		panic(err)
 	}
 	cmd.Flags().StringSlice(cmdFlagInheritBearerClauseInput, []string{predicateTrue}, "input to satisfy the type's invariant clause")
@@ -968,7 +961,7 @@ func execTokenCmdLock(cmd *cobra.Command, config *types.WalletConfig) error {
 	if err != nil {
 		return err
 	}
-	tokenID, err := getHexFlag(cmd, cmdFlagTokenId)
+	tokenID, err := getHexFlag(cmd, cmdFlagTokenID)
 	if err != nil {
 		return err
 	}
@@ -1002,8 +995,8 @@ func tokenCmdUnlock(config *types.WalletConfig) *cobra.Command {
 			return execTokenCmdUnlock(cmd, config)
 		},
 	}
-	setHexFlag(cmd, cmdFlagTokenId, nil, "token identifier")
-	if err := cmd.MarkFlagRequired(cmdFlagTokenId); err != nil {
+	setHexFlag(cmd, cmdFlagTokenID, nil, "token identifier")
+	if err := cmd.MarkFlagRequired(cmdFlagTokenID); err != nil {
 		panic(err)
 	}
 	cmd.Flags().StringSlice(cmdFlagInheritBearerClauseInput, []string{predicateTrue}, "input to satisfy the type's invariant clause")
@@ -1015,7 +1008,7 @@ func execTokenCmdUnlock(cmd *cobra.Command, config *types.WalletConfig) error {
 	if err != nil {
 		return err
 	}
-	tokenID, err := getHexFlag(cmd, cmdFlagTokenId)
+	tokenID, err := getHexFlag(cmd, cmdFlagTokenID)
 	if err != nil {
 		return err
 	}
