@@ -16,6 +16,7 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	"github.com/alphabill-org/alphabill-wallet/client/rpc/mocksrv"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
+	moneywallet "github.com/alphabill-org/alphabill-wallet/wallet/money"
 )
 
 func TestWalletCreateCmd(t *testing.T) {
@@ -195,4 +196,92 @@ func execCommand(obsF Factory, homeDir, command string) (*testutils.TestConsoleW
 	wcmd := NewWalletCmd(&types.BaseConfiguration{HomeDir: homeDir, ConsoleWriter: outputWriter, LogCfgFile: "logger-config.yaml"}, obsF)
 	wcmd.SetArgs(strings.Split(command, " "))
 	return outputWriter, wcmd.Execute()
+}
+
+func Test_groupPubKeysAndAmounts(t *testing.T) {
+	t.Run("count of keys and amounts do not match", func(t *testing.T) {
+		data, err := groupPubKeysAndAmounts(nil, []string{"1"})
+		require.EqualError(t, err, `must specify the same amount of addresses and amounts (got 0 vs 1)`)
+		require.Empty(t, data)
+
+		data, err = groupPubKeysAndAmounts([]string{}, []string{"1"})
+		require.EqualError(t, err, `must specify the same amount of addresses and amounts (got 0 vs 1)`)
+		require.Empty(t, data)
+
+		data, err = groupPubKeysAndAmounts([]string{"key"}, []string{"1", "2"})
+		require.EqualError(t, err, `must specify the same amount of addresses and amounts (got 1 vs 2)`)
+		require.Empty(t, data)
+
+		data, err = groupPubKeysAndAmounts([]string{"key"}, nil)
+		require.EqualError(t, err, `must specify the same amount of addresses and amounts (got 1 vs 0)`)
+		require.Empty(t, data)
+
+		data, err = groupPubKeysAndAmounts([]string{"key"}, []string{})
+		require.EqualError(t, err, `must specify the same amount of addresses and amounts (got 1 vs 0)`)
+		require.Empty(t, data)
+
+		data, err = groupPubKeysAndAmounts([]string{"key1", "key2"}, []string{"1"})
+		require.EqualError(t, err, `must specify the same amount of addresses and amounts (got 2 vs 1)`)
+		require.Empty(t, data)
+	})
+
+	t.Run("single address and amount", func(t *testing.T) {
+		data, err := groupPubKeysAndAmounts([]string{"0x01"}, []string{"1"})
+		require.NoError(t, err)
+		require.Equal(t, []moneywallet.ReceiverData{{PubKey: []byte{1}, Amount: 100000000}}, data)
+	})
+
+	t.Run("address and amount pair", func(t *testing.T) {
+		data, err := groupPubKeysAndAmounts([]string{"0x01", "0x02"}, []string{"1", "2"})
+		require.NoError(t, err)
+		require.Equal(t, []moneywallet.ReceiverData{
+			{PubKey: []byte{1}, Amount: 100000000},
+			{PubKey: []byte{2}, Amount: 200000000},
+		}, data)
+	})
+}
+
+func Test_parseRefNumbers(t *testing.T) {
+	t.Run("empty input", func(t *testing.T) {
+		ref, err := parseReferenceNumber("")
+		require.NoError(t, err)
+		require.Empty(t, ref)
+	})
+
+	t.Run("string too long", func(t *testing.T) {
+		ref, err := parseReferenceNumber(strings.Repeat("A", 33))
+		require.EqualError(t, err, `maximum allowed length of the reference number is 32 bytes, argument is 33 bytes`)
+		require.Empty(t, ref)
+
+		// utf-8, single character might require multiple bytes!
+		ref, err = parseReferenceNumber(strings.Repeat("A", 31) + "Ö")
+		require.EqualError(t, err, `maximum allowed length of the reference number is 32 bytes, argument is 33 bytes`)
+		require.Empty(t, ref)
+	})
+
+	t.Run("bytes too long", func(t *testing.T) {
+		ref, err := parseReferenceNumber("0x" + strings.Repeat("0", 66))
+		require.EqualError(t, err, `maximum allowed length of the reference number is 32 bytes, argument is 33 bytes`)
+		require.Empty(t, ref)
+	})
+
+	t.Run("invalid hex encoding", func(t *testing.T) {
+		ref, err := parseReferenceNumber("0xInvalid")
+		require.EqualError(t, err, `decoding reference number from hex string to binary: encoding/hex: invalid byte: U+0049 'I'`)
+		require.Empty(t, ref)
+
+		ref, err = parseReferenceNumber("0x123")
+		require.EqualError(t, err, `decoding reference number from hex string to binary: encoding/hex: odd length hex string`)
+		require.Empty(t, ref)
+	})
+
+	t.Run("valid inputs", func(t *testing.T) {
+		ref, err := parseReferenceNumber("Ref Number")
+		require.NoError(t, err)
+		require.Equal(t, []byte("Ref Number"), ref)
+
+		ref, err = parseReferenceNumber("0xAABBCC")
+		require.NoError(t, err)
+		require.Equal(t, []byte{0xAA, 0xBB, 0xCC}, ref)
+	})
 }

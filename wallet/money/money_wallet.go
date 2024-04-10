@@ -53,6 +53,7 @@ type (
 		Receivers           []ReceiverData
 		WaitForConfirmation bool
 		AccountIndex        uint64
+		ReferenceNumber     []byte
 	}
 
 	ReceiverData struct {
@@ -230,14 +231,14 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*wallet.Proof, error)
 			})
 		}
 		remainingValue := largestBill.Value() - totalAmount
-		tx, err := tx_builder.NewSplitTx(targetUnits, remainingValue, k, w.SystemID(), largestBill, timeout, fcb.ID)
+		tx, err := tx_builder.NewSplitTx(targetUnits, remainingValue, k, w.SystemID(), largestBill, timeout, fcb.ID, cmd.ReferenceNumber)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create N-way split tx: %w", err)
 		}
 		txs = append(txs, tx)
 	} else {
 		// if single receiver then perform up to N transfers (until target amount is reached)
-		txs, err = tx_builder.CreateTransactions(cmd.Receivers[0].PubKey, cmd.Receivers[0].Amount, w.SystemID(), bills, k, timeout, fcb.ID)
+		txs, err = tx_builder.CreateTransactions(cmd.Receivers[0].PubKey, cmd.Receivers[0].Amount, w.SystemID(), bills, k, timeout, fcb.ID, cmd.ReferenceNumber)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create transactions: %w", err)
 		}
