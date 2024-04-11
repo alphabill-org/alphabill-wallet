@@ -8,14 +8,15 @@ import (
 	"testing"
 	"time"
 
+	ethrpc "github.com/ethereum/go-ethereum/rpc"
+	"github.com/stretchr/testify/require"
+
 	abcrypto "github.com/alphabill-org/alphabill/crypto"
 	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/rpc"
 	"github.com/alphabill-org/alphabill/txsystem"
 	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/types"
-	ethrpc "github.com/ethereum/go-ethereum/rpc"
-	"github.com/stretchr/testify/require"
 
 	rpcclient "github.com/alphabill-org/alphabill-wallet/client/rpc"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
@@ -92,7 +93,7 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 	// transfer initial bill to wallet 1
 	transferInitialBillTx, err := testutil.CreateInitialBillTransferTx(accKey, genesisConfig.InitialBillID, fcrID, initialBillValue, 10000, initialBillCounter)
 	require.NoError(t, err)
-	batch := txsubmitter.NewBatch(accKey.PubKey, w.rpcClient, observe.Logger())
+	batch := txsubmitter.NewBatch(w.rpcClient, observe.Logger())
 	batch.Add(&txsubmitter.TxSubmission{
 		UnitID:      transferInitialBillTx.UnitID(),
 		TxHash:      transferInitialBillTx.Hash(crypto.SHA256),

@@ -14,7 +14,7 @@ import (
 
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 )
 
@@ -67,7 +67,7 @@ func (w *Wallet) newType(ctx context.Context, accNr uint64, payloadType string, 
 	if err != nil {
 		return nil, err
 	}
-	err = sub.ToBatch(w.rpcClient, acc.PubKey, w.log).SendTx(ctx, w.confirmTx)
+	err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +118,7 @@ func (w *Wallet) newToken(ctx context.Context, accNr uint64, payloadType string,
 	if err != nil {
 		return nil, err
 	}
-	err = sub.ToBatch(w.rpcClient, key.PubKey, w.log).SendTx(ctx, w.confirmTx)
+	err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
 	if err != nil {
 		return nil, err
 	}
@@ -284,7 +284,7 @@ func (w *Wallet) doSendMultiple(ctx context.Context, amount uint64, tokens []*To
 		return tokens[i].Amount > tokens[j].Amount
 	})
 
-	batch := txsubmitter.NewBatch(acc.PubKey, w.rpcClient, w.log)
+	batch := txsubmitter.NewBatch(w.rpcClient, w.log)
 	rnFetcher := &cachingRoundNumberFetcher{delegate: w.GetRoundNumber}
 
 	for _, t := range tokens {
@@ -342,7 +342,7 @@ func createTx(systemID types.SystemID, payloadType string, unitId []byte, timeou
 			UnitID:   unitId,
 			ClientMetadata: &types.ClientMetadata{
 				Timeout:           timeout,
-				MaxTransactionFee: tx_builder.MaxFee,
+				MaxTransactionFee: txbuilder.MaxFee,
 				FeeCreditRecordID: fcrID,
 			},
 		},

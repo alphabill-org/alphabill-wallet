@@ -9,7 +9,7 @@ import (
 	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
-	txbuilder "github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
 )
 
 func AddFeeCredit(t *testing.T, amount uint64, systemID types.SystemID, accountKey *account.AccountKey, unitID []byte, unitCounter uint64, fcrID, fcrBacklink []byte, node *testpartition.NodePartition) {

@@ -18,7 +18,7 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
 )
 
 const (
@@ -339,7 +339,7 @@ func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID 
 	if err != nil {
 		return nil, err
 	}
-	err = sub.ToBatch(w.rpcClient, key.PubKey, w.log).SendTx(ctx, w.confirmTx)
+	err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
 	if sub.Confirmed() {
 		return &SubmissionResult{FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee}, err
 	}
@@ -409,7 +409,7 @@ func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId 
 		if err != nil {
 			return nil, err
 		}
-		if err = sub.ToBatch(w.rpcClient, acc.PubKey, w.log).SendTx(ctx, w.confirmTx); err != nil {
+		if err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx); err != nil {
 			return nil, err
 		}
 		if sub.Confirmed() {
@@ -462,7 +462,7 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 	if err != nil {
 		return nil, err
 	}
-	err = sub.ToBatch(w.rpcClient, acc.PubKey, w.log).SendTx(ctx, w.confirmTx)
+	err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
 	if sub.Confirmed() {
 		return &SubmissionResult{FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee}, err
 	}
@@ -509,7 +509,7 @@ func (w *Wallet) ensureFeeCredit(ctx context.Context, accountKey *account.Accoun
 	if fcb == nil {
 		return ErrNoFeeCredit
 	}
-	maxFee := uint64(txCount) * tx_builder.MaxFee
+	maxFee := uint64(txCount) * txbuilder.MaxFee
 	if fcb.Balance() < maxFee {
 		return ErrInsufficientFeeCredit
 	}
@@ -546,7 +546,7 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID []
 	if err != nil {
 		return nil, err
 	}
-	err = sub.ToBatch(w.rpcClient, key.PubKey, w.log).SendTx(ctx, w.confirmTx)
+	err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
 	if sub.Confirmed() {
 		return &SubmissionResult{FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee}, err
 	}
@@ -582,7 +582,7 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	if err != nil {
 		return nil, err
 	}
-	err = sub.ToBatch(w.rpcClient, key.PubKey, w.log).SendTx(ctx, w.confirmTx)
+	err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
 	if sub.Confirmed() {
 		return &SubmissionResult{FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee}, err
 	}

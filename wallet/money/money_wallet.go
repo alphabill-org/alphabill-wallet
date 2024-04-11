@@ -20,7 +20,8 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/dc"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
+	"github.com/alphabill-org/alphabill-wallet/wallet/txpublisher"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 )
 
@@ -34,7 +35,7 @@ type (
 		am            account.Manager
 		rpcClient     RpcClient
 		feeManager    *fees.FeeManager
-		TxPublisher   *TxPublisher
+		txPublisher   *txpublisher.TxPublisher
 		dustCollector *dc.DustCollector
 		log           *slog.Logger
 	}
@@ -84,13 +85,13 @@ func CreateNewWallet(am account.Manager, mnemonic string) error {
 
 func LoadExistingWallet(am account.Manager, feeManagerDB fees.FeeManagerDB, rpcClient RpcClient, log *slog.Logger) (*Wallet, error) {
 	moneySystemID := money.DefaultSystemIdentifier
-	moneyTxPublisher := NewTxPublisher(rpcClient, log)
+	moneyTxPublisher := txpublisher.NewTxPublisher(rpcClient, log)
 	feeManager := fees.NewFeeManager(am, feeManagerDB, moneySystemID, rpcClient, FeeCreditRecordIDFormPublicKey, moneySystemID, rpcClient, FeeCreditRecordIDFormPublicKey, log)
 	dustCollector := dc.NewDustCollector(moneySystemID, maxBillsForDustCollection, txTimeoutBlockCount, rpcClient, log)
 	return &Wallet{
 		am:            am,
 		rpcClient:     rpcClient,
-		TxPublisher:   moneyTxPublisher,
+		txPublisher:   moneyTxPublisher,
 		feeManager:    feeManager,
 		dustCollector: dustCollector,
 		log:           log,
@@ -204,7 +205,7 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*wallet.Proof, error)
 		return nil, errors.New("insufficient balance for transaction")
 	}
 	timeout := roundNumber + txTimeoutBlockCount
-	batch := txsubmitter.NewBatch(k.PubKey, w.rpcClient, w.log)
+	batch := txsubmitter.NewBatch(w.rpcClient, w.log)
 
 	var txs []*types.TransactionOrder
 	if len(cmd.Receivers) > 1 {
@@ -231,14 +232,14 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*wallet.Proof, error)
 			})
 		}
 		remainingValue := largestBill.Value() - totalAmount
-		tx, err := tx_builder.NewSplitTx(targetUnits, remainingValue, k, w.SystemID(), largestBill, timeout, fcb.ID, cmd.ReferenceNumber)
+		tx, err := txbuilder.NewSplitTx(targetUnits, remainingValue, k, w.SystemID(), largestBill, timeout, fcb.ID, cmd.ReferenceNumber)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create N-way split tx: %w", err)
 		}
 		txs = append(txs, tx)
 	} else {
 		// if single receiver then perform up to N transfers (until target amount is reached)
-		txs, err = tx_builder.CreateTransactions(cmd.Receivers[0].PubKey, cmd.Receivers[0].Amount, w.SystemID(), bills, k, timeout, fcb.ID, cmd.ReferenceNumber)
+		txs, err = txbuilder.CreateTransactions(cmd.Receivers[0].PubKey, cmd.Receivers[0].Amount, w.SystemID(), bills, k, timeout, fcb.ID, cmd.ReferenceNumber)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create transactions: %w", err)
 		}
@@ -252,7 +253,7 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*wallet.Proof, error)
 		})
 	}
 
-	txsCost := tx_builder.MaxFee * uint64(len(batch.Submissions()))
+	txsCost := txbuilder.MaxFee * uint64(len(batch.Submissions()))
 	if fcb.Balance() < txsCost {
 		return nil, errors.New("insufficient fee credit balance for transaction(s)")
 	}
@@ -269,8 +270,8 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*wallet.Proof, error)
 }
 
 // SendTx sends tx and waits for confirmation, returns tx proof
-func (w *Wallet) SendTx(ctx context.Context, tx *types.TransactionOrder, senderPubKey []byte) (*wallet.Proof, error) {
-	return w.TxPublisher.SendTx(ctx, tx, senderPubKey)
+func (w *Wallet) SendTx(ctx context.Context, tx *types.TransactionOrder) (*wallet.Proof, error) {
+	return w.txPublisher.SendTx(ctx, tx)
 }
 
 // AddFeeCredit creates fee credit for the given amount.
