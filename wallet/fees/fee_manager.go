@@ -16,8 +16,8 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
-	txbuilder "github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
-	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
+	"github.com/alphabill-org/alphabill-wallet/wallet/txpublisher"
 )
 
 const (
@@ -318,7 +318,7 @@ func (w *FeeManager) LockFeeCredit(ctx context.Context, cmd LockFeeCreditCmd) (*
 	if err != nil {
 		return nil, fmt.Errorf("failed to create lockFC transaction: %w", err)
 	}
-	proof, err := sendTx(ctx, tx, accountKey.PubKey, w.targetPartitionClient, w.log)
+	proof, err := sendTx(ctx, tx, w.targetPartitionClient, w.log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send lockFC transaction: %w", err)
 	}
@@ -350,7 +350,7 @@ func (w *FeeManager) UnlockFeeCredit(ctx context.Context, cmd UnlockFeeCreditCmd
 	if err != nil {
 		return nil, fmt.Errorf("failed to create unlockFC transaction: %w", err)
 	}
-	proof, err := sendTx(ctx, tx, accountKey.PubKey, w.targetPartitionClient, w.log)
+	proof, err := sendTx(ctx, tx, w.targetPartitionClient, w.log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send unlockFC transaction: %w", err)
 	}
@@ -520,7 +520,7 @@ func (w *FeeManager) sendLockFCTx(ctx context.Context, accountKey *account.Accou
 	}
 
 	// send lockFC transaction
-	proof, err := sendTx(ctx, tx, accountKey.PubKey, w.targetPartitionClient, w.log)
+	proof, err := sendTx(ctx, tx, w.targetPartitionClient, w.log)
 	if err != nil {
 		return fmt.Errorf("failed to send lockFC transaction: %w", err)
 	}
@@ -621,7 +621,7 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 	}
 
 	// send transferFC transaction to money partition
-	proof, err := sendTx(ctx, tx, accountKey.PubKey, w.moneyClient, w.log)
+	proof, err := sendTx(ctx, tx, w.moneyClient, w.log)
 	if err != nil {
 		return fmt.Errorf("failed to send transferFC transaction: %w", err)
 	}
@@ -700,7 +700,7 @@ func (w *FeeManager) sendAddFCTx(ctx context.Context, accountKey *account.Accoun
 
 	// send addFC transaction
 	w.log.InfoContext(ctx, "sending add fee credit transaction")
-	proof, err := sendTx(ctx, addFCTx, accountKey.PubKey, w.targetPartitionClient, w.log)
+	proof, err := sendTx(ctx, addFCTx, w.targetPartitionClient, w.log)
 	if err != nil {
 		return fmt.Errorf("failed to send addFC transaction: %w", err)
 	}
@@ -840,7 +840,7 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 
 	// send lock transaction
 	w.log.InfoContext(ctx, "sending lock transaction")
-	proof, err := sendTx(ctx, tx, accountKey.PubKey, w.moneyClient, w.log)
+	proof, err := sendTx(ctx, tx, w.moneyClient, w.log)
 	if err != nil {
 		return fmt.Errorf("failed to send lock transaction: %w", err)
 	}
@@ -904,7 +904,7 @@ func (w *FeeManager) sendCloseFCTx(ctx context.Context, accountKey *account.Acco
 
 	// send closeFC transaction to target partition
 	w.log.InfoContext(ctx, "sending close fee credit transaction")
-	proof, err := sendTx(ctx, tx, accountKey.PubKey, w.targetPartitionClient, w.log)
+	proof, err := sendTx(ctx, tx, w.targetPartitionClient, w.log)
 	if err != nil {
 		return fmt.Errorf("failed to send closeFC transaction: %w", err)
 	}
@@ -975,7 +975,7 @@ func (w *FeeManager) sendReclaimFCTx(ctx context.Context, accountKey *account.Ac
 
 	// send reclaimFC transaction
 	w.log.InfoContext(ctx, "sending reclaim fee credit transaction")
-	proof, err := sendTx(ctx, reclaimFC, accountKey.PubKey, w.moneyClient, w.log)
+	proof, err := sendTx(ctx, reclaimFC, w.moneyClient, w.log)
 	if err != nil {
 		return fmt.Errorf("failed to send reclaimFC transaction: %w", err)
 	}
@@ -1050,7 +1050,7 @@ func (w *FeeManager) unlockFeeCreditRecord(ctx context.Context, accountKey *acco
 	if err != nil {
 		return nil, fmt.Errorf("failed to create unlockFC transaction: %w", err)
 	}
-	proof, err := sendTx(ctx, tx, accountKey.PubKey, w.targetPartitionClient, w.log)
+	proof, err := sendTx(ctx, tx, w.targetPartitionClient, w.log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send unlockFC tx: %w", err)
 	}
@@ -1073,7 +1073,7 @@ func (w *FeeManager) unlockBill(ctx context.Context, accountKey *account.Account
 				if err != nil {
 					return nil, fmt.Errorf("failed to create unlock tx: %w", err)
 				}
-				proof, err := sendTx(ctx, unlockTx, accountKey.PubKey, w.moneyClient, w.log)
+				proof, err := sendTx(ctx, unlockTx, w.moneyClient, w.log)
 				if err != nil {
 					return nil, fmt.Errorf("failed to send unlock tx: %w", err)
 				}
@@ -1106,16 +1106,6 @@ func (p *ReclaimFeeTxProofs) GetFees() uint64 {
 	return p.Lock.GetActualFee() + p.CloseFC.GetActualFee() + p.ReclaimFC.GetActualFee()
 }
 
-func sendTx(ctx context.Context, tx *types.TransactionOrder, senderPubKey wallet.PubKey, c RpcClient, log *slog.Logger) (*wallet.Proof, error) {
-	batch := txsubmitter.NewBatch(senderPubKey, c, log)
-	txSubmission := &txsubmitter.TxSubmission{
-		UnitID:      tx.UnitID(),
-		TxHash:      tx.Hash(crypto.SHA256),
-		Transaction: tx,
-	}
-	batch.Add(txSubmission)
-	if err := batch.SendTx(ctx, true); err != nil {
-		return nil, err
-	}
-	return txSubmission.Proof, nil
+func sendTx(ctx context.Context, tx *types.TransactionOrder, c RpcClient, log *slog.Logger) (*wallet.Proof, error) {
+	return txpublisher.NewTxPublisher(c, log).SendTx(ctx, tx)
 }

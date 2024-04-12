@@ -27,6 +27,7 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/bills"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/evm"
 	clifees "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/fees"
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/orchestration"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/tokens"
 	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	"github.com/alphabill-org/alphabill-wallet/util"
@@ -74,6 +75,7 @@ func NewWalletCmd(baseConfig *types.BaseConfiguration, obsF Factory) *cobra.Comm
 	walletCmd.AddCommand(AddKeyCmd(config))
 	walletCmd.AddCommand(tokens.NewTokenCmd(config))
 	walletCmd.AddCommand(evm.NewEvmCmd(config))
+	walletCmd.AddCommand(orchestration.NewCmd(config))
 	// add passwords flags for (encrypted)wallet
 	//walletCmd.PersistentFlags().BoolP(passwordPromptCmdName, "p", false, passwordPromptUsage)
 	//walletCmd.PersistentFlags().String(passwordArgCmdName, "", passwordArgUsage)

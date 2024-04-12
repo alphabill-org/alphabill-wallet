@@ -141,14 +141,14 @@ func (w *Wallet) joinTokenForDC(ctx context.Context, acc *account.AccountKey, bu
 	if err != nil {
 		return 0, err
 	}
-	if err = sub.ToBatch(w.rpcClient, acc.PubKey, w.log).SendTx(ctx, true); err != nil {
+	if err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, true); err != nil {
 		return 0, err
 	}
 	return sub.Proof.TxRecord.ServerMetadata.ActualFee, nil
 }
 
 func (w *Wallet) burnTokensForDC(ctx context.Context, acc *account.AccountKey, tokensToBurn []*TokenUnit, targetTokenCounter uint64, targetTokenID types.UnitID, invariantPredicateArgs []*PredicateInput) (uint64, uint64, []*wallet.Proof, error) {
-	burnBatch := txsubmitter.NewBatch(acc.PubKey, w.rpcClient, w.log)
+	burnBatch := txsubmitter.NewBatch(w.rpcClient, w.log)
 	rnFetcher := &cachingRoundNumberFetcher{delegate: w.GetRoundNumber}
 	burnBatchAmount := uint64(0)
 
@@ -233,7 +233,7 @@ func (w *Wallet) lockTokenForDC(ctx context.Context, acc *account.AccountKey, ta
 		return 0, err
 	}
 
-	if err = sub.ToBatch(w.rpcClient, acc.PubKey, w.log).SendTx(ctx, true); err != nil {
+	if err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, true); err != nil {
 		return 0, err
 	}
 	return sub.Proof.TxRecord.ServerMetadata.ActualFee, nil

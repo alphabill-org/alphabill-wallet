@@ -3,12 +3,13 @@ package args
 import "strings"
 
 const (
-	RpcUrl                 = "rpc-url"
-	DefaultMoneyRpcUrl     = "localhost:26866"
-	DefaultTokensRpcUrl    = "localhost:28866"
-	DefaultEvmRpcUrl       = "localhost:29866"
-	PartitionCmdName       = "partition"
-	PartitionRpcUrlCmdName = "partition-rpc-url"
+	RpcUrl                     = "rpc-url"
+	DefaultMoneyRpcUrl         = "localhost:26866"
+	DefaultTokensRpcUrl        = "localhost:28866"
+	DefaultEvmRpcUrl           = "localhost:29866"
+	DefaultOrchestrationRpcUrl = "localhost:30866"
+	PartitionCmdName           = "partition"
+	PartitionRpcUrlCmdName     = "partition-rpc-url"
 
 	PasswordPromptUsage     = "password (interactive from prompt)"
 	PasswordArgUsage        = "password (non-interactive from args)"
