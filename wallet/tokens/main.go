@@ -53,6 +53,7 @@ type (
 		TokenTypeID TokenTypeID
 		TokenID     TokenID
 		FeeSum      uint64
+		Proofs      []*wallet.Proof
 	}
 
 	// AccountDcResult dust collection results for single account.
@@ -135,7 +136,7 @@ func (w *Wallet) NewFungibleType(ctx context.Context, accNr uint64, attrs Create
 		return nil, err
 	}
 	if sub.Confirmed() {
-		return &SubmissionResult{TokenTypeID: sub.UnitID, FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee}, nil
+		return &SubmissionResult{TokenTypeID: sub.UnitID, FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee, Proofs: []*wallet.Proof{sub.Proof}}, nil
 	}
 	return &SubmissionResult{TokenTypeID: sub.UnitID}, nil
 }
@@ -163,7 +164,7 @@ func (w *Wallet) NewNonFungibleType(ctx context.Context, accNr uint64, attrs Cre
 		return nil, err
 	}
 	if sub.Confirmed() {
-		return &SubmissionResult{TokenTypeID: sub.UnitID, FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee}, nil
+		return &SubmissionResult{TokenTypeID: sub.UnitID, FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee, Proofs: []*wallet.Proof{sub.Proof}}, nil
 	}
 	return &SubmissionResult{TokenTypeID: sub.UnitID}, nil
 }
@@ -184,7 +185,7 @@ func (w *Wallet) NewFungibleToken(ctx context.Context, accNr uint64, unitID Toke
 	}
 	if sub.Confirmed() {
 		newTokenID := sub.Proof.TxRecord.ServerMetadata.TargetUnits[0]
-		return &SubmissionResult{TokenID: newTokenID, TokenTypeID: sub.UnitID, FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee}, nil
+		return &SubmissionResult{TokenID: newTokenID, TokenTypeID: sub.UnitID, FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee, Proofs: []*wallet.Proof{sub.Proof}}, nil
 	}
 	return &SubmissionResult{TokenTypeID: sub.UnitID}, nil
 }
@@ -210,7 +211,7 @@ func (w *Wallet) NewNFT(ctx context.Context, accNr uint64, attrs MintNonFungible
 	}
 	if sub.Confirmed() {
 		newTokenID := sub.Proof.TxRecord.ServerMetadata.TargetUnits[0]
-		return &SubmissionResult{TokenID: newTokenID, TokenTypeID: sub.UnitID, FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee}, nil
+		return &SubmissionResult{TokenID: newTokenID, TokenTypeID: sub.UnitID, FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee, Proofs: []*wallet.Proof{sub.Proof}}, nil
 	}
 	return &SubmissionResult{TokenTypeID: sub.UnitID}, nil
 }
@@ -341,7 +342,7 @@ func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID 
 	}
 	err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
 	if sub.Confirmed() {
-		return &SubmissionResult{FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee}, err
+		return &SubmissionResult{FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee, Proofs: []*wallet.Proof{sub.Proof}}, err
 	}
 	return &SubmissionResult{}, err
 }
@@ -413,7 +414,7 @@ func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId 
 			return nil, err
 		}
 		if sub.Confirmed() {
-			return &SubmissionResult{FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee}, err
+			return &SubmissionResult{FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee, Proofs: []*wallet.Proof{sub.Proof}}, err
 		}
 		return &SubmissionResult{}, err
 	} else {
@@ -464,7 +465,7 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 	}
 	err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
 	if sub.Confirmed() {
-		return &SubmissionResult{FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee}, err
+		return &SubmissionResult{FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee, Proofs: []*wallet.Proof{sub.Proof}}, err
 	}
 	return &SubmissionResult{}, err
 }
@@ -548,7 +549,7 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID []
 	}
 	err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
 	if sub.Confirmed() {
-		return &SubmissionResult{FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee}, err
+		return &SubmissionResult{FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee, Proofs: []*wallet.Proof{sub.Proof}}, err
 	}
 	return &SubmissionResult{}, err
 }
@@ -584,7 +585,7 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	}
 	err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
 	if sub.Confirmed() {
-		return &SubmissionResult{FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee}, err
+		return &SubmissionResult{FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee, Proofs: []*wallet.Proof{sub.Proof}}, err
 	}
 	return &SubmissionResult{}, err
 }
