@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -20,6 +19,7 @@ import (
 	"github.com/alphabill-org/alphabill/logger"
 	"github.com/alphabill-org/alphabill/observability"
 	moneytx "github.com/alphabill-org/alphabill/txsystem/money"
+	abtypes "github.com/alphabill-org/alphabill/types"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
@@ -152,9 +152,8 @@ func SendCmd(config *types.WalletConfig) *cobra.Command {
 		"If the command results in more than one transaction all of them use the same reference number")
 	cmd.Flags().StringP(args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "rpc node url")
 	cmd.Flags().Uint64P(args.KeyCmdName, "k", 1, "which key to use for sending the transaction")
-	// use string instead of boolean as boolean requires equals sign between name and value e.g. w=[true|false]
-	cmd.Flags().StringP(args.WaitForConfCmdName, "w", "true", "waits for transaction confirmation "+
-		"on the blockchain, otherwise just broadcasts the transaction")
+	args.AddWaitForProofFlags(cmd, cmd.Flags())
+
 	if err := cmd.MarkFlagRequired(args.AddressCmdName); err != nil {
 		panic(err)
 	}
@@ -201,11 +200,8 @@ func ExecSendCmd(ctx context.Context, cmd *cobra.Command, config *types.WalletCo
 	if accountNumber == 0 {
 		return fmt.Errorf("invalid parameter for flag %q: 0 is not a valid account key", args.KeyCmdName)
 	}
-	waitForConfStr, err := cmd.Flags().GetString(args.WaitForConfCmdName)
-	if err != nil {
-		return err
-	}
-	waitForConf, err := strconv.ParseBool(waitForConfStr)
+
+	waitForConf, proofFile, err := args.WaitForProofArg(cmd)
 	if err != nil {
 		return err
 	}
@@ -237,6 +233,16 @@ func ExecSendCmd(ctx context.Context, cmd *cobra.Command, config *types.WalletCo
 			feeSum += proof.TxRecord.ServerMetadata.GetActualFee()
 		}
 		config.Base.ConsoleWriter.Println("Paid", util.AmountToString(feeSum, 8), "fees for transaction(s).")
+		if proofFile != "" {
+			w, err := os.Create(proofFile)
+			if err != nil {
+				return fmt.Errorf("creating file for transaction proof: %w", err)
+			}
+			if err := abtypes.Cbor.Encode(w, proofs); err != nil {
+				return fmt.Errorf("encoding transaction proofs as CBOR: %w", err)
+			}
+			config.Base.ConsoleWriter.Println("Transaction proof(s) saved to file:" + proofFile)
+		}
 	} else {
 		config.Base.ConsoleWriter.Println("Successfully sent transaction(s)")
 	}
