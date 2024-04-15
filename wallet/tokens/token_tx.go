@@ -301,12 +301,14 @@ func (w *Wallet) doSendMultiple(ctx context.Context, amount uint64, tokens []*To
 	}
 	err := batch.SendTx(ctx, w.confirmTx)
 	feeSum := uint64(0)
+	var proofs []*wallet.Proof
 	for _, sub := range batch.Submissions() {
 		if sub.Confirmed() {
 			feeSum += sub.Proof.TxRecord.ServerMetadata.ActualFee
+			proofs = append(proofs, sub.Proof)
 		}
 	}
-	return &SubmissionResult{FeeSum: feeSum}, err
+	return &SubmissionResult{FeeSum: feeSum, Proofs: proofs}, err
 }
 
 func (w *Wallet) prepareSplitOrTransferTx(ctx context.Context, acc *account.AccountKey, amount uint64, token *TokenUnit, receiverPubKey []byte, invariantPredicateArgs []*PredicateInput, rn roundNumberFetcher) (*txsubmitter.TxSubmission, error) {
