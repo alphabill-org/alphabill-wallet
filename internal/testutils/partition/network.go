@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -13,10 +14,10 @@ import (
 	"time"
 
 	abcrypto "github.com/alphabill-org/alphabill-go-sdk/crypto"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
 	"github.com/alphabill-org/alphabill/keyvaluedb"
 	"github.com/alphabill-org/alphabill/keyvaluedb/boltdb"
 	"github.com/alphabill-org/alphabill/keyvaluedb/memorydb"
-	"github.com/alphabill-org/alphabill/logger"
 	"github.com/alphabill-org/alphabill/network"
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/observability"
@@ -27,7 +28,6 @@ import (
 	"github.com/alphabill-org/alphabill/rootchain/partitions"
 	"github.com/alphabill-org/alphabill/state"
 	"github.com/alphabill-org/alphabill/txsystem"
-	"github.com/alphabill-org/alphabill-go-sdk/types"
 	libp2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
@@ -219,7 +219,7 @@ func (r *RootPartition) start(ctx context.Context) error {
 	// start root nodes
 	for i, rn := range r.Nodes {
 		rootPeer := rootPeers[i]
-		log := r.obs.DefaultLogger().With(logger.NodeID(rootPeer.ID()))
+		log := r.obs.DefaultLogger().With(slog.Any("node_id", rootPeer.ID()))
 		obs := observability.WithLogger(r.obs.DefaultObserver(), log)
 		// this is a unit test set-up pre-populate store with addresses, create separate test for node discovery
 		for _, p := range rootPeers {
@@ -363,7 +363,7 @@ func (n *NodePartition) start(t *testing.T, ctx context.Context, bootNodes []pee
 }
 
 func (n *NodePartition) startNode(ctx context.Context, pn *PartitionNode) error {
-	log := n.obs.DefaultLogger().With(logger.NodeID(pn.peerConf.ID))
+	log := n.obs.DefaultLogger().With(slog.Any("node_id", pn.peerConf.ID))
 	node, err := partition.NewNode(
 		ctx,
 		pn.peerConf,

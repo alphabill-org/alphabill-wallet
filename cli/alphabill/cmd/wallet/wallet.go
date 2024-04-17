@@ -3,20 +3,13 @@ package wallet
 import (
 	"context"
 	"fmt"
-	"log/slog"
-	"os"
 	"path/filepath"
 	"strconv"
 
-	"github.com/alphabill-org/alphabill/logger"
-	"github.com/alphabill-org/alphabill/observability"
 	moneytx "github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/spf13/cobra"
 	"github.com/tyler-smith/go-bip39"
-	"go.opentelemetry.io/otel/attribute"
-	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
-	"go.opentelemetry.io/otel/trace"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
@@ -32,32 +25,21 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/money"
 )
 
-type Factory interface {
-	Logger(cfg *logger.LogConfiguration) (*slog.Logger, error)
-	Observability(metrics, traces string) (observability.MeterAndTracer, error)
-}
-
 // NewWalletCmd creates a new cobra command for the wallet component.
-func NewWalletCmd(baseConfig *types.BaseConfiguration, obsF Factory) *cobra.Command {
+func NewWalletCmd(baseConfig *types.BaseConfiguration) *cobra.Command {
 	config := &types.WalletConfig{Base: baseConfig}
 	var walletCmd = &cobra.Command{
 		Use:   "wallet",
 		Short: "cli for managing alphabill wallet",
 		PersistentPreRunE: func(ccmd *cobra.Command, args []string) error {
 			// initialize config so that baseConf.HomeDir gets configured
-			if err := types.InitializeConfig(ccmd, baseConfig, obsF); err != nil {
+			if err := types.InitializeConfig(ccmd, baseConfig); err != nil {
 				return fmt.Errorf("initializing base configuration: %w", err)
 			}
-
-			ctx, span := config.Tracer().Start(ccmd.Context(), "execute.wallet.cmd", trace.WithAttributes(semconv.ProcessCommandArgs(os.Args...)))
-			ccmd.SetContext(ctx)
-			// when command returns error the PostRun hooks are not triggered so use OnFinalize to end the span
-			cobra.OnFinalize(func() { span.End() })
 
 			if err := InitWalletConfig(ccmd, config); err != nil {
 				return fmt.Errorf("initializing wallet configuration: %w", err)
 			}
-			span.SetAttributes(attribute.String("wallet.home", config.WalletHomeDir))
 			return nil
 		},
 	}
@@ -159,9 +141,6 @@ func SendCmd(config *types.WalletConfig) *cobra.Command {
 }
 
 func ExecSendCmd(ctx context.Context, cmd *cobra.Command, config *types.WalletConfig) error {
-	ctx, span := config.Tracer().Start(ctx, "execSendCmd")
-	defer span.End()
-
 	rpcUrl, err := cmd.Flags().GetString(args.RpcUrl)
 	if err != nil {
 		return err
@@ -182,7 +161,7 @@ func ExecSendCmd(ctx context.Context, cmd *cobra.Command, config *types.WalletCo
 	}
 	defer feeManagerDB.Close()
 
-	w, err := money.LoadExistingWallet(am, feeManagerDB, rpcClient, config.Base.Observe.Logger())
+	w, err := money.LoadExistingWallet(am, feeManagerDB, rpcClient, config.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -253,14 +232,11 @@ func GetBalanceCmd(config *types.WalletConfig) *cobra.Command {
 }
 
 func ExecGetBalanceCmd(cmd *cobra.Command, config *types.WalletConfig) error {
-	ctx, span := config.Tracer().Start(cmd.Context(), "execGetBalanceCmd")
-	defer span.End()
-
 	rpcUrl, err := cmd.Flags().GetString(args.RpcUrl)
 	if err != nil {
 		return err
 	}
-	rpcClient, err := rpc.DialContext(ctx, args.BuildRpcUrl(rpcUrl))
+	rpcClient, err := rpc.DialContext(cmd.Context(), args.BuildRpcUrl(rpcUrl))
 	if err != nil {
 		return fmt.Errorf("failed to dial rpc url: %w", err)
 	}
@@ -278,7 +254,7 @@ func ExecGetBalanceCmd(cmd *cobra.Command, config *types.WalletConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	w, err := money.LoadExistingWallet(am, feeManagerDB, rpcClient, config.Base.Observe.Logger())
+	w, err := money.LoadExistingWallet(am, feeManagerDB, rpcClient, config.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -304,7 +280,7 @@ func ExecGetBalanceCmd(cmd *cobra.Command, config *types.WalletConfig) error {
 		quiet = false // quiet is supposed to work only when total or key flag is provided
 	}
 	if accountNumber == 0 {
-		totals, sum, err := w.GetBalances(ctx, money.GetBalanceCmd{CountDCBills: showUnswapped})
+		totals, sum, err := w.GetBalances(cmd.Context(), money.GetBalanceCmd{CountDCBills: showUnswapped})
 		if err != nil {
 			return err
 		}
@@ -320,7 +296,7 @@ func ExecGetBalanceCmd(cmd *cobra.Command, config *types.WalletConfig) error {
 			config.Base.ConsoleWriter.Println(fmt.Sprintf("Total %s", sumStr))
 		}
 	} else {
-		balance, err := w.GetBalance(ctx, money.GetBalanceCmd{AccountIndex: accountNumber - 1, CountDCBills: showUnswapped})
+		balance, err := w.GetBalance(cmd.Context(), money.GetBalanceCmd{AccountIndex: accountNumber - 1, CountDCBills: showUnswapped})
 		if err != nil {
 			return err
 		}
@@ -409,7 +385,7 @@ func ExecCollectDust(cmd *cobra.Command, config *types.WalletConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	w, err := money.LoadExistingWallet(am, feeManagerDB, rpcClient, config.Base.Observe.Logger())
+	w, err := money.LoadExistingWallet(am, feeManagerDB, rpcClient, config.Base.Logger)
 	if err != nil {
 		return err
 	}

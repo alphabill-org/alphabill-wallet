@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"sort"
 
-	"github.com/alphabill-org/alphabill/logger"
 	"github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-sdk/types"
 
@@ -174,7 +173,7 @@ func (w *DustCollector) swapDCBills(ctx context.Context, k *account.AccountKey, 
 	dcBatch.Add(sub)
 
 	// send swap tx
-	w.log.InfoContext(ctx, fmt.Sprintf("sending swap tx with timeout=%d", timeout), logger.UnitID(unitID))
+	w.log.InfoContext(ctx, fmt.Sprintf("sending swap tx with timeout=%d, unitID=%X", timeout, unitID))
 	if err := dcBatch.SendTx(ctx, true); err != nil {
 		return nil, fmt.Errorf("failed to send swap tx: %w", err)
 	}

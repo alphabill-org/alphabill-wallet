@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/alphabill-org/alphabill/logger"
 	"github.com/alphabill-org/alphabill-go-sdk/types"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet"
@@ -109,7 +108,7 @@ func (t *TxSubmissionBatch) confirmUnitsTx(ctx context.Context) error {
 					return err
 				}
 				if txRecord != nil && txProof != nil {
-					t.log.DebugContext(ctx, "Unit is confirmed", logger.UnitID(sub.UnitID))
+					t.log.DebugContext(ctx, fmt.Sprintf("Tx confirmed: hash=%X, unitID=%X", sub.TxHash, sub.UnitID))
 					sub.Proof = &wallet.Proof{TxRecord: txRecord, TxProof: txProof}
 				}
 			}
@@ -119,10 +118,11 @@ func (t *TxSubmissionBatch) confirmUnitsTx(ctx context.Context) error {
 		if unconfirmed {
 			// If this was the last attempt to get proofs, log the ones that timed out.
 			if roundNumber > t.maxTimeout {
-				t.log.InfoContext(ctx, "Tx confirmation timeout is reached", logger.Round(roundNumber))
+				t.log.InfoContext(ctx, fmt.Sprintf("Tx confirmation timeout is reached: round=%d", roundNumber))
+
 				for _, sub := range t.submissions {
 					if !sub.Confirmed() {
-						t.log.InfoContext(ctx, fmt.Sprintf("Tx not confirmed for hash=%X", sub.TxHash), logger.UnitID(sub.UnitID))
+						t.log.InfoContext(ctx, fmt.Sprintf("Tx not confirmed: hash=%X, unitID=%X", sub.TxHash, sub.UnitID))
 					}
 				}
 				return errors.New("confirmation timeout")

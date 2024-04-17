@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
@@ -161,7 +162,7 @@ func TestSendingMoneyUsingWallets_integration(t *testing.T) {
 	testutils.VerifyStdout(t, stdout, "Successfully sent transaction(s)")
 }
 
-func waitForBalanceCLI(t *testing.T, logF Factory, homedir string, url string, expectedBalance uint64, accountIndex uint64) {
+func waitForBalanceCLI(t *testing.T, logF types.Factory, homedir string, url string, expectedBalance uint64, accountIndex uint64) {
 	require.Eventually(t, func() bool {
 		stdout, err := execCommand(logF, homedir, "get-balance --rpc-url "+url)
 		require.NoError(t, err)
@@ -175,7 +176,7 @@ func waitForBalanceCLI(t *testing.T, logF Factory, homedir string, url string, e
 	}, test.WaitDuration, test.WaitTick)
 }
 
-func waitForFeeCreditCLI(t *testing.T, logF Factory, homedir string, url string, expectedBalance uint64, accountIndex uint64) {
+func waitForFeeCreditCLI(t *testing.T, logF types.Factory, homedir string, url string, expectedBalance uint64, accountIndex uint64) {
 	require.Eventually(t, func() bool {
 		stdout, err := execCommand(logF, homedir, "fees list --rpc-url "+url)
 		require.NoError(t, err)
@@ -190,7 +191,7 @@ func waitForFeeCreditCLI(t *testing.T, logF Factory, homedir string, url string,
 }
 
 // addAccount calls "add-key" cli function on given wallet and returns the added pubkey hex
-func addAccount(t *testing.T, obsF Factory, homedir string) string {
+func addAccount(t *testing.T, obsF types.Factory, homedir string) string {
 	stdout, err := execCommand(obsF, homedir, "add-key")
 	require.NoError(t, err)
 	for _, line := range stdout.Lines {

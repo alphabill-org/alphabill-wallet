@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	abrpc "github.com/alphabill-org/alphabill/rpc"
-	"github.com/alphabill-org/alphabill/txsystem/fc/unit"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-sdk/util"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -22,7 +22,7 @@ func TestWalletCreateCmd(t *testing.T) {
 	outputWriter := &testutils.TestConsoleWriter{}
 	homeDir := testutils.SetupTestHomeDir(t, "wallet-test")
 	obsF := observability.NewFactory(t)
-	wcmd := NewWalletCmd(&types.BaseConfiguration{HomeDir: homeDir, ConsoleWriter: outputWriter, LogCfgFile: "logger-config.yaml"}, obsF)
+	wcmd := NewWalletCmd(&types.BaseConfiguration{HomeDir: homeDir, ConsoleWriter: outputWriter}, obsF)
 	wcmd.SetArgs([]string{"create"})
 	err := wcmd.Execute()
 	require.NoError(t, err)
@@ -35,7 +35,7 @@ func TestWalletCreateCmd_encrypt(t *testing.T) {
 	outputWriter := &testutils.TestConsoleWriter{}
 	homeDir := testutils.SetupTestHomeDir(t, "wallet-test")
 	obsF := observability.NewFactory(t)
-	wcmd := NewWalletCmd(&types.BaseConfiguration{HomeDir: homeDir, ConsoleWriter: outputWriter, LogCfgFile: "logger-config.yaml"}, obsF)
+	wcmd := NewWalletCmd(&types.BaseConfiguration{HomeDir: homeDir, ConsoleWriter: outputWriter}, obsF)
 	pw := "123456"
 	wcmd.SetArgs([]string{"create", "--pn", pw})
 	err := wcmd.Execute()
@@ -46,19 +46,19 @@ func TestWalletCreateCmd_encrypt(t *testing.T) {
 
 	// verify wallet is encrypted
 	// failing case: missing password
-	wcmd = NewWalletCmd(&types.BaseConfiguration{HomeDir: homeDir, ConsoleWriter: outputWriter, LogCfgFile: "logger-config.yaml"}, obsF)
+	wcmd = NewWalletCmd(&types.BaseConfiguration{HomeDir: homeDir, ConsoleWriter: outputWriter}, obsF)
 	wcmd.SetArgs([]string{"add-key"})
 	err = wcmd.Execute()
 	require.ErrorContains(t, err, "invalid password")
 
 	// failing case: wrong password
-	wcmd = NewWalletCmd(&types.BaseConfiguration{HomeDir: homeDir, ConsoleWriter: outputWriter, LogCfgFile: "logger-config.yaml"}, obsF)
+	wcmd = NewWalletCmd(&types.BaseConfiguration{HomeDir: homeDir, ConsoleWriter: outputWriter}, obsF)
 	wcmd.SetArgs([]string{"add-key", "--pn", "123"})
 	err = wcmd.Execute()
 	require.ErrorContains(t, err, "invalid password")
 
 	// passing case:
-	wcmd = NewWalletCmd(&types.BaseConfiguration{HomeDir: homeDir, ConsoleWriter: outputWriter, LogCfgFile: "logger-config.yaml"}, obsF)
+	wcmd = NewWalletCmd(&types.BaseConfiguration{HomeDir: homeDir, ConsoleWriter: outputWriter}, obsF)
 	wcmd.SetArgs([]string{"add-key", "--pn", pw})
 	err = wcmd.Execute()
 	require.NoError(t, err)
@@ -68,7 +68,7 @@ func TestWalletCreateCmd_invalidSeed(t *testing.T) {
 	outputWriter := &testutils.TestConsoleWriter{}
 	homeDir := testutils.SetupTestHomeDir(t, "wallet-test")
 	obsF := observability.NewFactory(t)
-	wcmd := NewWalletCmd(&types.BaseConfiguration{HomeDir: homeDir, ConsoleWriter: outputWriter, LogCfgFile: "logger-config.yaml"}, obsF)
+	wcmd := NewWalletCmd(&types.BaseConfiguration{HomeDir: homeDir, ConsoleWriter: outputWriter}, obsF)
 	wcmd.SetArgs([]string{"create", "-s", "--wallet-location", homeDir})
 	err := wcmd.Execute()
 	require.EqualError(t, err, `invalid value "--wallet-location" for flag "seed" (mnemonic)`)
@@ -181,7 +181,7 @@ func TestSendingFailsWithInsufficientBalance(t *testing.T) {
 		}),
 		mocksrv.WithOwnerUnit(&abrpc.Unit[any]{
 			UnitID:         money.NewFeeCreditRecordID(nil, testutils.TestPubKey0Hash(t)),
-			Data:           unit.FeeCreditRecord{Balance: 1e8},
+			Data:           fc.FeeCreditRecord{Balance: 1e8},
 			OwnerPredicate: testutils.TestPubKey0Hash(t),
 		}),
 	))
@@ -190,9 +190,9 @@ func TestSendingFailsWithInsufficientBalance(t *testing.T) {
 	require.ErrorContains(t, err, "insufficient balance for transaction")
 }
 
-func execCommand(obsF Factory, homeDir, command string) (*testutils.TestConsoleWriter, error) {
+func execCommand(obsF types.Factory, homeDir, command string) (*testutils.TestConsoleWriter, error) {
 	outputWriter := &testutils.TestConsoleWriter{}
-	wcmd := NewWalletCmd(&types.BaseConfiguration{HomeDir: homeDir, ConsoleWriter: outputWriter, LogCfgFile: "logger-config.yaml"}, obsF)
+	wcmd := NewWalletCmd(&types.BaseConfiguration{HomeDir: homeDir, ConsoleWriter: outputWriter}, obsF)
 	wcmd.SetArgs(strings.Split(command, " "))
 	return outputWriter, wcmd.Execute()
 }

@@ -176,7 +176,7 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to create lock tx: %w", err)
 	}
-	moneyTxPublisher := money.NewTxPublisher(moneyClient, config.WalletConfig.Base.Observe.Logger())
+	moneyTxPublisher := money.NewTxPublisher(moneyClient, config.WalletConfig.Base.Logger)
 	_, err = moneyTxPublisher.SendTx(cmd.Context(), tx, accountKey.PubKey)
 	if err != nil {
 		return fmt.Errorf("failed to send lock tx: %w", err)
@@ -253,7 +253,7 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to create unlock tx: %w", err)
 	}
-	moneyTxPublisher := money.NewTxPublisher(moneyClient, config.WalletConfig.Base.Observe.Logger())
+	moneyTxPublisher := money.NewTxPublisher(moneyClient, config.WalletConfig.Base.Logger)
 	_, err = moneyTxPublisher.SendTx(cmd.Context(), tx, accountKey.PubKey)
 	if err != nil {
 		return fmt.Errorf("failed to send unlock tx: %w", err)

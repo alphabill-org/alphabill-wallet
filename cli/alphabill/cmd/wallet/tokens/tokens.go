@@ -1072,7 +1072,7 @@ func initTokensWallet(cmd *cobra.Command, config *types.WalletConfig) (*tokenswa
 	if !strings.HasPrefix(infoResponse.Name, tokensTypeVar.String()) {
 		return nil, errors.New("invalid rpc url provided for tokens partition")
 	}
-	return tokenswallet.New(infoResponse.SystemID, tokensClient, am, confirmTx, nil, config.Base.Observe.Logger())
+	return tokenswallet.New(infoResponse.SystemID, tokensClient, am, confirmTx, nil, config.Base.Logger)
 }
 
 func readParentTypeInfo(cmd *cobra.Command, keyNr uint64, am account.Manager) (tokenswallet.TokenTypeID, []*tokenswallet.PredicateInput, error) {
