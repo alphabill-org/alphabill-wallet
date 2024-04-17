@@ -10,9 +10,9 @@ import (
 	"testing"
 
 	"github.com/alphabill-org/alphabill/partition/event"
-	"github.com/alphabill-org/alphabill/txsystem/money"
-	"github.com/alphabill-org/alphabill/txsystem/tokens"
-	"github.com/alphabill-org/alphabill/types"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/tokens"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
@@ -25,9 +25,9 @@ import (
 
 func TestNFTs_Integration(t *testing.T) {
 	network := NewAlphabillNetwork(t)
-	_, err := network.abNetwork.GetNodePartition(money.DefaultSystemIdentifier)
+	_, err := network.abNetwork.GetNodePartition(money.DefaultSystemID)
 	require.NoError(t, err)
-	tokenPartition, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemIdentifier)
+	tokenPartition, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemID)
 	require.NoError(t, err)
 	homedirW1 := network.homeDir
 	w1key2 := network.walletKey2
@@ -110,7 +110,7 @@ func TestNFTs_Integration(t *testing.T) {
 
 func TestNFTDataUpdateCmd_Integration(t *testing.T) {
 	network := NewAlphabillNetwork(t)
-	tokenPartition, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemIdentifier)
+	tokenPartition, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemID)
 	require.NoError(t, err)
 	homedir := network.homeDir
 	w1key := network.walletKey1
@@ -189,7 +189,7 @@ func TestNFTDataUpdateCmd_Integration(t *testing.T) {
 
 func TestNFT_InvariantPredicate_Integration(t *testing.T) {
 	network := NewAlphabillNetwork(t)
-	tokenPartition, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemIdentifier)
+	tokenPartition, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemID)
 	require.NoError(t, err)
 	homedirW1 := network.homeDir
 	w1key := network.walletKey1
@@ -229,9 +229,9 @@ func TestNFT_InvariantPredicate_Integration(t *testing.T) {
 
 func TestNFT_LockUnlock_Integration(t *testing.T) {
 	network := NewAlphabillNetwork(t)
-	_, err := network.abNetwork.GetNodePartition(money.DefaultSystemIdentifier)
+	_, err := network.abNetwork.GetNodePartition(money.DefaultSystemID)
 	require.NoError(t, err)
-	tokensPartition, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemIdentifier)
+	tokensPartition, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemID)
 	require.NoError(t, err)
 	homedirW1 := network.homeDir
 	rpcUrl := tokensPartition.Nodes[0].AddrRPC

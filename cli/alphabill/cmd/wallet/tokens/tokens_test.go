@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/txsystem/tokens"
-	"github.com/alphabill-org/alphabill/types"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/tokens"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 

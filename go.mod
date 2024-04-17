@@ -5,12 +5,13 @@ go 1.21
 replace github.com/multiformats/go-multistream v0.5.0 => github.com/multiformats/go-multistream v0.4.1
 
 require (
-	github.com/alphabill-org/alphabill v0.4.1-0.20240405074241-c2342f0895e9
+	github.com/alphabill-org/alphabill v0.4.1-0.20240417065339-7ac074d11fd2
+	github.com/alphabill-org/alphabill-go-sdk v0.0.0-20240417060459-c088e5ce78a8
 	github.com/btcsuite/btcd v0.23.2
 	github.com/btcsuite/btcd/btcutil v1.1.2
 	github.com/ethereum/go-ethereum v1.12.2
-	github.com/fxamacker/cbor/v2 v2.5.0
-	github.com/holiman/uint256 v1.2.3
+	github.com/fxamacker/cbor/v2 v2.6.0
+	github.com/holiman/uint256 v1.2.4
 	github.com/libp2p/go-libp2p v0.33.2
 	github.com/multiformats/go-multiaddr v0.12.3
 	github.com/neilotoole/slogt v1.1.0

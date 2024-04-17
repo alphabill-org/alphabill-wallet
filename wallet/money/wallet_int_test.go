@@ -8,12 +8,13 @@ import (
 	"testing"
 	"time"
 
-	abcrypto "github.com/alphabill-org/alphabill/crypto"
-	"github.com/alphabill-org/alphabill/network/protocol/genesis"
-	"github.com/alphabill-org/alphabill/predicates/templates"
+	abcrypto "github.com/alphabill-org/alphabill-go-sdk/crypto"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
+
 	"github.com/alphabill-org/alphabill/rpc"
 	"github.com/alphabill-org/alphabill/txsystem"
-	"github.com/alphabill-org/alphabill/txsystem/money"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/stretchr/testify/require"
 
@@ -59,7 +60,7 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 		InitialBillOwner: templates.NewP2pkh256BytesFromKey(accKey.PubKey),
 	}
 	network := startMoneyOnlyAlphabillPartition(t, genesisConfig)
-	moneyPart, err := network.GetNodePartition(money.DefaultSystemIdentifier)
+	moneyPart, err := network.GetNodePartition(money.DefaultSystemID)
 	require.NoError(t, err)
 	addr := initRPCServer(t, moneyPart.Nodes[0])
 
@@ -159,14 +160,14 @@ func startMoneyOnlyAlphabillPartition(t *testing.T, genesisConfig *testutil.Mone
 	mPart, err := testpartition.NewPartition(t, "money node", 1, func(tb map[string]abcrypto.Verifier) txsystem.TransactionSystem {
 		system, err := money.NewTxSystem(
 			testobserve.Default(t),
-			money.WithSystemIdentifier(money.DefaultSystemIdentifier),
+			money.WithSystemIdentifier(money.DefaultSystemID),
 			money.WithSystemDescriptionRecords(createSDRs()),
 			money.WithTrustBase(tb),
 			money.WithState(genesisState),
 		)
 		require.NoError(t, err)
 		return system
-	}, money.DefaultSystemIdentifier, genesisState)
+	}, money.DefaultSystemID, genesisState)
 	require.NoError(t, err)
 	abNet, err := testpartition.NewAlphabillPartition([]*testpartition.NodePartition{mPart})
 	require.NoError(t, err)
@@ -203,11 +204,11 @@ func initRPCServer(t *testing.T, partitionNode *testpartition.PartitionNode) str
 	return listener.Addr().String()
 }
 
-func createSDRs() []*genesis.SystemDescriptionRecord {
-	return []*genesis.SystemDescriptionRecord{{
-		SystemIdentifier: money.DefaultSystemIdentifier,
+func createSDRs() []*types.SystemDescriptionRecord {
+	return []*types.SystemDescriptionRecord{{
+		SystemIdentifier: money.DefaultSystemID,
 		T2Timeout:        2500,
-		FeeCreditBill: &genesis.FeeCreditBill{
+		FeeCreditBill: &types.FeeCreditBill{
 			UnitID:         money.NewBillID(nil, []byte{2}),
 			OwnerPredicate: templates.AlwaysTrueBytes(),
 		},

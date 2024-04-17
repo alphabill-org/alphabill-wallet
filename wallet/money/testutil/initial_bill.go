@@ -6,12 +6,13 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	abcrypto "github.com/alphabill-org/alphabill/crypto"
-	"github.com/alphabill-org/alphabill/network/protocol/genesis"
-	"github.com/alphabill-org/alphabill/predicates/templates"
+	abcrypto "github.com/alphabill-org/alphabill-go-sdk/crypto"
+	"github.com/alphabill-org/alphabill-go-sdk/hash"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
+	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
+
 	"github.com/alphabill-org/alphabill/state"
-	"github.com/alphabill-org/alphabill/txsystem/money"
-	"github.com/alphabill-org/alphabill/types"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 )
@@ -21,17 +22,26 @@ type MoneyGenesisConfig struct {
 	InitialBillValue   uint64
 	InitialBillOwner   types.PredicateBytes
 	DCMoneySupplyValue uint64
-	SDRs               []*genesis.SystemDescriptionRecord
+	SDRs               []*types.SystemDescriptionRecord
 }
 
-var defaultMoneySDR = &genesis.SystemDescriptionRecord{
-	SystemIdentifier: money.DefaultSystemIdentifier,
-	T2Timeout:        2500,
-	FeeCreditBill: &genesis.FeeCreditBill{
-		UnitID:         money.NewBillID(nil, []byte{2}),
-		OwnerPredicate: templates.AlwaysTrueBytes(),
-	},
-}
+var (
+	defaultMoneySDR = &types.SystemDescriptionRecord{
+		SystemIdentifier: money.DefaultSystemID,
+		T2Timeout:        2500,
+		FeeCreditBill: &types.FeeCreditBill{
+			UnitID:         money.NewBillID(nil, []byte{2}),
+			OwnerPredicate: templates.AlwaysTrueBytes(),
+		},
+	}
+
+	// TODO: duplicated from alphabill repo, really need those here?
+	// The ID of the dust collector money supply
+	DustCollectorMoneySupplyID = money.NewBillID(nil, nil)
+
+	// Dust collector predicate
+	DustCollectorPredicate = templates.NewP2pkh256BytesFromKeyHash(hash.Sum256([]byte("dust collector")))
+)
 
 func MoneyGenesisState(t *testing.T, config *MoneyGenesisConfig) *state.State {
 	if len(config.SDRs) == 0 {
@@ -46,8 +56,8 @@ func MoneyGenesisState(t *testing.T, config *MoneyGenesisConfig) *state.State {
 	require.NoError(t, s.AddUnitLog(config.InitialBillID, zeroHash))
 
 	// dust collector money supply
-	require.NoError(t, s.Apply(state.AddUnit(money.DustCollectorMoneySupplyID, money.DustCollectorPredicate, &money.BillData{V: config.DCMoneySupplyValue})))
-	require.NoError(t, s.AddUnitLog(money.DustCollectorMoneySupplyID, zeroHash))
+	require.NoError(t, s.Apply(state.AddUnit(DustCollectorMoneySupplyID, DustCollectorPredicate, &money.BillData{V: config.DCMoneySupplyValue})))
+	require.NoError(t, s.AddUnitLog(DustCollectorMoneySupplyID, zeroHash))
 
 	// fee credit bills
 	for _, sdr := range config.SDRs {
@@ -74,7 +84,7 @@ func CreateInitialBillTransferTx(accountKey *account.AccountKey, billID, fcrID t
 	}
 	txo := &types.TransactionOrder{
 		Payload: &types.Payload{
-			SystemID:   money.DefaultSystemIdentifier,
+			SystemID:   money.DefaultSystemID,
 			Type:       money.PayloadTypeTransfer,
 			UnitID:     billID,
 			Attributes: attrBytes,

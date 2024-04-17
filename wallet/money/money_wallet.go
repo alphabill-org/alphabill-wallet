@@ -8,11 +8,11 @@ import (
 	"log/slog"
 	"sort"
 
-	abcrypto "github.com/alphabill-org/alphabill/crypto"
-	"github.com/alphabill-org/alphabill/hash"
-	"github.com/alphabill-org/alphabill/predicates/templates"
-	"github.com/alphabill-org/alphabill/txsystem/money"
-	"github.com/alphabill-org/alphabill/types"
+	abcrypto "github.com/alphabill-org/alphabill-go-sdk/crypto"
+	"github.com/alphabill-org/alphabill-go-sdk/hash"
+	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
 
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
@@ -82,7 +82,7 @@ func CreateNewWallet(am account.Manager, mnemonic string) error {
 }
 
 func LoadExistingWallet(am account.Manager, feeManagerDB fees.FeeManagerDB, rpcClient RpcClient, log *slog.Logger) (*Wallet, error) {
-	moneySystemID := money.DefaultSystemIdentifier
+	moneySystemID := money.DefaultSystemID
 	moneyTxPublisher := NewTxPublisher(rpcClient, log)
 	feeManager := fees.NewFeeManager(am, feeManagerDB, moneySystemID, rpcClient, FeeCreditRecordIDFormPublicKey, moneySystemID, rpcClient, FeeCreditRecordIDFormPublicKey, log)
 	dustCollector := dc.NewDustCollector(moneySystemID, maxBillsForDustCollection, txTimeoutBlockCount, rpcClient, log)
@@ -103,7 +103,7 @@ func (w *Wallet) GetAccountManager() account.Manager {
 func (w *Wallet) SystemID() types.SystemID {
 	// TODO: return the default "AlphaBill Money System ID" for now
 	// but this should come from config (base wallet? AB client?)
-	return money.DefaultSystemIdentifier
+	return money.DefaultSystemID
 }
 
 // Close terminates connection to alphabill node, closes account manager and cancels any background goroutines.

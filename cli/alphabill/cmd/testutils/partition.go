@@ -7,20 +7,21 @@ import (
 	"net/http"
 	"testing"
 
+	abcrypto "github.com/alphabill-org/alphabill-go-sdk/crypto"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/tokens"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
+	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
+
 	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
 	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
-	abcrypto "github.com/alphabill-org/alphabill/crypto"
-	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/partition"
-	"github.com/alphabill-org/alphabill/predicates/templates"
 	abrpc "github.com/alphabill-org/alphabill/rpc"
 	"github.com/alphabill-org/alphabill/state"
 	"github.com/alphabill-org/alphabill/txsystem"
-	"github.com/alphabill-org/alphabill/txsystem/money"
-	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/stretchr/testify/require"
 )
 
@@ -32,13 +33,13 @@ func CreateMoneyPartition(t *testing.T, genesisConfig *testutil.MoneyGenesisConf
 		genesisState = genesisState.Clone()
 		system, err := money.NewTxSystem(
 			testobserve.Default(t),
-			money.WithSystemIdentifier(money.DefaultSystemIdentifier),
+			money.WithSystemIdentifier(money.DefaultSystemID),
 			money.WithHashAlgorithm(crypto.SHA256),
-			money.WithSystemDescriptionRecords([]*genesis.SystemDescriptionRecord{
+			money.WithSystemDescriptionRecords([]*types.SystemDescriptionRecord{
 				{
-					SystemIdentifier: money.DefaultSystemIdentifier,
+					SystemIdentifier: money.DefaultSystemID,
 					T2Timeout:        DefaultT2Timeout,
-					FeeCreditBill: &genesis.FeeCreditBill{
+					FeeCreditBill: &types.FeeCreditBill{
 						UnitID:         money.NewBillID(nil, []byte{2}),
 						OwnerPredicate: templates.AlwaysTrueBytes(),
 					},
@@ -49,7 +50,7 @@ func CreateMoneyPartition(t *testing.T, genesisConfig *testutil.MoneyGenesisConf
 		)
 		require.NoError(t, err)
 		return system
-	}, money.DefaultSystemIdentifier, genesisState)
+	}, money.DefaultSystemID, genesisState)
 	require.NoError(t, err)
 	return moneyPart
 }
@@ -74,7 +75,7 @@ func CreateTokensPartition(t *testing.T) *testpartition.NodePartition {
 			)
 			require.NoError(t, err)
 			return system
-		}, tokens.DefaultSystemIdentifier, tokensState,
+		}, tokens.DefaultSystemID, tokensState,
 	)
 	require.NoError(t, err)
 	return network

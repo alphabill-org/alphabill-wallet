@@ -7,7 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/alphabill-org/alphabill/logger"
-	"github.com/alphabill-org/alphabill/types"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"

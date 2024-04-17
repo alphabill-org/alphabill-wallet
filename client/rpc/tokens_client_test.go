@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/alphabill-org/alphabill/rpc"
-	tokentxs "github.com/alphabill-org/alphabill/txsystem/tokens"
+	tokentxs "github.com/alphabill-org/alphabill-go-sdk/txsystem/tokens"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/client/rpc/mocksrv"

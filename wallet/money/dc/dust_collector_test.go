@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/txsystem/fc/unit"
-	"github.com/alphabill-org/alphabill/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/fc"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
@@ -22,9 +22,9 @@ func TestDC_OK(t *testing.T) {
 		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Counter: 1})),
 		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Counter: 2})),
 		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{3}, &money.BillData{V: 3, Counter: 3})),
-		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
+		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &fc.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
 	)
-	dc := NewDustCollector(money.DefaultSystemIdentifier, 10, 10, moneyClient, logger.New(t))
+	dc := NewDustCollector(money.DefaultSystemID, 10, 10, moneyClient, logger.New(t))
 
 	// when dc runs
 	dcResult, err := dc.CollectDust(context.Background(), accountKeys.AccountKey)
@@ -48,9 +48,9 @@ func TestDCWontRunForSingleBill(t *testing.T) {
 	require.NoError(t, err)
 	moneyClient := testutil.NewRpcClientMock(
 		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Counter: 1})),
-		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
+		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &fc.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
 	)
-	dc := NewDustCollector(money.DefaultSystemIdentifier, 10, 10, moneyClient, logger.New(t))
+	dc := NewDustCollector(money.DefaultSystemID, 10, 10, moneyClient, logger.New(t))
 
 	// when dc runs
 	dcResult, err := dc.CollectDust(context.Background(), accountKeys.AccountKey)
@@ -70,9 +70,9 @@ func TestAllBillsAreSwapped_WhenWalletBillCountEqualToMaxBillCount(t *testing.T)
 		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Counter: 1})),
 		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Counter: 2})),
 		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{3}, &money.BillData{V: 3, Counter: 3})),
-		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
+		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &fc.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
 	)
-	w := NewDustCollector(money.DefaultSystemIdentifier, maxBillsPerDC, 10, moneyClient, logger.New(t))
+	w := NewDustCollector(money.DefaultSystemID, maxBillsPerDC, 10, moneyClient, logger.New(t))
 
 	// when dc runs
 	dcResult, err := w.CollectDust(context.Background(), accountKeys.AccountKey)
@@ -104,9 +104,9 @@ func TestOnlyFirstNBillsAreSwapped_WhenBillCountOverLimit(t *testing.T) {
 		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Counter: 2})),
 		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{3}, &money.BillData{V: 3, Counter: 3})),
 		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{4}, &money.BillData{V: 4, Counter: 4})),
-		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
+		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &fc.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
 	)
-	w := NewDustCollector(money.DefaultSystemIdentifier, maxBillsPerDC, 10, moneyClient, logger.New(t))
+	w := NewDustCollector(money.DefaultSystemID, maxBillsPerDC, 10, moneyClient, logger.New(t))
 
 	// when dc runs
 	dcResult, err := w.CollectDust(context.Background(), accountKeys.AccountKey)

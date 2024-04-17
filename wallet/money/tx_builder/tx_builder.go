@@ -7,11 +7,11 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/alphabill-org/alphabill/crypto"
-	"github.com/alphabill-org/alphabill/predicates/templates"
-	"github.com/alphabill-org/alphabill/txsystem/fc/transactions"
-	"github.com/alphabill-org/alphabill/txsystem/money"
-	"github.com/alphabill-org/alphabill/types"
+	"github.com/alphabill-org/alphabill-go-sdk/crypto"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/fc"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
+	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
@@ -164,11 +164,11 @@ func NewUnlockTx(ac *account.AccountKey, systemID types.SystemID, b *api.Bill, t
 }
 
 func NewLockFCTx(ac *account.AccountKey, systemID types.SystemID, fcb *api.FeeCreditBill, lockStatus uint64, timeout uint64) (*types.TransactionOrder, error) {
-	attr := &transactions.LockFeeCreditAttributes{
+	attr := &fc.LockFeeCreditAttributes{
 		LockStatus: lockStatus,
 		Backlink:   fcb.Backlink(),
 	}
-	txPayload, err := NewTxPayload(systemID, transactions.PayloadTypeLockFeeCredit, fcb.ID, timeout, nil, attr)
+	txPayload, err := NewTxPayload(systemID, fc.PayloadTypeLockFeeCredit, fcb.ID, timeout, nil, attr)
 	if err != nil {
 		return nil, err
 	}
@@ -176,10 +176,10 @@ func NewLockFCTx(ac *account.AccountKey, systemID types.SystemID, fcb *api.FeeCr
 }
 
 func NewUnlockFCTx(ac *account.AccountKey, systemID types.SystemID, fcb *api.FeeCreditBill, timeout uint64) (*types.TransactionOrder, error) {
-	attr := &transactions.UnlockFeeCreditAttributes{
+	attr := &fc.UnlockFeeCreditAttributes{
 		Backlink: fcb.Backlink(),
 	}
-	txPayload, err := NewTxPayload(systemID, transactions.PayloadTypeUnlockFeeCredit, fcb.ID, timeout, nil, attr)
+	txPayload, err := NewTxPayload(systemID, fc.PayloadTypeUnlockFeeCredit, fcb.ID, timeout, nil, attr)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +187,7 @@ func NewUnlockFCTx(ac *account.AccountKey, systemID types.SystemID, fcb *api.Fee
 }
 
 func NewTransferFCTx(amount uint64, targetRecordID []byte, targetUnitBacklink []byte, k *account.AccountKey, moneySystemID, targetSystemID types.SystemID, unitID []byte, counter, timeout, t1, t2 uint64) (*types.TransactionOrder, error) {
-	attr := &transactions.TransferFeeCreditAttributes{
+	attr := &fc.TransferFeeCreditAttributes{
 		Amount:                 amount,
 		TargetSystemIdentifier: targetSystemID,
 		TargetRecordID:         targetRecordID,
@@ -196,7 +196,7 @@ func NewTransferFCTx(amount uint64, targetRecordID []byte, targetUnitBacklink []
 		TargetUnitBacklink:     targetUnitBacklink,
 		Counter:                counter,
 	}
-	txPayload, err := NewTxPayload(moneySystemID, transactions.PayloadTypeTransferFeeCredit, unitID, timeout, nil, attr)
+	txPayload, err := NewTxPayload(moneySystemID, fc.PayloadTypeTransferFeeCredit, unitID, timeout, nil, attr)
 	if err != nil {
 		return nil, err
 	}
@@ -204,12 +204,12 @@ func NewTransferFCTx(amount uint64, targetRecordID []byte, targetUnitBacklink []
 }
 
 func NewAddFCTx(unitID []byte, fcProof *wallet.Proof, ac *account.AccountKey, systemID types.SystemID, timeout uint64) (*types.TransactionOrder, error) {
-	attr := &transactions.AddFeeCreditAttributes{
+	attr := &fc.AddFeeCreditAttributes{
 		FeeCreditOwnerCondition: templates.NewP2pkh256BytesFromKeyHash(ac.PubKeyHash.Sha256),
 		FeeCreditTransfer:       fcProof.TxRecord,
 		FeeCreditTransferProof:  fcProof.TxProof,
 	}
-	txPayload, err := NewTxPayload(systemID, transactions.PayloadTypeAddFeeCredit, unitID, timeout, nil, attr)
+	txPayload, err := NewTxPayload(systemID, fc.PayloadTypeAddFeeCredit, unitID, timeout, nil, attr)
 	if err != nil {
 		return nil, err
 	}
@@ -217,12 +217,12 @@ func NewAddFCTx(unitID []byte, fcProof *wallet.Proof, ac *account.AccountKey, sy
 }
 
 func NewCloseFCTx(systemID types.SystemID, unitID []byte, timeout uint64, amount uint64, targetUnitID []byte, targetUnitBacklink uint64, k *account.AccountKey) (*types.TransactionOrder, error) {
-	attr := &transactions.CloseFeeCreditAttributes{
+	attr := &fc.CloseFeeCreditAttributes{
 		Amount:            amount,
 		TargetUnitID:      targetUnitID,
 		TargetUnitCounter: targetUnitBacklink,
 	}
-	txPayload, err := NewTxPayload(systemID, transactions.PayloadTypeCloseFeeCredit, unitID, timeout, nil, attr)
+	txPayload, err := NewTxPayload(systemID, fc.PayloadTypeCloseFeeCredit, unitID, timeout, nil, attr)
 	if err != nil {
 		return nil, err
 	}
@@ -230,12 +230,12 @@ func NewCloseFCTx(systemID types.SystemID, unitID []byte, timeout uint64, amount
 }
 
 func NewReclaimFCTx(systemID types.SystemID, unitID []byte, timeout uint64, fcProof *wallet.Proof, counter uint64, k *account.AccountKey) (*types.TransactionOrder, error) {
-	attr := &transactions.ReclaimFeeCreditAttributes{
+	attr := &fc.ReclaimFeeCreditAttributes{
 		CloseFeeCreditTransfer: fcProof.TxRecord,
 		CloseFeeCreditProof:    fcProof.TxProof,
 		Counter:                counter,
 	}
-	txPayload, err := NewTxPayload(systemID, transactions.PayloadTypeReclaimFeeCredit, unitID, timeout, nil, attr)
+	txPayload, err := NewTxPayload(systemID, fc.PayloadTypeReclaimFeeCredit, unitID, timeout, nil, attr)
 	if err != nil {
 		return nil, err
 	}

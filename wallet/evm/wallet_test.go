@@ -6,8 +6,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/txsystem/evm"
-	"github.com/alphabill-org/alphabill/types"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/evm"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
 	"github.com/stretchr/testify/require"
 
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
@@ -55,7 +55,7 @@ func (e *evmClientMock) GetTxProof(ctx context.Context, unitID types.UnitID, txH
 	if e.SimulateErr != nil {
 		return nil, e.SimulateErr
 	}
-	details := evmclient.ProcessingDetails{
+	details := evm.ProcessingDetails{
 		ErrorDetails: "some error string",
 	}
 	encoded, _ := types.Cbor.Marshal(details)
@@ -73,11 +73,11 @@ func (e *evmClientMock) GetTxProof(ctx context.Context, unitID types.UnitID, txH
 	}, nil
 }
 
-func (e *evmClientMock) Call(ctx context.Context, callAttr *evmclient.CallAttributes) (*evmclient.ProcessingDetails, error) {
+func (e *evmClientMock) Call(ctx context.Context, callAttr *evm.CallEVMRequest) (*evm.ProcessingDetails, error) {
 	if e.SimulateErr != nil {
 		return nil, e.SimulateErr
 	}
-	return &evmclient.ProcessingDetails{
+	return &evm.ProcessingDetails{
 		ErrorDetails: "actual execution failed",
 	}, nil
 }
@@ -128,7 +128,7 @@ func createTestWallet(t *testing.T) (*Wallet, *evmClientMock) {
 	require.NoError(t, err)
 	clientMock := newClientMock()
 	return &Wallet{
-		systemID: evm.DefaultEvmTxSystemIdentifier,
+		systemID: evm.DefaultSystemID,
 		am:       am,
 		restCli:  clientMock,
 	}, clientMock
@@ -215,7 +215,7 @@ func TestWallet_EvmCall(t *testing.T) {
 	require.NotNil(t, w)
 	require.NotNil(t, clientMock)
 	ctx := context.Background()
-	attrs := &evmclient.CallAttributes{}
+	attrs := &evm.CallEVMRequest{}
 	res, err := w.EvmCall(ctx, 1, attrs)
 	require.ErrorContains(t, err, "account key read failed: account does not exist")
 	require.Nil(t, res)
@@ -264,7 +264,7 @@ func TestWallet_SendEvmTx(t *testing.T) {
 	require.NotNil(t, w)
 	require.NotNil(t, clientMock)
 	ctx := context.Background()
-	attrs := &evmclient.TxAttributes{}
+	attrs := &evm.TxAttributes{}
 	res, err := w.SendEvmTx(ctx, 1, attrs)
 	require.ErrorContains(t, err, "account key read failed: account does not exist")
 	require.Nil(t, res)

@@ -6,10 +6,10 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/fc"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
 	"github.com/alphabill-org/alphabill/rpc"
-	"github.com/alphabill-org/alphabill/txsystem/fc/unit"
-	"github.com/alphabill-org/alphabill/txsystem/money"
-	"github.com/alphabill-org/alphabill/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/client/rpc/mocksrv"
@@ -77,7 +77,7 @@ func TestRpcClient(t *testing.T) {
 		service.Reset()
 		fcb := &api.FeeCreditBill{
 			ID: []byte{1},
-			FeeCreditRecord: &unit.FeeCreditRecord{
+			FeeCreditRecord: &fc.FeeCreditRecord{
 				Balance:  192,
 				Timeout:  168,
 				Backlink: []byte{1, 2, 3, 4, 5},

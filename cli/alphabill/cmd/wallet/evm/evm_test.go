@@ -16,9 +16,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/alphabill-org/alphabill/txsystem/evm"
-	"github.com/alphabill-org/alphabill/txsystem/evm/api"
-	"github.com/alphabill-org/alphabill/types"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/evm"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
+	"github.com/alphabill-org/alphabill/logger"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
 	cmdtypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
@@ -190,7 +190,7 @@ func Test_evmCmdCall_ok(t *testing.T) {
 		balance:  "15000000000000000000", // balance is returned by EVM in wei 10^-18
 		backlink: make([]byte, 32),
 		nonce:    1,
-		callResp: &api.CallEVMResponse{
+		callResp: &evm.CallEVMResponse{
 			ProcessingDetails: evmDetails,
 		},
 	}
@@ -226,7 +226,7 @@ func Test_evmCmdCall_ok_defaultGas(t *testing.T) {
 		balance:  "15000000000000000000", // balance is returned by EVM in wei 10^-18
 		backlink: make([]byte, 32),
 		nonce:    1,
-		callResp: &api.CallEVMResponse{
+		callResp: &evm.CallEVMResponse{
 			ProcessingDetails: evmDetails,
 		},
 	}
@@ -273,8 +273,8 @@ type clientMockConf struct {
 	gasPrice   string
 	receivedTx *types.TransactionOrder
 	serverMeta *types.ServerMetadata
-	callReq    *api.CallEVMRequest
-	callResp   *api.CallEVMResponse
+	callReq    *evm.CallEVMRequest
+	callResp   *evm.CallEVMResponse
 }
 
 func mockClientCalls(br *clientMockConf, logF func() *slog.Logger) (*httptest.Server, *url.URL) {
@@ -282,7 +282,7 @@ func mockClientCalls(br *clientMockConf, logF func() *slog.Logger) (*httptest.Se
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.Contains(r.URL.Path, "/api/v1/evm/balance/"):
-			api.WriteCBORResponse(w, &struct {
+			writeCBORResponse(w, &struct {
 				_        struct{} `cbor:",toarray"`
 				Balance  string
 				Backlink []byte
@@ -291,46 +291,46 @@ func mockClientCalls(br *clientMockConf, logF func() *slog.Logger) (*httptest.Se
 				Backlink: br.backlink,
 			}, http.StatusOK, log)
 		case strings.Contains(r.URL.Path, "/api/v1/evm/transactionCount/"):
-			api.WriteCBORResponse(w, &struct {
+			writeCBORResponse(w, &struct {
 				_     struct{} `cbor:",toarray"`
 				Nonce uint64
 			}{
 				Nonce: br.nonce,
 			}, http.StatusOK, log)
 		case strings.Contains(r.URL.Path, "/api/v1/evm/call"):
-			br.callReq = &api.CallEVMRequest{}
+			br.callReq = &evm.CallEVMRequest{}
 			if err := types.Cbor.Decode(r.Body, br.callReq); err != nil {
-				api.WriteCBORError(w, fmt.Errorf("unable to decode request body: %w", err), http.StatusBadRequest, log)
+				writeCBORError(w, fmt.Errorf("unable to decode request body: %w", err), http.StatusBadRequest, log)
 				return
 			}
-			api.WriteCBORResponse(w, br.callResp, http.StatusOK, log)
+			writeCBORResponse(w, br.callResp, http.StatusOK, log)
 		case strings.Contains(r.URL.Path, "/api/v1/evm/gasPrice"):
-			api.WriteCBORResponse(w, &struct {
+			writeCBORResponse(w, &struct {
 				_        struct{} `cbor:",toarray"`
 				GasPrice string
 			}{
 				GasPrice: br.gasPrice,
 			}, http.StatusOK, log)
 		case strings.Contains(r.URL.Path, "/api/v1/rounds/latest"):
-			api.WriteCBORResponse(w, br.round, http.StatusOK, log)
+			writeCBORResponse(w, br.round, http.StatusOK, log)
 		case strings.Contains(r.URL.Path, "/api/v1/transactions"):
 			if r.Method == "POST" {
 				buf := new(bytes.Buffer)
 				if _, err := buf.ReadFrom(r.Body); err != nil {
-					api.WriteCBORError(w, fmt.Errorf("reading request body failed: %w", err), http.StatusBadRequest, log)
+					writeCBORError(w, fmt.Errorf("reading request body failed: %w", err), http.StatusBadRequest, log)
 					return
 				}
 				tx := &types.TransactionOrder{}
 				if err := types.Cbor.Unmarshal(buf.Bytes(), tx); err != nil {
-					api.WriteCBORError(w, fmt.Errorf("unable to decode request body as transaction: %w", err), http.StatusBadRequest, log)
+					writeCBORError(w, fmt.Errorf("unable to decode request body as transaction: %w", err), http.StatusBadRequest, log)
 					return
 				}
 				br.receivedTx = tx
-				api.WriteCBORResponse(w, tx.Hash(crypto.SHA256), http.StatusAccepted, log)
+				writeCBORResponse(w, tx.Hash(crypto.SHA256), http.StatusAccepted, log)
 				return
 			}
 			// GET
-			api.WriteCBORResponse(w, struct {
+			writeCBORResponse(w, struct {
 				_        struct{} `cbor:",toarray"`
 				TxRecord *types.TransactionRecord
 				TxProof  *types.TxProof
@@ -358,4 +358,26 @@ func execEvmCmd(obs *testobserve.Observability, homeDir, command string) (*testu
 		WalletHomeDir: filepath.Join(homeDir, "wallet")})
 	ccmd.SetArgs(strings.Split(command, " "))
 	return outputWriter, ccmd.Execute()
+}
+
+// WriteCBORResponse replies to the request with the given response and HTTP code.
+func writeCBORResponse(w http.ResponseWriter, response any, statusCode int, log *slog.Logger) {
+	w.Header().Set("Content-Type", "application/cbor")
+	w.WriteHeader(statusCode)
+	if err := types.Cbor.Encode(w, response); err != nil {
+		log.Warn("failed to write CBOR response", logger.Error(err))
+	}
+}
+
+func writeCBORError(w http.ResponseWriter, e error, code int, log *slog.Logger) {
+	w.Header().Set("Content-Type", "application/cbor")
+	w.WriteHeader(code)
+	if err := types.Cbor.Encode(w, struct {
+		_   struct{} `cbor:",toarray"`
+		Err string
+	}{
+		Err: fmt.Sprintf("%v", e),
+	}); err != nil {
+		log.Warn("failed to write CBOR error response", logger.Error(err))
+	}
 }

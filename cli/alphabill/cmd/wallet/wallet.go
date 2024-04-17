@@ -10,7 +10,7 @@ import (
 
 	"github.com/alphabill-org/alphabill/logger"
 	"github.com/alphabill-org/alphabill/observability"
-	moneytx "github.com/alphabill-org/alphabill/txsystem/money"
+	moneytx "github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/spf13/cobra"
 	"github.com/tyler-smith/go-bip39"

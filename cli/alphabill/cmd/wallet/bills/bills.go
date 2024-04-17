@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/alphabill-org/alphabill/network/protocol/genesis"
-	moneytx "github.com/alphabill-org/alphabill/txsystem/money"
-	"github.com/alphabill-org/alphabill/types"
-	"github.com/spf13/cobra"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
+	moneysdk "github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
 
+	"github.com/spf13/cobra"
 	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
@@ -19,13 +18,6 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/money"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	txbuilder "github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
-)
-
-type (
-	// TrustBase json schema for trust base file.
-	TrustBase struct {
-		RootValidators []*genesis.PublicKeyInfo `json:"root_validators"`
-	}
 )
 
 // NewBillsCmd creates a new cobra command for the wallet bills component.
@@ -130,7 +122,7 @@ func lockCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 	cmd.Flags().StringVarP(&config.RpcUrl, args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "rpc node url")
 	cmd.Flags().Uint64VarP(&config.Key, args.KeyCmdName, "k", 1, "account number of the bill to lock")
 	cmd.Flags().Var(&config.BillID, args.BillIdCmdName, "id of the bill to lock")
-	cmd.Flags().Uint32Var(&config.SystemID, args.SystemIdentifierCmdName, uint32(moneytx.DefaultSystemIdentifier), "system identifier")
+	cmd.Flags().Uint32Var(&config.SystemID, args.SystemIdentifierCmdName, uint32(moneysdk.DefaultSystemID), "system identifier")
 	return cmd
 }
 
@@ -205,7 +197,7 @@ func unlockCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 	cmd.Flags().StringVarP(&config.RpcUrl, args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "rpc node url")
 	cmd.Flags().Uint64VarP(&config.Key, args.KeyCmdName, "k", 1, "account number of the bill to unlock")
 	cmd.Flags().Var(&config.BillID, args.BillIdCmdName, "id of the bill to unlock")
-	cmd.Flags().Uint32Var(&config.SystemID, args.SystemIdentifierCmdName, uint32(moneytx.DefaultSystemIdentifier), "system identifier")
+	cmd.Flags().Uint32Var(&config.SystemID, args.SystemIdentifierCmdName, uint32(moneysdk.DefaultSystemID), "system identifier")
 	return cmd
 }
 

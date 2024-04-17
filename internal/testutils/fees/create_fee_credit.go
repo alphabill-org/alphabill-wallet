@@ -3,14 +3,14 @@ package testfees
 import (
 	"testing"
 
-	abcrypto "github.com/alphabill-org/alphabill/crypto"
-	"github.com/alphabill-org/alphabill/predicates/templates"
-	testfc "github.com/alphabill-org/alphabill/txsystem/fc/testutils"
-	"github.com/alphabill-org/alphabill/txsystem/fc/transactions"
-	testtransaction "github.com/alphabill-org/alphabill/txsystem/testutils/transaction"
-	"github.com/alphabill-org/alphabill/types"
-	"github.com/stretchr/testify/require"
+	abcrypto "github.com/alphabill-org/alphabill-go-sdk/crypto"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/fc"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
+	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
 
+	testfc "github.com/alphabill-org/alphabill/txsystem/fc/testutils"
+	testtransaction "github.com/alphabill-org/alphabill/txsystem/testutils/transaction"
+	"github.com/stretchr/testify/require"
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
 )
@@ -25,7 +25,7 @@ func CreateFeeCredit(t *testing.T, initialBillID, fcrID types.UnitID, fcrAmount 
 			testfc.WithTargetRecordID(fcrID),
 		),
 		testtransaction.WithUnitID(initialBillID),
-		testtransaction.WithPayloadType(transactions.PayloadTypeTransferFeeCredit),
+		testtransaction.WithPayloadType(fc.PayloadTypeTransferFeeCredit),
 	)
 
 	signer, _ := abcrypto.NewInMemorySecp256K1SignerFromKey(privKey)
@@ -49,7 +49,7 @@ func CreateFeeCredit(t *testing.T, initialBillID, fcrID types.UnitID, fcrAmount 
 		),
 		testtransaction.WithUnitID(fcrID),
 		testtransaction.WithOwnerProof(templates.NewP2pkh256BytesFromKey(pubKey)),
-		testtransaction.WithPayloadType(transactions.PayloadTypeAddFeeCredit),
+		testtransaction.WithPayloadType(fc.PayloadTypeAddFeeCredit),
 	)
 	require.NoError(t, moneyPartition.SubmitTx(addFC))
 	require.Eventually(t, testpartition.BlockchainContainsTx(moneyPartition, addFC), test.WaitDuration, test.WaitTick)

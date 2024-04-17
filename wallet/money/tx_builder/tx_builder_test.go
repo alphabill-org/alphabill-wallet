@@ -3,10 +3,10 @@ package tx_builder
 import (
 	"testing"
 
-	"github.com/alphabill-org/alphabill/hash"
-	"github.com/alphabill-org/alphabill/predicates/templates"
-	"github.com/alphabill-org/alphabill/txsystem/money"
-	"github.com/alphabill-org/alphabill/types"
+	"github.com/alphabill-org/alphabill-go-sdk/hash"
+	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
 
@@ -35,7 +35,8 @@ func TestSplitTransactionAmount(t *testing.T) {
 	}
 	amount := uint64(150)
 	timeout := uint64(100)
-	systemID := money.DefaultSystemIdentifier
+	systemID := money.DefaultSystemID
+
 	remainingValue := b.Value() - amount
 
 	tx, err := NewSplitTx([]*money.TargetUnit{
@@ -137,7 +138,7 @@ func TestCreateTransactions(t *testing.T) {
 		},
 	}
 
-	systemID := money.DefaultSystemIdentifier
+	systemID := money.DefaultSystemID
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
