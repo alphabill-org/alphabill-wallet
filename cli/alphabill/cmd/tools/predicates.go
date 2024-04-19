@@ -60,7 +60,7 @@ func runCreatePredicateCmd(cmd *cobra.Command, args []string) (err error) {
 		if err != nil {
 			return fmt.Errorf("reading flag %q value: %w", flagNameOutput, err)
 		}
-		f, err := os.Create(filename)
+		f, err := os.Create(filepath.Clean(filename))
 		if err != nil {
 			return fmt.Errorf("creating output file: %w", err)
 		}
@@ -88,13 +88,13 @@ func argValueBytes(cmd *cobra.Command, hexFlag, fileFlag string, required bool) 
 		if err != nil {
 			return nil, fmt.Errorf("reading %q flag: %w", fileFlag, err)
 		}
-		fName, err := filepath.Abs(s)
+		filename, err := filepath.Abs(s)
 		if err != nil {
 			return nil, fmt.Errorf("parsing %q flag as filename: %w", fileFlag, err)
 		}
-		buf, err := os.ReadFile(fName)
+		buf, err := os.ReadFile(filepath.Clean(filename))
 		if err != nil {
-			return nil, fmt.Errorf("reading %q file: %w", fName, err)
+			return nil, fmt.Errorf("reading %q file: %w", filename, err)
 		}
 		return buf, nil
 	}
