@@ -18,12 +18,12 @@ import (
 
 const maxBurnBatchSize = 100
 
-func (w *Wallet) CollectDust(ctx context.Context, accountNumber uint64, allowedTokenTypes []TokenTypeID, invariantPredicateArgs []*PredicateInput) ([]*AccountDcResult, error) {
+func (w *Wallet) CollectDust(ctx context.Context, accountNumber uint64, allowedTokenTypes []TokenTypeID, invariantPredicateArgs []*PredicateInput) (map[uint64][]*SubmissionResult, error) {
 	keys, err := w.getAccounts(accountNumber)
 	if err != nil {
 		return nil, err
 	}
-	results := make([]*AccountDcResult, 0, len(keys))
+	results := make(map[uint64][]*SubmissionResult, len(keys))
 
 	for _, key := range keys {
 		tokensByTypes, err := w.getTokensForDC(ctx, key.PubKey, allowedTokenTypes)
@@ -40,10 +40,7 @@ func (w *Wallet) CollectDust(ctx context.Context, accountNumber uint64, allowedT
 				subResults = append(subResults, subResult)
 			}
 		}
-		results = append(results, &AccountDcResult{
-			AccountNumber:     key.idx + 1,
-			SubmissionResults: subResults,
-		})
+		results[key.idx] = subResults
 	}
 	return results, nil
 }

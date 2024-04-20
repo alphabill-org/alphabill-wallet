@@ -93,11 +93,7 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 	transferInitialBillTx, err := testutil.CreateInitialBillTransferTx(accKey, genesisConfig.InitialBillID, fcrID, initialBillValue, 10000, initialBillBacklink)
 	require.NoError(t, err)
 	batch := txsubmitter.NewBatch(accKey.PubKey, w.rpcClient, observe.Logger())
-	batch.Add(&txsubmitter.TxSubmission{
-		UnitID:      transferInitialBillTx.UnitID(),
-		TxHash:      transferInitialBillTx.Hash(crypto.SHA256),
-		Transaction: transferInitialBillTx,
-	})
+	batch.Add(txsubmitter.New(transferInitialBillTx))
 	err = batch.SendTx(ctx, false)
 	require.NoError(t, err)
 	require.Eventually(t, testpartition.BlockchainContainsTx(moneyPart, transferInitialBillTx), test.WaitDuration, test.WaitTick)

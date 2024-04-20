@@ -1121,11 +1121,7 @@ func (p *ReclaimFeeTxProofs) GetFees() uint64 {
 
 func sendTx(ctx context.Context, tx *types.TransactionOrder, senderPubKey wallet.PubKey, c RpcClient, log *slog.Logger) (*wallet.Proof, error) {
 	batch := txsubmitter.NewBatch(senderPubKey, c, log)
-	txSubmission := &txsubmitter.TxSubmission{
-		UnitID:      tx.UnitID(),
-		TxHash:      tx.Hash(crypto.SHA256),
-		Transaction: tx,
-	}
+	txSubmission := txsubmitter.New(tx)
 	batch.Add(txSubmission)
 	if err := batch.SendTx(ctx, true); err != nil {
 		return nil, err
