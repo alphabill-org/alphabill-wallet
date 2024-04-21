@@ -892,6 +892,65 @@ func TestUnlockToken(t *testing.T) {
 	require.Equal(t, tokens.PayloadTypeUnlockToken, tx.PayloadType())
 }
 
+func TestSendFungibleByID(t *testing.T) {
+	t.Parallel()
+
+	token := &TokenUnit{
+		ID:     test.RandomBytes(32),
+		Kind:   Fungible,
+		Symbol: "AB",
+		TypeID: test.RandomBytes(32),
+		Amount: 100,
+	}
+
+	be := &mockTokensRpcClient{
+		getToken: func(ctx context.Context, id TokenID) (*TokenUnit, error) {
+			if bytes.Equal(id, token.ID) {
+				return token, nil
+			}
+			return nil, fmt.Errorf("not found")
+		},
+		getFeeCreditRecord: func(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
+			return &api.FeeCreditBill{
+				ID: []byte{1},
+				FeeCreditRecord: &unit.FeeCreditRecord{
+					Balance: 50,
+				},
+			}, nil
+		},
+		sendTransaction: func(ctx context.Context, txs *types.TransactionOrder) ([]byte, error) {
+			return nil, nil
+		},
+		getRoundNumber: func(ctx context.Context) (uint64, error) {
+			return 1, nil
+		},
+	}
+
+	// Initialize the wallet
+	wallet := initTestWallet(t, be)
+
+	// Test sending fungible token by ID
+	sub, err := wallet.SendFungibleByID(context.Background(), 1, token.ID, 50, nil, nil)
+	require.NoError(t, err)
+	// ensure it's a split
+	require.Equal(t, tokens.PayloadTypeSplitFungibleToken, sub.Submissions[0].Transaction.PayloadType())
+
+	sub, err = wallet.SendFungibleByID(context.Background(), 1, token.ID, 100, nil, nil)
+	require.NoError(t, err)
+	// ensure it's a transfer
+	require.Equal(t, tokens.PayloadTypeTransferFungibleToken, sub.Submissions[0].Transaction.PayloadType())
+
+	// Test sending fungible token by ID with insufficient balance
+	_, err = wallet.SendFungibleByID(context.Background(), 1, token.ID, 200, nil, nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "insufficient FT value")
+
+	// Test sending fungible token by ID with invalid account number
+	_, err = wallet.SendFungibleByID(context.Background(), 0, token.ID, 50, nil, nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid account number")
+}
+
 func initTestWallet(t *testing.T, rpcClient RpcClient) *Wallet {
 	t.Helper()
 	return &Wallet{

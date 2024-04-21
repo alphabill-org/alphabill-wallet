@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"math"
 
+	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/backend"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/alphabill-org/alphabill/types"
@@ -471,6 +472,34 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 	}
 	err = sub.ToBatch(w.rpcClient, acc.PubKey, w.log).SendTx(ctx, w.confirmTx)
 	return newSingleResult(sub, accountNumber), nil
+}
+
+// SendFungibleByID sends fungible tokens by given unit ID, if amount matches, does the transfer, otherwise splits the token
+func (w *Wallet) SendFungibleByID(ctx context.Context, accountNumber uint64, tokenID backend.TokenID, targetAmount uint64, receiverPubKey []byte, invariantPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
+	if accountNumber < 1 {
+		return nil, fmt.Errorf("invalid account number: %d", accountNumber)
+	}
+	acc, err := w.am.GetAccountKey(accountNumber - 1)
+	if err != nil {
+		return nil, err
+	}
+	err = w.ensureFeeCredit(ctx, acc, 1)
+	if err != nil {
+		return nil, err
+	}
+	token, err := w.GetToken(ctx, tokenID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get token %X: %w", tokenID, err)
+	}
+	if targetAmount > token.Amount {
+		return nil, fmt.Errorf("insufficient FT value: got %v, need %v", token.Amount, targetAmount)
+	}
+	sub, err := w.prepareSplitOrTransferTx(ctx, acc, targetAmount, token, receiverPubKey, invariantPredicateArgs, w.GetRoundNumber)
+	if err != nil {
+		return nil, err
+	}
+	err = sub.ToBatch(w.rpcClient, acc.PubKey, w.log).SendTx(ctx, w.confirmTx)
+	return newSingleResult(sub, accountNumber), err
 }
 
 func (w *Wallet) BurnTokens(ctx context.Context, accountNumber uint64, tokensToBurn []*TokenUnit, invariantPredicateArgs []*PredicateInput) (uint64, uint64, []*wallet.Proof, error) {
