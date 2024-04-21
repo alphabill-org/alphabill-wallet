@@ -473,6 +473,17 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 	return newSingleResult(sub, accountNumber), nil
 }
 
+func (w *Wallet) BurnTokens(ctx context.Context, accountNumber uint64, tokensToBurn []*TokenUnit, invariantPredicateArgs []*PredicateInput) (uint64, uint64, []*wallet.Proof, error) {
+	if accountNumber < 1 {
+		return 0, 0, nil, fmt.Errorf("invalid account number: %d", accountNumber)
+	}
+	acc, err := w.am.GetAccountKey(accountNumber - 1)
+	if err != nil {
+		return 0, 0, nil, err
+	}
+	return w.burnTokensForDC(ctx, acc, tokensToBurn, nil, nil, invariantPredicateArgs)
+}
+
 // GetFeeCredit returns fee credit bill for given account,
 // can return nil if fee credit bill has not been created yet.
 func (w *Wallet) GetFeeCredit(ctx context.Context, cmd fees.GetFeeCreditCmd) (*api.FeeCreditBill, error) {
