@@ -1,4 +1,4 @@
-package tx_builder
+package txbuilder
 
 import (
 	"bytes"
@@ -7,7 +7,6 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/alphabill-org/alphabill-go-sdk/crypto"
 	"github.com/alphabill-org/alphabill-go-sdk/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-sdk/types"
@@ -16,6 +15,7 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
+	"github.com/alphabill-org/alphabill-wallet/wallet/txbuilder"
 )
 
 const MaxFee = uint64(1)
@@ -23,10 +23,10 @@ const MaxFee = uint64(1)
 // CreateTransactions creates 1 to N P2PKH transactions from given bills until target amount is reached.
 // If there exists a bill with value equal to the given amount then transfer transaction is created using that bill,
 // otherwise bills are selected in the given order.
-func CreateTransactions(pubKey []byte, amount uint64, systemID types.SystemID, bills []*api.Bill, k *account.AccountKey, timeout uint64, fcrID []byte) ([]*types.TransactionOrder, error) {
+func CreateTransactions(pubKey []byte, amount uint64, systemID types.SystemID, bills []*api.Bill, k *account.AccountKey, timeout uint64, fcrID, refNo []byte) ([]*types.TransactionOrder, error) {
 	billIndex := slices.IndexFunc(bills, func(b *api.Bill) bool { return b.Value() == amount })
 	if billIndex >= 0 {
-		tx, err := NewTransferTx(pubKey, k, systemID, bills[billIndex], timeout, fcrID)
+		tx, err := NewTransferTx(pubKey, k, systemID, bills[billIndex], timeout, fcrID, refNo)
 		if err != nil {
 			return nil, err
 		}
@@ -36,7 +36,7 @@ func CreateTransactions(pubKey []byte, amount uint64, systemID types.SystemID, b
 	var accumulatedSum uint64
 	for _, b := range bills {
 		remainingAmount := amount - accumulatedSum
-		tx, err := CreateTransaction(pubKey, k, remainingAmount, systemID, b, timeout, fcrID)
+		tx, err := CreateTransaction(pubKey, k, remainingAmount, systemID, b, timeout, fcrID, refNo)
 		if err != nil {
 			return nil, err
 		}
@@ -50,25 +50,25 @@ func CreateTransactions(pubKey []byte, amount uint64, systemID types.SystemID, b
 }
 
 // CreateTransaction creates a P2PKH transfer or split transaction using the given bill.
-func CreateTransaction(receiverPubKey []byte, k *account.AccountKey, amount uint64, systemID types.SystemID, bill *api.Bill, timeout uint64, fcrID []byte) (*types.TransactionOrder, error) {
+func CreateTransaction(receiverPubKey []byte, k *account.AccountKey, amount uint64, systemID types.SystemID, bill *api.Bill, timeout uint64, fcrID, refNo []byte) (*types.TransactionOrder, error) {
 	if bill.Value() <= amount {
-		return NewTransferTx(receiverPubKey, k, systemID, bill, timeout, fcrID)
+		return NewTransferTx(receiverPubKey, k, systemID, bill, timeout, fcrID, refNo)
 	}
 	targetUnits := []*money.TargetUnit{
 		{Amount: amount, OwnerCondition: templates.NewP2pkh256BytesFromKey(receiverPubKey)},
 	}
 	remainingValue := bill.Value() - amount
-	return NewSplitTx(targetUnits, remainingValue, k, systemID, bill, timeout, fcrID)
+	return NewSplitTx(targetUnits, remainingValue, k, systemID, bill, timeout, fcrID, refNo)
 }
 
 // NewTransferTx creates a P2PKH transfer transaction.
-func NewTransferTx(receiverPubKey []byte, k *account.AccountKey, systemID types.SystemID, bill *api.Bill, timeout uint64, fcrID []byte) (*types.TransactionOrder, error) {
+func NewTransferTx(receiverPubKey []byte, k *account.AccountKey, systemID types.SystemID, bill *api.Bill, timeout uint64, fcrID, refNo []byte) (*types.TransactionOrder, error) {
 	attr := &money.TransferAttributes{
 		NewBearer:   templates.NewP2pkh256BytesFromKey(receiverPubKey),
 		TargetValue: bill.Value(),
 		Counter:     bill.Counter(),
 	}
-	txPayload, err := NewTxPayload(systemID, money.PayloadTypeTransfer, bill.ID, timeout, fcrID, attr)
+	txPayload, err := txbuilder.NewTxPayload(systemID, money.PayloadTypeTransfer, bill.ID, timeout, fcrID, refNo, attr)
 	if err != nil {
 		return nil, err
 	}
@@ -76,13 +76,13 @@ func NewTransferTx(receiverPubKey []byte, k *account.AccountKey, systemID types.
 }
 
 // NewSplitTx creates a P2PKH split transaction.
-func NewSplitTx(targetUnits []*money.TargetUnit, remainingValue uint64, k *account.AccountKey, systemID types.SystemID, bill *api.Bill, timeout uint64, fcrID []byte) (*types.TransactionOrder, error) {
+func NewSplitTx(targetUnits []*money.TargetUnit, remainingValue uint64, k *account.AccountKey, systemID types.SystemID, bill *api.Bill, timeout uint64, fcrID, refNo []byte) (*types.TransactionOrder, error) {
 	attr := &money.SplitAttributes{
 		TargetUnits:    targetUnits,
 		RemainingValue: remainingValue,
 		Counter:        bill.Counter(),
 	}
-	txPayload, err := NewTxPayload(systemID, money.PayloadTypeSplit, bill.ID, timeout, fcrID, attr)
+	txPayload, err := txbuilder.NewTxPayload(systemID, money.PayloadTypeSplit, bill.ID, timeout, fcrID, refNo, attr)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func NewDustTx(ac *account.AccountKey, systemID types.SystemID, bill *api.Bill, 
 		Value:             bill.Value(),
 		Counter:           bill.Counter(),
 	}
-	txPayload, err := NewTxPayload(systemID, money.PayloadTypeTransDC, bill.ID, timeout, money.NewFeeCreditRecordID(nil, ac.PubKeyHash.Sha256), attr)
+	txPayload, err := txbuilder.NewTxPayload(systemID, money.PayloadTypeTransDC, bill.ID, timeout, money.NewFeeCreditRecordID(nil, ac.PubKeyHash.Sha256), nil, attr)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func NewSwapTx(k *account.AccountKey, systemID types.SystemID, dcProofs []*walle
 		DcTransferProofs: dustTransferProofs,
 		TargetValue:      billValueSum,
 	}
-	swapTx, err := NewTxPayload(systemID, money.PayloadTypeSwapDC, targetUnitID, timeout, money.NewFeeCreditRecordID(nil, k.PubKeyHash.Sha256), attr)
+	swapTx, err := txbuilder.NewTxPayload(systemID, money.PayloadTypeSwapDC, targetUnitID, timeout, money.NewFeeCreditRecordID(nil, k.PubKeyHash.Sha256), nil, attr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build swap transaction: %w", err)
 	}
@@ -145,7 +145,7 @@ func NewLockTx(ac *account.AccountKey, systemID types.SystemID, unitID []byte, c
 		LockStatus: lockStatus,
 		Counter:    counter,
 	}
-	txPayload, err := NewTxPayload(systemID, money.PayloadTypeLock, unitID, timeout, money.NewFeeCreditRecordID(nil, ac.PubKeyHash.Sha256), attr)
+	txPayload, err := txbuilder.NewTxPayload(systemID, money.PayloadTypeLock, unitID, timeout, money.NewFeeCreditRecordID(nil, ac.PubKeyHash.Sha256), nil, attr)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +156,7 @@ func NewUnlockTx(ac *account.AccountKey, systemID types.SystemID, b *api.Bill, t
 	attr := &money.UnlockAttributes{
 		Counter: b.Counter(),
 	}
-	txPayload, err := NewTxPayload(systemID, money.PayloadTypeUnlock, b.ID, timeout, money.NewFeeCreditRecordID(nil, ac.PubKeyHash.Sha256), attr)
+	txPayload, err := txbuilder.NewTxPayload(systemID, money.PayloadTypeUnlock, b.ID, timeout, money.NewFeeCreditRecordID(nil, ac.PubKeyHash.Sha256), nil, attr)
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +168,7 @@ func NewLockFCTx(ac *account.AccountKey, systemID types.SystemID, fcb *api.FeeCr
 		LockStatus: lockStatus,
 		Backlink:   fcb.Backlink(),
 	}
-	txPayload, err := NewTxPayload(systemID, fc.PayloadTypeLockFeeCredit, fcb.ID, timeout, nil, attr)
+	txPayload, err := txbuilder.NewTxPayload(systemID, fc.PayloadTypeLockFeeCredit, fcb.ID, timeout, nil, nil, attr)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +179,7 @@ func NewUnlockFCTx(ac *account.AccountKey, systemID types.SystemID, fcb *api.Fee
 	attr := &fc.UnlockFeeCreditAttributes{
 		Backlink: fcb.Backlink(),
 	}
-	txPayload, err := NewTxPayload(systemID, fc.PayloadTypeUnlockFeeCredit, fcb.ID, timeout, nil, attr)
+	txPayload, err := txbuilder.NewTxPayload(systemID, fc.PayloadTypeUnlockFeeCredit, fcb.ID, timeout, nil, nil, attr)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func NewTransferFCTx(amount uint64, targetRecordID []byte, targetUnitBacklink []
 		TargetUnitBacklink:     targetUnitBacklink,
 		Counter:                counter,
 	}
-	txPayload, err := NewTxPayload(moneySystemID, fc.PayloadTypeTransferFeeCredit, unitID, timeout, nil, attr)
+	txPayload, err := txbuilder.NewTxPayload(moneySystemID, fc.PayloadTypeTransferFeeCredit, unitID, timeout, nil, nil, attr)
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +209,7 @@ func NewAddFCTx(unitID []byte, fcProof *wallet.Proof, ac *account.AccountKey, sy
 		FeeCreditTransfer:       fcProof.TxRecord,
 		FeeCreditTransferProof:  fcProof.TxProof,
 	}
-	txPayload, err := NewTxPayload(systemID, fc.PayloadTypeAddFeeCredit, unitID, timeout, nil, attr)
+	txPayload, err := txbuilder.NewTxPayload(systemID, fc.PayloadTypeAddFeeCredit, unitID, timeout, nil, nil, attr)
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +222,7 @@ func NewCloseFCTx(systemID types.SystemID, unitID []byte, timeout uint64, amount
 		TargetUnitID:      targetUnitID,
 		TargetUnitCounter: targetUnitBacklink,
 	}
-	txPayload, err := NewTxPayload(systemID, fc.PayloadTypeCloseFeeCredit, unitID, timeout, nil, attr)
+	txPayload, err := txbuilder.NewTxPayload(systemID, fc.PayloadTypeCloseFeeCredit, unitID, timeout, nil, nil, attr)
 	if err != nil {
 		return nil, err
 	}
@@ -235,46 +235,17 @@ func NewReclaimFCTx(systemID types.SystemID, unitID []byte, timeout uint64, fcPr
 		CloseFeeCreditProof:    fcProof.TxProof,
 		Counter:                counter,
 	}
-	txPayload, err := NewTxPayload(systemID, fc.PayloadTypeReclaimFeeCredit, unitID, timeout, nil, attr)
+	txPayload, err := txbuilder.NewTxPayload(systemID, fc.PayloadTypeReclaimFeeCredit, unitID, timeout, nil, nil, attr)
 	if err != nil {
 		return nil, err
 	}
 	return SignPayload(txPayload, k)
 }
 
-func NewTxPayload(systemID types.SystemID, txType string, unitID types.UnitID, timeout uint64, fcrID []byte, attr interface{}) (*types.Payload, error) {
-	attrBytes, err := types.Cbor.Marshal(attr)
-	if err != nil {
-		return nil, err
-	}
-	return &types.Payload{
-		SystemID:   systemID,
-		Type:       txType,
-		UnitID:     unitID,
-		Attributes: attrBytes,
-		ClientMetadata: &types.ClientMetadata{
-			Timeout:           timeout,
-			MaxTransactionFee: MaxFee,
-			FeeCreditRecordID: fcrID,
-		},
-	}, nil
-}
-
 func SignPayload(payload *types.Payload, ac *account.AccountKey) (*types.TransactionOrder, error) {
-	signer, err := crypto.NewInMemorySecp256K1SignerFromKey(ac.PrivKey)
+	payloadSig, err := txbuilder.SignPayload(payload, ac.PrivKey)
 	if err != nil {
 		return nil, err
 	}
-	payloadBytes, err := payload.Bytes()
-	if err != nil {
-		return nil, err
-	}
-	sig, err := signer.SignBytes(payloadBytes)
-	if err != nil {
-		return nil, err
-	}
-	return &types.TransactionOrder{
-		Payload:    payload,
-		OwnerProof: templates.NewP2pkh256SignatureBytes(sig, ac.PubKey),
-	}, nil
+	return txbuilder.NewTransactionOrderP2PKH(payload, payloadSig, ac.PubKey), nil
 }

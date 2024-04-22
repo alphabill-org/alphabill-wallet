@@ -13,7 +13,6 @@ import (
 	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
 
 	"github.com/alphabill-org/alphabill/state"
-
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 )
 

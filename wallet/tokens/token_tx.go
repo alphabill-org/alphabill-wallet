@@ -14,7 +14,7 @@ import (
 
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 )
 
@@ -67,7 +67,7 @@ func (w *Wallet) newType(ctx context.Context, accNr uint64, payloadType string, 
 	if err != nil {
 		return nil, err
 	}
-	err = sub.ToBatch(w.rpcClient, acc.PubKey, w.log).SendTx(ctx, w.confirmTx)
+	err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func preparePredicateSignatures(am account.Manager, args []*PredicateInput, tx *
 	return signatures, nil
 }
 
-func (w *Wallet) newToken(ctx context.Context, accNr uint64, payloadType string, attrs MintAttr, tokenId TokenID, mintPredicateArgs []*PredicateInput) (*txsubmitter.TxSubmission, error) {
+func (w *Wallet) newToken(ctx context.Context, accNr uint64, payloadType string, attrs MintAttr, unitID TokenTypeID, mintPredicateArgs []*PredicateInput) (*txsubmitter.TxSubmission, error) {
 	if accNr < 1 {
 		return nil, fmt.Errorf("invalid account number: %d", accNr)
 	}
@@ -106,7 +106,7 @@ func (w *Wallet) newToken(ctx context.Context, accNr uint64, payloadType string,
 	if err != nil {
 		return nil, err
 	}
-	sub, err := w.prepareTxSubmission(ctx, payloadType, attrs, tokenId, key, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
+	sub, err := w.prepareTxSubmission(ctx, payloadType, attrs, unitID, key, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.am, mintPredicateArgs, tx, attrs)
 		if err != nil {
 			return err
@@ -118,7 +118,7 @@ func (w *Wallet) newToken(ctx context.Context, accNr uint64, payloadType string,
 	if err != nil {
 		return nil, err
 	}
-	err = sub.ToBatch(w.rpcClient, key.PubKey, w.log).SendTx(ctx, w.confirmTx)
+	err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
 	if err != nil {
 		return nil, err
 	}
@@ -203,34 +203,36 @@ func makeTxFeeProof(tx *types.TransactionOrder, ac *account.AccountKey) (wallet.
 func
 newFungibleTransferTxAttrs(token *TokenUnit, receiverPubKey []byte) *tokens.TransferFungibleTokenAttributes {
 	return &tokens.TransferFungibleTokenAttributes{
-		TypeID:                       token.TypeID,
 		NewBearer:                    BearerPredicateFromPubKey(receiverPubKey),
 		Value:                        token.Amount,
-		Backlink:                     token.TxHash,
+		Nonce:                        token.Nonce,
+		Counter:                      token.Counter,
+		TypeID:                       token.TypeID,
 		InvariantPredicateSignatures: nil,
 	}
 }
 
 func newNonFungibleTransferTxAttrs(token *TokenUnit, receiverPubKey []byte) *tokens.TransferNonFungibleTokenAttributes {
 	return &tokens.TransferNonFungibleTokenAttributes{
-		NFTTypeID:                    token.TypeID,
 		NewBearer:                    BearerPredicateFromPubKey(receiverPubKey),
-		Backlink:                     token.TxHash,
+		Nonce:                        token.Nonce,
+		Counter:                      token.Counter,
+		NFTTypeID:                    token.TypeID,
 		InvariantPredicateSignatures: nil,
 	}
 }
 
-func newLockTxAttrs(backlink []byte, lockStatus uint64) *tokens.LockTokenAttributes {
+func newLockTxAttrs(counter uint64, lockStatus uint64) *tokens.LockTokenAttributes {
 	return &tokens.LockTokenAttributes{
 		LockStatus:                   lockStatus,
-		Backlink:                     backlink,
+		Counter:                      counter,
 		InvariantPredicateSignatures: nil,
 	}
 }
 
-func newUnlockTxAttrs(backlink []byte) *tokens.UnlockTokenAttributes {
+func newUnlockTxAttrs(counter uint64) *tokens.UnlockTokenAttributes {
 	return &tokens.UnlockTokenAttributes{
-		Backlink:                     backlink,
+		Counter:                      counter,
 		InvariantPredicateSignatures: nil,
 	}
 }
@@ -255,22 +257,23 @@ func BearerPredicateFromPubKey(receiverPubKey wallet.PubKey) wallet.Predicate {
 
 func newSplitTxAttrs(token *TokenUnit, amount uint64, receiverPubKey []byte) *tokens.SplitFungibleTokenAttributes {
 	return &tokens.SplitFungibleTokenAttributes{
-		TypeID:                       token.TypeID,
 		NewBearer:                    BearerPredicateFromPubKey(receiverPubKey),
 		TargetValue:                  amount,
+		Nonce:                        nil,
+		Counter:                      token.Counter,
+		TypeID:                       token.TypeID,
 		RemainingValue:               token.Amount - amount,
-		Backlink:                     token.TxHash,
 		InvariantPredicateSignatures: [][]byte{nil},
 	}
 }
 
-func newBurnTxAttrs(token *TokenUnit, targetTokenBacklink wallet.TxHash, targetTokenID types.UnitID) *tokens.BurnFungibleTokenAttributes {
+func newBurnTxAttrs(token *TokenUnit, targetTokenCounter uint64, targetTokenID types.UnitID) *tokens.BurnFungibleTokenAttributes {
 	return &tokens.BurnFungibleTokenAttributes{
 		TypeID:                       token.TypeID,
 		Value:                        token.Amount,
 		TargetTokenID:                targetTokenID,
-		TargetTokenBacklink:          targetTokenBacklink,
-		Backlink:                     token.TxHash,
+		TargetTokenCounter:           targetTokenCounter,
+		Counter:                      token.Counter,
 		InvariantPredicateSignatures: nil,
 	}
 }
@@ -282,7 +285,7 @@ func (w *Wallet) doSendMultiple(ctx context.Context, amount uint64, tokens []*To
 		return tokens[i].Amount > tokens[j].Amount
 	})
 
-	batch := txsubmitter.NewBatch(acc.PubKey, w.rpcClient, w.log)
+	batch := txsubmitter.NewBatch(w.rpcClient, w.log)
 	rnFetcher := &cachingRoundNumberFetcher{delegate: w.GetRoundNumber}
 
 	for _, t := range tokens {
@@ -299,12 +302,14 @@ func (w *Wallet) doSendMultiple(ctx context.Context, amount uint64, tokens []*To
 	}
 	err := batch.SendTx(ctx, w.confirmTx)
 	feeSum := uint64(0)
+	var proofs []*wallet.Proof
 	for _, sub := range batch.Submissions() {
 		if sub.Confirmed() {
 			feeSum += sub.Proof.TxRecord.ServerMetadata.ActualFee
+			proofs = append(proofs, sub.Proof)
 		}
 	}
-	return &SubmissionResult{FeeSum: feeSum}, err
+	return &SubmissionResult{FeeSum: feeSum, Proofs: proofs}, err
 }
 
 func (w *Wallet) prepareSplitOrTransferTx(ctx context.Context, acc *account.AccountKey, amount uint64, token *TokenUnit, receiverPubKey []byte, invariantPredicateArgs []*PredicateInput, rn roundNumberFetcher) (*txsubmitter.TxSubmission, error) {
@@ -340,7 +345,7 @@ func createTx(systemID types.SystemID, payloadType string, unitId []byte, timeou
 			UnitID:   unitId,
 			ClientMetadata: &types.ClientMetadata{
 				Timeout:           timeout,
-				MaxTransactionFee: tx_builder.MaxFee,
+				MaxTransactionFee: txbuilder.MaxFee,
 				FeeCreditRecordID: fcrID,
 			},
 		},

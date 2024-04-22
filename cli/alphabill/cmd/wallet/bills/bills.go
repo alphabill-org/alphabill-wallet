@@ -17,7 +17,8 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
-	txbuilder "github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
+	"github.com/alphabill-org/alphabill-wallet/wallet/txpublisher"
 )
 
 // NewBillsCmd creates a new cobra command for the wallet bills component.
@@ -44,7 +45,7 @@ func listCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 	cmd.Flags().StringVarP(&config.RpcUrl, args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "rpc node url")
 	cmd.Flags().Uint64VarP(&config.Key, args.KeyCmdName, "k", 0, "specifies which account bills to list (default: all accounts)")
 	cmd.Flags().BoolVarP(&config.ShowUnswapped, args.ShowUnswappedCmdName, "s", false, "includes unswapped dust bills in output")
-	cmd.Flags().MarkHidden(args.ShowUnswappedCmdName)
+	_ = cmd.Flags().MarkHidden(args.ShowUnswappedCmdName)
 	return cmd
 }
 
@@ -176,8 +177,8 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to create lock tx: %w", err)
 	}
-	moneyTxPublisher := money.NewTxPublisher(moneyClient, config.WalletConfig.Base.Logger)
-	_, err = moneyTxPublisher.SendTx(cmd.Context(), tx, accountKey.PubKey)
+	moneyTxPublisher := txpublisher.NewTxPublisher(moneyClient, config.WalletConfig.Base.Logger)
+	_, err = moneyTxPublisher.SendTx(cmd.Context(), tx)
 	if err != nil {
 		return fmt.Errorf("failed to send lock tx: %w", err)
 	}
@@ -253,8 +254,8 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to create unlock tx: %w", err)
 	}
-	moneyTxPublisher := money.NewTxPublisher(moneyClient, config.WalletConfig.Base.Logger)
-	_, err = moneyTxPublisher.SendTx(cmd.Context(), tx, accountKey.PubKey)
+	moneyTxPublisher := txpublisher.NewTxPublisher(moneyClient, config.WalletConfig.Base.Logger)
+	_, err = moneyTxPublisher.SendTx(cmd.Context(), tx)
 	if err != nil {
 		return fmt.Errorf("failed to send unlock tx: %w", err)
 	}

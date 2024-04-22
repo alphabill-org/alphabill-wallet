@@ -2,7 +2,6 @@ package tokens
 
 import (
 	"context"
-	"crypto"
 	"fmt"
 	"sort"
 
@@ -56,7 +55,7 @@ func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, typedTokens [
 	// first token to be joined into
 	targetToken := typedTokens[0]
 	targetTokenID := targetToken.ID
-	targetTokenBacklink := targetToken.TxHash
+	targetTokenCounter := targetToken.Counter
 	totalAmountJoined := targetToken.Amount
 	burnTokens := typedTokens[1:]
 	totalFees := uint64(0)
@@ -84,22 +83,24 @@ func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, typedTokens [
 		}
 
 		var lockFee uint64
-		targetTokenBacklink, lockFee, err = w.lockTokenForDC(ctx, acc.AccountKey, targetTokenID, targetTokenBacklink, invariantPredicateArgs)
+		lockFee, err = w.lockTokenForDC(ctx, acc.AccountKey, targetTokenID, targetTokenCounter, invariantPredicateArgs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to lock target token: %w", err)
 		}
 
-		burnBatchAmount, burnFee, proofs, err := w.burnTokensForDC(ctx, acc.AccountKey, burnBatch, targetTokenBacklink, targetTokenID, invariantPredicateArgs)
+		targetTokenCounter += 1
+		burnBatchAmount, burnFee, proofs, err := w.burnTokensForDC(ctx, acc.AccountKey, burnBatch, targetTokenCounter, targetTokenID, invariantPredicateArgs)
 		if err != nil {
 			return nil, err
 		}
 
-		// if there's more to burn, update backlink to continue
+		// if there's more to burn, update counter to continue
 		var joinFee uint64
-		targetTokenBacklink, joinFee, err = w.joinTokenForDC(ctx, acc.AccountKey, proofs, targetTokenBacklink, targetTokenID, invariantPredicateArgs)
+		joinFee, err = w.joinTokenForDC(ctx, acc.AccountKey, proofs, targetTokenCounter, targetTokenID, invariantPredicateArgs)
 		if err != nil {
 			return nil, err
 		}
+		targetTokenCounter += 1
 
 		totalAmountJoined += burnBatchAmount
 		totalFees += lockFee + burnFee + joinFee
@@ -107,7 +108,7 @@ func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, typedTokens [
 	return &SubmissionResult{FeeSum: totalFees}, nil
 }
 
-func (w *Wallet) joinTokenForDC(ctx context.Context, acc *account.AccountKey, burnProofs []*wallet.Proof, targetTokenBacklink wallet.TxHash, targetTokenID types.UnitID, invariantPredicateArgs []*PredicateInput) (wallet.TxHash, uint64, error) {
+func (w *Wallet) joinTokenForDC(ctx context.Context, acc *account.AccountKey, burnProofs []*wallet.Proof, targetTokenCounter uint64, targetTokenID types.UnitID, invariantPredicateArgs []*PredicateInput) (uint64, error) {
 	// explicitly sort proofs by unit ids in increasing order
 	sort.Slice(burnProofs, func(i, j int) bool {
 		a := burnProofs[i].TxRecord.TransactionOrder.UnitID()
@@ -124,7 +125,7 @@ func (w *Wallet) joinTokenForDC(ctx context.Context, acc *account.AccountKey, bu
 	joinAttrs := &tokens.JoinFungibleTokenAttributes{
 		BurnTransactions:             burnTxs,
 		Proofs:                       burnTxProofs,
-		Backlink:                     targetTokenBacklink,
+		Counter:                      targetTokenCounter,
 		InvariantPredicateSignatures: nil,
 	}
 
@@ -138,22 +139,22 @@ func (w *Wallet) joinTokenForDC(ctx context.Context, acc *account.AccountKey, bu
 		return err
 	})
 	if err != nil {
-		return nil, 0, err
+		return 0, err
 	}
-	if err = sub.ToBatch(w.rpcClient, acc.PubKey, w.log).SendTx(ctx, true); err != nil {
-		return nil, 0, err
+	if err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, true); err != nil {
+		return 0, err
 	}
-	return sub.Proof.TxRecord.TransactionOrder.Hash(crypto.SHA256), sub.Proof.TxRecord.ServerMetadata.ActualFee, nil
+	return sub.Proof.TxRecord.ServerMetadata.ActualFee, nil
 }
 
-func (w *Wallet) burnTokensForDC(ctx context.Context, acc *account.AccountKey, tokensToBurn []*TokenUnit, targetTokenBacklink wallet.TxHash, targetTokenID types.UnitID, invariantPredicateArgs []*PredicateInput) (uint64, uint64, []*wallet.Proof, error) {
-	burnBatch := txsubmitter.NewBatch(acc.PubKey, w.rpcClient, w.log)
+func (w *Wallet) burnTokensForDC(ctx context.Context, acc *account.AccountKey, tokensToBurn []*TokenUnit, targetTokenCounter uint64, targetTokenID types.UnitID, invariantPredicateArgs []*PredicateInput) (uint64, uint64, []*wallet.Proof, error) {
+	burnBatch := txsubmitter.NewBatch(w.rpcClient, w.log)
 	rnFetcher := &cachingRoundNumberFetcher{delegate: w.GetRoundNumber}
 	burnBatchAmount := uint64(0)
 
 	for _, token := range tokensToBurn {
 		burnBatchAmount += token.Amount
-		attrs := newBurnTxAttrs(token, targetTokenBacklink, targetTokenID)
+		attrs := newBurnTxAttrs(token, targetTokenCounter, targetTokenID)
 		sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeBurnFungibleToken, attrs, token.ID, acc, rnFetcher.getRoundNumber, func(tx *types.TransactionOrder) error {
 			signatures, err := preparePredicateSignatures(w.GetAccountManager(), invariantPredicateArgs, tx, attrs)
 			if err != nil {
@@ -213,10 +214,10 @@ func (w *Wallet) getTokensForDC(ctx context.Context, key wallet.PubKey, allowedT
 	return tokensByTypes, nil
 }
 
-func (w *Wallet) lockTokenForDC(ctx context.Context, acc *account.AccountKey, targetTokenID types.UnitID, targetTokenBacklink wallet.TxHash, invariantPredicateArgs []*PredicateInput) (wallet.TxHash, uint64, error) {
+func (w *Wallet) lockTokenForDC(ctx context.Context, acc *account.AccountKey, targetTokenID types.UnitID, targetTokenCounter uint64, invariantPredicateArgs []*PredicateInput) (uint64, error) {
 	attr := &tokens.LockTokenAttributes{
 		LockStatus: wallet.LockReasonCollectDust,
-		Backlink:   targetTokenBacklink,
+		Counter:    targetTokenCounter,
 	}
 
 	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeLockToken, attr, targetTokenID, acc, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
@@ -229,11 +230,11 @@ func (w *Wallet) lockTokenForDC(ctx context.Context, acc *account.AccountKey, ta
 		return err
 	})
 	if err != nil {
-		return nil, 0, err
+		return 0, err
 	}
 
-	if err = sub.ToBatch(w.rpcClient, acc.PubKey, w.log).SendTx(ctx, true); err != nil {
-		return nil, 0, err
+	if err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, true); err != nil {
+		return 0, err
 	}
-	return sub.Proof.TxRecord.TransactionOrder.Hash(crypto.SHA256), sub.Proof.TxRecord.ServerMetadata.ActualFee, nil
+	return sub.Proof.TxRecord.ServerMetadata.ActualFee, nil
 }

@@ -18,7 +18,7 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
 )
 
 const (
@@ -53,6 +53,7 @@ type (
 		TokenTypeID TokenTypeID
 		TokenID     TokenID
 		FeeSum      uint64
+		Proofs      []*wallet.Proof
 	}
 
 	// AccountDcResult dust collection results for single account.
@@ -135,7 +136,7 @@ func (w *Wallet) NewFungibleType(ctx context.Context, accNr uint64, attrs Create
 		return nil, err
 	}
 	if sub.Confirmed() {
-		return &SubmissionResult{TokenTypeID: sub.UnitID, FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee}, nil
+		return &SubmissionResult{TokenTypeID: sub.UnitID, FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee, Proofs: []*wallet.Proof{sub.Proof}}, nil
 	}
 	return &SubmissionResult{TokenTypeID: sub.UnitID}, nil
 }
@@ -163,36 +164,33 @@ func (w *Wallet) NewNonFungibleType(ctx context.Context, accNr uint64, attrs Cre
 		return nil, err
 	}
 	if sub.Confirmed() {
-		return &SubmissionResult{TokenTypeID: sub.UnitID, FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee}, nil
+		return &SubmissionResult{TokenTypeID: sub.UnitID, FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee, Proofs: []*wallet.Proof{sub.Proof}}, nil
 	}
 	return &SubmissionResult{TokenTypeID: sub.UnitID}, nil
 }
 
-func (w *Wallet) NewFungibleToken(ctx context.Context, accNr uint64, typeId TokenTypeID, amount uint64, bearerPredicate wallet.Predicate, mintPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) NewFungibleToken(ctx context.Context, accNr uint64, unitID TokenTypeID, amount uint64, bearerPredicate wallet.Predicate, mintPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
 	w.log.Info("Creating new fungible token")
 	attrs := &tokens.MintFungibleTokenAttributes{
 		Bearer:                           bearerPredicate,
-		TypeID:                           typeId,
 		Value:                            amount,
+		Nonce:                            0,
 		TokenCreationPredicateSignatures: nil,
 	}
 
 	var err error
-	tokenID, err := tokens.NewRandomFungibleTokenID(nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed generate fungible token ID: %w", err)
-	}
-	sub, err := w.newToken(ctx, accNr, tokens.PayloadTypeMintFungibleToken, attrs, tokenID, mintPredicateArgs)
+	sub, err := w.newToken(ctx, accNr, tokens.PayloadTypeMintFungibleToken, attrs, unitID, mintPredicateArgs)
 	if err != nil {
 		return nil, err
 	}
 	if sub.Confirmed() {
-		return &SubmissionResult{TokenID: sub.UnitID, FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee}, nil
+		newTokenID := sub.Proof.TxRecord.ServerMetadata.TargetUnits[0]
+		return &SubmissionResult{TokenID: newTokenID, TokenTypeID: sub.UnitID, FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee, Proofs: []*wallet.Proof{sub.Proof}}, nil
 	}
-	return &SubmissionResult{TokenID: sub.UnitID}, nil
+	return &SubmissionResult{TokenTypeID: sub.UnitID}, nil
 }
 
-func (w *Wallet) NewNFT(ctx context.Context, accNr uint64, attrs MintNonFungibleTokenAttributes, tokenID TokenID, mintPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) NewNFT(ctx context.Context, accNr uint64, attrs MintNonFungibleTokenAttributes, typeID TokenTypeID, mintPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
 	w.log.Info("Creating new NFT")
 	if len(attrs.Name) > nameMaxSize {
 		return nil, errInvalidNameLength
@@ -206,22 +204,16 @@ func (w *Wallet) NewNFT(ctx context.Context, accNr uint64, attrs MintNonFungible
 	if len(attrs.Data) > dataMaxSize {
 		return nil, errInvalidDataLength
 	}
-	if tokenID == nil {
-		var err error
-		tokenID, err = tokens.NewRandomNonFungibleTokenID(nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed generate non-fungible token ID: %w", err)
-		}
-	}
 
-	sub, err := w.newToken(ctx, accNr, tokens.PayloadTypeMintNFT, attrs.ToCBOR(), tokenID, mintPredicateArgs)
+	sub, err := w.newToken(ctx, accNr, tokens.PayloadTypeMintNFT, attrs.ToCBOR(), typeID, mintPredicateArgs)
 	if err != nil {
 		return nil, err
 	}
 	if sub.Confirmed() {
-		return &SubmissionResult{TokenID: sub.UnitID, FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee}, nil
+		newTokenID := sub.Proof.TxRecord.ServerMetadata.TargetUnits[0]
+		return &SubmissionResult{TokenID: newTokenID, TokenTypeID: sub.UnitID, FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee, Proofs: []*wallet.Proof{sub.Proof}}, nil
 	}
-	return &SubmissionResult{TokenID: sub.UnitID}, nil
+	return &SubmissionResult{TokenTypeID: sub.UnitID}, nil
 }
 
 func (w *Wallet) ListTokenTypes(ctx context.Context, accountNumber uint64, kind Kind) ([]*TokenUnitType, error) {
@@ -348,9 +340,9 @@ func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID 
 	if err != nil {
 		return nil, err
 	}
-	err = sub.ToBatch(w.rpcClient, key.PubKey, w.log).SendTx(ctx, w.confirmTx)
+	err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
 	if sub.Confirmed() {
-		return &SubmissionResult{FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee}, err
+		return &SubmissionResult{FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee, Proofs: []*wallet.Proof{sub.Proof}}, err
 	}
 	return &SubmissionResult{}, err
 }
@@ -418,11 +410,11 @@ func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId 
 		if err != nil {
 			return nil, err
 		}
-		if err = sub.ToBatch(w.rpcClient, acc.PubKey, w.log).SendTx(ctx, w.confirmTx); err != nil {
+		if err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx); err != nil {
 			return nil, err
 		}
 		if sub.Confirmed() {
-			return &SubmissionResult{FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee}, err
+			return &SubmissionResult{FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee, Proofs: []*wallet.Proof{sub.Proof}}, err
 		}
 		return &SubmissionResult{}, err
 	} else {
@@ -455,7 +447,7 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 
 	attrs := &tokens.UpdateNonFungibleTokenAttributes{
 		Data:                 data,
-		Backlink:             t.TxHash,
+		Counter:              t.Counter,
 		DataUpdateSignatures: nil,
 	}
 
@@ -471,9 +463,9 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 	if err != nil {
 		return nil, err
 	}
-	err = sub.ToBatch(w.rpcClient, acc.PubKey, w.log).SendTx(ctx, w.confirmTx)
+	err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
 	if sub.Confirmed() {
-		return &SubmissionResult{FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee}, err
+		return &SubmissionResult{FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee, Proofs: []*wallet.Proof{sub.Proof}}, err
 	}
 	return &SubmissionResult{}, err
 }
@@ -518,7 +510,7 @@ func (w *Wallet) ensureFeeCredit(ctx context.Context, accountKey *account.Accoun
 	if fcb == nil {
 		return ErrNoFeeCredit
 	}
-	maxFee := uint64(txCount) * tx_builder.MaxFee
+	maxFee := uint64(txCount) * txbuilder.MaxFee
 	if fcb.Balance() < maxFee {
 		return ErrInsufficientFeeCredit
 	}
@@ -542,7 +534,7 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID []
 	if token.IsLocked() {
 		return nil, errors.New("token is already locked")
 	}
-	attrs := newLockTxAttrs(token.TxHash, wallet.LockReasonManual)
+	attrs := newLockTxAttrs(token.Counter, wallet.LockReasonManual)
 	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeLockToken, attrs, tokenID, key, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.am, ib, tx, attrs)
 		if err != nil {
@@ -555,9 +547,9 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID []
 	if err != nil {
 		return nil, err
 	}
-	err = sub.ToBatch(w.rpcClient, key.PubKey, w.log).SendTx(ctx, w.confirmTx)
+	err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
 	if sub.Confirmed() {
-		return &SubmissionResult{FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee}, err
+		return &SubmissionResult{FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee, Proofs: []*wallet.Proof{sub.Proof}}, err
 	}
 	return &SubmissionResult{}, err
 }
@@ -578,7 +570,7 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	if !token.IsLocked() {
 		return nil, errors.New("token is already unlocked")
 	}
-	attrs := newUnlockTxAttrs(token.TxHash)
+	attrs := newUnlockTxAttrs(token.Counter)
 	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeUnlockToken, attrs, tokenID, key, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.am, ib, tx, attrs)
 		if err != nil {
@@ -591,9 +583,9 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	if err != nil {
 		return nil, err
 	}
-	err = sub.ToBatch(w.rpcClient, key.PubKey, w.log).SendTx(ctx, w.confirmTx)
+	err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
 	if sub.Confirmed() {
-		return &SubmissionResult{FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee}, err
+		return &SubmissionResult{FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee, Proofs: []*wallet.Proof{sub.Proof}}, err
 	}
 	return &SubmissionResult{}, err
 }

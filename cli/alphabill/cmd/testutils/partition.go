@@ -23,6 +23,12 @@ import (
 	"github.com/alphabill-org/alphabill/state"
 	"github.com/alphabill-org/alphabill/txsystem"
 	"github.com/stretchr/testify/require"
+
+	"github.com/alphabill-org/alphabill-wallet/client/rpc"
+	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
+	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 )
 
 const DefaultT2Timeout = uint32(2500)

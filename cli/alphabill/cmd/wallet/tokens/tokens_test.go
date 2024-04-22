@@ -75,7 +75,7 @@ func TestListTokensCommandInputs(t *testing.T) {
 			expectedPass:  "some pass phrase",
 		},
 		{
-			name:          "list all fungible tokens with falgs",
+			name:          "list all fungible tokens with flags",
 			args:          []string{"fungible", "--with-all", "--with-type-name"},
 			expectedKind:  tokenswallet.Fungible,
 			expectedFlags: []string{cmdFlagWithAll, cmdFlagWithTypeName},
@@ -243,40 +243,40 @@ func TestWalletCreateFungibleTokenCmd_AmountFlag(t *testing.T) {
 }
 
 func TestWalletCreateNonFungibleTokenCmd_TypeFlag(t *testing.T) {
-	type args struct {
+	type params struct {
 		cmdParams string
 	}
 	tests := []struct {
 		name       string
-		args       args
+		params     params
 		want       []byte
 		wantErrStr string
 	}{
 		{
 			name:       "missing token type parameter",
-			args:       args{cmdParams: "new non-fungible --data 12AB"},
+			params:     params{cmdParams: "new non-fungible --data 12AB"},
 			wantErrStr: "required flag(s) \"type\" not set",
 		},
 		{
 			name:       "missing token type parameter has no value",
-			args:       args{cmdParams: "new non-fungible --type"},
+			params:     params{cmdParams: "new non-fungible --type"},
 			wantErrStr: "flag needs an argument: --type",
 		},
 		{
 			name:       "type parameter is not hex encoded",
-			args:       args{cmdParams: "new non-fungible --type 11dummy"},
+			params:     params{cmdParams: "new non-fungible --type 11dummy"},
 			wantErrStr: "invalid argument \"11dummy\" for \"--type\" flag",
 		},
 		{
 			name:       "type parameter is odd length",
-			args:       args{cmdParams: "new non-fungible --type A8B08"},
+			params:     params{cmdParams: "new non-fungible --type A8B08"},
 			wantErrStr: "invalid argument \"A8B08\" for \"--type\" flag: encoding/hex: odd length hex string",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			homedir := testutils.CreateNewTestWallet(t)
-			_, err := doExecTokensCmd(t, homedir, tt.args.cmdParams)
+			_, err := doExecTokensCmd(t, homedir, tt.params.cmdParams)
 			if len(tt.wantErrStr) != 0 {
 				require.ErrorContains(t, err, tt.wantErrStr)
 			} else {
@@ -284,12 +284,6 @@ func TestWalletCreateNonFungibleTokenCmd_TypeFlag(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestWalletCreateNonFungibleTokenCmd_TokenIdFlag(t *testing.T) {
-	homedir := testutils.CreateNewTestWallet(t)
-	execTokensCmdWithError(t, homedir, "new non-fungible --type A8B0 --token-identifier A8B09", "invalid argument \"A8B09\" for \"--token-identifier\" flag: encoding/hex: odd length hex string")
-	execTokensCmdWithError(t, homedir, "new non-fungible --type A8B0 --token-identifier nothex", "invalid argument \"nothex\" for \"--token-identifier\" flag: encoding/hex: invalid byte")
 }
 
 func TestWalletCreateNonFungibleTokenCmd_DataFileFlag(t *testing.T) {
@@ -440,12 +434,6 @@ func randomFungibleTokenTypeID(t *testing.T) types.UnitID {
 
 func randomNonFungibleTokenTypeID(t *testing.T) types.UnitID {
 	unitID, err := tokens.NewRandomNonFungibleTokenTypeID(nil)
-	require.NoError(t, err)
-	return unitID
-}
-
-func randomNonFungibleTokenID(t *testing.T) types.UnitID {
-	unitID, err := tokens.NewRandomNonFungibleTokenID(nil)
 	require.NoError(t, err)
 	return unitID
 }

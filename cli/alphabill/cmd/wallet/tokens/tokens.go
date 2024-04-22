@@ -7,11 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	sdktypes "github.com/alphabill-org/alphabill-go-sdk/types"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
@@ -39,7 +39,7 @@ const (
 	cmdFlagTokenDataUpdateClauseInput = "data-update-input"
 	cmdFlagAmount                     = "amount"
 	cmdFlagType                       = "type"
-	cmdFlagTokenId                    = "token-identifier"
+	cmdFlagTokenID                    = "token-identifier"
 	cmdFlagTokenURI                   = "token-uri"
 	cmdFlagTokenData                  = "data"
 	cmdFlagTokenDataFile              = "data-file"
@@ -77,7 +77,7 @@ func NewTokenCmd(config *types.WalletConfig) *cobra.Command {
 	cmd.AddCommand(tokenCmdLock(config))
 	cmd.AddCommand(tokenCmdUnlock(config))
 	cmd.PersistentFlags().StringP(args.RpcUrl, "r", args.DefaultTokensRpcUrl, "rpc node url")
-	cmd.PersistentFlags().StringP(args.WaitForConfCmdName, "w", "true", "waits for transaction confirmation on the blockchain, otherwise just broadcasts the transaction")
+	args.AddWaitForProofFlags(cmd, cmd.PersistentFlags())
 	return cmd
 }
 
@@ -206,6 +206,9 @@ func execTokenCmdNewTypeFungible(cmd *cobra.Command, config *types.WalletConfig)
 	if result.FeeSum > 0 {
 		config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for transaction(s).", util.AmountToString(result.FeeSum, 8)))
 	}
+	if err := saveTxProofs(cmd, result.Proofs, config.Base.ConsoleWriter); err != nil {
+		return fmt.Errorf("saving transaction proof(s): %w", err)
+	}
 	return nil
 }
 
@@ -292,6 +295,9 @@ func execTokenCmdNewTypeNonFungible(cmd *cobra.Command, config *types.WalletConf
 	if result.FeeSum > 0 {
 		config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for transaction(s).", util.AmountToString(result.FeeSum, 8)))
 	}
+	if err := saveTxProofs(cmd, result.Proofs, config.Base.ConsoleWriter); err != nil {
+		return fmt.Errorf("saving transaction proof(s): %w", err)
+	}
 	return nil
 }
 
@@ -377,6 +383,9 @@ func execTokenCmdNewTokenFungible(cmd *cobra.Command, config *types.WalletConfig
 	if result.FeeSum > 0 {
 		config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for transaction(s).", util.AmountToString(result.FeeSum, 8)))
 	}
+	if err := saveTxProofs(cmd, result.Proofs, config.Base.ConsoleWriter); err != nil {
+		return fmt.Errorf("saving transaction proof(s): %w", err)
+	}
 	return nil
 }
 
@@ -399,8 +408,6 @@ func tokenCmdNewTokenNonFungible(config *types.WalletConfig) *cobra.Command {
 	cmd.Flags().String(cmdFlagTokenURI, "", "URI to associated resource, ie. jpg file on IPFS")
 	cmd.Flags().String(cmdFlagTokenDataUpdateClause, predicateTrue, "data update predicate, values <true|false|ptpkh>")
 	cmd.Flags().StringSlice(cmdFlagMintClauseInput, []string{predicatePtpkh}, "input to satisfy the type's minting clause")
-	setHexFlag(cmd, cmdFlagTokenId, nil, "token identifier")
-	_ = cmd.Flags().MarkHidden(cmdFlagTokenId)
 	return cmd
 }
 
@@ -409,11 +416,7 @@ func execTokenCmdNewTokenNonFungible(cmd *cobra.Command, config *types.WalletCon
 	if err != nil {
 		return err
 	}
-	typeId, err := getHexFlag(cmd, cmdFlagType)
-	if err != nil {
-		return err
-	}
-	tokenID, err := getHexFlag(cmd, cmdFlagTokenId)
+	typeID, err := getHexFlag(cmd, cmdFlagType)
 	if err != nil {
 		return err
 	}
@@ -448,21 +451,23 @@ func execTokenCmdNewTokenNonFungible(cmd *cobra.Command, config *types.WalletCon
 		return err
 	}
 	a := tokenswallet.MintNonFungibleTokenAttributes{
-		Bearer:              bearerPredicate,
 		Name:                name,
-		NftType:             typeId,
 		Uri:                 uri,
 		Data:                data,
+		Bearer:              bearerPredicate,
 		DataUpdatePredicate: dataUpdatePredicate,
+		Nonce:               0,
 	}
-	result, err := tw.NewNFT(cmd.Context(), accountNumber, a, tokenID, ci)
+	result, err := tw.NewNFT(cmd.Context(), accountNumber, a, typeID, ci)
 	if err != nil {
 		return err
 	}
-
 	config.Base.ConsoleWriter.Println(fmt.Sprintf("Sent request for new non-fungible token with id=%s", result.TokenID))
 	if result.FeeSum > 0 {
 		config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for transaction(s).", util.AmountToString(result.FeeSum, 8)))
+	}
+	if err := saveTxProofs(cmd, result.Proofs, config.Base.ConsoleWriter); err != nil {
+		return fmt.Errorf("saving transaction proof(s): %w", err)
 	}
 	return nil
 }
@@ -574,6 +579,9 @@ func execTokenCmdSendFungible(cmd *cobra.Command, config *types.WalletConfig) er
 	if result.FeeSum > 0 {
 		config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for transaction(s).", util.AmountToString(result.FeeSum, 8)))
 	}
+	if err := saveTxProofs(cmd, result.Proofs, config.Base.ConsoleWriter); err != nil {
+		return fmt.Errorf("saving transaction proof(s): %w", err)
+	}
 	return err
 }
 
@@ -586,8 +594,8 @@ func tokenCmdSendNonFungible(config *types.WalletConfig) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringSlice(cmdFlagInheritBearerClauseInput, []string{predicateTrue}, "input to satisfy the type's invariant clause")
-	setHexFlag(cmd, cmdFlagTokenId, nil, "token identifier")
-	err := cmd.MarkFlagRequired(cmdFlagTokenId)
+	setHexFlag(cmd, cmdFlagTokenID, nil, "token identifier")
+	err := cmd.MarkFlagRequired(cmdFlagTokenID)
 	if err != nil {
 		return nil
 	}
@@ -610,7 +618,7 @@ func execTokenCmdSendNonFungible(cmd *cobra.Command, config *types.WalletConfig)
 	}
 	defer tw.Shutdown()
 
-	tokenID, err := getHexFlag(cmd, cmdFlagTokenId)
+	tokenID, err := getHexFlag(cmd, cmdFlagTokenID)
 	if err != nil {
 		return err
 	}
@@ -631,6 +639,9 @@ func execTokenCmdSendNonFungible(cmd *cobra.Command, config *types.WalletConfig)
 	}
 	if result.FeeSum > 0 {
 		config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for transaction(s).", util.AmountToString(result.FeeSum, 8)))
+	}
+	if err := saveTxProofs(cmd, result.Proofs, config.Base.ConsoleWriter); err != nil {
+		return fmt.Errorf("saving transaction proof(s): %w", err)
 	}
 	return err
 }
@@ -703,8 +714,8 @@ func tokenCmdUpdateNFTData(config *types.WalletConfig) *cobra.Command {
 			return execTokenCmdUpdateNFTData(cmd, config)
 		},
 	}
-	setHexFlag(cmd, cmdFlagTokenId, nil, "token identifier")
-	if err := cmd.MarkFlagRequired(cmdFlagTokenId); err != nil {
+	setHexFlag(cmd, cmdFlagTokenID, nil, "token identifier")
+	if err := cmd.MarkFlagRequired(cmdFlagTokenID); err != nil {
 		panic(err)
 	}
 
@@ -719,7 +730,7 @@ func execTokenCmdUpdateNFTData(cmd *cobra.Command, config *types.WalletConfig) e
 		return err
 	}
 
-	tokenID, err := getHexFlag(cmd, cmdFlagTokenId)
+	tokenID, err := getHexFlag(cmd, cmdFlagTokenID)
 	if err != nil {
 		return err
 	}
@@ -746,6 +757,9 @@ func execTokenCmdUpdateNFTData(cmd *cobra.Command, config *types.WalletConfig) e
 	}
 	if result.FeeSum > 0 {
 		config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for transaction(s).", util.AmountToString(result.FeeSum, 8)))
+	}
+	if err := saveTxProofs(cmd, result.Proofs, config.Base.ConsoleWriter); err != nil {
+		return fmt.Errorf("saving transaction proof(s): %w", err)
 	}
 	return err
 }
@@ -955,8 +969,8 @@ func tokenCmdLock(config *types.WalletConfig) *cobra.Command {
 			return execTokenCmdLock(cmd, config)
 		},
 	}
-	setHexFlag(cmd, cmdFlagTokenId, nil, "token identifier")
-	if err := cmd.MarkFlagRequired(cmdFlagTokenId); err != nil {
+	setHexFlag(cmd, cmdFlagTokenID, nil, "token identifier")
+	if err := cmd.MarkFlagRequired(cmdFlagTokenID); err != nil {
 		panic(err)
 	}
 	cmd.Flags().StringSlice(cmdFlagInheritBearerClauseInput, []string{predicateTrue}, "input to satisfy the type's invariant clause")
@@ -968,7 +982,7 @@ func execTokenCmdLock(cmd *cobra.Command, config *types.WalletConfig) error {
 	if err != nil {
 		return err
 	}
-	tokenID, err := getHexFlag(cmd, cmdFlagTokenId)
+	tokenID, err := getHexFlag(cmd, cmdFlagTokenID)
 	if err != nil {
 		return err
 	}
@@ -991,6 +1005,9 @@ func execTokenCmdLock(cmd *cobra.Command, config *types.WalletConfig) error {
 	if result.FeeSum > 0 {
 		config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for transaction(s).", util.AmountToString(result.FeeSum, 8)))
 	}
+	if err := saveTxProofs(cmd, result.Proofs, config.Base.ConsoleWriter); err != nil {
+		return fmt.Errorf("saving transaction proof(s): %w", err)
+	}
 	return nil
 }
 
@@ -1002,8 +1019,8 @@ func tokenCmdUnlock(config *types.WalletConfig) *cobra.Command {
 			return execTokenCmdUnlock(cmd, config)
 		},
 	}
-	setHexFlag(cmd, cmdFlagTokenId, nil, "token identifier")
-	if err := cmd.MarkFlagRequired(cmdFlagTokenId); err != nil {
+	setHexFlag(cmd, cmdFlagTokenID, nil, "token identifier")
+	if err := cmd.MarkFlagRequired(cmdFlagTokenID); err != nil {
 		panic(err)
 	}
 	cmd.Flags().StringSlice(cmdFlagInheritBearerClauseInput, []string{predicateTrue}, "input to satisfy the type's invariant clause")
@@ -1015,7 +1032,7 @@ func execTokenCmdUnlock(cmd *cobra.Command, config *types.WalletConfig) error {
 	if err != nil {
 		return err
 	}
-	tokenID, err := getHexFlag(cmd, cmdFlagTokenId)
+	tokenID, err := getHexFlag(cmd, cmdFlagTokenID)
 	if err != nil {
 		return err
 	}
@@ -1038,6 +1055,9 @@ func execTokenCmdUnlock(cmd *cobra.Command, config *types.WalletConfig) error {
 	if result.FeeSum > 0 {
 		config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for transaction(s).", util.AmountToString(result.FeeSum, 8)))
 	}
+	if err := saveTxProofs(cmd, result.Proofs, config.Base.ConsoleWriter); err != nil {
+		return fmt.Errorf("saving transaction proof(s): %w", err)
+	}
 	return err
 }
 
@@ -1050,11 +1070,7 @@ func initTokensWallet(cmd *cobra.Command, config *types.WalletConfig) (*tokenswa
 	if err != nil {
 		return nil, err
 	}
-	confirmTxStr, err := cmd.Flags().GetString(args.WaitForConfCmdName)
-	if err != nil {
-		return nil, err
-	}
-	confirmTx, err := strconv.ParseBool(confirmTxStr)
+	confirmTx, _, err := args.WaitForProofArg(cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -1202,4 +1218,27 @@ func getFileSize(filepath string) (int64, error) {
 	}
 	// get the size
 	return fi.Size(), nil
+}
+
+/*
+saveTxProofs saves the tx proofs into file when the cmd has appropriate flag set.
+*/
+func saveTxProofs(cmd *cobra.Command, proofs []*wallet.Proof, out types.ConsoleWrapper) error {
+	_, proofFile, err := args.WaitForProofArg(cmd)
+	if err != nil {
+		return err
+	}
+	if proofFile == "" {
+		return nil
+	}
+
+	w, err := os.Create(proofFile)
+	if err != nil {
+		return fmt.Errorf("creating file for transaction proofs: %w", err)
+	}
+	if err := sdktypes.Cbor.Encode(w, proofs); err != nil {
+		return fmt.Errorf("encoding transaction proofs as CBOR: %w", err)
+	}
+	out.Println("Transaction proof(s) saved to file:" + proofFile)
+	return nil
 }

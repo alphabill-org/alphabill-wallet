@@ -61,11 +61,11 @@ type (
 
 	MintNonFungibleTokenAttributes struct {
 		Name                string
-		NftType             TokenTypeID
 		Uri                 string
 		Data                []byte
 		Bearer              wallet.Predicate
 		DataUpdatePredicate wallet.Predicate
+		Nonce               uint64
 	}
 
 	MintAttr interface {
@@ -187,9 +187,9 @@ func (c *CreateFungibleTokenTypeAttributes) ToCBOR() *tokens.CreateFungibleToken
 		icon = &tokens.Icon{Type: c.Icon.Type, Data: c.Icon.Data}
 	}
 	return &tokens.CreateFungibleTokenTypeAttributes{
+		Symbol:                   c.Symbol,
 		Name:                     c.Name,
 		Icon:                     icon,
-		Symbol:                   c.Symbol,
 		DecimalPlaces:            c.DecimalPlaces,
 		ParentTypeID:             c.ParentTypeId,
 		SubTypeCreationPredicate: c.SubTypeCreationPredicate,
@@ -217,12 +217,12 @@ func (c *CreateNonFungibleTokenTypeAttributes) ToCBOR() *tokens.CreateNonFungibl
 
 func (a *MintNonFungibleTokenAttributes) ToCBOR() *tokens.MintNonFungibleTokenAttributes {
 	return &tokens.MintNonFungibleTokenAttributes{
+		Bearer:              a.Bearer,
 		Name:                a.Name,
-		NFTTypeID:           a.NftType,
 		URI:                 a.Uri,
 		Data:                a.Data,
-		Bearer:              a.Bearer,
 		DataUpdatePredicate: a.DataUpdatePredicate,
+		Nonce:               a.Nonce,
 	}
 }
 
@@ -274,6 +274,8 @@ type (
 		TypeID   TokenTypeID `json:"typeId"`
 		TypeName string      `json:"typeName"`
 		Owner    types.Bytes `json:"owner"`
+		Nonce    types.Bytes `json:"nonce,omitempty"`
+		Counter  uint64      `json:"counter"`
 		Locked   uint64      `json:"locked"`
 
 		// fungible only
@@ -288,8 +290,7 @@ type (
 		NftDataUpdatePredicate wallet.Predicate `json:"nftDataUpdatePredicate,omitempty"`
 
 		// meta
-		Kind   Kind          `json:"kind"`
-		TxHash wallet.TxHash `json:"txHash"`
+		Kind Kind `json:"kind"`
 	}
 
 	TokenID     = types.UnitID

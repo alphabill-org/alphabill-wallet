@@ -5,14 +5,16 @@ go 1.21
 replace github.com/multiformats/go-multistream v0.5.0 => github.com/multiformats/go-multistream v0.4.1
 
 require (
-	github.com/alphabill-org/alphabill v0.4.1-0.20240417065339-7ac074d11fd2
-	github.com/alphabill-org/alphabill-go-sdk v0.0.0-20240417060459-c088e5ce78a8
+	github.com/alphabill-org/alphabill v0.4.1-0.20240422105117-be814d5a0a22
+	github.com/alphabill-org/alphabill-go-sdk v0.0.0-20240421205746-062b116d15f6
 	github.com/btcsuite/btcd v0.23.2
 	github.com/btcsuite/btcd/btcutil v1.1.2
 	github.com/ethereum/go-ethereum v1.12.2
 	github.com/fxamacker/cbor/v2 v2.6.0
 	github.com/holiman/uint256 v1.2.4
 	github.com/libp2p/go-libp2p v0.33.2
+	github.com/lmittmann/tint v1.0.2
+	github.com/mattn/go-isatty v0.0.20
 	github.com/multiformats/go-multiaddr v0.12.3
 	github.com/neilotoole/slogt v1.1.0
 	github.com/prometheus/client_golang v1.18.0
@@ -24,7 +26,6 @@ require (
 	github.com/tyler-smith/go-bip39 v1.1.0
 	go.etcd.io/bbolt v1.3.8
 	go.opentelemetry.io/otel v1.21.0
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.21.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.21.0
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.14.0
 	go.opentelemetry.io/otel/exporters/zipkin v1.21.0
@@ -33,7 +34,6 @@ require (
 	go.opentelemetry.io/otel/trace v1.21.0
 	golang.org/x/crypto v0.19.0
 	golang.org/x/term v0.17.0
-	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -121,10 +121,8 @@ require (
 	github.com/libp2p/go-netroute v0.2.1 // indirect
 	github.com/libp2p/go-reuseport v0.4.0 // indirect
 	github.com/libp2p/go-yamux/v4 v4.0.1 // indirect
-	github.com/lmittmann/tint v1.0.2 // indirect
 	github.com/magiconair/properties v1.8.6 // indirect
 	github.com/marten-seemann/tcp v0.0.0-20210406111302-dfbc87cc63fd // indirect
-	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.9 // indirect
 	github.com/miekg/dns v1.1.58 // indirect
 	github.com/mikioh/tcpinfo v0.0.0-20190314235526-30a79bb1804b // indirect
@@ -199,6 +197,7 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.2.1 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )

@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/tools"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet"
 )
@@ -32,6 +33,7 @@ func (a *WalletApp) Execute(ctx context.Context) (err error) {
 
 func (a *WalletApp) AddSubcommands(opts []interface{}) {
 	a.baseCmd.AddCommand(wallet.NewWalletCmd(a.baseConf))
+	a.baseCmd.AddCommand(tools.NewToolsCmd())
 }
 
 func newBaseCmd() (*cobra.Command, *types.BaseConfiguration) {

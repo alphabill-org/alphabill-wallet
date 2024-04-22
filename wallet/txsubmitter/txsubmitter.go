@@ -22,7 +22,6 @@ type (
 	}
 
 	TxSubmissionBatch struct {
-		sender      wallet.PubKey
 		submissions []*TxSubmission
 		maxTimeout  uint64
 		rpcClient   RpcClient
@@ -36,9 +35,8 @@ type (
 	}
 )
 
-func (s *TxSubmission) ToBatch(rpcClient RpcClient, sender wallet.PubKey, log *slog.Logger) *TxSubmissionBatch {
+func (s *TxSubmission) ToBatch(rpcClient RpcClient, log *slog.Logger) *TxSubmissionBatch {
 	return &TxSubmissionBatch{
-		sender:      sender,
 		rpcClient:   rpcClient,
 		submissions: []*TxSubmission{s},
 		maxTimeout:  s.Transaction.Timeout(),
@@ -50,9 +48,8 @@ func (s *TxSubmission) Confirmed() bool {
 	return s.Proof != nil
 }
 
-func NewBatch(sender wallet.PubKey, rpcClient RpcClient, log *slog.Logger) *TxSubmissionBatch {
+func NewBatch(rpcClient RpcClient, log *slog.Logger) *TxSubmissionBatch {
 	return &TxSubmissionBatch{
-		sender:    sender,
 		rpcClient: rpcClient,
 		log:       log,
 	}
