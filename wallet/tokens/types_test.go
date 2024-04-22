@@ -50,6 +50,18 @@ func TestParsePredicateArgument(t *testing.T) {
 			result: []byte{0x53, 0x01},
 		},
 		{
+			input: "0xinvalid",
+			err:   `encoding/hex: invalid byte: U+0069 'i'`,
+		},
+		{
+			input: "foobar",
+			err:   `invalid predicate argument: "foobar"`,
+		},
+		{
+			input: "ptpkh:0x01",
+			err:   `invalid key number: 'ptpkh:0x01': strconv.ParseUint: parsing "0x01": invalid syntax`,
+		},
+		{
 			input: "ptpkh:0",
 			err:   "invalid key number: 0",
 		},
@@ -68,7 +80,7 @@ func TestParsePredicateArgument(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			argument, err := parsePredicate(tt.input, tt.accNumber, mock)
+			argument, err := parsePredicateArgument(tt.input, tt.accNumber, mock)
 			if tt.err != "" {
 				require.ErrorContains(t, err, tt.err)
 			} else {
@@ -81,6 +93,37 @@ func TestParsePredicateArgument(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_parsePredicateArgument_file(t *testing.T) {
+	// share temp dir for all the subtest
+	tmpDir := t.TempDir()
+
+	t.Run("empty argument", func(t *testing.T) {
+		// provide file prefix but no name - this resolves to current working DIR!
+		buf, err := parsePredicateArgument(filePrefix, 0, nil)
+		require.ErrorIs(t, err, syscall.EISDIR)
+		require.Empty(t, buf)
+	})
+
+	t.Run("nonexisting file", func(t *testing.T) {
+		buf, err := parsePredicateArgument(filePrefix+filepath.Join(tmpDir, "doesnt.exist"), 0, nil)
+		require.ErrorIs(t, err, fs.ErrNotExist)
+		require.Empty(t, buf)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		data := make([]byte, 10)
+		_, err := rand.Read(data)
+		require.NoError(t, err)
+
+		filename := filepath.Join(tmpDir, "predicate.cbor")
+		require.NoError(t, os.WriteFile(filename, data, 0666))
+
+		buf, err := parsePredicateArgument(filePrefix+filename, 0, nil)
+		require.NoError(t, err)
+		require.Equal(t, &PredicateInput{Argument: data}, buf)
+	})
 }
 
 func TestParsePredicateClause(t *testing.T) {
@@ -163,6 +206,9 @@ func TestParsePredicateClause(t *testing.T) {
 }
 
 func Test_ParsePredicateClause_file(t *testing.T) {
+	// share temp dir for all the subtest
+	tmpDir := t.TempDir()
+
 	t.Run("empty argument", func(t *testing.T) {
 		// provide file prefix but no name - this resolves to current working DIR!
 		buf, err := ParsePredicateClause(filePrefix, 0, nil)
@@ -171,7 +217,7 @@ func Test_ParsePredicateClause_file(t *testing.T) {
 	})
 
 	t.Run("nonexisting file", func(t *testing.T) {
-		buf, err := ParsePredicateClause(filePrefix+"some.random.name", 0, nil)
+		buf, err := ParsePredicateClause(filePrefix+filepath.Join(tmpDir, "some.random.name"), 0, nil)
 		require.ErrorIs(t, err, fs.ErrNotExist)
 		require.Empty(t, buf)
 	})
@@ -181,7 +227,7 @@ func Test_ParsePredicateClause_file(t *testing.T) {
 		_, err := rand.Read(data)
 		require.NoError(t, err)
 
-		filename := filepath.Join(t.TempDir(), "predicate.cbor")
+		filename := filepath.Join(tmpDir, "predicate.cbor")
 		require.NoError(t, os.WriteFile(filename, data, 0666))
 
 		buf, err := ParsePredicateClause(filePrefix+filename, 0, nil)

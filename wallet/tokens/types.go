@@ -88,10 +88,10 @@ type (
 	}
 )
 
-func ParsePredicates(arguments []string, keyNr uint64, am account.Manager) ([]*PredicateInput, error) {
+func ParsePredicateArguments(arguments []string, keyNr uint64, am account.Manager) ([]*PredicateInput, error) {
 	creationInputs := make([]*PredicateInput, 0, len(arguments))
 	for _, argument := range arguments {
-		input, err := parsePredicate(argument, keyNr, am)
+		input, err := parsePredicateArgument(argument, keyNr, am)
 		if err != nil {
 			return nil, err
 		}
@@ -100,44 +100,50 @@ func ParsePredicates(arguments []string, keyNr uint64, am account.Manager) ([]*P
 	return creationInputs, nil
 }
 
-// parsePredicate uses the following format:
-// empty|true|false|empty produce an empty predicate argument
-// ptpkh (provided key #) or ptpkh:n (n > 0) produce an argument with the signed transaction by the given key
-func parsePredicate(argument string, keyNr uint64, am account.Manager) (*PredicateInput, error) {
-	if len(argument) == 0 || argument == predicateEmpty || argument == predicateTrue || argument == predicateFalse {
+/*
+parsePredicateArgument parses the "argument" using following format:
+  - empty | true | false -> will produce an empty predicate argument;
+  - ptpkh (provided key #) or ptpkh:n -> will return either the default account number ("keyNr" param)
+    or the user provided key index (the "n" part converted to int, must be greater than zero);
+  - @filename -> will load content of the file to be used as predicate argument;
+*/
+func parsePredicateArgument(argument string, keyNr uint64, am account.Manager) (*PredicateInput, error) {
+	switch {
+	case len(argument) == 0 || argument == predicateEmpty || argument == predicateTrue || argument == predicateFalse:
 		return &PredicateInput{Argument: nil}, nil
-	}
-	var err error
-	if strings.HasPrefix(argument, predicatePtpkh) {
+	case strings.HasPrefix(argument, predicatePtpkh):
 		if split := strings.Split(argument, ":"); len(split) == 2 {
-			keyStr := split[1]
-			if strings.HasPrefix(strings.ToLower(keyStr), hexPrefix) {
-				return nil, fmt.Errorf("invalid creation input: '%s'", argument)
-			} else {
-				keyNr, err = strconv.ParseUint(keyStr, 10, 64)
-				if err != nil {
-					return nil, fmt.Errorf("invalid creation input: '%s': %w", argument, err)
-				}
+			var err error
+			if keyNr, err = strconv.ParseUint(split[1], 10, 64); err != nil {
+				return nil, fmt.Errorf("invalid key number: '%s': %w", argument, err)
 			}
 		}
 		if keyNr < 1 {
 			return nil, fmt.Errorf("invalid key number: %v in '%s'", keyNr, argument)
 		}
-		_, err := am.GetAccountKey(keyNr - 1)
-		if err != nil {
+		if _, err := am.GetAccountKey(keyNr - 1); err != nil {
 			return nil, err
 		}
 		return &PredicateInput{AccountNumber: keyNr}, nil
-
-	}
-	if strings.HasPrefix(argument, hexPrefix) {
+	case strings.HasPrefix(argument, hexPrefix):
 		decoded, err := DecodeHexOrEmpty(argument)
 		if err != nil {
 			return nil, err
 		}
 		return &PredicateInput{Argument: decoded}, nil
+	case strings.HasPrefix(argument, filePrefix):
+		filename, err := filepath.Abs(strings.TrimPrefix(argument, filePrefix))
+		if err != nil {
+			return nil, err
+		}
+		buf, err := os.ReadFile(filepath.Clean(filename))
+		if err != nil {
+			return nil, err
+		}
+		return &PredicateInput{Argument: buf}, nil
+	default:
+		return nil, fmt.Errorf("invalid predicate argument: %q", argument)
 	}
-	return nil, fmt.Errorf("invalid creation input: '%s'", argument)
 }
 
 func ParsePredicateClause(clause string, keyNr uint64, am account.Manager) ([]byte, error) {
