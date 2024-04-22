@@ -6,10 +6,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/alphabill-org/alphabill-go-sdk/types"
 	"github.com/alphabill-org/alphabill-go-sdk/hash"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/orchestration"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
 	"github.com/alphabill-org/alphabill-go-sdk/util"
-	"github.com/alphabill-org/alphabill/txsystem/orchestration"
 
 	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
@@ -36,7 +36,7 @@ func NewCmd(config *clitypes.WalletConfig) *cobra.Command {
 	cmd.AddCommand(addVarCmd(orchestrationConfig))
 	cmd.PersistentFlags().StringVarP(&orchestrationConfig.RpcUrl, args.RpcUrl, "r", args.DefaultOrchestrationRpcUrl, "rpc node url")
 	cmd.PersistentFlags().Uint64VarP(&orchestrationConfig.Key, args.KeyCmdName, "k", 1, "account number of the proof-of-authority key")
-	cmd.PersistentFlags().Uint32VarP(&orchestrationConfig.SystemID, args.SystemIdentifierCmdName, "s", uint32(orchestration.DefaultSystemIdentifier), "system identifier of the orchestration partition")
+	cmd.PersistentFlags().Uint32VarP(&orchestrationConfig.SystemID, args.SystemIdentifierCmdName, "s", uint32(orchestration.DefaultSystemID), "system identifier of the orchestration partition")
 	return cmd
 }
 

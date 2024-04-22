@@ -60,10 +60,10 @@ github.com/aead/siphash v1.0.1/go.mod h1:Nywa3cDsYNNK3gaciGTWPwHt0wlpNV15vwmswBA
 github.com/ajg/form v1.5.1/go.mod h1:uL1WgH+h2mgNtvBq0339dVnzXdBETtL2LeUXaIv25UY=
 github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156 h1:eMwmnE/GDgah4HI848JfFxHt+iPb26b4zyfspmqY0/8=
 github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156/go.mod h1:Cb/ax3seSYIx7SuZdm2G2xzfwmv3TPSk2ucNfQESPXM=
-github.com/alphabill-org/alphabill v0.4.1-0.20240422105117-be814d5a0a22 h1:V27txVEsf1PC93DsB4DgpOi3brxAQnp58UDQl5fsZSw=
-github.com/alphabill-org/alphabill v0.4.1-0.20240422105117-be814d5a0a22/go.mod h1:ZtvtmmE6tL82XBjNY/4lqptIg92pV1cxm3xlbrMigT8=
-github.com/alphabill-org/alphabill-go-sdk v0.0.0-20240421205746-062b116d15f6 h1:D3tQ7gXbqeeLBhlW49BWrQdFNS0J0/9teG9LX1c9k74=
-github.com/alphabill-org/alphabill-go-sdk v0.0.0-20240421205746-062b116d15f6/go.mod h1:Fi88ZmQfQ2Ed6wUbUaEkaA0DfU4IGY74NVXYdYctNJ0=
+github.com/alphabill-org/alphabill v0.4.1-0.20240422130829-5b2ad85ce54a h1:rJO9dtiL1nsG91hTOIxJ3yHUlGizvQ6PCBU3QD/E4sg=
+github.com/alphabill-org/alphabill v0.4.1-0.20240422130829-5b2ad85ce54a/go.mod h1:sZyzt6lVBwnAbM+yuLxKy9nghjZCy5AZVEwh5gFkVrU=
+github.com/alphabill-org/alphabill-go-sdk v0.0.0-20240422130418-da97381fac73 h1:C9jn1IeBLpVEaAAfPNr7DznMWo5LRroKZ7qcIHtLxHI=
+github.com/alphabill-org/alphabill-go-sdk v0.0.0-20240422130418-da97381fac73/go.mod h1:Fi88ZmQfQ2Ed6wUbUaEkaA0DfU4IGY74NVXYdYctNJ0=
 github.com/anmitsu/go-shlex v0.0.0-20161002113705-648efa622239/go.mod h1:2FmKhYUyUczH0OGQWaF5ceTx0UBShxjsH6f8oGKYe2c=
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
 github.com/aymerick/raymond v2.0.3-0.20180322193309-b565731e1464+incompatible/go.mod h1:osfaiScAUVup+UC9Nfq76eWqDhXlp+4UYaA8uhTBO6g=
