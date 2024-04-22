@@ -4,6 +4,8 @@ import (
 	"crypto"
 	"encoding/hex"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -22,6 +24,7 @@ const (
 	predicateFalse = "false"
 	predicatePtpkh = "ptpkh"
 	hexPrefix      = "0x"
+	filePrefix     = "@"
 )
 
 type (
@@ -138,15 +141,20 @@ func parsePredicate(argument string, keyNr uint64, am account.Manager) (*Predica
 }
 
 func ParsePredicateClause(clause string, keyNr uint64, am account.Manager) ([]byte, error) {
-	if len(clause) == 0 || clause == predicateTrue {
+	switch {
+	case len(clause) == 0 || clause == predicateTrue:
 		return templates.AlwaysTrueBytes(), nil
-	}
-	if clause == predicateFalse {
+	case clause == predicateFalse:
 		return templates.AlwaysFalseBytes(), nil
-	}
-
-	var err error
-	if strings.HasPrefix(clause, predicatePtpkh) {
+	case strings.HasPrefix(clause, hexPrefix):
+		return DecodeHexOrEmpty(clause)
+	case strings.HasPrefix(clause, filePrefix):
+		filename, err := filepath.Abs(strings.TrimPrefix(clause, filePrefix))
+		if err != nil {
+			return nil, err
+		}
+		return os.ReadFile(filepath.Clean(filename))
+	case strings.HasPrefix(clause, predicatePtpkh):
 		if split := strings.Split(clause, ":"); len(split) == 2 {
 			keyStr := split[1]
 			if strings.HasPrefix(strings.ToLower(keyStr), hexPrefix) {
@@ -159,6 +167,7 @@ func ParsePredicateClause(clause string, keyNr uint64, am account.Manager) ([]by
 				}
 				return templates.NewP2pkh256BytesFromKeyHash(keyHash), nil
 			} else {
+				var err error
 				keyNr, err = strconv.ParseUint(keyStr, 10, 64)
 				if err != nil {
 					return nil, fmt.Errorf("invalid predicate clause: '%s': %w", clause, err)
@@ -173,11 +182,8 @@ func ParsePredicateClause(clause string, keyNr uint64, am account.Manager) ([]by
 			return nil, err
 		}
 		return templates.NewP2pkh256BytesFromKeyHash(accountKey.PubKeyHash.Sha256), nil
+	}
 
-	}
-	if strings.HasPrefix(clause, hexPrefix) {
-		return DecodeHexOrEmpty(clause)
-	}
 	return nil, fmt.Errorf("invalid predicate clause: '%s'", clause)
 }
 

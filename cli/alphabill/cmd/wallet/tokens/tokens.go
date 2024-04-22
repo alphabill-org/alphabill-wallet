@@ -57,6 +57,9 @@ const (
 
 	maxBinaryFile64KiB = 64 * 1024
 	maxDecimalPlaces   = 8
+
+	helpPredicateValues = `Valid values are either one of the predicate template name [ true | false | ptpkh | ptpkh:n | ptpkh:0x<hex-string> ] ` +
+		`or @filename to load predicate from given file.`
 )
 
 type runTokenListTypesCmd func(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind tokenswallet.Kind) error
@@ -114,9 +117,9 @@ func addCommonTypeFlags(cmd *cobra.Command) *cobra.Command {
 	setHexFlag(cmd, cmdFlagParentType, nil, "unit identifier of a parent type in hexadecimal format")
 	cmd.Flags().StringSlice(cmdFlagSybTypeClauseInput, nil, "input to satisfy the parent type creation clause (mandatory with --parent-type)")
 	cmd.MarkFlagsRequiredTogether(cmdFlagParentType, cmdFlagSybTypeClauseInput)
-	cmd.Flags().String(cmdFlagSybTypeClause, predicateTrue, "predicate to control sub typing, values <true|false|ptpkh>")
-	cmd.Flags().String(cmdFlagMintClause, predicatePtpkh, "predicate to control minting of this type, values <true|false|ptpkh>")
-	cmd.Flags().String(cmdFlagInheritBearerClause, predicateTrue, "predicate that will be inherited by subtypes into their bearer clauses, values <true|false|ptpkh>")
+	cmd.Flags().String(cmdFlagSybTypeClause, predicateTrue, "predicate to control sub typing. "+helpPredicateValues)
+	cmd.Flags().String(cmdFlagMintClause, predicatePtpkh, "predicate to control minting of this type. "+helpPredicateValues)
+	cmd.Flags().String(cmdFlagInheritBearerClause, predicateTrue, "predicate that will be inherited by subtypes into their bearer clauses. "+helpPredicateValues)
 	return cmd
 }
 
@@ -222,7 +225,7 @@ func tokenCmdNewTypeNonFungible(config *types.WalletConfig) *cobra.Command {
 	}
 	setHexFlag(cmd, cmdFlagType, nil, "type unit identifier")
 	_ = cmd.Flags().MarkHidden(cmdFlagType)
-	cmd.Flags().String(cmdFlagTokenDataUpdateClause, predicateTrue, "data update predicate, values <true|false|ptpkh>")
+	cmd.Flags().String(cmdFlagTokenDataUpdateClause, predicateTrue, "data update predicate. "+helpPredicateValues)
 	return cmd
 }
 
@@ -319,7 +322,7 @@ func tokenCmdNewTokenFungible(config *types.WalletConfig) *cobra.Command {
 			return execTokenCmdNewTokenFungible(cmd, config)
 		},
 	}
-	cmd.Flags().String(cmdFlagBearerClause, predicatePtpkh, "predicate that defines the ownership of this fungible token, values <true|false|ptpkh>")
+	cmd.Flags().String(cmdFlagBearerClause, predicatePtpkh, "predicate that defines the ownership of this fungible token. "+helpPredicateValues)
 	cmd.Flags().String(cmdFlagAmount, "", "amount, must be bigger than 0 and is interpreted according to token type precision (decimals)")
 	err := cmd.MarkFlagRequired(cmdFlagAmount)
 	if err != nil {
@@ -398,7 +401,7 @@ func tokenCmdNewTokenNonFungible(config *types.WalletConfig) *cobra.Command {
 		},
 	}
 	addDataFlags(cmd)
-	cmd.Flags().String(cmdFlagBearerClause, predicatePtpkh, "predicate that defines the ownership of this non-fungible token, values <true|false|ptpkh>")
+	cmd.Flags().String(cmdFlagBearerClause, predicatePtpkh, "predicate that defines the ownership of this non-fungible token. "+helpPredicateValues)
 	setHexFlag(cmd, cmdFlagType, nil, "type unit identifier")
 	err := cmd.MarkFlagRequired(cmdFlagType)
 	if err != nil {
@@ -406,7 +409,7 @@ func tokenCmdNewTokenNonFungible(config *types.WalletConfig) *cobra.Command {
 	}
 	cmd.Flags().String(cmdFlagName, "", "name of the token (optional)")
 	cmd.Flags().String(cmdFlagTokenURI, "", "URI to associated resource, ie. jpg file on IPFS")
-	cmd.Flags().String(cmdFlagTokenDataUpdateClause, predicateTrue, "data update predicate, values <true|false|ptpkh>")
+	cmd.Flags().String(cmdFlagTokenDataUpdateClause, predicateTrue, "data update predicate. "+helpPredicateValues)
 	cmd.Flags().StringSlice(cmdFlagMintClauseInput, []string{predicatePtpkh}, "input to satisfy the type's minting clause")
 	return cmd
 }
@@ -1124,19 +1127,27 @@ func readPredicateInput(cmd *cobra.Command, flag string, keyNr uint64, am accoun
 	return creationInputs, nil
 }
 
-// parsePredicateClause uses the following format:
-// empty string returns "always true"
-// true
-// false
-// ptpkh
-// ptpkh:1
-// ptpkh:0x<hex> where hex value is the hash of a public key
+/*
+parsePredicateClauseCmd reads the "flag" value and converts it to predicate bytes.
+The flag's value must use the following format:
+  - empty string returns "always true"
+  - true
+  - false
+  - ptpkh
+  - ptpkh:n - where n is integer >= 0
+  - ptpkh:0x<hex> - where hex value is the hash of a public key
+  - @filename - to load the content of given file
+*/
 func parsePredicateClauseCmd(cmd *cobra.Command, flag string, keyNr uint64, am account.Manager) ([]byte, error) {
 	clause, err := cmd.Flags().GetString(flag)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading flag %q value: %w", flag, err)
 	}
-	return tokenswallet.ParsePredicateClause(clause, keyNr, am)
+	buf, err := tokenswallet.ParsePredicateClause(clause, keyNr, am)
+	if err != nil {
+		return nil, fmt.Errorf("parsing flag %q value: %w", flag, err)
+	}
+	return buf, nil
 }
 
 func readNFTData(cmd *cobra.Command, required bool) ([]byte, error) {

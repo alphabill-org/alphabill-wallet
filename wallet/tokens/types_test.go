@@ -1,6 +1,11 @@
 package tokens
 
 import (
+	"crypto/rand"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"syscall"
 	"testing"
 
 	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
@@ -154,6 +159,34 @@ func TestParsePredicateClause(t *testing.T) {
 			require.Equal(t, tt.expectedIndex, mock.recordedIndex)
 		})
 	}
+}
+
+func Test_ParsePredicateClause_file(t *testing.T) {
+	t.Run("empty argument", func(t *testing.T) {
+		// provide file prefix but no name - this resolves to current working DIR!
+		buf, err := ParsePredicateClause(filePrefix, 0, nil)
+		require.ErrorIs(t, err, syscall.EISDIR)
+		require.Empty(t, buf)
+	})
+
+	t.Run("nonexisting file", func(t *testing.T) {
+		buf, err := ParsePredicateClause(filePrefix+"some.random.name", 0, nil)
+		require.ErrorIs(t, err, fs.ErrNotExist)
+		require.Empty(t, buf)
+	})
+
+	t.Run("success", func(t *testing.T) {
+		data := make([]byte, 10)
+		_, err := rand.Read(data)
+		require.NoError(t, err)
+
+		filename := filepath.Join(t.TempDir(), "predicate.cbor")
+		require.NoError(t, os.WriteFile(filename, data, 0666))
+
+		buf, err := ParsePredicateClause(filePrefix+filename, 0, nil)
+		require.NoError(t, err)
+		require.Equal(t, data, buf)
+	})
 }
 
 func TestDecodeHexOrEmpty(t *testing.T) {
