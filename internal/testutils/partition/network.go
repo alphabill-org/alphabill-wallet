@@ -353,7 +353,7 @@ func (n *NodePartition) start(t *testing.T, ctx context.Context, bootNodes []pee
 	// make sure node network (to other nodes and root nodes) is initiated
 	for _, nd := range n.Nodes {
 		if ok := eventually(
-			func() bool { return len(nd.GetPeer().Network().Peers()) >= len(n.Nodes) },
+			func() bool { return len(nd.Peer().Network().Peers()) >= len(n.Nodes) },
 			2*time.Second, 100*time.Millisecond); !ok {
 			return fmt.Errorf("network not initialized")
 		}

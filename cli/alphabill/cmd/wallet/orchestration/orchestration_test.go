@@ -13,8 +13,8 @@ import (
 	abcrypto "github.com/alphabill-org/alphabill-go-sdk/crypto"
 	"github.com/alphabill-org/alphabill-go-sdk/types"
 	"github.com/alphabill-org/alphabill-go-sdk/util"
+	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
 
-	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/state"
 	"github.com/alphabill-org/alphabill/txsystem"
 	"github.com/alphabill-org/alphabill/txsystem/orchestration"
@@ -24,6 +24,7 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
 	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
 	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
 	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
@@ -152,8 +153,7 @@ func execOrchestrationCmd(t *testing.T, homedir string, command string) (*testut
 		Base: &clitypes.BaseConfiguration{
 			HomeDir:       homedir,
 			ConsoleWriter: outputWriter,
-			LogCfgFile:    "logger-config.yaml",
-			Observe:       testobserve.Default(t),
+			Logger:        logger.New(t),
 		},
 		WalletHomeDir: filepath.Join(homedir, "wallet"),
 	})
