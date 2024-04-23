@@ -34,12 +34,11 @@ var (
 		},
 	}
 
-	// TODO: duplicated from alphabill repo, really need those here?
 	// The ID of the dust collector money supply
-	DustCollectorMoneySupplyID = money.NewBillID(nil, nil)
+	dustCollectorMoneySupplyID = money.NewBillID(nil, nil)
 
 	// Dust collector predicate
-	DustCollectorPredicate = templates.NewP2pkh256BytesFromKeyHash(hash.Sum256([]byte("dust collector")))
+	dustCollectorPredicate = templates.NewP2pkh256BytesFromKeyHash(hash.Sum256([]byte("dust collector")))
 )
 
 func MoneyGenesisState(t *testing.T, config *MoneyGenesisConfig) *state.State {
@@ -55,8 +54,8 @@ func MoneyGenesisState(t *testing.T, config *MoneyGenesisConfig) *state.State {
 	require.NoError(t, s.AddUnitLog(config.InitialBillID, zeroHash))
 
 	// dust collector money supply
-	require.NoError(t, s.Apply(state.AddUnit(DustCollectorMoneySupplyID, DustCollectorPredicate, &money.BillData{V: config.DCMoneySupplyValue})))
-	require.NoError(t, s.AddUnitLog(DustCollectorMoneySupplyID, zeroHash))
+	require.NoError(t, s.Apply(state.AddUnit(dustCollectorMoneySupplyID, dustCollectorPredicate, &money.BillData{V: config.DCMoneySupplyValue})))
+	require.NoError(t, s.AddUnitLog(dustCollectorMoneySupplyID, zeroHash))
 
 	// fee credit bills
 	for _, sdr := range config.SDRs {
