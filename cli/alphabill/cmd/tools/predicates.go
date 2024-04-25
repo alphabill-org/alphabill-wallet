@@ -8,7 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
+	"github.com/alphabill-org/alphabill-go-sdk/predicates"
 	"github.com/alphabill-org/alphabill-go-sdk/types"
 )
 
@@ -43,7 +43,7 @@ func createPredicateCmd() *cobra.Command {
 }
 
 func runCreatePredicateCmd(cmd *cobra.Command, args []string) (err error) {
-	pred := templates.Predicate{}
+	pred := predicates.Predicate{}
 	if pred.Tag, err = cmd.Flags().GetUint64(flagNameEngine); err != nil {
 		return fmt.Errorf("reading engine id flag: %w", err)
 	}
