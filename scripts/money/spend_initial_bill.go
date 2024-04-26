@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/alphabill-org/alphabill/hash"
-	"github.com/alphabill-org/alphabill/predicates/templates"
-	"github.com/alphabill-org/alphabill/txsystem/fc/transactions"
-	"github.com/alphabill-org/alphabill/txsystem/money"
-	"github.com/alphabill-org/alphabill/types"
-	"github.com/alphabill-org/alphabill/util"
+	"github.com/alphabill-org/alphabill-go-sdk/hash"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/fc"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
+	"github.com/alphabill-org/alphabill-go-sdk/util"
+	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/fxamacker/cbor/v2"
 
@@ -148,7 +149,7 @@ func execInitialBill(ctx context.Context, rpcClient api.RpcClient, timeout uint6
 
 func createTransferFC(feeAmount uint64, unitID []byte, targetUnitID []byte, t1, t2, counter uint64) (*types.TransactionOrder, error) {
 	attr, err := cbor.Marshal(
-		&transactions.TransferFeeCreditAttributes{
+		&fc.TransferFeeCreditAttributes{
 			Amount:                 feeAmount,
 			TargetSystemIdentifier: 1,
 			TargetRecordID:         targetUnitID,
@@ -163,7 +164,7 @@ func createTransferFC(feeAmount uint64, unitID []byte, targetUnitID []byte, t1, 
 	tx := &types.TransactionOrder{
 		Payload: &types.Payload{
 			SystemID:       1,
-			Type:           transactions.PayloadTypeTransferFeeCredit,
+			Type:           fc.PayloadTypeTransferFeeCredit,
 			UnitID:         unitID,
 			Attributes:     attr,
 			ClientMetadata: &types.ClientMetadata{Timeout: t2, MaxTransactionFee: 1},
@@ -175,7 +176,7 @@ func createTransferFC(feeAmount uint64, unitID []byte, targetUnitID []byte, t1, 
 
 func createAddFC(unitID []byte, ownerCondition []byte, transferFC *types.TransactionRecord, transferFCProof *types.TxProof, timeout uint64, maxFee uint64) (*types.TransactionOrder, error) {
 	attr, err := cbor.Marshal(
-		&transactions.AddFeeCreditAttributes{
+		&fc.AddFeeCreditAttributes{
 			FeeCreditTransfer:       transferFC,
 			FeeCreditTransferProof:  transferFCProof,
 			FeeCreditOwnerCondition: ownerCondition,
@@ -187,7 +188,7 @@ func createAddFC(unitID []byte, ownerCondition []byte, transferFC *types.Transac
 	return &types.TransactionOrder{
 		Payload: &types.Payload{
 			SystemID:       1,
-			Type:           transactions.PayloadTypeAddFeeCredit,
+			Type:           fc.PayloadTypeAddFeeCredit,
 			UnitID:         unitID,
 			Attributes:     attr,
 			ClientMetadata: &types.ClientMetadata{Timeout: timeout, MaxTransactionFee: maxFee},

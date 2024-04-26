@@ -12,8 +12,10 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/alphabill-org/alphabill-go-sdk/types"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/evm"
+
 	testtransaction "github.com/alphabill-org/alphabill/txsystem/testutils/transaction"
-	"github.com/alphabill-org/alphabill/types"
 	"github.com/stretchr/testify/require"
 
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
@@ -240,9 +242,9 @@ func TestEvmClient_Call(t *testing.T) {
 					w := httptest.NewRecorder()
 					callEVMResponse := &struct {
 						_                 struct{} `cbor:",toarray"`
-						ProcessingDetails *ProcessingDetails
+						ProcessingDetails *evm.ProcessingDetails
 					}{
-						ProcessingDetails: &ProcessingDetails{ErrorDetails: "some error occurred"},
+						ProcessingDetails: &evm.ProcessingDetails{ErrorDetails: "some error occurred"},
 					}
 					writeCBORResponse(t, w, callEVMResponse, http.StatusOK)
 					return w.Result(), nil
@@ -250,7 +252,7 @@ func TestEvmClient_Call(t *testing.T) {
 			}},
 		}
 
-		attr := &CallAttributes{}
+		attr := &evm.CallEVMRequest{}
 		result, err := cli.Call(context.Background(), attr)
 		require.NoError(t, err)
 		require.NotNil(t, result)
@@ -268,7 +270,7 @@ func TestEvmClient_Call(t *testing.T) {
 				},
 			}},
 		}
-		attr := &CallAttributes{}
+		attr := &evm.CallEVMRequest{}
 		result, err := cli.Call(context.Background(), attr)
 		require.ErrorContains(t, err, "transaction send failed: 400 Bad Request, not a valid transaction")
 		require.Nil(t, result)

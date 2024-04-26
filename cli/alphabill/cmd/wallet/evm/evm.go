@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/alphabill-org/alphabill/txsystem/evm"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/evm"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/spf13/cobra"
 
@@ -152,7 +152,7 @@ func initEvmWallet(cobraCmd *cobra.Command, config *types.EvmConfig) (*evmwallet
 	if err != nil {
 		return nil, err
 	}
-	wallet, err := evmwallet.New(evm.DefaultEvmTxSystemIdentifier, uri, am)
+	wallet, err := evmwallet.New(evm.DefaultSystemID, uri, am)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func execEvmCmdDeploy(cmd *cobra.Command, config *types.EvmConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to read '%s' parameter: %w", MaxGasCmdName, err)
 	}
-	attributes := &evmclient.TxAttributes{
+	attributes := &evm.TxAttributes{
 		Data: code,
 		Gas:  maxGas,
 	}
@@ -238,7 +238,7 @@ func execEvmCmdExecute(cmd *cobra.Command, config *types.EvmConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to read '%s' parameter: %w", MaxGasCmdName, err)
 	}
-	attributes := &evmclient.TxAttributes{
+	attributes := &evm.TxAttributes{
 		To:   toAddr,
 		Data: fnIDAndArg,
 		Gas:  maxGas,
@@ -288,7 +288,7 @@ func execEvmCmdCall(cmd *cobra.Command, config *types.EvmConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to read '%s' parameter: %w", ValueCmdName, err)
 	}
-	attributes := &evmclient.CallAttributes{
+	attributes := &evm.CallEVMRequest{
 		To:    toAddr,
 		Data:  data,
 		Value: new(big.Int).SetUint64(value),

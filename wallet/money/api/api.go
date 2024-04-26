@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/alphabill-org/alphabill/txsystem/fc/unit"
-	"github.com/alphabill-org/alphabill/txsystem/money"
-	"github.com/alphabill-org/alphabill/types"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/fc"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 )
@@ -28,7 +28,7 @@ type (
 
 	FeeCreditBill struct {
 		ID              types.UnitID
-		FeeCreditRecord *unit.FeeCreditRecord
+		FeeCreditRecord *fc.FeeCreditRecord
 	}
 
 	RpcClient interface {

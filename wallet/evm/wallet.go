@@ -8,9 +8,10 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/alphabill-org/alphabill/crypto"
-	"github.com/alphabill-org/alphabill/predicates/templates"
-	"github.com/alphabill-org/alphabill/types"
+	"github.com/alphabill-org/alphabill-go-sdk/crypto"
+	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/evm"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	evmclient "github.com/alphabill-org/alphabill-wallet/wallet/evm/client"
@@ -21,7 +22,7 @@ const txTimeoutBlockCount = 10
 type (
 	evmClient interface {
 		Client
-		Call(ctx context.Context, callAttr *evmclient.CallAttributes) (*evmclient.ProcessingDetails, error)
+		Call(ctx context.Context, callAttr *evm.CallEVMRequest) (*evm.ProcessingDetails, error)
 		GetTransactionCount(ctx context.Context, ethAddr []byte) (uint64, error)
 		GetBalance(ctx context.Context, ethAddr []byte) (string, []byte, error)
 		GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*evmclient.Bill, error)
@@ -66,7 +67,7 @@ func (w *Wallet) Shutdown() {
 	w.am.Close()
 }
 
-func (w *Wallet) SendEvmTx(ctx context.Context, accNr uint64, attrs *evmclient.TxAttributes) (*evmclient.Result, error) {
+func (w *Wallet) SendEvmTx(ctx context.Context, accNr uint64, attrs *evm.TxAttributes) (*evmclient.Result, error) {
 	if accNr < 1 {
 		return nil, fmt.Errorf("invalid account number: %d", accNr)
 	}
@@ -112,7 +113,7 @@ func (w *Wallet) SendEvmTx(ctx context.Context, accNr uint64, attrs *evmclient.T
 	if proof == nil || proof.TxRecord == nil {
 		return nil, fmt.Errorf("unexpected result")
 	}
-	var details evmclient.ProcessingDetails
+	var details evm.ProcessingDetails
 	if err = proof.TxRecord.UnmarshalProcessingDetails(&details); err != nil {
 		return nil, fmt.Errorf("failed to de-serialize evm execution result: %w", err)
 	}
@@ -123,7 +124,7 @@ func (w *Wallet) SendEvmTx(ctx context.Context, accNr uint64, attrs *evmclient.T
 	}, nil
 }
 
-func (w *Wallet) EvmCall(ctx context.Context, accNr uint64, attrs *evmclient.CallAttributes) (*evmclient.Result, error) {
+func (w *Wallet) EvmCall(ctx context.Context, accNr uint64, attrs *evm.CallEVMRequest) (*evmclient.Result, error) {
 	if accNr < 1 {
 		return nil, fmt.Errorf("invalid account number: %d", accNr)
 	}

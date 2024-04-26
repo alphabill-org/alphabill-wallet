@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/alphabill-org/alphabill/predicates"
-	"github.com/alphabill-org/alphabill/types"
+	"github.com/alphabill-org/alphabill-go-sdk/predicates"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
 )
 
 const (

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/txsystem/tokens"
-	"github.com/alphabill-org/alphabill/types"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/tokens"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 
@@ -17,7 +17,7 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
 	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
 	tokenswallet "github.com/alphabill-org/alphabill-wallet/wallet/tokens"
 )
 
@@ -418,8 +418,7 @@ func doExecTokensCmd(t *testing.T, homedir string, command string) (*testutils.T
 		Base: &clitypes.BaseConfiguration{
 			HomeDir:       homedir,
 			ConsoleWriter: outputWriter,
-			LogCfgFile:    "logger-config.yaml",
-			Observe:       observability.Default(t),
+			Logger:        logger.New(t),
 		},
 		WalletHomeDir: filepath.Join(homedir, "wallet"),
 	})

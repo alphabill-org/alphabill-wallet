@@ -29,16 +29,6 @@ The default location of configuration file is `$AB_HOME/config.props`
 
 The default `$AB_HOME` is `$HOME/.alphabill`
 
-## Logging configuration
-
-Logging can be configured through a yaml configuration file. See `cli/alphabill/config/logger-config.yaml` for example.
-
-Default location of the logger configuration file is `$AB_HOME/logger-config.yaml`
-
-The location can be changed through `--logger-config` configuration key. If it's relative URL, then it's relative
-to `$AB_HOME`. Some logging related parameters can be set via command line parameters too - run `alphabill -h`
-for more.
-
 ## Tracing tests
 
 To enable trace exporter for test the `AB_TEST_TRACER` environment variable has to be set
@@ -54,17 +44,6 @@ some parameters are already "hardcoded":
 - "always_on" sampler is used (`OTEL_TRACES_SAMPLER`);
 - the `otlptracehttp` exporter is created with "insecure client transport"
   (`OTEL_EXPORTER_OTLP_INSECURE`);
-
-## Tracing wallet commands
-
-It is possible to collect traces from wallet command by setting the `AB_TRACING` and `OTEL_EXPORTER_OTLP_ENDPOINT`
-environment variables, ie:
-
-```sh
-AB_TRACING=otlptracehttp OTEL_EXPORTER_OTLP_ENDPOINT=https://apmserver.abdev1.guardtime.com alphabill wallet ...
-```
-will send the traces into the devnet APM backend.
-
 
 # CI setup
 

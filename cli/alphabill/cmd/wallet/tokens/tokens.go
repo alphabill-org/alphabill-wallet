@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	sdktypes "github.com/alphabill-org/alphabill-go-sdk/types"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
@@ -19,7 +20,6 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	tokenswallet "github.com/alphabill-org/alphabill-wallet/wallet/tokens"
-	abtypes "github.com/alphabill-org/alphabill/types"
 )
 
 const (
@@ -1094,7 +1094,7 @@ func initTokensWallet(cmd *cobra.Command, config *types.WalletConfig) (*tokenswa
 	if !strings.HasPrefix(infoResponse.Name, tokensTypeVar.String()) {
 		return nil, errors.New("invalid rpc url provided for tokens partition")
 	}
-	return tokenswallet.New(infoResponse.SystemID, tokensClient, am, confirmTx, nil, config.Base.Observe.Logger())
+	return tokenswallet.New(infoResponse.SystemID, tokensClient, am, confirmTx, nil, config.Base.Logger)
 }
 
 func readParentTypeInfo(cmd *cobra.Command, keyNr uint64, am account.Manager) (tokenswallet.TokenTypeID, []*tokenswallet.PredicateInput, error) {
@@ -1250,7 +1250,7 @@ func saveTxProofs(cmd *cobra.Command, proofs []*wallet.Proof, out types.ConsoleW
 	if err != nil {
 		return fmt.Errorf("creating file for transaction proofs: %w", err)
 	}
-	if err := abtypes.Cbor.Encode(w, proofs); err != nil {
+	if err := sdktypes.Cbor.Encode(w, proofs); err != nil {
 		return fmt.Errorf("encoding transaction proofs as CBOR: %w", err)
 	}
 	out.Println("Transaction proof(s) saved to file:" + proofFile)

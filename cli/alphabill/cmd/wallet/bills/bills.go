@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/alphabill-org/alphabill/network/protocol/genesis"
-	moneytx "github.com/alphabill-org/alphabill/txsystem/money"
-	"github.com/alphabill-org/alphabill/types"
-	"github.com/spf13/cobra"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
+	moneysdk "github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
 
+	"github.com/spf13/cobra"
 	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
@@ -20,13 +19,6 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txpublisher"
-)
-
-type (
-	// TrustBase json schema for trust base file.
-	TrustBase struct {
-		RootValidators []*genesis.PublicKeyInfo `json:"root_validators"`
-	}
 )
 
 // NewBillsCmd creates a new cobra command for the wallet bills component.
@@ -131,7 +123,7 @@ func lockCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 	cmd.Flags().StringVarP(&config.RpcUrl, args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "rpc node url")
 	cmd.Flags().Uint64VarP(&config.Key, args.KeyCmdName, "k", 1, "account number of the bill to lock")
 	cmd.Flags().Var(&config.BillID, args.BillIdCmdName, "id of the bill to lock")
-	cmd.Flags().Uint32Var(&config.SystemID, args.SystemIdentifierCmdName, uint32(moneytx.DefaultSystemIdentifier), "system identifier")
+	cmd.Flags().Uint32Var(&config.SystemID, args.SystemIdentifierCmdName, uint32(moneysdk.DefaultSystemID), "system identifier")
 	return cmd
 }
 
@@ -185,7 +177,7 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to create lock tx: %w", err)
 	}
-	moneyTxPublisher := txpublisher.NewTxPublisher(moneyClient, config.WalletConfig.Base.Observe.Logger())
+	moneyTxPublisher := txpublisher.NewTxPublisher(moneyClient, config.WalletConfig.Base.Logger)
 	_, err = moneyTxPublisher.SendTx(cmd.Context(), tx)
 	if err != nil {
 		return fmt.Errorf("failed to send lock tx: %w", err)
@@ -206,7 +198,7 @@ func unlockCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 	cmd.Flags().StringVarP(&config.RpcUrl, args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "rpc node url")
 	cmd.Flags().Uint64VarP(&config.Key, args.KeyCmdName, "k", 1, "account number of the bill to unlock")
 	cmd.Flags().Var(&config.BillID, args.BillIdCmdName, "id of the bill to unlock")
-	cmd.Flags().Uint32Var(&config.SystemID, args.SystemIdentifierCmdName, uint32(moneytx.DefaultSystemIdentifier), "system identifier")
+	cmd.Flags().Uint32Var(&config.SystemID, args.SystemIdentifierCmdName, uint32(moneysdk.DefaultSystemID), "system identifier")
 	return cmd
 }
 
@@ -262,7 +254,7 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to create unlock tx: %w", err)
 	}
-	moneyTxPublisher := txpublisher.NewTxPublisher(moneyClient, config.WalletConfig.Base.Observe.Logger())
+	moneyTxPublisher := txpublisher.NewTxPublisher(moneyClient, config.WalletConfig.Base.Logger)
 	_, err = moneyTxPublisher.SendTx(cmd.Context(), tx)
 	if err != nil {
 		return fmt.Errorf("failed to send unlock tx: %w", err)

@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"sort"
 
-	abcrypto "github.com/alphabill-org/alphabill/crypto"
-	"github.com/alphabill-org/alphabill/hash"
-	"github.com/alphabill-org/alphabill/predicates/templates"
-	"github.com/alphabill-org/alphabill/txsystem/tokens"
-	"github.com/alphabill-org/alphabill/types"
+	abcrypto "github.com/alphabill-org/alphabill-go-sdk/crypto"
+	"github.com/alphabill-org/alphabill-go-sdk/hash"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/tokens"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
+	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
@@ -200,7 +200,8 @@ func makeTxFeeProof(tx *types.TransactionOrder, ac *account.AccountKey) (wallet.
 	return templates.NewP2pkh256SignatureBytes(sig, ac.PubKey), nil
 }
 
-func newFungibleTransferTxAttrs(token *TokenUnit, receiverPubKey []byte) *tokens.TransferFungibleTokenAttributes {
+func
+newFungibleTransferTxAttrs(token *TokenUnit, receiverPubKey []byte) *tokens.TransferFungibleTokenAttributes {
 	return &tokens.TransferFungibleTokenAttributes{
 		NewBearer:                    BearerPredicateFromPubKey(receiverPubKey),
 		Value:                        token.Amount,

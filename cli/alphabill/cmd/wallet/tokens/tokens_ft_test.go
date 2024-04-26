@@ -8,10 +8,10 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/predicates/templates"
-	"github.com/alphabill-org/alphabill/txsystem/money"
-	"github.com/alphabill-org/alphabill/txsystem/tokens"
-	"github.com/alphabill-org/alphabill/types"
+	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/tokens"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
@@ -32,7 +32,7 @@ var defaultInitialBillID = money.NewBillID(nil, []byte{1})
 
 func TestFungibleToken_Subtyping_Integration(t *testing.T) {
 	network := NewAlphabillNetwork(t)
-	tokensPartition, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemIdentifier)
+	tokensPartition, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemID)
 	require.NoError(t, err)
 	homedirW1 := network.homeDir
 	rpcUrl := tokensPartition.Nodes[0].AddrRPC
@@ -78,7 +78,7 @@ func TestFungibleToken_Subtyping_Integration(t *testing.T) {
 
 func TestFungibleToken_InvariantPredicate_Integration(t *testing.T) {
 	network := NewAlphabillNetwork(t)
-	tokensPartition, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemIdentifier)
+	tokensPartition, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemID)
 	require.NoError(t, err)
 	homedirW1 := network.homeDir
 	w1key := network.walletKey1
@@ -119,9 +119,9 @@ func TestFungibleToken_InvariantPredicate_Integration(t *testing.T) {
 
 func TestFungibleTokens_Sending_Integration(t *testing.T) {
 	network := NewAlphabillNetwork(t)
-	_, err := network.abNetwork.GetNodePartition(money.DefaultSystemIdentifier)
+	_, err := network.abNetwork.GetNodePartition(money.DefaultSystemID)
 	require.NoError(t, err)
-	tokensPartition, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemIdentifier)
+	tokensPartition, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemID)
 	require.NoError(t, err)
 	homedirW1 := network.homeDir
 	w1key := network.walletKey1
@@ -211,10 +211,10 @@ func TestWalletCreateFungibleTokenTypeAndTokenAndSendCmd_IntegrationTest(t *test
 	}
 
 	network := NewAlphabillNetwork(t)
-	tokensPart, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemIdentifier)
+	tokensPart, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemID)
 	require.NoError(t, err)
 	homedir := network.homeDir
-	tokensPartition, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemIdentifier)
+	tokensPartition, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemID)
 	require.NoError(t, err)
 	rpcUrl := tokensPartition.Nodes[0].AddrRPC
 
@@ -275,7 +275,7 @@ func TestWalletCreateFungibleTokenTypeAndTokenAndSendCmd_IntegrationTest(t *test
 func TestFungibleTokens_CollectDust_Integration(t *testing.T) {
 	network := NewAlphabillNetwork(t)
 	homedir := network.homeDir
-	tokensPartition, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemIdentifier)
+	tokensPartition, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemID)
 	require.NoError(t, err)
 	rpcUrl := tokensPartition.Nodes[0].AddrRPC
 
@@ -311,10 +311,10 @@ func TestFungibleTokens_CollectDust_Integration(t *testing.T) {
 
 func TestFungibleTokens_LockUnlock_Integration(t *testing.T) {
 	network := NewAlphabillNetwork(t)
-	_, err := network.abNetwork.GetNodePartition(money.DefaultSystemIdentifier)
+	_, err := network.abNetwork.GetNodePartition(money.DefaultSystemID)
 	require.NoError(t, err)
 	homedirW1 := network.homeDir
-	tokensPartition, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemIdentifier)
+	tokensPartition, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemID)
 	require.NoError(t, err)
 	rpcUrl := tokensPartition.Nodes[0].AddrRPC
 
@@ -434,10 +434,10 @@ func NewAlphabillNetwork(t *testing.T) *AlphabillNetwork {
 	require.NoError(t, err)
 	defer moneyWallet.Close()
 
-	tokenFeeManager := fees.NewFeeManager(am, feeManagerDB, money.DefaultSystemIdentifier, moneyRpcClient, moneywallet.FeeCreditRecordIDFormPublicKey, tokens.DefaultSystemIdentifier, tokensRpcClient, tokenswallet.FeeCreditRecordIDFromPublicKey, log)
+	tokenFeeManager := fees.NewFeeManager(am, feeManagerDB, money.DefaultSystemID, moneyRpcClient, moneywallet.FeeCreditRecordIDFormPublicKey, tokens.DefaultSystemID, tokensRpcClient, tokenswallet.FeeCreditRecordIDFromPublicKey, log)
 	defer tokenFeeManager.Close()
 
-	tokensWallet, err := tokenswallet.New(tokens.DefaultSystemIdentifier, tokensRpcClient, am, true, tokenFeeManager, log)
+	tokensWallet, err := tokenswallet.New(tokens.DefaultSystemID, tokensRpcClient, am, true, tokenFeeManager, log)
 	require.NoError(t, err)
 	require.NotNil(t, tokensWallet)
 	defer tokensWallet.Shutdown()
@@ -487,10 +487,10 @@ func loadTokensWallet(t *testing.T, walletDir string, moneyRpcClient *rpc.Client
 	require.NoError(t, err)
 	t.Cleanup(func() { feeManagerDB.Close() })
 
-	tokenFeeManager := fees.NewFeeManager(am, feeManagerDB, money.DefaultSystemIdentifier, moneyRpcClient, moneywallet.FeeCreditRecordIDFormPublicKey, tokens.DefaultSystemIdentifier, tokensRpcClient, tokenswallet.FeeCreditRecordIDFromPublicKey, testobserve.Default(t).Logger())
+	tokenFeeManager := fees.NewFeeManager(am, feeManagerDB, money.DefaultSystemID, moneyRpcClient, moneywallet.FeeCreditRecordIDFormPublicKey, tokens.DefaultSystemID, tokensRpcClient, tokenswallet.FeeCreditRecordIDFromPublicKey, testobserve.Default(t).Logger())
 	t.Cleanup(tokenFeeManager.Close)
 
-	tokensWallet, err := tokenswallet.New(tokens.DefaultSystemIdentifier, tokensRpcClient, am, true, tokenFeeManager, testobserve.Default(t).Logger())
+	tokensWallet, err := tokenswallet.New(tokens.DefaultSystemID, tokensRpcClient, am, true, tokenFeeManager, testobserve.Default(t).Logger())
 	require.NoError(t, err)
 	require.NotNil(t, tokensWallet)
 	t.Cleanup(tokensWallet.Shutdown)

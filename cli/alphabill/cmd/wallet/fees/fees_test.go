@@ -6,12 +6,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/predicates/templates"
+	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
 	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
@@ -218,7 +218,7 @@ func TestWalletFeesLockCmds_Ok(t *testing.T) {
 func execFeesCommand(t *testing.T, homeDir, moneyRpcUrl, command string) (*testutils.TestConsoleWriter, error) {
 	outputWriter := &testutils.TestConsoleWriter{}
 	wcmd := NewFeesCmd(&types.WalletConfig{
-		Base:          &types.BaseConfiguration{HomeDir: homeDir, Observe: observability.Default(t), ConsoleWriter: outputWriter},
+		Base:          &types.BaseConfiguration{HomeDir: homeDir, Logger: logger.New(t), ConsoleWriter: outputWriter},
 		WalletHomeDir: filepath.Join(homeDir, "wallet"),
 	})
 	args := strings.Split(command, " ")

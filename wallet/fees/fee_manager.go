@@ -9,8 +9,8 @@ import (
 	"log/slog"
 	"sort"
 
-	"github.com/alphabill-org/alphabill/txsystem/fc/transactions"
-	"github.com/alphabill-org/alphabill/types"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/fc"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
 
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
@@ -657,7 +657,7 @@ func (w *FeeManager) sendAddFCTx(ctx context.Context, accountKey *account.Accoun
 			}
 			return nil
 		}
-		transferFCAttr := &transactions.TransferFeeCreditAttributes{}
+		transferFCAttr := &fc.TransferFeeCreditAttributes{}
 		if err := feeCtx.TransferFCProof.TxRecord.TransactionOrder.UnmarshalAttributes(transferFCAttr); err != nil {
 			return fmt.Errorf("failed to unmarshal transferFC attributes: %w", err)
 		}

@@ -9,12 +9,11 @@ import (
 	"syscall"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd"
-	"github.com/alphabill-org/alphabill/observability"
 )
 
 func main() {
 	ctx := quitSignalContext()
-	err := cmd.New(observability.NewFactory()).Execute(ctx)
+	err := cmd.New().Execute(ctx)
 	if err != nil && !cancelledByQuitSignal(ctx) {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)
