@@ -7,15 +7,18 @@ import (
 	"net/http"
 	"testing"
 
-	abcrypto "github.com/alphabill-org/alphabill/crypto"
+	sdkcrypto "github.com/alphabill-org/alphabill-go-sdk/crypto"
+	sdkmoney "github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
+	sdktokens "github.com/alphabill-org/alphabill-go-sdk/txsystem/tokens"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
+	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
+
 	"github.com/alphabill-org/alphabill/partition"
-	"github.com/alphabill-org/alphabill/predicates/templates"
 	abrpc "github.com/alphabill-org/alphabill/rpc"
 	"github.com/alphabill-org/alphabill/state"
 	"github.com/alphabill-org/alphabill/txsystem"
 	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
-	"github.com/alphabill-org/alphabill/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/client/rpc"
@@ -29,18 +32,18 @@ const DefaultT2Timeout = uint32(2500)
 
 func CreateMoneyPartition(t *testing.T, genesisConfig *testutil.MoneyGenesisConfig, nodeCount uint8) *testpartition.NodePartition {
 	genesisState := testutil.MoneyGenesisState(t, genesisConfig)
-	moneyPart, err := testpartition.NewPartition(t, "money node", nodeCount, func(tb map[string]abcrypto.Verifier) txsystem.TransactionSystem {
+	moneyPart, err := testpartition.NewPartition(t, "money node", nodeCount, func(tb map[string]sdkcrypto.Verifier) txsystem.TransactionSystem {
 		genesisState = genesisState.Clone()
 		system, err := money.NewTxSystem(
 			testobserve.Default(t),
-			money.WithSystemIdentifier(money.DefaultSystemIdentifier),
+			money.WithSystemIdentifier(sdkmoney.DefaultSystemID),
 			money.WithHashAlgorithm(crypto.SHA256),
 			money.WithSystemDescriptionRecords([]*types.SystemDescriptionRecord{
 				{
-					SystemIdentifier: money.DefaultSystemIdentifier,
+					SystemIdentifier: sdkmoney.DefaultSystemID,
 					T2Timeout:        DefaultT2Timeout,
 					FeeCreditBill: &types.FeeCreditBill{
-						UnitID:         money.NewBillID(nil, []byte{2}),
+						UnitID:         sdkmoney.NewBillID(nil, []byte{2}),
 						OwnerPredicate: templates.AlwaysTrueBytes(),
 					},
 				},
@@ -50,7 +53,7 @@ func CreateMoneyPartition(t *testing.T, genesisConfig *testutil.MoneyGenesisConf
 		)
 		require.NoError(t, err)
 		return system
-	}, money.DefaultSystemIdentifier, genesisState)
+	}, sdkmoney.DefaultSystemID, genesisState)
 	require.NoError(t, err)
 	return moneyPart
 }
@@ -66,7 +69,7 @@ func StartAlphabill(t *testing.T, partitions []*testpartition.NodePartition) *te
 func CreateTokensPartition(t *testing.T) *testpartition.NodePartition {
 	tokensState := state.NewEmptyState()
 	network, err := testpartition.NewPartition(t, "tokens node", 1,
-		func(tb map[string]abcrypto.Verifier) txsystem.TransactionSystem {
+		func(tb map[string]sdkcrypto.Verifier) txsystem.TransactionSystem {
 			tokensState = tokensState.Clone()
 			system, err := tokens.NewTxSystem(
 				testobserve.Default(t),
@@ -75,7 +78,7 @@ func CreateTokensPartition(t *testing.T) *testpartition.NodePartition {
 			)
 			require.NoError(t, err)
 			return system
-		}, tokens.DefaultSystemIdentifier, tokensState,
+		}, sdktokens.DefaultSystemID, tokensState,
 	)
 	require.NoError(t, err)
 	return network
@@ -142,7 +145,7 @@ func InitRpcServer(node *partition.Node, nodeName string, cfg *abrpc.ServerConfi
 		},
 		{
 			Namespace: "admin",
-			Service:   abrpc.NewAdminAPI(node, nodeName, node.GetPeer(), obs.Logger()),
+			Service:   abrpc.NewAdminAPI(node, nodeName, node.Peer(), obs.Logger()),
 		},
 	}
 	httpServer, err := abrpc.NewHTTPServer(cfg, obs)

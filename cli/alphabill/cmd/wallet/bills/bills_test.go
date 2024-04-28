@@ -6,15 +6,15 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/predicates/templates"
+	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
 	abrpc "github.com/alphabill-org/alphabill/rpc"
-	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	"github.com/alphabill-org/alphabill-wallet/client/rpc/mocksrv"
-	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
 	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
@@ -137,7 +137,7 @@ func TestWalletBillsLockUnlockCmd_Ok(t *testing.T) {
 	homedir, accountKey, rpcUrl, abNet := setupNetwork(t, nil)
 
 	// add fee credit
-	testutils.AddFeeCredit(t, 1e8, money.DefaultSystemIdentifier, accountKey, testutils.DefaultInitialBillID, 0, money.NewFeeCreditRecordID(nil, accountKey.PubKeyHash.Sha256), nil, abNet.NodePartitions[money.DefaultSystemIdentifier])
+	testutils.AddFeeCredit(t, 1e8, money.DefaultSystemID, accountKey, testutils.DefaultInitialBillID, 0, money.NewFeeCreditRecordID(nil, accountKey.PubKeyHash.Sha256), nil, abNet.NodePartitions[money.DefaultSystemID])
 
 	// lock bill
 	stdout, err := execBillsCommand(t, homedir, fmt.Sprintf("lock --rpc-url %s --bill-id %s", rpcUrl, money.NewBillID(nil, []byte{1})))
@@ -178,7 +178,7 @@ func TestWalletBillsLockUnlockCmd_Nok(t *testing.T) {
 
 func execBillsCommand(t *testing.T, homeDir, command string) (*testutils.TestConsoleWriter, error) {
 	outputWriter := &testutils.TestConsoleWriter{}
-	baseConfig := &types.BaseConfiguration{HomeDir: homeDir, ConsoleWriter: outputWriter, LogCfgFile: "logger-config.yaml", Observe: testobserve.Default(t)}
+	baseConfig := &types.BaseConfiguration{HomeDir: homeDir, ConsoleWriter: outputWriter, Logger: logger.New(t)}
 	bcmd := NewBillsCmd(&types.WalletConfig{Base: baseConfig, WalletHomeDir: filepath.Join(homeDir, "wallet")})
 	bcmd.SetArgs(strings.Split(command, " "))
 	return outputWriter, bcmd.Execute()

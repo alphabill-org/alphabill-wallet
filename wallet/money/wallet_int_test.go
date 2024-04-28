@@ -8,15 +8,16 @@ import (
 	"testing"
 	"time"
 
-	ethrpc "github.com/ethereum/go-ethereum/rpc"
-	"github.com/stretchr/testify/require"
+	sdkcrypto "github.com/alphabill-org/alphabill-go-sdk/crypto"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
+	sdkmoney "github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
 
-	abcrypto "github.com/alphabill-org/alphabill/crypto"
-	"github.com/alphabill-org/alphabill/predicates/templates"
 	"github.com/alphabill-org/alphabill/rpc"
 	"github.com/alphabill-org/alphabill/txsystem"
 	"github.com/alphabill-org/alphabill/txsystem/money"
-	"github.com/alphabill-org/alphabill/types"
+	ethrpc "github.com/ethereum/go-ethereum/rpc"
+	"github.com/stretchr/testify/require"
 
 	rpcclient "github.com/alphabill-org/alphabill-wallet/client/rpc"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
@@ -30,7 +31,7 @@ import (
 )
 
 var (
-	fcrID     = money.NewFeeCreditRecordID(nil, []byte{1})
+	fcrID     = sdkmoney.NewFeeCreditRecordID(nil, []byte{1})
 	fcrAmount = uint64(1e8)
 )
 
@@ -55,12 +56,12 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 
 	// start server
 	genesisConfig := &testutil.MoneyGenesisConfig{
-		InitialBillID:    money.NewBillID(nil, []byte{1}),
+		InitialBillID:    sdkmoney.NewBillID(nil, []byte{1}),
 		InitialBillValue: 10000 * 1e8,
 		InitialBillOwner: templates.NewP2pkh256BytesFromKey(accKey.PubKey),
 	}
 	network := startMoneyOnlyAlphabillPartition(t, genesisConfig)
-	moneyPart, err := network.GetNodePartition(money.DefaultSystemIdentifier)
+	moneyPart, err := network.GetNodePartition(sdkmoney.DefaultSystemID)
 	require.NoError(t, err)
 	addr := initRPCServer(t, moneyPart.Nodes[0])
 
@@ -157,17 +158,17 @@ func startMoneyOnlyAlphabillPartition(t *testing.T, genesisConfig *testutil.Mone
 	genesisConfig.DCMoneySupplyValue = 10000 * 1e8
 	genesisConfig.SDRs = createSDRs()
 	genesisState := testutil.MoneyGenesisState(t, genesisConfig)
-	mPart, err := testpartition.NewPartition(t, "money node", 1, func(tb map[string]abcrypto.Verifier) txsystem.TransactionSystem {
+	mPart, err := testpartition.NewPartition(t, "money node", 1, func(tb map[string]sdkcrypto.Verifier) txsystem.TransactionSystem {
 		system, err := money.NewTxSystem(
 			testobserve.Default(t),
-			money.WithSystemIdentifier(money.DefaultSystemIdentifier),
+			money.WithSystemIdentifier(sdkmoney.DefaultSystemID),
 			money.WithSystemDescriptionRecords(createSDRs()),
 			money.WithTrustBase(tb),
 			money.WithState(genesisState),
 		)
 		require.NoError(t, err)
 		return system
-	}, money.DefaultSystemIdentifier, genesisState)
+	}, sdkmoney.DefaultSystemID, genesisState)
 	require.NoError(t, err)
 	abNet, err := testpartition.NewAlphabillPartition([]*testpartition.NodePartition{mPart})
 	require.NoError(t, err)
@@ -206,10 +207,10 @@ func initRPCServer(t *testing.T, partitionNode *testpartition.PartitionNode) str
 
 func createSDRs() []*types.SystemDescriptionRecord {
 	return []*types.SystemDescriptionRecord{{
-		SystemIdentifier: money.DefaultSystemIdentifier,
+		SystemIdentifier: sdkmoney.DefaultSystemID,
 		T2Timeout:        2500,
 		FeeCreditBill: &types.FeeCreditBill{
-			UnitID:         money.NewBillID(nil, []byte{2}),
+			UnitID:         sdkmoney.NewBillID(nil, []byte{2}),
 			OwnerPredicate: templates.AlwaysTrueBytes(),
 		},
 	}}

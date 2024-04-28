@@ -13,7 +13,8 @@ import (
 	"path"
 	"time"
 
-	"github.com/alphabill-org/alphabill/types"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/evm"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/shopspring/decimal"
 
@@ -157,14 +158,14 @@ func (e *EvmClient) GetTransactionCount(ctx context.Context, ethAddr []byte) (ui
 }
 
 // Call execute smart contract tx without storing the result in blockchain. Can be used to simulate tx or to read state.
-func (e *EvmClient) Call(ctx context.Context, callAttr *CallAttributes) (*ProcessingDetails, error) {
+func (e *EvmClient) Call(ctx context.Context, callAttr *evm.CallEVMRequest) (*evm.ProcessingDetails, error) {
 	b, err := types.Cbor.Marshal(callAttr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode transactions: %w", err)
 	}
 	callEVMResponse := &struct {
 		_       struct{} `cbor:",toarray"`
-		Details *ProcessingDetails
+		Details *evm.ProcessingDetails
 	}{}
 	addr := e.getURL(apiPathPrefix, evmApiSubPrefix, "call")
 	if err = e.post(ctx, addr, bytes.NewReader(b), http.StatusOK, callEVMResponse); err != nil {

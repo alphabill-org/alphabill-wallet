@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	abutil "github.com/alphabill-org/alphabill/util"
+	abutil "github.com/alphabill-org/alphabill-go-sdk/util"
 	bolt "go.etcd.io/bbolt"
 
 	"github.com/alphabill-org/alphabill-wallet/crypto"

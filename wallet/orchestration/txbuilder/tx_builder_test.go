@@ -4,8 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/alphabill-org/alphabill/txsystem/orchestration"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/orchestration"
 
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
@@ -19,7 +18,7 @@ var (
 
 func TestNewAddVarTx_OK(t *testing.T) {
 	timeout := uint64(10)
-	systemID := orchestration.DefaultSystemIdentifier
+	systemID := orchestration.DefaultSystemID
 	unitID := orchestration.NewVarID(nil, test.RandomBytes(32))
 	_var := orchestration.ValidatorAssignmentRecord{}
 
@@ -43,7 +42,7 @@ func TestNewAddVarTx_OK(t *testing.T) {
 
 func TestNewAddVarTxUnsigned_OK(t *testing.T) {
 	timeout := uint64(10)
-	systemID := orchestration.DefaultSystemIdentifier
+	systemID := orchestration.DefaultSystemID
 	unitID := orchestration.NewVarID(nil, test.RandomBytes(32))
 	_var := orchestration.ValidatorAssignmentRecord{}
 

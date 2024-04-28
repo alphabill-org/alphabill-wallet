@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/fc"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
+
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	"github.com/alphabill-org/alphabill/rpc"
-	"github.com/alphabill-org/alphabill/txsystem/fc/unit"
-	"github.com/alphabill-org/alphabill/txsystem/money"
-	"github.com/alphabill-org/alphabill/types"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -68,7 +69,7 @@ func (c *Client) GetBill(ctx context.Context, unitID types.UnitID, includeStateP
 // GetFeeCreditRecord returns fee credit bill for the given bill id.
 // Returns api.ErrNotFound if the fee credit bill does not exist.
 func (c *Client) GetFeeCreditRecord(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
-	var u *rpc.Unit[unit.FeeCreditRecord]
+	var u *rpc.Unit[fc.FeeCreditRecord]
 	if err := c.c.CallContext(ctx, &u, "state_getUnit", unitID, includeStateProof); err != nil {
 		return nil, err
 	}

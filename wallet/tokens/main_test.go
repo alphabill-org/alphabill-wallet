@@ -8,11 +8,12 @@ import (
 	"math"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/hash"
-	"github.com/alphabill-org/alphabill/predicates/templates"
-	"github.com/alphabill-org/alphabill/txsystem/fc/unit"
-	"github.com/alphabill-org/alphabill/txsystem/tokens"
-	"github.com/alphabill-org/alphabill/types"
+	"github.com/alphabill-org/alphabill-go-sdk/hash"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/fc"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/tokens"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
+	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
 
@@ -33,7 +34,7 @@ func Test_GetRoundNumber_OK(t *testing.T) {
 			return 42, nil
 		},
 	}
-	w, err := New(tokens.DefaultSystemIdentifier, rpcClient, nil, false, nil, observe.DefaultLogger())
+	w, err := New(tokens.DefaultSystemID, rpcClient, nil, false, nil, observe.DefaultLogger())
 	require.NoError(t, err)
 
 	roundNumber, err := w.GetRoundNumber(context.Background())
@@ -45,9 +46,9 @@ func Test_GetFeeCreditBill_OK(t *testing.T) {
 	t.Parallel()
 
 	observe := observability.NewFactory(t)
-	expectedFCB := &api.FeeCreditBill{ID: []byte{1}, FeeCreditRecord: &unit.FeeCreditRecord{Balance: 100}}
+	expectedFCB := &api.FeeCreditBill{ID: []byte{1}, FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100}}
 	rpcClient := &mockTokensRpcClient{}
-	w, err := New(tokens.DefaultSystemIdentifier, rpcClient, nil, false, nil, observe.DefaultLogger())
+	w, err := New(tokens.DefaultSystemID, rpcClient, nil, false, nil, observe.DefaultLogger())
 	require.NoError(t, err)
 
 	// verify that correct fee credit bill is returned
@@ -218,7 +219,7 @@ func TestNewTypes(t *testing.T) {
 		getFeeCreditRecord: func(ctx context.Context, unitID types.UnitID, includeProof bool) (*api.FeeCreditBill, error) {
 			return &api.FeeCreditBill{
 				ID: []byte{1},
-				FeeCreditRecord: &unit.FeeCreditRecord{
+				FeeCreditRecord: &fc.FeeCreditRecord{
 					Balance:  100000,
 					Backlink: []byte{2},
 				},
@@ -333,7 +334,7 @@ func TestMintFungibleToken(t *testing.T) {
 		getFeeCreditRecord: func(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
 			return &api.FeeCreditBill{
 				ID:              []byte{1},
-				FeeCreditRecord: &unit.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
+				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
 			}, nil
 		},
 	}
@@ -397,7 +398,7 @@ func TestSendFungible(t *testing.T) {
 		getFeeCreditRecord: func(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
 			return &api.FeeCreditBill{
 				ID:              []byte{1},
-				FeeCreditRecord: &unit.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
+				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
 			}, nil
 		},
 		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
@@ -454,11 +455,11 @@ func TestSendFungible(t *testing.T) {
 					case tokens.PayloadTypeTransferFungibleToken:
 						attrs := &tokens.TransferFungibleTokenAttributes{}
 						require.NoError(t, tx.UnmarshalAttributes(attrs))
-						total += attrs.GetValue()
+						total += attrs.Value
 					case tokens.PayloadTypeSplitFungibleToken:
 						attrs := &tokens.SplitFungibleTokenAttributes{}
 						require.NoError(t, tx.UnmarshalAttributes(attrs))
-						total += attrs.GetTargetValue()
+						total += attrs.TargetValue
 					default:
 						t.Errorf("unexpected tx type: %s", tx.PayloadType())
 					}
@@ -599,7 +600,7 @@ func TestMintNFT(t *testing.T) {
 		getFeeCreditRecord: func(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
 			return &api.FeeCreditBill{
 				ID:              []byte{1},
-				FeeCreditRecord: &unit.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
+				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
 			}, nil
 		},
 	}
@@ -686,7 +687,7 @@ func TestTransferNFT(t *testing.T) {
 		getFeeCreditRecord: func(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
 			return &api.FeeCreditBill{
 				ID:              []byte{1},
-				FeeCreditRecord: &unit.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
+				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
 			}, nil
 		},
 	}
@@ -757,7 +758,7 @@ func TestUpdateNFTData(t *testing.T) {
 		getFeeCreditRecord: func(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
 			return &api.FeeCreditBill{
 				ID:              []byte{1},
-				FeeCreditRecord: &unit.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
+				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
 			}, nil
 		},
 	}
@@ -825,7 +826,7 @@ func TestLockToken(t *testing.T) {
 		getFeeCreditRecord: func(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
 			return &api.FeeCreditBill{
 				ID:              []byte{1},
-				FeeCreditRecord: &unit.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
+				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
 			}, nil
 		},
 	}
@@ -865,7 +866,7 @@ func TestUnlockToken(t *testing.T) {
 		getFeeCreditRecord: func(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
 			return &api.FeeCreditBill{
 				ID:              []byte{1},
-				FeeCreditRecord: &unit.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
+				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
 			}, nil
 		},
 	}

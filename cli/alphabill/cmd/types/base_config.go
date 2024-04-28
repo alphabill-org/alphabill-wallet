@@ -8,43 +8,21 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/alphabill-org/alphabill/logger"
-	"github.com/alphabill-org/alphabill/observability"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/trace"
-	"gopkg.in/yaml.v3"
 )
 
 type (
-	LoggerFactory func(cfg *logger.LogConfiguration) (*slog.Logger, error)
-
-	Observability interface {
-		Tracer(name string, options ...trace.TracerOption) trace.Tracer
-		TracerProvider() trace.TracerProvider
-		Meter(name string, opts ...metric.MeterOption) metric.Meter
-		PrometheusRegisterer() prometheus.Registerer
-		Shutdown() error
-		Logger() *slog.Logger
-	}
-
 	BaseConfiguration struct {
 		// The Alphabill home directory
 		HomeDir string
 		// Configuration file URL. If it's relative, then it's relative from the HomeDir.
 		CfgFile string
-		// Logger configuration file URL.
-		LogCfgFile string
-
-		Metrics string
-		Tracing string
 
 		ConsoleWriter ConsoleWrapper
 
-		Observe Observability
+		Logger *slog.Logger
 	}
 )
 
@@ -55,17 +33,11 @@ const (
 	defaultConfigFile = "config.props"
 	// the default alphabill directory.
 	defaultAlphabillDir = ".alphabill"
-	// The default logger configuration file name.
-	defaultLoggerConfigFile = "logger-config.yaml"
 	// The configuration key for home directory.
 	keyHome = "home"
 	// The configuration key for config file name.
 	keyConfig = "config"
-	// Enables or disables metrics collection
-	keyMetrics = "metrics"
-	keyTracing = "tracing"
 
-	flagNameLoggerCfgFile = "logger-config"
 	flagNameLogOutputFile = "log-file"
 	flagNameLogLevel      = "log-level"
 	flagNameLogFormat     = "log-format"
@@ -74,13 +46,9 @@ const (
 func (c *BaseConfiguration) AddConfigurationFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().StringVar(&c.HomeDir, keyHome, "", fmt.Sprintf("set the AB_HOME for this invocation (default is %s)", alphabillHomeDir()))
 	cmd.PersistentFlags().StringVar(&c.CfgFile, keyConfig, "", fmt.Sprintf("config file URL (default is $AB_HOME/%s)", defaultConfigFile))
-	cmd.PersistentFlags().StringVar(&c.Metrics, keyMetrics, "", "metrics exporter, disabled when not set. One of: stdout, prometheus")
-	cmd.PersistentFlags().StringVar(&c.Tracing, keyTracing, "", "traces exporter, disabled when not set. One of: stdout, otlptracehttp, zipkin")
-	cmd.PersistentFlags().StringVar(&c.LogCfgFile, flagNameLoggerCfgFile, defaultLoggerConfigFile, "logger config file URL. Considered absolute if starts with '/'. Otherwise relative from $AB_HOME.")
-	// do not set default values for these flags as then we can easily determine whether to load the value from cfg file or not
 	cmd.PersistentFlags().String(flagNameLogOutputFile, "", "log file path or one of the special values: stdout, stderr, discard")
 	cmd.PersistentFlags().String(flagNameLogLevel, "", "logging level, one of: DEBUG, INFO, WARN, ERROR")
-	cmd.PersistentFlags().String(flagNameLogFormat, "", "log format, one of: text, json, console, ecs")
+	cmd.PersistentFlags().String(flagNameLogFormat, "", "log format, one of: text, json, console")
 }
 
 func (c *BaseConfiguration) InitConfigFileLocation() {
@@ -107,41 +75,16 @@ func (c *BaseConfiguration) InitConfigFileLocation() {
 	}
 }
 
-/*
-LoggerCfgFilename always returns non-empty filename - either the value
-of the flag set by user or default cfg location.
-The flag will be assigned the default filename (ie without path) if user
-doesn't specify that flag.
-*/
-func (c *BaseConfiguration) LoggerCfgFilename() string {
-	if !filepath.IsAbs(c.LogCfgFile) {
-		return filepath.Join(c.HomeDir, c.LogCfgFile)
-	}
-	return c.LogCfgFile
-}
-
 func (c *BaseConfiguration) ConfigFileExists() bool {
 	_, err := os.Stat(c.CfgFile)
 	return err == nil
 }
 
 /*
-InitLogger creates Logger based on configuration flags in "cmd".
+initLogger creates Logger based on configuration flags in "cmd".
 */
-func (c *BaseConfiguration) InitLogger(cmd *cobra.Command, loggerBuilder LoggerFactory) (*slog.Logger, error) {
-	cfg := &logger.LogConfiguration{}
-
-	loggerCfgFile := c.LoggerCfgFilename()
-	if f, err := os.Open(loggerCfgFile); err != nil {
-		defaultLoggerCfg := filepath.Join(c.HomeDir, defaultLoggerConfigFile)
-		if !(errors.Is(err, os.ErrNotExist) && loggerCfgFile == defaultLoggerCfg) {
-			return nil, fmt.Errorf("opening logger configuration file: %w", err)
-		}
-	} else {
-		if err := yaml.NewDecoder(f).Decode(cfg); err != nil {
-			return nil, fmt.Errorf("decoding logger configuration (%s): %w", loggerCfgFile, err)
-		}
-	}
+func initLogger(cmd *cobra.Command) (*slog.Logger, error) {
+	cfg := &logConfiguration{}
 
 	getFlagValueIfSet := func(flagName string, value *string) error {
 		if cmd.Flags().Changed(flagName) {
@@ -153,25 +96,17 @@ func (c *BaseConfiguration) InitLogger(cmd *cobra.Command, loggerBuilder LoggerF
 		return nil
 	}
 
-	// flags override values loaded from cfg file.
-	// NB! these flags mustn't have default values in Cobra cmd definition!
-	if err := getFlagValueIfSet(flagNameLogLevel, &cfg.Level); err != nil {
+	if err := getFlagValueIfSet(flagNameLogLevel, &cfg.level); err != nil {
 		return nil, err
 	}
-	if err := getFlagValueIfSet(flagNameLogFormat, &cfg.Format); err != nil {
+	if err := getFlagValueIfSet(flagNameLogFormat, &cfg.format); err != nil {
 		return nil, err
 	}
-	if err := getFlagValueIfSet(flagNameLogOutputFile, &cfg.OutputPath); err != nil {
+	if err := getFlagValueIfSet(flagNameLogOutputFile, &cfg.outputPath); err != nil {
 		return nil, err
 	}
 
-	// if it is a wallet cmd and logging on console then use "wallet formatting"
-	// unless user has requested specific format by flag
-	if forceWalletLogFormat(cmd, cfg.OutputPath) {
-		cfg.Format = "wallet"
-	}
-
-	log, err := loggerBuilder(cfg)
+	log, err := newLogger(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("building logger: %w", err)
 	}
@@ -215,24 +150,6 @@ func (c *BaseConfiguration) InitializeConfig(cmd *cobra.Command) error {
 	}
 
 	return nil
-}
-
-func forceWalletLogFormat(cmd *cobra.Command, outFilename string) bool {
-	// if user has specified format flag respect that
-	if cmd.Flags().Changed(flagNameLogFormat) {
-		return false
-	}
-
-	switch outFilename {
-	case "", "stdout", "stderr":
-		for ; cmd != nil; cmd = cmd.Parent() {
-			if cmd.Name() == "wallet" {
-				return true
-			}
-		}
-	}
-
-	return false
 }
 
 func envKey(key string) string {
@@ -279,30 +196,20 @@ func bindFlags(cmd *cobra.Command, v *viper.Viper) error {
 	return errors.Join(bindFlagErr...)
 }
 
-type Factory interface {
-	Logger(cfg *logger.LogConfiguration) (*slog.Logger, error)
-	Observability(metrics, traces string) (observability.MeterAndTracer, error)
-}
-
-func InitializeConfig(cmd *cobra.Command, config *BaseConfiguration, obsF Factory) error {
+func InitializeConfig(cmd *cobra.Command, config *BaseConfiguration) error {
 	var errs []error
 
 	if err := config.InitializeConfig(cmd); err != nil {
 		errs = append(errs, fmt.Errorf("reading configuration: %w", err))
 	}
 
-	log, err := config.InitLogger(cmd, obsF.Logger)
+	log, err := initLogger(cmd)
 	if err != nil {
 		errs = append(errs, fmt.Errorf("initializing logger: %w", err))
 	}
 
-	observe, err := obsF.Observability(config.Metrics, config.Tracing)
-	if err != nil {
-		errs = append(errs, fmt.Errorf("initializing observability: %w", err))
-	}
-	if observe != nil && log != nil {
-		config.Observe = observability.WithLogger(observe, log)
-	}
+	config.Logger = log
+
 	if config.ConsoleWriter == nil {
 		config.ConsoleWriter = NewStdoutWriter()
 	}

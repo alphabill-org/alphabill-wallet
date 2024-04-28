@@ -10,19 +10,22 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	abcrypto "github.com/alphabill-org/alphabill/crypto"
-	"github.com/alphabill-org/alphabill/predicates/templates"
+	abcrypto "github.com/alphabill-org/alphabill-go-sdk/crypto"
+	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
+	sdkorchestration "github.com/alphabill-org/alphabill-go-sdk/txsystem/orchestration"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
+	"github.com/alphabill-org/alphabill-go-sdk/util"
+
 	"github.com/alphabill-org/alphabill/state"
 	"github.com/alphabill-org/alphabill/txsystem"
 	"github.com/alphabill-org/alphabill/txsystem/orchestration"
-	"github.com/alphabill-org/alphabill/types"
-	"github.com/alphabill-org/alphabill/util"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
 	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
 	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
 	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
 	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
@@ -30,14 +33,14 @@ import (
 
 func TestAddVar_OK(t *testing.T) {
 	network := startOrchestrationPartition(t)
-	orchestrationPartition, err := network.abNetwork.GetNodePartition(orchestration.DefaultSystemIdentifier)
+	orchestrationPartition, err := network.abNetwork.GetNodePartition(sdkorchestration.DefaultSystemID)
 	require.NoError(t, err)
 	rpcUrl := orchestrationPartition.Nodes[0].AddrRPC
-	varData := orchestration.ValidatorAssignmentRecord{
+	varData := sdkorchestration.ValidatorAssignmentRecord{
 		EpochNumber:            0,
 		EpochSwitchRoundNumber: 10000,
-		ValidatorAssignment: orchestration.ValidatorAssignment{
-			Validators: []orchestration.ValidatorInfo{
+		ValidatorAssignment: sdkorchestration.ValidatorAssignment{
+			Validators: []sdkorchestration.ValidatorInfo{
 				{
 					ValidatorID: []byte{1},
 					Stake:       100,
@@ -60,8 +63,8 @@ func TestAddVar_OK(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "Validator Assignment Record added successfully.", stdout.Lines[0])
 	require.Eventually(t, testpartition.BlockchainContains(orchestrationPartition, func(tx *types.TransactionOrder) bool {
-		if tx.PayloadType() == orchestration.PayloadTypeAddVAR {
-			var attrs *orchestration.AddVarAttributes
+		if tx.PayloadType() == sdkorchestration.PayloadTypeAddVAR {
+			var attrs *sdkorchestration.AddVarAttributes
 			require.NoError(t, tx.UnmarshalAttributes(&attrs))
 			require.Equal(t, varData, attrs.Var)
 			return true
@@ -70,7 +73,7 @@ func TestAddVar_OK(t *testing.T) {
 	}), test.WaitDuration, test.WaitTick)
 }
 
-func writeVarFile(t *testing.T, homedir string, varData orchestration.ValidatorAssignmentRecord) string {
+func writeVarFile(t *testing.T, homedir string, varData sdkorchestration.ValidatorAssignmentRecord) string {
 	varFilePath := filepath.Join(homedir, "var-file.json")
 	err := util.WriteJsonFile(varFilePath, &varData)
 	require.NoError(t, err)
@@ -127,7 +130,7 @@ func createOrchestrationPartition(t *testing.T, ownerPredicate types.PredicateBy
 			require.NoError(t, err)
 			return txSystem
 		},
-		orchestration.DefaultSystemIdentifier,
+		sdkorchestration.DefaultSystemID,
 		s,
 	)
 	require.NoError(t, err)
@@ -151,8 +154,7 @@ func execOrchestrationCmd(t *testing.T, homedir string, command string) (*testut
 		Base: &clitypes.BaseConfiguration{
 			HomeDir:       homedir,
 			ConsoleWriter: outputWriter,
-			LogCfgFile:    "logger-config.yaml",
-			Observe:       testobserve.Default(t),
+			Logger:        logger.New(t),
 		},
 		WalletHomeDir: filepath.Join(homedir, "wallet"),
 	})

@@ -5,9 +5,9 @@ import (
 	"context"
 	"crypto"
 
-	"github.com/alphabill-org/alphabill/txsystem/fc/unit"
-	"github.com/alphabill-org/alphabill/txsystem/money"
-	"github.com/alphabill-org/alphabill/types"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/fc"
+	"github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
@@ -173,7 +173,7 @@ func NewMoneyBill(unitIDPart []byte, billData *money.BillData) *api.Bill {
 	}
 }
 
-func NewMoneyFCR(pubKeyHash []byte, fcrData *unit.FeeCreditRecord) *api.FeeCreditBill {
+func NewMoneyFCR(pubKeyHash []byte, fcrData *fc.FeeCreditRecord) *api.FeeCreditBill {
 	fcrID := money.NewFeeCreditRecordID(nil, pubKeyHash)
 	return &api.FeeCreditBill{
 		ID:              fcrID,

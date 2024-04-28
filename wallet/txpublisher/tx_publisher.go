@@ -6,8 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/alphabill-org/alphabill/logger"
-	"github.com/alphabill-org/alphabill/types"
+	"github.com/alphabill-org/alphabill-go-sdk/types"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
@@ -40,7 +39,7 @@ func (w *TxPublisher) SendTx(ctx context.Context, tx *types.TransactionOrder) (*
 		TxHash:      tx.Hash(crypto.SHA256),
 		Transaction: tx,
 	}
-	w.log.InfoContext(ctx, fmt.Sprintf("Sending tx '%s' with hash: '%X'", tx.PayloadType(), tx.Hash(crypto.SHA256)), logger.UnitID(tx.UnitID()))
+	w.log.InfoContext(ctx, fmt.Sprintf("Sending tx '%s' with hash: '%X'", tx.PayloadType(), tx.Hash(crypto.SHA256)))
 	txBatch := txSub.ToBatch(w.rpcClient, w.log)
 	err := txBatch.SendTx(ctx, true)
 	if err != nil {

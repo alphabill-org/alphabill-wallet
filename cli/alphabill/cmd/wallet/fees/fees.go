@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -85,7 +86,7 @@ func addFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Observe)
+	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Logger)
 	if err != nil {
 		return fmt.Errorf("failed to create fee credit manager: %w", err)
 	}
@@ -125,7 +126,7 @@ func listFeesCmdExec(cmd *cobra.Command, config *feesConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Observe)
+	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -165,7 +166,7 @@ func reclaimFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Observe)
+	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -212,7 +213,7 @@ func lockFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Observe)
+	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -264,7 +265,7 @@ func unlockFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Observe)
+	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -398,7 +399,7 @@ func (c *feesConfig) getTargetPartitionUrl() string {
 
 // Creates a fees.FeeManager that needs to be closed with the Close() method.
 // Does not close the account.Manager passed as an argument.
-func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager, feeManagerDB fees.FeeManagerDB, obs clitypes.Observability) (*fees.FeeManager, error) {
+func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager, feeManagerDB fees.FeeManagerDB, logger *slog.Logger) (*fees.FeeManager, error) {
 	moneyClient, err := rpc.DialContext(ctx, c.getMoneyRpcUrl())
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial money rpc url: %w", err)
@@ -424,7 +425,7 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 			moneyInfo.SystemID,
 			moneyClient,
 			moneywallet.FeeCreditRecordIDFormPublicKey,
-			obs.Logger(),
+			logger,
 		), nil
 	case clitypes.TokensType:
 		tokensRpcUrl := c.getTargetPartitionRpcUrl()
@@ -450,7 +451,7 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 			tokenInfo.SystemID,
 			tokensClient,
 			tokenswallet.FeeCreditRecordIDFromPublicKey,
-			obs.Logger(),
+			logger,
 		), nil
 	case clitypes.EvmType:
 		evmRpcUrl := c.getTargetPartitionRpcUrl()
@@ -476,7 +477,7 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 			evmInfo.SystemID,
 			evmClient,
 			evmwallet.FeeCreditRecordIDFromPublicKey,
-			obs.Logger(),
+			logger,
 		), nil
 	default:
 		panic(`invalid "partition" flag value: ` + c.targetPartitionType)
