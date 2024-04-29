@@ -62,8 +62,8 @@ github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156 h1:eMwmnE/GDgah
 github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156/go.mod h1:Cb/ax3seSYIx7SuZdm2G2xzfwmv3TPSk2ucNfQESPXM=
 github.com/alphabill-org/alphabill v0.4.1-0.20240425063520-81f6876fc20a h1:CKpjJ71N1jADJh9rM1knU/lCupPS6ug6Evj9oaFZv4U=
 github.com/alphabill-org/alphabill v0.4.1-0.20240425063520-81f6876fc20a/go.mod h1:Fgg3uCXgf84VZ1m0ZZ7R6/YFu/EZj831+S7KPaG65bU=
-github.com/alphabill-org/alphabill-go-sdk v0.0.0-20240425062054-4980c786865b h1:jksuoJZb/oqISDH17XNklZjx6/X2AqjbScay8i9nKfI=
-github.com/alphabill-org/alphabill-go-sdk v0.0.0-20240425062054-4980c786865b/go.mod h1:JSGwziy+YvwD4kkCCK09yD+BAEeuOFIcJl2oLP04YKg=
+github.com/alphabill-org/alphabill-go-sdk v0.0.0-20240429200854-0adea9ac2348 h1:wq9iZwFgJBODvj4euI6WT4K03zbh1wBYwAZcx2QHWMU=
+github.com/alphabill-org/alphabill-go-sdk v0.0.0-20240429200854-0adea9ac2348/go.mod h1:JSGwziy+YvwD4kkCCK09yD+BAEeuOFIcJl2oLP04YKg=
 github.com/anmitsu/go-shlex v0.0.0-20161002113705-648efa622239/go.mod h1:2FmKhYUyUczH0OGQWaF5ceTx0UBShxjsH6f8oGKYe2c=
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
 github.com/aymerick/raymond v2.0.3-0.20180322193309-b565731e1464+incompatible/go.mod h1:osfaiScAUVup+UC9Nfq76eWqDhXlp+4UYaA8uhTBO6g=
