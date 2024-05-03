@@ -2,7 +2,6 @@ package tokens
 
 import (
 	"context"
-	"crypto"
 	"fmt"
 	"sort"
 
@@ -154,13 +153,7 @@ func (w *Wallet) prepareTxSubmission(ctx context.Context, payloadType string, at
 	}
 	tx.FeeProof = sig
 
-	// convert again for hashing as the tx might have been modified
-	txSub := &txsubmitter.TxSubmission{
-		UnitID:      unitId,
-		Transaction: tx,
-		TxHash:      tx.Hash(crypto.SHA256),
-	}
-	return txSub, nil
+	return txsubmitter.New(tx), nil
 }
 
 func signTx(tx *types.TransactionOrder, attrs types.SigBytesProvider, ac *account.AccountKey) (wallet.Predicate, error) {
@@ -276,7 +269,7 @@ func newBurnTxAttrs(token *TokenUnit, targetTokenBacklink wallet.TxHash, targetT
 }
 
 // assumes there's sufficient balance for the given amount, sends transactions immediately
-func (w *Wallet) doSendMultiple(ctx context.Context, amount uint64, tokens []*TokenUnit, acc *account.AccountKey, receiverPubKey []byte, invariantPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) doSendMultiple(ctx context.Context, amount uint64, tokens []*TokenUnit, acc *accountKey, receiverPubKey []byte, invariantPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
 	var accumulatedSum uint64
 	sort.Slice(tokens, func(i, j int) bool {
 		return tokens[i].Amount > tokens[j].Amount
@@ -287,7 +280,7 @@ func (w *Wallet) doSendMultiple(ctx context.Context, amount uint64, tokens []*To
 
 	for _, t := range tokens {
 		remainingAmount := amount - accumulatedSum
-		sub, err := w.prepareSplitOrTransferTx(ctx, acc, remainingAmount, t, receiverPubKey, invariantPredicateArgs, rnFetcher.getRoundNumber)
+		sub, err := w.prepareSplitOrTransferTx(ctx, acc.AccountKey, remainingAmount, t, receiverPubKey, invariantPredicateArgs, rnFetcher.getRoundNumber)
 		if err != nil {
 			return nil, err
 		}
@@ -304,7 +297,7 @@ func (w *Wallet) doSendMultiple(ctx context.Context, amount uint64, tokens []*To
 			feeSum += sub.Proof.TxRecord.ServerMetadata.ActualFee
 		}
 	}
-	return &SubmissionResult{FeeSum: feeSum}, err
+	return &SubmissionResult{Submissions: batch.Submissions(), FeeSum: feeSum, AccountNumber: acc.idx + 1}, err
 }
 
 func (w *Wallet) prepareSplitOrTransferTx(ctx context.Context, acc *account.AccountKey, amount uint64, token *TokenUnit, receiverPubKey []byte, invariantPredicateArgs []*PredicateInput, rn roundNumberFetcher) (*txsubmitter.TxSubmission, error) {
