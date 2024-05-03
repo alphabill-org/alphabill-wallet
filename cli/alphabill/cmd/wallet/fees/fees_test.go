@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
+	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"

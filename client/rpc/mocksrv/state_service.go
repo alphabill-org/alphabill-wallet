@@ -4,8 +4,8 @@ import (
 	"context"
 	"crypto"
 
+	"github.com/alphabill-org/alphabill-go-base/types"
 	abrpc "github.com/alphabill-org/alphabill/rpc"
-	"github.com/alphabill-org/alphabill-go-sdk/types"
 )
 
 type (

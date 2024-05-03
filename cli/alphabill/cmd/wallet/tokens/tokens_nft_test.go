@@ -10,10 +10,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
+	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill/partition/event"
-	"github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
-	"github.com/alphabill-org/alphabill-go-sdk/txsystem/tokens"
-	"github.com/alphabill-org/alphabill-go-sdk/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"

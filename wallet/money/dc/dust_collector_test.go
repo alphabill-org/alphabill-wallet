@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-go-sdk/txsystem/fc"
-	"github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"

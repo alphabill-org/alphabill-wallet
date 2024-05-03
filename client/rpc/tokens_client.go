@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	tokentxs "github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill/rpc"
-	tokentxs "github.com/alphabill-org/alphabill-go-sdk/txsystem/tokens"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"

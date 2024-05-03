@@ -1,12 +1,12 @@
 module github.com/alphabill-org/alphabill-wallet
 
-go 1.21
+go 1.22
 
 replace github.com/multiformats/go-multistream v0.5.0 => github.com/multiformats/go-multistream v0.4.1
 
 require (
-	github.com/alphabill-org/alphabill v0.4.1-0.20240425063520-81f6876fc20a
-	github.com/alphabill-org/alphabill-go-sdk v0.0.0-20240429200854-0adea9ac2348
+	github.com/alphabill-org/alphabill v0.4.1-0.20240503101350-071534e1437a
+	github.com/alphabill-org/alphabill-go-base v0.0.0-20240503095749-e99ca48da918
 	github.com/btcsuite/btcd v0.23.2
 	github.com/btcsuite/btcd/btcutil v1.1.2
 	github.com/ethereum/go-ethereum v1.12.2

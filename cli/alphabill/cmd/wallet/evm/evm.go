@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/alphabill-org/alphabill-go-sdk/txsystem/evm"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/evm"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/spf13/cobra"
 

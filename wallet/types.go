@@ -1,8 +1,8 @@
 package wallet
 
 import (
-	"github.com/alphabill-org/alphabill-go-sdk/hash"
-	"github.com/alphabill-org/alphabill-go-sdk/types"
+	"github.com/alphabill-org/alphabill-go-base/hash"
+	"github.com/alphabill-org/alphabill-go-base/types"
 )
 
 const (

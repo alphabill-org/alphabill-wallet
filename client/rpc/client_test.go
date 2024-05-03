@@ -6,9 +6,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-go-sdk/txsystem/fc"
-	"github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
-	"github.com/alphabill-org/alphabill-go-sdk/types"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill/rpc"
 	"github.com/stretchr/testify/require"
 

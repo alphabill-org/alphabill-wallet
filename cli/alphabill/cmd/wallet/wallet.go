@@ -12,8 +12,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/tyler-smith/go-bip39"
 
-	sdktypes "github.com/alphabill-org/alphabill-go-sdk/types"
-	sdkmoney "github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
+	sdkmoney "github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	sdktypes "github.com/alphabill-org/alphabill-go-base/types"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"

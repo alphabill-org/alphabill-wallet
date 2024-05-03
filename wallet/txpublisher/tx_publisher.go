@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/alphabill-org/alphabill-go-sdk/types"
+	"github.com/alphabill-org/alphabill-go-base/types"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"

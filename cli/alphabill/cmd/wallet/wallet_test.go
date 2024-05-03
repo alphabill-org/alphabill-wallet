@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-go-sdk/txsystem/fc"
-	"github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
-	"github.com/alphabill-org/alphabill-go-sdk/util"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-base/util"
 	abrpc "github.com/alphabill-org/alphabill/rpc"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"

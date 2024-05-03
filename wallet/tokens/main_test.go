@@ -8,11 +8,11 @@ import (
 	"math"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-go-sdk/hash"
-	"github.com/alphabill-org/alphabill-go-sdk/txsystem/fc"
-	"github.com/alphabill-org/alphabill-go-sdk/txsystem/tokens"
-	"github.com/alphabill-org/alphabill-go-sdk/types"
-	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
+	"github.com/alphabill-org/alphabill-go-base/hash"
+	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
+	"github.com/alphabill-org/alphabill-go-base/types"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"

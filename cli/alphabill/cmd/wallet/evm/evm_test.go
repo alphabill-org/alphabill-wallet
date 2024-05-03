@@ -15,8 +15,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/alphabill-org/alphabill-go-sdk/txsystem/evm"
-	"github.com/alphabill-org/alphabill-go-sdk/types"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/evm"
+	"github.com/alphabill-org/alphabill-go-base/types"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
 	cmdtypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"

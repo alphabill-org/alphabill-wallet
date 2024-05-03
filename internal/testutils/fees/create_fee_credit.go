@@ -3,16 +3,16 @@ package testfees
 import (
 	"testing"
 
-	abcrypto "github.com/alphabill-org/alphabill-go-sdk/crypto"
-	"github.com/alphabill-org/alphabill-go-sdk/txsystem/fc"
-	"github.com/alphabill-org/alphabill-go-sdk/types"
-	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
+	abcrypto "github.com/alphabill-org/alphabill-go-base/crypto"
+	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
+	"github.com/alphabill-org/alphabill-go-base/types"
 
+	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
 	testfc "github.com/alphabill-org/alphabill/txsystem/fc/testutils"
 	testtransaction "github.com/alphabill-org/alphabill/txsystem/testutils/transaction"
 	"github.com/stretchr/testify/require"
-	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
-	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
 )
 
 // CreateFeeCredit creates fee credit to be able to spend initial bill

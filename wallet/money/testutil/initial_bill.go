@@ -6,14 +6,14 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	abcrypto "github.com/alphabill-org/alphabill-go-sdk/crypto"
-	"github.com/alphabill-org/alphabill-go-sdk/hash"
-	"github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
-	"github.com/alphabill-org/alphabill-go-sdk/types"
-	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
+	abcrypto "github.com/alphabill-org/alphabill-go-base/crypto"
+	"github.com/alphabill-org/alphabill-go-base/hash"
+	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-base/types"
 
-	"github.com/alphabill-org/alphabill/state"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
+	"github.com/alphabill-org/alphabill/state"
 )
 
 type MoneyGenesisConfig struct {

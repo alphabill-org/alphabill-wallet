@@ -6,8 +6,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-go-sdk/txsystem/evm"
-	"github.com/alphabill-org/alphabill-go-sdk/types"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/evm"
+	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/stretchr/testify/require"
 
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"

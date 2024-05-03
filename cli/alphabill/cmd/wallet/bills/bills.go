@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/alphabill-org/alphabill-go-sdk/types"
-	moneysdk "github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
+	moneysdk "github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-base/types"
 
-	"github.com/spf13/cobra"
 	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
@@ -19,6 +18,7 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txpublisher"
+	"github.com/spf13/cobra"
 )
 
 // NewBillsCmd creates a new cobra command for the wallet bills component.

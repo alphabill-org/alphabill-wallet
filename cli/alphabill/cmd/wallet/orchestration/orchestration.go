@@ -6,10 +6,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/alphabill-org/alphabill-go-sdk/hash"
-	"github.com/alphabill-org/alphabill-go-sdk/txsystem/orchestration"
-	"github.com/alphabill-org/alphabill-go-sdk/types"
-	"github.com/alphabill-org/alphabill-go-sdk/util"
+	"github.com/alphabill-org/alphabill-go-base/hash"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/orchestration"
+	"github.com/alphabill-org/alphabill-go-base/types"
+	"github.com/alphabill-org/alphabill-go-base/util"
 
 	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"

@@ -12,8 +12,8 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-go-sdk/types"
-	"github.com/alphabill-org/alphabill-go-sdk/txsystem/evm"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/evm"
+	"github.com/alphabill-org/alphabill-go-base/types"
 
 	testtransaction "github.com/alphabill-org/alphabill/txsystem/testutils/transaction"
 	"github.com/stretchr/testify/require"

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
 

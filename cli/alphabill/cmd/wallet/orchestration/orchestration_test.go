@@ -10,11 +10,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	abcrypto "github.com/alphabill-org/alphabill-go-sdk/crypto"
-	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
-	sdkorchestration "github.com/alphabill-org/alphabill-go-sdk/txsystem/orchestration"
-	"github.com/alphabill-org/alphabill-go-sdk/types"
-	"github.com/alphabill-org/alphabill-go-sdk/util"
+	abcrypto "github.com/alphabill-org/alphabill-go-base/crypto"
+	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
+	sdkorchestration "github.com/alphabill-org/alphabill-go-base/txsystem/orchestration"
+	"github.com/alphabill-org/alphabill-go-base/types"
+	"github.com/alphabill-org/alphabill-go-base/util"
 
 	"github.com/alphabill-org/alphabill/state"
 	"github.com/alphabill-org/alphabill/txsystem"

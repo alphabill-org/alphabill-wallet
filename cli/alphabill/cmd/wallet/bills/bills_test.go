@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
-	"github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	abrpc "github.com/alphabill-org/alphabill/rpc"
 	"github.com/stretchr/testify/require"
 

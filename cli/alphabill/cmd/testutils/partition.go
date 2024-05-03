@@ -7,11 +7,11 @@ import (
 	"net/http"
 	"testing"
 
-	sdkcrypto "github.com/alphabill-org/alphabill-go-sdk/crypto"
-	sdkmoney "github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
-	sdktokens "github.com/alphabill-org/alphabill-go-sdk/txsystem/tokens"
-	"github.com/alphabill-org/alphabill-go-sdk/types"
-	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
+	sdkcrypto "github.com/alphabill-org/alphabill-go-base/crypto"
+	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
+	sdkmoney "github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	sdktokens "github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
+	"github.com/alphabill-org/alphabill-go-base/types"
 
 	"github.com/alphabill-org/alphabill/partition"
 	abrpc "github.com/alphabill-org/alphabill/rpc"

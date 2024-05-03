@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	sdkcrypto "github.com/alphabill-org/alphabill-go-sdk/crypto"
-	"github.com/alphabill-org/alphabill-go-sdk/types"
-	sdkmoney "github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
-	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
+	sdkcrypto "github.com/alphabill-org/alphabill-go-base/crypto"
+	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
+	sdkmoney "github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-base/types"
 
 	"github.com/alphabill-org/alphabill/rpc"
 	"github.com/alphabill-org/alphabill/txsystem"

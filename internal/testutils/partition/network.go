@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	abcrypto "github.com/alphabill-org/alphabill-go-sdk/crypto"
-	"github.com/alphabill-org/alphabill-go-sdk/types"
+	abcrypto "github.com/alphabill-org/alphabill-go-base/crypto"
+	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill/keyvaluedb"
 	"github.com/alphabill-org/alphabill/keyvaluedb/boltdb"
 	"github.com/alphabill-org/alphabill/keyvaluedb/memorydb"

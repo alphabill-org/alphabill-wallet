@@ -1,7 +1,7 @@
 package testutils
 
 import (
-	"github.com/alphabill-org/alphabill-go-sdk/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 )
 
 var (

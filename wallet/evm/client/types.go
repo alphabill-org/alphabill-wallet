@@ -1,7 +1,7 @@
 package client
 
 import (
-	"github.com/alphabill-org/alphabill-go-sdk/txsystem/evm"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/evm"
 )
 
 type Result struct {

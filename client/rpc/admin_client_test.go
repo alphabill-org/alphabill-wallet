@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-go-sdk/types"
+	"github.com/alphabill-org/alphabill-go-base/types"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/stretchr/testify/require"
 

@@ -8,10 +8,10 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/alphabill-org/alphabill-go-sdk/crypto"
-	"github.com/alphabill-org/alphabill-go-sdk/predicates/templates"
-	"github.com/alphabill-org/alphabill-go-sdk/types"
-	"github.com/alphabill-org/alphabill-go-sdk/txsystem/evm"
+	"github.com/alphabill-org/alphabill-go-base/crypto"
+	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/evm"
+	"github.com/alphabill-org/alphabill-go-base/types"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	evmclient "github.com/alphabill-org/alphabill-wallet/wallet/evm/client"
