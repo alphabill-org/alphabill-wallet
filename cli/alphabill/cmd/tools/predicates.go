@@ -85,10 +85,14 @@ func createWASMPredicateCmd() *cobra.Command {
 	}
 
 	cmd.Flags().String(flagNameCodeFile, "", "filename from where to read predicate code (WASM binary)")
-	cmd.MarkFlagRequired(flagNameCodeFile)
+	if err := cmd.MarkFlagRequired(flagNameCodeFile); err != nil {
+		panic(err)
+	}
 	cmd.Flags().String(flagNameMainFunc, "", `name of the function to call from the WASM binary, ie `+
 		`the function which implements the predicate logic`)
-	cmd.MarkFlagRequired(flagNameMainFunc)
+	if err := cmd.MarkFlagRequired(flagNameMainFunc); err != nil {
+		panic(err)
+	}
 
 	cmd.Flags().BytesHexP(flagNameParam, "p", nil, "predicate program parameter as hex encoded string, see '"+
 		flagNameParamFile+"' flag description for more.")
