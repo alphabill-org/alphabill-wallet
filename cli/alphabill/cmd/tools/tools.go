@@ -10,6 +10,7 @@ func NewToolsCmd() *cobra.Command {
 		Short: "tools working with Alphabill data structures etc",
 	}
 	toolsCmd.AddCommand(createPredicateCmd())
+	toolsCmd.AddCommand(createWASMPredicateCmd())
 
 	return toolsCmd
 }
