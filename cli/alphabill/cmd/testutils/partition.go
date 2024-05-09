@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"testing"
 
-	sdkcrypto "github.com/alphabill-org/alphabill-go-base/crypto"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	sdkmoney "github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	sdktokens "github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
@@ -32,7 +31,7 @@ const DefaultT2Timeout = uint32(2500)
 
 func CreateMoneyPartition(t *testing.T, genesisConfig *testutil.MoneyGenesisConfig, nodeCount uint8) *testpartition.NodePartition {
 	genesisState := testutil.MoneyGenesisState(t, genesisConfig)
-	moneyPart, err := testpartition.NewPartition(t, "money node", nodeCount, func(tb map[string]sdkcrypto.Verifier) txsystem.TransactionSystem {
+	moneyPart, err := testpartition.NewPartition(t, "money node", nodeCount, func(tb types.RootTrustBase) txsystem.TransactionSystem {
 		genesisState = genesisState.Clone()
 		system, err := money.NewTxSystem(
 			testobserve.Default(t),
@@ -69,7 +68,7 @@ func StartAlphabill(t *testing.T, partitions []*testpartition.NodePartition) *te
 func CreateTokensPartition(t *testing.T) *testpartition.NodePartition {
 	tokensState := state.NewEmptyState()
 	network, err := testpartition.NewPartition(t, "tokens node", 1,
-		func(tb map[string]sdkcrypto.Verifier) txsystem.TransactionSystem {
+		func(tb types.RootTrustBase) txsystem.TransactionSystem {
 			tokensState = tokensState.Clone()
 			system, err := tokens.NewTxSystem(
 				testobserve.Default(t),

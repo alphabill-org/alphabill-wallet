@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	sdkcrypto "github.com/alphabill-org/alphabill-go-base/crypto"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	sdkmoney "github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
@@ -158,7 +157,7 @@ func startMoneyOnlyAlphabillPartition(t *testing.T, genesisConfig *testutil.Mone
 	genesisConfig.DCMoneySupplyValue = 10000 * 1e8
 	genesisConfig.SDRs = createSDRs()
 	genesisState := testutil.MoneyGenesisState(t, genesisConfig)
-	mPart, err := testpartition.NewPartition(t, "money node", 1, func(tb map[string]sdkcrypto.Verifier) txsystem.TransactionSystem {
+	mPart, err := testpartition.NewPartition(t, "money node", 1, func(tb types.RootTrustBase) txsystem.TransactionSystem {
 		system, err := money.NewTxSystem(
 			testobserve.Default(t),
 			money.WithSystemIdentifier(sdkmoney.DefaultSystemID),

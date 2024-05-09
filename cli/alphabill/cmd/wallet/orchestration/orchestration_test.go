@@ -10,7 +10,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	abcrypto "github.com/alphabill-org/alphabill-go-base/crypto"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	sdkorchestration "github.com/alphabill-org/alphabill-go-base/txsystem/orchestration"
 	"github.com/alphabill-org/alphabill-go-base/types"
@@ -119,7 +118,7 @@ func createOrchestrationPartition(t *testing.T, ownerPredicate types.PredicateBy
 		t,
 		"orchestration node",
 		1,
-		func(tb map[string]abcrypto.Verifier) txsystem.TransactionSystem {
+		func(tb types.RootTrustBase) txsystem.TransactionSystem {
 			s = s.Clone()
 			txSystem, err := orchestration.NewTxSystem(
 				testobserve.Default(t),
