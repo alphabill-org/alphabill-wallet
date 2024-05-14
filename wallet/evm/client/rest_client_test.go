@@ -75,22 +75,22 @@ func TestEvmClient_GetBalance(t *testing.T) {
 					}
 					w := httptest.NewRecorder()
 					response := struct {
-						_        struct{} `cbor:",toarray"`
-						Balance  string
-						Backlink []byte
+						_       struct{} `cbor:",toarray"`
+						Balance string
+						Counter uint64
 					}{
-						Balance:  "13000000",
-						Backlink: nil,
+						Balance: "13000000",
+						Counter: 0,
 					}
 					writeCBORResponse(t, w, response, http.StatusOK)
 					return w.Result(), nil
 				},
 			}},
 		}
-		amount, backlink, err := cli.GetBalance(context.Background(), addr)
+		amount, counter, err := cli.GetBalance(context.Background(), addr)
 		require.NoError(t, err)
 		require.EqualValues(t, "13000000", amount)
-		require.Nil(t, backlink)
+		require.EqualValues(t, 0, counter)
 	})
 	t.Run("not found", func(t *testing.T) {
 		cli := &EvmClient{
@@ -99,22 +99,22 @@ func TestEvmClient_GetBalance(t *testing.T) {
 				do: func(r *http.Request) (*http.Response, error) {
 					w := httptest.NewRecorder()
 					response := struct {
-						_        struct{} `cbor:",toarray"`
-						Balance  string
-						Backlink []byte
+						_       struct{} `cbor:",toarray"`
+						Balance string
+						Counter uint64
 					}{
-						Balance:  "130000001",
-						Backlink: []byte{1, 2, 3, 4, 5},
+						Balance: "130000001",
+						Counter: 12345,
 					}
 					writeCBORResponse(t, w, response, http.StatusOK)
 					return w.Result(), nil
 				},
 			}},
 		}
-		amount, backlink, err := cli.GetBalance(context.Background(), addr)
+		amount, counter, err := cli.GetBalance(context.Background(), addr)
 		require.NoError(t, err)
 		require.EqualValues(t, "130000001", amount)
-		require.EqualValues(t, backlink, []byte{1, 2, 3, 4, 5})
+		require.EqualValues(t, counter, 12345)
 	})
 	t.Run("not found", func(t *testing.T) {
 		cli := &EvmClient{
@@ -127,10 +127,10 @@ func TestEvmClient_GetBalance(t *testing.T) {
 				},
 			}},
 		}
-		amount, backlink, err := cli.GetBalance(context.Background(), addr)
+		amount, counter, err := cli.GetBalance(context.Background(), addr)
 		require.ErrorIs(t, err, ErrNotFound)
 		require.EqualValues(t, "", amount)
-		require.Nil(t, backlink)
+		require.EqualValues(t, 0, counter)
 	})
 }
 
@@ -151,12 +151,12 @@ func TestEvmClient_GetFeeCreditBill(t *testing.T) {
 					}
 					w := httptest.NewRecorder()
 					response := struct {
-						_        struct{} `cbor:",toarray"`
-						Balance  string
-						Backlink []byte
+						_       struct{} `cbor:",toarray"`
+						Balance string
+						Counter uint64
 					}{
-						Balance:  "1300000000000000",
-						Backlink: []byte{1, 2, 3, 4, 5},
+						Balance: "1300000000000000",
+						Counter: 12345,
 					}
 					writeCBORResponse(t, w, response, http.StatusOK)
 					return w.Result(), nil
@@ -169,7 +169,7 @@ func TestEvmClient_GetFeeCreditBill(t *testing.T) {
 		value := new(big.Int)
 		value.SetString("1300000000000000", 10)
 		require.EqualValues(t, WeiToAlpha(value), fcrBill.Value)
-		require.EqualValues(t, []byte{1, 2, 3, 4, 5}, fcrBill.TxHash)
+		require.EqualValues(t, 12345, fcrBill.Counter)
 	})
 }
 

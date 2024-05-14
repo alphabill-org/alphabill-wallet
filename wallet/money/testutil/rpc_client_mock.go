@@ -8,9 +8,9 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
-
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
+	mwtypes "github.com/alphabill-org/alphabill-wallet/wallet/money/types"
 )
 
 type (
@@ -174,7 +174,7 @@ func NewMoneyBill(unitIDPart []byte, billData *money.BillData) *api.Bill {
 }
 
 func NewMoneyFCR(pubKeyHash []byte, fcrData *fc.FeeCreditRecord) *api.FeeCreditBill {
-	fcrID := money.NewFeeCreditRecordID(nil, pubKeyHash)
+	fcrID := mwtypes.FeeCreditRecordIDFormPublicKeyHash(nil, pubKeyHash)
 	return &api.FeeCreditBill{
 		ID:              fcrID,
 		FeeCreditRecord: fcrData,

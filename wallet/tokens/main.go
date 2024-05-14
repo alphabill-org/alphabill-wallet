@@ -8,17 +8,16 @@ import (
 	"log/slog"
 	"math"
 
-	"go.opentelemetry.io/otel/trace"
-
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-go-base/util"
-
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
+	twtypes "github.com/alphabill-org/alphabill-wallet/wallet/tokens/types"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -477,7 +476,7 @@ func (w *Wallet) GetFeeCredit(ctx context.Context, cmd fees.GetFeeCreditCmd) (*a
 	if err != nil {
 		return nil, err
 	}
-	return w.GetFeeCreditBill(ctx, tokens.NewFeeCreditRecordID(nil, ac.PubKeyHash.Sha256))
+	return w.GetFeeCreditBill(ctx, twtypes.FeeCreditRecordIDFormPublicKeyHash(nil, ac.PubKeyHash.Sha256))
 }
 
 // GetFeeCreditBill returns fee credit bill for given unitID
@@ -503,7 +502,7 @@ func (w *Wallet) ReclaimFeeCredit(ctx context.Context, cmd fees.ReclaimFeeCmd) (
 }
 
 func (w *Wallet) ensureFeeCredit(ctx context.Context, accountKey *account.AccountKey, txCount int) error {
-	fcb, err := w.GetFeeCreditBill(ctx, tokens.NewFeeCreditRecordID(nil, accountKey.PubKeyHash.Sha256))
+	fcb, err := w.GetFeeCreditBill(ctx, twtypes.FeeCreditRecordIDFormPublicKeyHash(nil, accountKey.PubKeyHash.Sha256))
 	if err != nil {
 		return err
 	}
