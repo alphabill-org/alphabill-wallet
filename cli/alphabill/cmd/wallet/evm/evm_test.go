@@ -27,7 +27,7 @@ import (
 func Test_evmCmdDeploy_error_cases(t *testing.T) {
 	homedir := testutils.CreateNewTestWallet(t)
 	// balance is returned by EVM in wei 10^-18
-	mockServer, addr := mockClientCalls(t, &clientMockConf{balance: "15000000000000000000", backlink: make([]byte, 32)})
+	mockServer, addr := mockClientCalls(t, &clientMockConf{balance: "15000000000000000000", counter: 0})
 	defer mockServer.Close()
 	_, err := execEvmCmd(t, homedir, "evm deploy --alphabill-api-uri "+addr.Host)
 	require.ErrorContains(t, err, "required flag(s) \"data\", \"max-gas\" not set")
@@ -55,7 +55,7 @@ func Test_evmCmdDeploy_ok(t *testing.T) {
 	mockConf := &clientMockConf{
 		round:    3,
 		balance:  "15000000000000000000", // balance is returned by EVM in wei 10^-18
-		backlink: make([]byte, 32),
+		counter:  0,
 		nonce:    1,
 		gasPrice: "10000",
 		serverMeta: &types.ServerMetadata{
@@ -92,7 +92,7 @@ func Test_evmCmdDeploy_ok(t *testing.T) {
 func Test_evmCmdExecute_error_cases(t *testing.T) {
 	homedir := testutils.CreateNewTestWallet(t)
 	// balance is returned by EVM in wei 10^-18
-	mockServer, addr := mockClientCalls(t, &clientMockConf{balance: "15000000000000000000", backlink: make([]byte, 32), gasPrice: "20000000000000000000"})
+	mockServer, addr := mockClientCalls(t, &clientMockConf{balance: "15000000000000000000", counter: 0, gasPrice: "20000000000000000000"})
 	defer mockServer.Close()
 	_, err := execEvmCmd(t, homedir, "evm execute --alphabill-api-uri "+addr.Host)
 	require.ErrorContains(t, err, "required flag(s) \"address\", \"data\", \"max-gas\" not set")
@@ -118,7 +118,7 @@ func Test_evmCmdExecute_ok(t *testing.T) {
 	mockConf := &clientMockConf{
 		round:    3,
 		balance:  "15000000000000000000", // balance is returned by EVM in wei 10^-18
-		backlink: make([]byte, 32),
+		counter:  0,
 		nonce:    1,
 		gasPrice: "10000",
 		serverMeta: &types.ServerMetadata{
@@ -159,7 +159,7 @@ func Test_evmCmdExecute_ok(t *testing.T) {
 func Test_evmCmdCall_error_cases(t *testing.T) {
 	homedir := testutils.CreateNewTestWallet(t)
 	// balance is returned by EVM in wei 10^-18
-	mockServer, addr := mockClientCalls(t, &clientMockConf{balance: "15000000000000000000", backlink: make([]byte, 32)})
+	mockServer, addr := mockClientCalls(t, &clientMockConf{balance: "15000000000000000000", counter: 0})
 	defer mockServer.Close()
 	_, err := execEvmCmd(t, homedir, "evm call --alphabill-api-uri "+addr.Host)
 	require.ErrorContains(t, err, "required flag(s) \"address\", \"data\" not set")
@@ -179,10 +179,10 @@ func Test_evmCmdCall_ok(t *testing.T) {
 		ReturnData: []byte{0xDE, 0xAD, 0x00, 0xBE, 0xEF},
 	}
 	mockConf := &clientMockConf{
-		round:    3,
-		balance:  "15000000000000000000", // balance is returned by EVM in wei 10^-18
-		backlink: make([]byte, 32),
-		nonce:    1,
+		round:   3,
+		balance: "15000000000000000000", // balance is returned by EVM in wei 10^-18
+		counter: 0,
+		nonce:   1,
 		callResp: &evm.CallEVMResponse{
 			ProcessingDetails: evmDetails,
 		},
@@ -214,10 +214,10 @@ func Test_evmCmdCall_ok_defaultGas(t *testing.T) {
 		ReturnData: []byte{0xDE, 0xAD, 0x00, 0xBE, 0xEF},
 	}
 	mockConf := &clientMockConf{
-		round:    3,
-		balance:  "15000000000000000000", // balance is returned by EVM in wei 10^-18
-		backlink: make([]byte, 32),
-		nonce:    1,
+		round:   3,
+		balance: "15000000000000000000", // balance is returned by EVM in wei 10^-18
+		counter: 0,
+		nonce:   1,
 		callResp: &evm.CallEVMResponse{
 			ProcessingDetails: evmDetails,
 		},
@@ -246,7 +246,7 @@ func Test_evmCmdCall_ok_defaultGas(t *testing.T) {
 func Test_evmCmdBalance(t *testing.T) {
 	homedir := testutils.CreateNewTestWallet(t)
 	// balance is returned by EVM in wei 10^-18
-	mockServer, addr := mockClientCalls(t, &clientMockConf{balance: "15000000000000000000", backlink: make([]byte, 32)})
+	mockServer, addr := mockClientCalls(t, &clientMockConf{balance: "15000000000000000000", counter: 0})
 	defer mockServer.Close()
 	stdout, _ := execEvmCmd(t, homedir, "evm balance --alphabill-api-uri "+addr.Host)
 	testutils.VerifyStdout(t, stdout, "#1 15.000'000'00 (eth: 15.000'000'000'000'000'000)")
@@ -257,7 +257,7 @@ func Test_evmCmdBalance(t *testing.T) {
 
 type clientMockConf struct {
 	balance    string
-	backlink   []byte
+	counter    uint64
 	round      uint64
 	nonce      uint64
 	gasPrice   string
@@ -272,12 +272,12 @@ func mockClientCalls(t *testing.T, br *clientMockConf) (*httptest.Server, *url.U
 		switch {
 		case strings.Contains(r.URL.Path, "/api/v1/evm/balance/"):
 			writeCBORResponse(t, w, &struct {
-				_        struct{} `cbor:",toarray"`
-				Balance  string
-				Backlink []byte
+				_       struct{} `cbor:",toarray"`
+				Balance string
+				Counter uint64
 			}{
-				Balance:  br.balance,
-				Backlink: br.backlink,
+				Balance: br.balance,
+				Counter: br.counter,
 			}, http.StatusOK)
 		case strings.Contains(r.URL.Path, "/api/v1/evm/transactionCount/"):
 			writeCBORResponse(t, w, &struct {

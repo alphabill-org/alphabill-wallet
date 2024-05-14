@@ -13,7 +13,6 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
-
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
@@ -21,6 +20,7 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/dc"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
+	mwtypes "github.com/alphabill-org/alphabill-wallet/wallet/money/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txpublisher"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 )
@@ -86,7 +86,7 @@ func CreateNewWallet(am account.Manager, mnemonic string) error {
 func LoadExistingWallet(am account.Manager, feeManagerDB fees.FeeManagerDB, rpcClient RpcClient, log *slog.Logger) (*Wallet, error) {
 	moneySystemID := money.DefaultSystemID
 	moneyTxPublisher := txpublisher.NewTxPublisher(rpcClient, log)
-	feeManager := fees.NewFeeManager(am, feeManagerDB, moneySystemID, rpcClient, FeeCreditRecordIDFormPublicKey, moneySystemID, rpcClient, FeeCreditRecordIDFormPublicKey, log)
+	feeManager := fees.NewFeeManager(am, feeManagerDB, moneySystemID, rpcClient, mwtypes.FeeCreditRecordIDFormPublicKey, moneySystemID, rpcClient, mwtypes.FeeCreditRecordIDFormPublicKey, log)
 	dustCollector := dc.NewDustCollector(moneySystemID, maxBillsForDustCollection, txTimeoutBlockCount, rpcClient, log)
 	return &Wallet{
 		am:            am,
@@ -295,7 +295,7 @@ func (w *Wallet) GetFeeCredit(ctx context.Context, cmd fees.GetFeeCreditCmd) (*a
 	if err != nil {
 		return nil, fmt.Errorf("failed to load account key: %w", err)
 	}
-	return w.GetFeeCreditBill(ctx, money.NewFeeCreditRecordID(nil, accountKey.PubKeyHash.Sha256))
+	return w.GetFeeCreditBill(ctx, mwtypes.FeeCreditRecordIDFormPublicKeyHash(nil, accountKey.PubKeyHash.Sha256))
 }
 
 // GetFeeCreditBill returns fee credit bill for given unitID,

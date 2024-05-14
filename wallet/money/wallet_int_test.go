@@ -9,15 +9,9 @@ import (
 	"time"
 
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
+	testsig "github.com/alphabill-org/alphabill-go-base/testutils/sig"
 	sdkmoney "github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
-
-	"github.com/alphabill-org/alphabill/rpc"
-	"github.com/alphabill-org/alphabill/txsystem"
-	"github.com/alphabill-org/alphabill/txsystem/money"
-	ethrpc "github.com/ethereum/go-ethereum/rpc"
-	"github.com/stretchr/testify/require"
-
 	rpcclient "github.com/alphabill-org/alphabill-wallet/client/rpc"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	testfees "github.com/alphabill-org/alphabill-wallet/internal/testutils/fees"
@@ -26,12 +20,13 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
+	mwtypes "github.com/alphabill-org/alphabill-wallet/wallet/money/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
-)
-
-var (
-	fcrID     = sdkmoney.NewFeeCreditRecordID(nil, []byte{1})
-	fcrAmount = uint64(1e8)
+	"github.com/alphabill-org/alphabill/rpc"
+	"github.com/alphabill-org/alphabill/txsystem"
+	"github.com/alphabill-org/alphabill/txsystem/money"
+	ethrpc "github.com/ethereum/go-ethereum/rpc"
+	"github.com/stretchr/testify/require"
 )
 
 /*
@@ -42,6 +37,7 @@ wallet account 2 and 3 should have only single bill
 */
 func TestCollectDustInMultiAccountWallet(t *testing.T) {
 	observe := testobserve.Default(t)
+	signer, _ := testsig.CreateSignerAndVerifier(t)
 
 	// setup account
 	dir := t.TempDir()
@@ -86,7 +82,9 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 	require.NoError(t, err)
 
 	// create fee credit for initial bill transfer
-	_ = testfees.CreateFeeCredit(t, genesisConfig.InitialBillID, fcrID, fcrAmount, accKey.PrivKey, accKey.PubKey, network)
+	fcrID := mwtypes.FeeCreditRecordIDFormPublicKeyHash(nil, accKey.PubKeyHash.Sha256)
+	fcrAmount := uint64(1e8)
+	_ = testfees.CreateFeeCredit(t, signer, genesisConfig.InitialBillID, fcrID, fcrAmount, accKey, network)
 	initialBillCounter := uint64(1)
 	initialBillValue := genesisConfig.InitialBillValue - fcrAmount
 

@@ -78,9 +78,9 @@ func TestRpcClient(t *testing.T) {
 		fcb := &api.FeeCreditBill{
 			ID: []byte{1},
 			FeeCreditRecord: &fc.FeeCreditRecord{
-				Balance:  192,
-				Timeout:  168,
-				Backlink: []byte{1, 2, 3, 4, 5},
+				Balance: 192,
+				Timeout: 168,
+				Counter: 12345,
 			},
 		}
 		service.Units = map[string]*rpc.Unit[any]{

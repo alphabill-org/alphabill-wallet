@@ -89,14 +89,14 @@ func (e *evmClientMock) GetTransactionCount(ctx context.Context, ethAddr []byte)
 	return uint64(1), nil
 }
 
-func (e *evmClientMock) GetBalance(ctx context.Context, ethAddr []byte) (string, []byte, error) {
+func (e *evmClientMock) GetBalance(ctx context.Context, ethAddr []byte) (string, uint64, error) {
 	if e.SimulateErr != nil {
-		return "", nil, e.SimulateErr
+		return "", 0, e.SimulateErr
 	}
 	if e.noFcb {
-		return "", nil, evmclient.ErrNotFound
+		return "", 0, evmclient.ErrNotFound
 	}
-	return "100000", test.RandomBytes(32), nil
+	return "100000", 0, nil
 }
 
 func (e *evmClientMock) GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*evmclient.Bill, error) {

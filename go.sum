@@ -56,10 +56,10 @@ github.com/VictoriaMetrics/fastcache v1.12.1/go.mod h1:tX04vaqcNoQeGLD+ra5pU5sWk
 github.com/aead/siphash v1.0.1/go.mod h1:Nywa3cDsYNNK3gaciGTWPwHt0wlpNV15vwmswBAUSII=
 github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156 h1:eMwmnE/GDgah4HI848JfFxHt+iPb26b4zyfspmqY0/8=
 github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156/go.mod h1:Cb/ax3seSYIx7SuZdm2G2xzfwmv3TPSk2ucNfQESPXM=
-github.com/alphabill-org/alphabill v0.4.1-0.20240507105314-bbc02b956412 h1:lmDrkwbarUHmW/ayPg3ZKiCuJZhV2knraDlWWgYFxqg=
-github.com/alphabill-org/alphabill v0.4.1-0.20240507105314-bbc02b956412/go.mod h1:E2hpzn3dw5g06fTBI2Bpt0EA9zFLr7oFFcHk1crlLQk=
-github.com/alphabill-org/alphabill-go-base v0.0.0-20240508081740-68288edb0c10 h1:UCYabQg2K8x1TImmjiR+OYydo/IK6eJCKoIP5o8uDjM=
-github.com/alphabill-org/alphabill-go-base v0.0.0-20240508081740-68288edb0c10/go.mod h1:5y8Rsc6aJ+dThkA1wK4cfQaqTTttgSD8HIT1x207SC8=
+github.com/alphabill-org/alphabill v0.4.1-0.20240514151519-79d2f1dbef7a h1:El61xckGUUQsdQ+xfhBaOrdxotU4U+4pBMskVg6AhGE=
+github.com/alphabill-org/alphabill v0.4.1-0.20240514151519-79d2f1dbef7a/go.mod h1:tGSpUbVVOHX88ckCQSuBhsa31fxaZzuADcapLz+cbiQ=
+github.com/alphabill-org/alphabill-go-base v0.0.0-20240510140521-e114be5cbeb0 h1:MuXb4Ii6A+VuEzoTbTO0XSKHoI37eGzKtMUTBAZJHI8=
+github.com/alphabill-org/alphabill-go-base v0.0.0-20240510140521-e114be5cbeb0/go.mod h1:5y8Rsc6aJ+dThkA1wK4cfQaqTTttgSD8HIT1x207SC8=
 github.com/anmitsu/go-shlex v0.0.0-20161002113705-648efa622239/go.mod h1:2FmKhYUyUczH0OGQWaF5ceTx0UBShxjsH6f8oGKYe2c=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/benbjohnson/clock v1.3.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=

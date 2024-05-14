@@ -24,7 +24,7 @@ type (
 		Client
 		Call(ctx context.Context, callAttr *evm.CallEVMRequest) (*evm.ProcessingDetails, error)
 		GetTransactionCount(ctx context.Context, ethAddr []byte) (uint64, error)
-		GetBalance(ctx context.Context, ethAddr []byte) (string, []byte, error)
+		GetBalance(ctx context.Context, ethAddr []byte) (string, uint64, error)
 		GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*evmclient.Bill, error)
 		GetGasPrice(ctx context.Context) (string, error)
 	}

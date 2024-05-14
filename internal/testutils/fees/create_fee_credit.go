@@ -7,19 +7,20 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/types"
-
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
+	"github.com/alphabill-org/alphabill-wallet/wallet/account"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
 	testfc "github.com/alphabill-org/alphabill/txsystem/fc/testutils"
 	testtransaction "github.com/alphabill-org/alphabill/txsystem/testutils/transaction"
 	"github.com/stretchr/testify/require"
 )
 
 // CreateFeeCredit creates fee credit to be able to spend initial bill
-func CreateFeeCredit(t *testing.T, initialBillID, fcrID types.UnitID, fcrAmount uint64, privKey []byte, pubKey []byte, network *testpartition.AlphabillNetwork) *types.TransactionOrder {
+func CreateFeeCredit(t *testing.T, signer abcrypto.Signer, initialBillID, fcrID types.UnitID, fcrAmount uint64, accountKey *account.AccountKey, network *testpartition.AlphabillNetwork) *types.TransactionOrder {
 	// send transferFC
-	transferFC := testfc.NewTransferFC(t,
-		testfc.NewTransferFCAttr(
+	transferFC := testfc.NewTransferFC(t, signer,
+		testfc.NewTransferFCAttr(t, signer,
 			testfc.WithCounter(0),
 			testfc.WithAmount(fcrAmount),
 			testfc.WithTargetRecordID(fcrID),
@@ -27,12 +28,8 @@ func CreateFeeCredit(t *testing.T, initialBillID, fcrID types.UnitID, fcrAmount 
 		testtransaction.WithUnitID(initialBillID),
 		testtransaction.WithPayloadType(fc.PayloadTypeTransferFeeCredit),
 	)
-
-	signer, _ := abcrypto.NewInMemorySecp256K1SignerFromKey(privKey)
-	sigBytes, err := transferFC.PayloadBytes()
+	transferFC, err := txbuilder.SignPayload(transferFC.Payload, accountKey)
 	require.NoError(t, err)
-	sig, _ := signer.SignBytes(sigBytes)
-	transferFC.OwnerProof = templates.NewP2pkh256SignatureBytes(sig, pubKey)
 
 	moneyPartition, err := network.GetNodePartition(1)
 	require.NoError(t, err)
@@ -43,14 +40,15 @@ func CreateFeeCredit(t *testing.T, initialBillID, fcrID types.UnitID, fcrAmount 
 	// send addFC
 	addFC := testfc.NewAddFC(t, network.RootPartition.Nodes[0].RootSigner,
 		testfc.NewAddFCAttr(t, network.RootPartition.Nodes[0].RootSigner,
-			testfc.WithTransferFCTx(transferFCRecord),
+			testfc.WithTransferFCRecord(transferFCRecord),
 			testfc.WithTransferFCProof(transferFCProof),
-			testfc.WithFCOwnerCondition(templates.NewP2pkh256BytesFromKey(pubKey)),
+			testfc.WithFCOwnerCondition(templates.NewP2pkh256BytesFromKey(accountKey.PubKey)),
 		),
 		testtransaction.WithUnitID(fcrID),
-		testtransaction.WithOwnerProof(templates.NewP2pkh256BytesFromKey(pubKey)),
 		testtransaction.WithPayloadType(fc.PayloadTypeAddFeeCredit),
 	)
+	addFC, err = txbuilder.SignPayload(addFC.Payload, accountKey)
+	require.NoError(t, err)
 	require.NoError(t, moneyPartition.SubmitTx(addFC))
 	require.Eventually(t, testpartition.BlockchainContainsTx(moneyPartition, addFC), test.WaitDuration, test.WaitTick)
 	return transferFCRecord.TransactionOrder

@@ -4,12 +4,11 @@ import "github.com/alphabill-org/alphabill-wallet/wallet"
 
 type (
 	Bill struct {
-		Id                   []byte            `json:"id,omitempty"`
-		Value                uint64            `json:"value,omitempty,string"`
-		TxHash               []byte            `json:"txHash,omitempty"`
-		DCTargetUnitID       []byte            `json:"targetUnitId,omitempty"`
-		DCTargetUnitBacklink []byte            `json:"targetUnitBacklink,omitempty"`
-		Locked               wallet.LockReason `json:"locked,omitempty,string"`
+		Id      []byte            `json:"id,omitempty"`
+		Value   uint64            `json:"value,omitempty,string"`
+		TxHash  []byte            `json:"txHash,omitempty"`
+		Counter uint64            `json:"counter,omitempty,string"`
+		Locked  wallet.LockReason `json:"locked,omitempty,string"`
 	}
 
 	RoundNumber struct {

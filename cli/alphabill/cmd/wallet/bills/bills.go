@@ -14,9 +14,9 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
+	mwtypes "github.com/alphabill-org/alphabill-wallet/wallet/money/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txpublisher"
 	"github.com/spf13/cobra"
 )
@@ -154,7 +154,7 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 		return errors.New("invalid rpc url provided for money partition")
 	}
 
-	fcrID := money.FeeCreditRecordIDFormPublicKey(nil, accountKey.PubKey)
+	fcrID := mwtypes.FeeCreditRecordIDFormPublicKey(nil, accountKey.PubKey)
 	fcb, err := moneyClient.GetFeeCreditRecord(cmd.Context(), fcrID, false)
 	if err != nil && !errors.Is(err, api.ErrNotFound) {
 		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
@@ -229,7 +229,7 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 		return errors.New("invalid rpc url provided for money partition")
 	}
 
-	fcrID := money.FeeCreditRecordIDFormPublicKey(nil, accountKey.PubKey)
+	fcrID := mwtypes.FeeCreditRecordIDFormPublicKey(nil, accountKey.PubKey)
 	fcb, err := moneyClient.GetFeeCreditRecord(cmd.Context(), fcrID, false)
 	if err != nil && !errors.Is(err, api.ErrNotFound) {
 		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
