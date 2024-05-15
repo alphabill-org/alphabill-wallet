@@ -12,9 +12,9 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
 )
 
-func AddFeeCredit(t *testing.T, amount uint64, systemID types.SystemID, accountKey *account.AccountKey, unitID []byte, unitCounter uint64, fcrID, fcrBacklink []byte, node *testpartition.NodePartition) {
+func AddFeeCredit(t *testing.T, amount uint64, systemID types.SystemID, accountKey *account.AccountKey, unitID []byte, unitCounter uint64, fcrID []byte, fcrCounter *uint64, node *testpartition.NodePartition) {
 	// create transferFC tx
-	transferFCTx, err := txbuilder.NewTransferFCTx(amount, fcrID, fcrBacklink, accountKey, systemID, systemID, unitID, unitCounter, 10000, 0, 10000)
+	transferFCTx, err := txbuilder.NewTransferFCTx(amount, fcrID, fcrCounter, accountKey, systemID, systemID, unitID, unitCounter, 10000, 0, 10000)
 	require.NoError(t, err)
 
 	// submit transferFC tx

@@ -597,10 +597,15 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 	if err != nil {
 		return fmt.Errorf("faild to fetch fee credit bill: %w", err)
 	}
+	var targetUnitCounter *uint64
+	if fcb != nil {
+		c := fcb.Counter()
+		targetUnitCounter = &c
+	}
 	tx, err := txbuilder.NewTransferFCTx(
 		feeCtx.TargetAmount,
 		fcrID,
-		fcb.Backlink(),
+		targetUnitCounter,
 		accountKey,
 		w.moneySystemID,
 		w.targetPartitionSystemID,

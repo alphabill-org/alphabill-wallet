@@ -220,8 +220,8 @@ func TestNewTypes(t *testing.T) {
 			return &api.FeeCreditBill{
 				ID: []byte{1},
 				FeeCreditRecord: &fc.FeeCreditRecord{
-					Balance:  100000,
-					Backlink: []byte{2},
+					Balance: 100000,
+					Counter: 2,
 				},
 			}, nil
 		},
@@ -334,7 +334,7 @@ func TestMintFungibleToken(t *testing.T) {
 		getFeeCreditRecord: func(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
 			return &api.FeeCreditBill{
 				ID:              []byte{1},
-				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
+				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Counter: 2},
 			}, nil
 		},
 	}
@@ -398,7 +398,7 @@ func TestSendFungible(t *testing.T) {
 		getFeeCreditRecord: func(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
 			return &api.FeeCreditBill{
 				ID:              []byte{1},
-				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
+				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Counter: 2},
 			}, nil
 		},
 		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
@@ -600,7 +600,7 @@ func TestMintNFT(t *testing.T) {
 		getFeeCreditRecord: func(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
 			return &api.FeeCreditBill{
 				ID:              []byte{1},
-				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
+				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Counter: 2},
 			}, nil
 		},
 	}
@@ -687,7 +687,7 @@ func TestTransferNFT(t *testing.T) {
 		getFeeCreditRecord: func(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
 			return &api.FeeCreditBill{
 				ID:              []byte{1},
-				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
+				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Counter: 2},
 			}, nil
 		},
 	}
@@ -758,7 +758,7 @@ func TestUpdateNFTData(t *testing.T) {
 		getFeeCreditRecord: func(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
 			return &api.FeeCreditBill{
 				ID:              []byte{1},
-				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
+				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Counter: 2},
 			}, nil
 		},
 	}
@@ -774,7 +774,7 @@ func TestUpdateNFTData(t *testing.T) {
 	tok := &TokenUnit{ID: test.RandomBytes(32), Kind: NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32), Counter: 0}
 	tokenz[string(tok.ID)] = tok
 
-	// test data, backlink and predicate inputs are submitted correctly
+	// test data, counter and predicate inputs are submitted correctly
 	data := test.RandomBytes(64)
 	result, err := tw.UpdateNFTData(context.Background(), 1, tok.ID, data, []*PredicateInput{{Argument: nil}})
 	require.NoError(t, err)
@@ -826,7 +826,7 @@ func TestLockToken(t *testing.T) {
 		getFeeCreditRecord: func(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
 			return &api.FeeCreditBill{
 				ID:              []byte{1},
-				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
+				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Counter: 2},
 			}, nil
 		},
 	}
@@ -866,7 +866,7 @@ func TestUnlockToken(t *testing.T) {
 		getFeeCreditRecord: func(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
 			return &api.FeeCreditBill{
 				ID:              []byte{1},
-				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
+				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Counter: 2},
 			}, nil
 		},
 	}

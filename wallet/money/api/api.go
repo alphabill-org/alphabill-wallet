@@ -48,11 +48,11 @@ func (b *FeeCreditBill) IsLocked() bool {
 	return b.FeeCreditRecord.IsLocked()
 }
 
-func (b *FeeCreditBill) Backlink() []byte {
+func (b *FeeCreditBill) Counter() uint64 {
 	if b == nil {
-		return nil
+		return 0
 	}
-	return b.FeeCreditRecord.GetBacklink()
+	return b.FeeCreditRecord.GetCounter()
 }
 
 func (b *FeeCreditBill) Balance() uint64 {

@@ -7,8 +7,6 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/spf13/cobra"
-
 	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
@@ -18,9 +16,10 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	evmwallet "github.com/alphabill-org/alphabill-wallet/wallet/evm"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
-	moneywallet "github.com/alphabill-org/alphabill-wallet/wallet/money"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
-	tokenswallet "github.com/alphabill-org/alphabill-wallet/wallet/tokens"
+	mwtypes "github.com/alphabill-org/alphabill-wallet/wallet/money/types"
+	twtypes "github.com/alphabill-org/alphabill-wallet/wallet/tokens/types"
+	"github.com/spf13/cobra"
 )
 
 // NewFeesCmd creates a new cobra command for the wallet fees component.
@@ -421,10 +420,10 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 			feeManagerDB,
 			moneyInfo.SystemID,
 			moneyClient,
-			moneywallet.FeeCreditRecordIDFormPublicKey,
+			mwtypes.FeeCreditRecordIDFormPublicKey,
 			moneyInfo.SystemID,
 			moneyClient,
-			moneywallet.FeeCreditRecordIDFormPublicKey,
+			mwtypes.FeeCreditRecordIDFormPublicKey,
 			logger,
 		), nil
 	case clitypes.TokensType:
@@ -447,10 +446,10 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 			feeManagerDB,
 			moneyInfo.SystemID,
 			moneyClient,
-			moneywallet.FeeCreditRecordIDFormPublicKey,
+			mwtypes.FeeCreditRecordIDFormPublicKey,
 			tokenInfo.SystemID,
 			tokensClient,
-			tokenswallet.FeeCreditRecordIDFromPublicKey,
+			twtypes.FeeCreditRecordIDFromPublicKey,
 			logger,
 		), nil
 	case clitypes.EvmType:
@@ -473,7 +472,7 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 			feeManagerDB,
 			moneyInfo.SystemID,
 			moneyClient,
-			moneywallet.FeeCreditRecordIDFormPublicKey,
+			mwtypes.FeeCreditRecordIDFormPublicKey,
 			evmInfo.SystemID,
 			evmClient,
 			evmwallet.FeeCreditRecordIDFromPublicKey,

@@ -12,13 +12,12 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-go-base/util"
-
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/fxamacker/cbor/v2"
-
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
 	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
+	mwtypes "github.com/alphabill-org/alphabill-wallet/wallet/money/types"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/fxamacker/cbor/v2"
 )
 
 /*
@@ -83,10 +82,7 @@ func execInitialBill(ctx context.Context, rpcClient api.RpcClient, timeout uint6
 
 	txFee := uint64(1)
 	feeAmount := uint64(2)
-	// Make the initial fcrID different from the default
-	// sha256(pubKey), so that wallet can later create its own
-	// fcrID for the same account with a different owner condition
-	fcrID := money.NewFeeCreditRecordID(billID, hash.Sum256(hash.Sum256(pubKey)))
+	fcrID := mwtypes.FeeCreditRecordIDFormOwnerPredicate(nil, templates.AlwaysTrueBytes())
 
 	// create transferFC
 	transferFC, err := createTransferFC(feeAmount+txFee, billID, fcrID, roundNumber, absoluteTimeout, counter)
