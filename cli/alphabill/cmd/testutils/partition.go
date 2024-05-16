@@ -11,6 +11,7 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	sdkmoney "github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	sdktokens "github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
+	sdkorchestration "github.com/alphabill-org/alphabill-go-base/txsystem/orchestration"
 	"github.com/alphabill-org/alphabill-go-base/types"
 
 	"github.com/alphabill-org/alphabill/partition"
@@ -19,20 +20,24 @@ import (
 	"github.com/alphabill-org/alphabill/txsystem"
 	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
+	"github.com/alphabill-org/alphabill/txsystem/orchestration"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/client/rpc"
-	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
-	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 )
 
 const DefaultT2Timeout = uint32(2500)
 
-func CreateMoneyPartition(t *testing.T, genesisConfig *testutil.MoneyGenesisConfig, nodeCount uint8) *testpartition.NodePartition {
+type Wallet struct {
+	Homedir string
+	PubKeys [][]byte
+}
+
+func createMoneyPartition(t *testing.T, genesisConfig *testutil.MoneyGenesisConfig, nodeCount uint8) *NodePartition {
 	genesisState := testutil.MoneyGenesisState(t, genesisConfig)
-	moneyPart, err := testpartition.NewPartition(t, "money node", nodeCount, func(tb map[string]sdkcrypto.Verifier) txsystem.TransactionSystem {
+	moneyPart, err := newPartition(t, "money node", nodeCount, func(tb map[string]sdkcrypto.Verifier) txsystem.TransactionSystem {
 		genesisState = genesisState.Clone()
 		system, err := money.NewTxSystem(
 			testobserve.Default(t),
@@ -58,17 +63,9 @@ func CreateMoneyPartition(t *testing.T, genesisConfig *testutil.MoneyGenesisConf
 	return moneyPart
 }
 
-func StartAlphabill(t *testing.T, partitions []*testpartition.NodePartition) *testpartition.AlphabillNetwork {
-	abNetwork, err := testpartition.NewAlphabillPartition(partitions)
-	require.NoError(t, err)
-	require.NoError(t, abNetwork.Start(t))
-	t.Cleanup(func() { abNetwork.WaitClose(t) })
-	return abNetwork
-}
-
-func CreateTokensPartition(t *testing.T) *testpartition.NodePartition {
+func CreateTokensPartition(t *testing.T) *NodePartition {
 	tokensState := state.NewEmptyState()
-	network, err := testpartition.NewPartition(t, "tokens node", 1,
+	network, err := newPartition(t, "tokens node", 1,
 		func(tb map[string]sdkcrypto.Verifier) txsystem.TransactionSystem {
 			tokensState = tokensState.Clone()
 			system, err := tokens.NewTxSystem(
@@ -84,9 +81,33 @@ func CreateTokensPartition(t *testing.T) *testpartition.NodePartition {
 	return network
 }
 
-func StartRpcServers(t *testing.T, partition *testpartition.NodePartition) {
+func CreateOrchestrationPartition(t *testing.T, ownerPredicate types.PredicateBytes) *NodePartition {
+	s := state.NewEmptyState()
+	network, err := newPartition(
+		t,
+		"orchestration node",
+		1,
+		func(tb map[string]sdkcrypto.Verifier) txsystem.TransactionSystem {
+			s = s.Clone()
+			txSystem, err := orchestration.NewTxSystem(
+				testobserve.Default(t),
+				orchestration.WithState(s),
+				orchestration.WithTrustBase(tb),
+				orchestration.WithOwnerPredicate(ownerPredicate),
+			)
+			require.NoError(t, err)
+			return txSystem
+		},
+		sdkorchestration.DefaultSystemID,
+		s,
+	)
+	require.NoError(t, err)
+	return network
+}
+
+func startRpcServers(t *testing.T, partition *NodePartition) {
 	for _, n := range partition.Nodes {
-		n.AddrRPC = StartRpcServer(t, n.Node, partition.SystemName, n.OwnerIndexer)
+		n.AddrRPC = startRpcServer(t, n.Node, partition.SystemName, n.OwnerIndexer)
 	}
 	// wait for rpc servers to start
 	for _, n := range partition.Nodes {
@@ -98,18 +119,18 @@ func StartRpcServers(t *testing.T, partition *testpartition.NodePartition) {
 			defer rpcClient.Close()
 			roundNumber, _ := rpcClient.GetRoundNumber(context.Background())
 			return roundNumber > 0
-		}, test.WaitDuration, test.WaitTick)
+		}, WaitDuration, WaitTick)
 	}
 }
 
-func StartRpcServer(t *testing.T, node *partition.Node, nodeName string, ownerIndexer partition.IndexReader) string {
+func startRpcServer(t *testing.T, node *partition.Node, nodeName string, ownerIndexer partition.IndexReader) string {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = listener.Close()
 	})
 
-	rpcServer, err := InitRpcServer(
+	rpcServer, err := initRpcServer(
 		node,
 		nodeName,
 		&abrpc.ServerConfiguration{
@@ -137,7 +158,7 @@ func StartRpcServer(t *testing.T, node *partition.Node, nodeName string, ownerIn
 	return listener.Addr().String()
 }
 
-func InitRpcServer(node *partition.Node, nodeName string, cfg *abrpc.ServerConfiguration, ownerIndexer partition.IndexReader, obs partition.Observability) (*http.Server, error) {
+func initRpcServer(node *partition.Node, nodeName string, cfg *abrpc.ServerConfiguration, ownerIndexer partition.IndexReader, obs partition.Observability) (*http.Server, error) {
 	cfg.APIs = []abrpc.API{
 		{
 			Namespace: "state",
@@ -155,17 +176,58 @@ func InitRpcServer(node *partition.Node, nodeName string, cfg *abrpc.ServerConfi
 	return httpServer, nil
 }
 
-// SetupNetwork starts alphabill network.
+// setupNetwork starts alphabill network.
 // Starts money partition, and optionally any other partitions, with rpc servers up and running.
 // Returns money node url and reference to the network object.
-func SetupNetwork(t *testing.T, genesisConfig *testutil.MoneyGenesisConfig, otherPartitions []*testpartition.NodePartition) (string, *testpartition.AlphabillNetwork) {
-	moneyPartition := CreateMoneyPartition(t, genesisConfig, 1)
-	nodePartitions := []*testpartition.NodePartition{moneyPartition}
-	nodePartitions = append(nodePartitions, otherPartitions...)
-	abNet := StartAlphabill(t, nodePartitions)
-
-	for _, nodePartition := range nodePartitions {
-		StartRpcServers(t, nodePartition)
+func SetupNetwork(t *testing.T, initialBillOwner []byte, otherPartitions ...*NodePartition) *AlphabillNetwork {
+	genesisConfig := &testutil.MoneyGenesisConfig{
+		InitialBillID:      DefaultInitialBillID,
+		InitialBillValue:   1e18,
+		InitialBillOwner:   templates.NewP2pkh256BytesFromKey(initialBillOwner),
+		DCMoneySupplyValue: 10000,
 	}
-	return moneyPartition.Nodes[0].AddrRPC, abNet
+
+	moneyPartition := createMoneyPartition(t, genesisConfig, 1)
+	partitions := append([]*NodePartition{moneyPartition}, otherPartitions...)
+
+	network, err := newAlphabillNetwork(partitions)
+	require.NoError(t, err)
+	require.NoError(t, network.start(t))
+	t.Cleanup(func() { network.waitClose(t) })
+
+	for _, partition := range partitions {
+		startRpcServers(t, partition)
+	}
+	return network
+}
+
+func SetupWallets(t *testing.T, walletCount, keyCount int) []*Wallet{
+	var wallets []*Wallet
+	for i := 0; i < walletCount; i++ {
+		am, home := CreateNewWallet(t)
+		defer am.Close()
+
+		pubKey, err := am.GetPublicKey(0)
+		require.NoError(t, err)
+
+		keys := [][]byte{pubKey}
+		for i := 1; i < keyCount; i++ {
+			_, pubKey, err := am.AddAccount()
+			require.NoError(t, err)
+			keys = append(keys, pubKey)
+		}
+
+		wallets = append(wallets, &Wallet{home, keys})
+	}
+	return wallets
+}
+
+// SetupNetworkWithWallets sets up the Alphabill network and also two wallets with two keys in both of them.
+// Starts money partition, and optionally any other partitions, with rpc servers up and running.
+// The owner of the initial bill is set to the first key of the first wallet.
+// Returns the created wallets and a reference to the Alphabill network network.
+func SetupNetworkWithWallets(t *testing.T, otherPartitions ...*NodePartition) ([]*Wallet, *AlphabillNetwork) {
+	wallets := SetupWallets(t, 2, 2)
+	network := SetupNetwork(t, wallets[0].PubKeys[0], otherPartitions...)
+	return wallets, network
 }

@@ -82,8 +82,8 @@ func TestWalletGetBalanceCmd(t *testing.T) {
 		}),
 	))
 
-	stdout, err := execCommand(homedir, "get-balance --rpc-url "+rpcUrl)
-	require.NoError(t, err)
+	walletCmd := newWalletCmdExecutor("--rpc-url", rpcUrl).WithHome(homedir)
+	stdout := walletCmd.Exec(t, "get-balance")
 	testutils.VerifyStdout(t, stdout, "#1 15", "Total 15")
 }
 
@@ -95,8 +95,8 @@ func TestWalletGetBalanceKeyCmdKeyFlag(t *testing.T) {
 		OwnerPredicate: testutils.TestPubKey1Hash(t),
 	})))
 
-	stdout, err := execCommand(homedir, "get-balance --key 2 --rpc-url "+rpcUrl)
-	require.NoError(t, err)
+	walletCmd := newWalletCmdExecutor("--rpc-url", rpcUrl).WithHome(homedir)
+	stdout := walletCmd.Exec(t, "get-balance", "--key", "2")
 	testutils.VerifyStdout(t, stdout, "#2 15")
 	testutils.VerifyStdoutNotExists(t, stdout, "Total 15")
 }
@@ -109,7 +109,8 @@ func TestWalletGetBalanceCmdTotalFlag(t *testing.T) {
 		OwnerPredicate: testutils.TestPubKey0Hash(t),
 	})))
 
-	stdout, _ := execCommand(homedir, "get-balance --total --rpc-url "+rpcUrl)
+	walletCmd := newWalletCmdExecutor("--rpc-url", rpcUrl).WithHome(homedir)
+	stdout := walletCmd.Exec(t, "get-balance", "--total")
 	testutils.VerifyStdout(t, stdout, "Total 15")
 	testutils.VerifyStdoutNotExists(t, stdout, "#1 15")
 }
@@ -122,7 +123,8 @@ func TestWalletGetBalanceCmdTotalWithKeyFlag(t *testing.T) {
 		OwnerPredicate: testutils.TestPubKey0Hash(t),
 	})))
 
-	stdout, _ := execCommand(homedir, "get-balance --key 1 --total --rpc-url "+rpcUrl)
+	walletCmd := newWalletCmdExecutor("--rpc-url", rpcUrl).WithHome(homedir)
+	stdout := walletCmd.Exec(t, "get-balance", "--key", "1", "--total")
 	testutils.VerifyStdout(t, stdout, "#1 15")
 	testutils.VerifyStdoutNotExists(t, stdout, "Total 15")
 }
@@ -135,23 +137,25 @@ func TestWalletGetBalanceCmdQuietFlag(t *testing.T) {
 		OwnerPredicate: testutils.TestPubKey0Hash(t),
 	})))
 
+	walletCmd := newWalletCmdExecutor("--rpc-url", rpcUrl).WithHome(homedir)
+
 	// verify quiet flag does nothing if no key or total flag is not provided
-	stdout, _ := execCommand(homedir, "get-balance --quiet --rpc-url "+rpcUrl)
+	stdout := walletCmd.Exec(t, "get-balance", "--quiet")
 	testutils.VerifyStdout(t, stdout, "#1 15")
 	testutils.VerifyStdout(t, stdout, "Total 15")
 
 	// verify quiet with total
-	stdout, _ = execCommand(homedir, "get-balance --quiet --total --rpc-url "+rpcUrl)
+	stdout = walletCmd.Exec(t, "get-balance", "--quiet", "--total")
 	testutils.VerifyStdout(t, stdout, "15")
 	testutils.VerifyStdoutNotExists(t, stdout, "#1 15")
 
 	// verify quiet with key
-	stdout, _ = execCommand(homedir, "get-balance --quiet --key 1 --rpc-url "+rpcUrl)
+	stdout = walletCmd.Exec(t, "get-balance", "--quiet", "--key", "1")
 	testutils.VerifyStdout(t, stdout, "15")
 	testutils.VerifyStdoutNotExists(t, stdout, "Total 15")
 
 	// verify quiet with key and total (total is not shown if key is provided)
-	stdout, _ = execCommand(homedir, "get-balance --quiet --key 1 --total --rpc-url "+rpcUrl)
+	stdout = walletCmd.Exec(t, "get-balance", "--quiet", "--key", "1", "--total")
 	testutils.VerifyStdout(t, stdout, "15")
 	testutils.VerifyStdoutNotExists(t, stdout, "#1 15")
 }
@@ -161,7 +165,9 @@ func TestPubKeysCmd(t *testing.T) {
 	pk, err := am.GetPublicKey(0)
 	require.NoError(t, err)
 	am.Close()
-	stdout, err := execCommand(homedir, "get-pubkeys")
+
+	walletCmd := newWalletCmdExecutor().WithHome(homedir)
+	stdout := walletCmd.Exec(t, "get-pubkeys")
 	require.NoError(t, err)
 	testutils.VerifyStdout(t, stdout, "#1 "+hexutil.Encode(pk))
 }
@@ -181,15 +187,9 @@ func TestSendingFailsWithInsufficientBalance(t *testing.T) {
 		}),
 	))
 
-	_, err := execCommand(homedir, "send --amount 10 --address 0x"+testutils.TestPubKey1Hex+" --rpc-url "+rpcUrl)
-	require.ErrorContains(t, err, "insufficient balance for transaction")
-}
-
-func execCommand(homeDir, command string) (*testutils.TestConsoleWriter, error) {
-	outputWriter := &testutils.TestConsoleWriter{}
-	wcmd := NewWalletCmd(&types.BaseConfiguration{HomeDir: homeDir, ConsoleWriter: outputWriter})
-	wcmd.SetArgs(strings.Split(command, " "))
-	return outputWriter, wcmd.Execute()
+	walletCmd := newWalletCmdExecutor("--rpc-url", rpcUrl).WithHome(homedir)
+	walletCmd.ExecWithError(t, "insufficient balance for transaction",
+		"send", "--amount", "10", "--address", "0x" + testutils.TestPubKey1Hex)
 }
 
 func Test_groupPubKeysAndAmounts(t *testing.T) {

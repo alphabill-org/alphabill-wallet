@@ -1,14 +1,13 @@
-package testpartition
+package testutils
 
 import (
 	"context"
-	gocrypto "crypto"
 	"crypto/rand"
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"path/filepath"
-	"reflect"
 	"sort"
 	"testing"
 	"time"
@@ -34,20 +33,17 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/require"
 
-	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils/net"
 	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
-	testevent "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition/event"
 )
 
 // AlphabillNetwork for integration tests
 type AlphabillNetwork struct {
 	NodePartitions map[types.SystemID]*NodePartition
-	RootPartition  *RootPartition
+	RootPartition  *rootPartition
 	ctxCancel      context.CancelFunc
 }
 
-type RootPartition struct {
+type rootPartition struct {
 	rcGenesis *genesis.RootGenesis
 	TrustBase map[string]abcrypto.Verifier
 	Nodes     []*rootNode
@@ -73,7 +69,7 @@ type PartitionNode struct {
 	peerConf     *network.PeerConfiguration
 	signer       abcrypto.Signer
 	genesis      *genesis.PartitionNode
-	EventHandler *testevent.TestEventHandler
+	EventHandler *TestEventHandler
 	confOpts     []partition.NodeOption
 	AddrRPC      string
 	proofDB      keyvaluedb.KeyValueDB
@@ -118,7 +114,7 @@ func getGenesisFiles(nodePartitions []*NodePartition) []*genesis.PartitionNode {
 }
 
 // newRootPartition creates new root partition, requires node partitions with genesis files
-func newRootPartition(nofRootNodes uint8, nodePartitions []*NodePartition) (*RootPartition, error) {
+func newRootPartition(nofRootNodes uint8, nodePartitions []*NodePartition) (*rootPartition, error) {
 	encKeyPairs, err := generateKeyPairs(nofRootNodes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate encryption keypairs, %w", err)
@@ -183,14 +179,14 @@ func newRootPartition(nofRootNodes uint8, nodePartitions []*NodePartition) (*Roo
 			}
 		}
 	}
-	return &RootPartition{
+	return &rootPartition{
 		rcGenesis: rootGenesis,
 		TrustBase: trustBase,
 		Nodes:     rootNodes,
 	}, nil
 }
 
-func (r *RootPartition) start(ctx context.Context) error {
+func (r *rootPartition) start(ctx context.Context) error {
 	rootNodes := len(r.Nodes)
 	var peerIDs = make([]peer.ID, rootNodes)
 	for i := 0; i < len(peerIDs); i++ {
@@ -202,7 +198,7 @@ func (r *RootPartition) start(ctx context.Context) error {
 	}
 	var rootPeers = make([]*network.Peer, rootNodes)
 	for i := 0; i < len(peerIDs); i++ {
-		port, err := net.GetFreePort()
+		port, err := getFreePort()
 		if err != nil {
 			return fmt.Errorf("failed to get free port, %w", err)
 		}
@@ -258,7 +254,7 @@ func (r *RootPartition) start(ctx context.Context) error {
 	return nil
 }
 
-func NewPartition(t *testing.T, systemName string, nodeCount uint8, txSystemProvider func(trustBase map[string]abcrypto.Verifier) txsystem.TransactionSystem, systemIdentifier types.SystemID, state *state.State) (abPartition *NodePartition, err error) {
+func newPartition(t *testing.T, systemName string, nodeCount uint8, txSystemProvider func(trustBase map[string]abcrypto.Verifier) txsystem.TransactionSystem, systemIdentifier types.SystemID, state *state.State) (abPartition *NodePartition, err error) {
 	if nodeCount < 1 {
 		return nil, fmt.Errorf("invalid count of partition Nodes: %d", nodeCount)
 	}
@@ -329,7 +325,7 @@ func (n *NodePartition) start(t *testing.T, ctx context.Context, bootNodes []pee
 	}
 
 	for _, nd := range n.Nodes {
-		nd.EventHandler = &testevent.TestEventHandler{}
+		nd.EventHandler = &TestEventHandler{}
 		blockStore, err := boltdb.New(nd.dbFile)
 		if err != nil {
 			return err
@@ -384,7 +380,7 @@ func (n *NodePartition) startNode(ctx context.Context, pn *PartitionNode) error 
 	return nil
 }
 
-func NewAlphabillPartition(nodePartitions []*NodePartition) (*AlphabillNetwork, error) {
+func newAlphabillNetwork(nodePartitions []*NodePartition) (*AlphabillNetwork, error) {
 	if len(nodePartitions) < 1 {
 		return nil, fmt.Errorf("no node partitions set, it makes no sense to start with only root")
 	}
@@ -403,26 +399,7 @@ func NewAlphabillPartition(nodePartitions []*NodePartition) (*AlphabillNetwork, 
 	}, nil
 }
 
-func NewMultiRootAlphabillPartition(nofRootNodes uint8, nodePartitions []*NodePartition) (*AlphabillNetwork, error) {
-	if len(nodePartitions) < 1 {
-		return nil, fmt.Errorf("no node partitions set, it makes no sense to start with only root")
-	}
-	// create root node(s)
-	rootPartition, err := newRootPartition(nofRootNodes, nodePartitions)
-	if err != nil {
-		return nil, err
-	}
-	nodeParts := make(map[types.SystemID]*NodePartition)
-	for _, part := range nodePartitions {
-		nodeParts[part.systemId] = part
-	}
-	return &AlphabillNetwork{
-		RootPartition:  rootPartition,
-		NodePartitions: nodeParts,
-	}, nil
-}
-
-func getBootstrapNodes(t *testing.T, root *RootPartition) []peer.AddrInfo {
+func getBootstrapNodes(t *testing.T, root *rootPartition) []peer.AddrInfo {
 	require.NotNil(t, root)
 	bootNodes := make([]peer.AddrInfo, len(root.Nodes))
 	for i, n := range root.Nodes {
@@ -431,7 +408,7 @@ func getBootstrapNodes(t *testing.T, root *RootPartition) []peer.AddrInfo {
 	return bootNodes
 }
 
-func (a *AlphabillNetwork) Start(t *testing.T) error {
+func (a *AlphabillNetwork) start(t *testing.T) error {
 	a.RootPartition.obs = testobserve.NewFactory(t)
 	// create context
 	ctx, ctxCancel := context.WithCancel(context.Background())
@@ -451,7 +428,7 @@ func (a *AlphabillNetwork) Start(t *testing.T) error {
 	return nil
 }
 
-func (a *AlphabillNetwork) Close() (err error) {
+func (a *AlphabillNetwork) close() (err error) {
 	a.ctxCancel()
 	// wait and check validator exit
 	for _, part := range a.NodePartitions {
@@ -474,14 +451,14 @@ func (a *AlphabillNetwork) Close() (err error) {
 }
 
 /*
-WaitClose closes the AB network and waits for all the nodes to stop.
+waitClose closes the AB network and waits for all the nodes to stop.
 It fails the test "t" if nodes do not stop/exit within timeout.
 */
-func (a *AlphabillNetwork) WaitClose(t *testing.T) {
+func (a *AlphabillNetwork) waitClose(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		if err := a.Close(); err != nil {
+		if err := a.close(); err != nil {
 			t.Errorf("stopping AB network: %v", err)
 		}
 	}()
@@ -501,108 +478,10 @@ func (a *AlphabillNetwork) GetNodePartition(sysID types.SystemID) (*NodePartitio
 	return part, nil
 }
 
-func (a *AlphabillNetwork) GetValidator(sysID types.SystemID) (partition.UnicityCertificateValidator, error) {
-	part, f := a.NodePartitions[sysID]
-	if !f {
-		return nil, fmt.Errorf("unknown partition %s", sysID)
-	}
-	return partition.NewDefaultUnicityCertificateValidator(part.partitionGenesis.SystemDescriptionRecord, a.RootPartition.TrustBase, gocrypto.SHA256)
-}
-
-// BroadcastTx sends transactions to all nodes.
-func (n *NodePartition) BroadcastTx(tx *types.TransactionOrder) error {
-	for _, n := range n.Nodes {
-		if _, err := n.SubmitTx(context.Background(), tx); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// SubmitTx sends transactions to the first node.
-func (n *NodePartition) SubmitTx(tx *types.TransactionOrder) error {
-	_, err := n.Nodes[0].SubmitTx(context.Background(), tx)
-	return err
-}
-
-func (n *NodePartition) GetTxProof(tx *types.TransactionOrder) (*types.Block, *types.TxProof, *types.TransactionRecord, error) {
-	for _, n := range n.Nodes {
-		number, err := n.LatestBlockNumber()
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		for i := uint64(0); i < number; i++ {
-			b, err := n.GetBlock(context.Background(), number-i)
-			if err != nil || b == nil {
-				continue
-			}
-			for j, t := range b.Transactions {
-				if reflect.DeepEqual(t.TransactionOrder, tx) {
-					proof, _, err := types.NewTxProof(b, j, gocrypto.SHA256)
-					if err != nil {
-						return nil, nil, nil, err
-					}
-					return b, proof, t, nil
-				}
-			}
-		}
-	}
-	return nil, nil, nil, fmt.Errorf("tx with id %x was not found", tx.UnitID())
-}
-
-// WaitTxProof - wait for proof from any validator in partition. If one has the proof it does not mean all have processed
-// the UC. Returns both transaction record and proof when tx has been executed and added to block
-func WaitTxProof(t *testing.T, part *NodePartition, txOrder *types.TransactionOrder) (*types.TransactionRecord, *types.TxProof, error) {
-	t.Helper()
-	var (
-		txRecord *types.TransactionRecord
-		txProof  *types.TxProof
-	)
-	txHash := txOrder.Hash(gocrypto.SHA256)
-	if ok := eventually(func() bool {
-		for _, n := range part.Nodes {
-			txRec, proof, err := n.GetTransactionRecord(context.Background(), txHash)
-			if errors.Is(err, partition.ErrIndexNotFound) {
-				continue
-			}
-			txRecord = txRec
-			txProof = proof
-			return true
-		}
-		return false
-	}, test.WaitDuration, test.WaitTick); ok {
-		return txRecord, txProof, nil
-	}
-	return nil, nil, fmt.Errorf("failed to confirm tx")
-}
-
-func WaitUnitProof(t *testing.T, part *NodePartition, ID types.UnitID, txOrder *types.TransactionOrder) (*types.UnitDataAndProof, error) {
-	t.Helper()
-	var (
-		unitProof *types.UnitDataAndProof
-	)
-	txOrderHash := txOrder.Hash(gocrypto.SHA256)
-	if ok := eventually(func() bool {
-		for _, n := range part.Nodes {
-			unitDataAndProof, err := partition.ReadUnitProofIndex(n.proofDB, ID, txOrderHash)
-			if err != nil {
-				continue
-			}
-			unitProof = unitDataAndProof
-			return true
-		}
-		return false
-	}, test.WaitDuration, test.WaitTick); ok {
-		return unitProof, nil
-	}
-	return nil, fmt.Errorf("failed to confirm tx")
-}
-
-// BlockchainContainsTx checks if at least one partition node block contains the given transaction.
-func BlockchainContainsTx(part *NodePartition, tx *types.TransactionOrder) func() bool {
-	return BlockchainContains(part, func(actualTx *types.TransactionOrder) bool {
-		return reflect.DeepEqual(actualTx, tx)
-	})
+func (a *AlphabillNetwork) RpcUrl(t *testing.T, systemID types.SystemID) string {
+	partition, ok := a.NodePartitions[systemID]
+	require.True(t, ok)
+	return partition.Nodes[0].AddrRPC
 }
 
 func BlockchainContains(part *NodePartition, criteria func(tx *types.TransactionOrder) bool) func() bool {
@@ -687,11 +566,24 @@ func generateKeyPairs(count uint8) ([]*network.PeerKeyPair, error) {
 			PublicKey:  pubKeyBytes,
 			PrivateKey: privateKeyBytes,
 		}
-		if err != nil {
-			return nil, err
-		}
 	}
 	return keyPairs, nil
+}
+
+func getFreePort() (int, error) {
+	addr, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
+	if err != nil {
+		return 0, err
+	}
+
+	l, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		return 0, err
+	}
+	defer func() {
+		_ = l.Close()
+	}()
+	return l.Addr().(*net.TCPAddr).Port, nil
 }
 
 func eventually(condition func() bool, waitFor time.Duration, tick time.Duration) bool {

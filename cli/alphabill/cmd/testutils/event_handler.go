@@ -1,10 +1,9 @@
-package testevent
+package testutils
 
 import (
 	"sync"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	"github.com/alphabill-org/alphabill/partition/event"
 	"github.com/stretchr/testify/require"
 )
@@ -42,7 +41,7 @@ func ContainsEvent(t *testing.T, eh *TestEventHandler, et event.Type) {
 		}
 		return false
 
-	}, test.WaitDuration, test.WaitTick)
+	}, WaitDuration, WaitTick)
 }
 
 func NotContainsEvent(t *testing.T, eh *TestEventHandler, et event.Type) {

@@ -1,28 +1,25 @@
 package testutils
 
 import (
-	"context"
 	"encoding/hex"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/alphabill-org/alphabill-go-base/hash"
-	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
-	"github.com/alphabill-org/alphabill-wallet/client/rpc"
-	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
-	tokenswallet "github.com/alphabill-org/alphabill-wallet/wallet/tokens"
 )
 
 const (
-	walletBaseDir  = "wallet"
+	WalletBaseDir  = "wallet"
 	TestMnemonic   = "dinosaur simple verify deliver bless ridge monkey design venue six problem lucky"
 	TestPubKey0Hex = "03c30573dc0c7fd43fcb801289a6a96cb78c27f4ba398b89da91ece23e9a99aca3"
 	TestPubKey1Hex = "02d36c574db299904b285aaeb57eb7b1fa145c43af90bec3c635c4174c224587b6"
+	WaitDuration   = 4 * time.Second
+	WaitTick       = 100 * time.Millisecond
 )
 
 func CreateNewTestWallet(t *testing.T, opts ...Option) string {
@@ -32,7 +29,7 @@ func CreateNewTestWallet(t *testing.T, opts ...Option) string {
 	}
 
 	homeDir := t.TempDir()
-	walletDir := filepath.Join(homeDir, walletBaseDir)
+	walletDir := filepath.Join(homeDir, WalletBaseDir)
 	am, err := account.NewManager(walletDir, "", true)
 	require.NoError(t, err)
 	defer am.Close()
@@ -48,33 +45,13 @@ func CreateNewTestWallet(t *testing.T, opts ...Option) string {
 
 func CreateNewWallet(t *testing.T) (account.Manager, string) {
 	homeDir := t.TempDir()
-	walletDir := filepath.Join(homeDir, walletBaseDir)
+	walletDir := filepath.Join(homeDir, WalletBaseDir)
 	am, err := account.NewManager(walletDir, "", true)
 	require.NoError(t, err)
 	t.Cleanup(am.Close)
 	err = am.CreateKeys("")
 	require.NoError(t, err)
 	return am, homeDir
-}
-
-func CreateNewTokenWallet(t *testing.T, addr string) (*tokenswallet.Wallet, string) {
-	homeDir := t.TempDir()
-	walletDir := filepath.Join(homeDir, "wallet")
-	am, err := account.NewManager(walletDir, "", true)
-	require.NoError(t, err)
-	require.NoError(t, am.CreateKeys(""))
-
-	o := testobserve.NewFactory(t)
-	rpcClient, err := rpc.DialContext(context.Background(), args.BuildRpcUrl(addr))
-	require.NoError(t, err)
-	t.Cleanup(rpcClient.Close)
-	tokensRpcClient := rpc.NewTokensClient(rpcClient)
-	w, err := tokenswallet.New(tokens.DefaultSystemID, tokensRpcClient, am, false, nil, o.DefaultLogger())
-	require.NoError(t, err)
-	require.NotNil(t, w)
-	t.Cleanup(w.Shutdown)
-
-	return w, homeDir
 }
 
 func SetupTestHomeDir(t *testing.T, dir string) string {

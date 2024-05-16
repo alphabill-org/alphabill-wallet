@@ -551,7 +551,7 @@ func TestMintNFT_InvalidInputs(t *testing.T) {
 		{
 			name: "invalid name",
 			attrs: MintNonFungibleTokenAttributes{
-				Name: test.RandomString(257),
+				Name: fmt.Sprintf("%x", test.RandomBytes(129))[:257],
 			},
 			wantErrStr: "name exceeds the maximum allowed size of 256 bytes",
 		},
