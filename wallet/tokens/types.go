@@ -40,7 +40,7 @@ type (
 		Name                     string
 		Icon                     *Icon
 		DecimalPlaces            uint32
-		ParentTypeId             TokenTypeID
+		ParentTypeID             TokenTypeID
 		SubTypeCreationPredicate wallet.Predicate
 		TokenCreationPredicate   wallet.Predicate
 		InvariantPredicate       wallet.Predicate
@@ -55,7 +55,7 @@ type (
 		Symbol                   string
 		Name                     string
 		Icon                     *Icon
-		ParentTypeId             TokenTypeID
+		ParentTypeID             TokenTypeID
 		SubTypeCreationPredicate wallet.Predicate
 		TokenCreationPredicate   wallet.Predicate
 		InvariantPredicate       wallet.Predicate
@@ -63,6 +63,7 @@ type (
 	}
 
 	MintNonFungibleTokenAttributes struct {
+		TypeID              types.UnitID
 		Name                string
 		Uri                 string
 		Data                []byte
@@ -74,6 +75,7 @@ type (
 	MintAttr interface {
 		types.SigBytesProvider
 		SetBearer([]byte)
+		GetTypeID() types.UnitID
 		SetTokenCreationPredicateSignatures([][]byte)
 	}
 
@@ -203,7 +205,7 @@ func (c *CreateFungibleTokenTypeAttributes) ToCBOR() *tokens.CreateFungibleToken
 		Name:                     c.Name,
 		Icon:                     icon,
 		DecimalPlaces:            c.DecimalPlaces,
-		ParentTypeID:             c.ParentTypeId,
+		ParentTypeID:             c.ParentTypeID,
 		SubTypeCreationPredicate: c.SubTypeCreationPredicate,
 		TokenCreationPredicate:   c.TokenCreationPredicate,
 		InvariantPredicate:       c.InvariantPredicate,
@@ -219,7 +221,7 @@ func (c *CreateNonFungibleTokenTypeAttributes) ToCBOR() *tokens.CreateNonFungibl
 		Symbol:                   c.Symbol,
 		Name:                     c.Name,
 		Icon:                     icon,
-		ParentTypeID:             c.ParentTypeId,
+		ParentTypeID:             c.ParentTypeID,
 		SubTypeCreationPredicate: c.SubTypeCreationPredicate,
 		TokenCreationPredicate:   c.TokenCreationPredicate,
 		InvariantPredicate:       c.InvariantPredicate,

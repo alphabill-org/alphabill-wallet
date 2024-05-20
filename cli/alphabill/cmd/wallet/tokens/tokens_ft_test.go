@@ -90,19 +90,19 @@ func TestFungibleToken_InvariantPredicate_Integration(t *testing.T) {
 	symbol1 := "AB"
 	typeID11 := randomFungibleTokenTypeID(t)
 	typeID12 := randomFungibleTokenTypeID(t)
-	execTokensCmd(t, homedirW1, fmt.Sprintf("new-type fungible -r %s  --symbol %s --type %s --decimals 0 --inherit-bearer-clause %s", rpcUrl, symbol1, typeID11, predicatePtpkh))
+	execTokensCmd(t, homedirW1, fmt.Sprintf("new-type fungible -r %s --symbol %s --type %s --decimals 0 --inherit-bearer-clause %s", rpcUrl, symbol1, typeID11, predicatePtpkh))
 	require.Eventually(t, testpartition.BlockchainContains(tokensPartition, func(tx *types.TransactionOrder) bool {
 		return bytes.Equal(tx.UnitID(), typeID11)
 	}), test.WaitDuration, test.WaitTick)
 
 	// second type inheriting the first one and leaves inherit-bearer clause to default (true)
-	execTokensCmd(t, homedirW1, fmt.Sprintf("new-type fungible -r %s  --symbol %s --type %s --decimals 0 --parent-type %s --subtype-input %s", rpcUrl, symbol1, typeID12, typeID11, predicateTrue))
+	execTokensCmd(t, homedirW1, fmt.Sprintf("new-type fungible -r %s --symbol %s --type %s --decimals 0 --parent-type %s --subtype-input %s", rpcUrl, symbol1, typeID12, typeID11, predicateTrue))
 	require.Eventually(t, testpartition.BlockchainContains(tokensPartition, func(tx *types.TransactionOrder) bool {
 		return bytes.Equal(tx.UnitID(), typeID12)
 	}), test.WaitDuration, test.WaitTick)
 
 	// mint
-	execTokensCmd(t, homedirW1, fmt.Sprintf("new fungible -r %s  --type %s --amount %v --mint-input %s,%s", rpcUrl, typeID12, 1000, predicatePtpkh, predicatePtpkh))
+	execTokensCmd(t, homedirW1, fmt.Sprintf("new fungible -r %s --type %s --amount %v --mint-input %s,%s", rpcUrl, typeID12, 1000, predicatePtpkh, predicatePtpkh))
 	ensureTokenIndexed(t, ctx, rpcClient, w1key.PubKeyHash.Sha256, nil)
 	testutils.VerifyStdout(t, execTokensCmd(t, homedirW1, fmt.Sprintf("list fungible -r %s", rpcUrl)), "amount='1'000'")
 
@@ -132,7 +132,7 @@ func TestFungibleTokens_Sending_Integration(t *testing.T) {
 	// fungible token types
 	symbol1 := "AB"
 	execTokensCmdWithError(t, homedirW1, "new-type fungible", "required flag(s) \"symbol\" not set")
-	execTokensCmd(t, homedirW1, fmt.Sprintf("new-type fungible  --symbol %s -r %s --type %s --decimals 0", symbol1, rpcUrl, typeID1))
+	execTokensCmd(t, homedirW1, fmt.Sprintf("new-type fungible --symbol %s -r %s --type %s --decimals 0", symbol1, rpcUrl, typeID1))
 
 	// TODO AB-1448
 	// testutils.VerifyStdout(t, execTokensCmd(t, homedirW1, fmt.Sprintf("list-types fungible -r %s", rpcUrl)), "symbol=AB (fungible)")
@@ -148,8 +148,8 @@ func TestFungibleTokens_Sending_Integration(t *testing.T) {
 			return false
 		}
 	}
-	execTokensCmd(t, homedirW1, fmt.Sprintf("new fungible  -r %s --type %s --amount 5", rpcUrl, typeID1))
-	execTokensCmd(t, homedirW1, fmt.Sprintf("new fungible  -r %s --type %s --amount 9", rpcUrl, typeID1))
+	execTokensCmd(t, homedirW1, fmt.Sprintf("new fungible -r %s --type %s --amount 5", rpcUrl, typeID1))
+	execTokensCmd(t, homedirW1, fmt.Sprintf("new fungible -r %s --type %s --amount 9", rpcUrl, typeID1))
 	require.Eventually(t, testpartition.BlockchainContains(tokensPartition, crit(5)), test.WaitDuration, test.WaitTick)
 	require.Eventually(t, testpartition.BlockchainContains(tokensPartition, crit(9)), test.WaitDuration, test.WaitTick)
 	testutils.VerifyStdoutEventually(t, func() *testutils.TestConsoleWriter {
@@ -163,7 +163,7 @@ func TestFungibleTokens_Sending_Integration(t *testing.T) {
 	w2.Shutdown()
 
 	// check w2 is empty
-	testutils.VerifyStdout(t, execTokensCmd(t, homedirW2, fmt.Sprintf("list fungible  -r %s", rpcUrl)), "No tokens")
+	testutils.VerifyStdout(t, execTokensCmd(t, homedirW2, fmt.Sprintf("list fungible -r %s", rpcUrl)), "No tokens")
 
 	// transfer tokens w1 -> w2
 	execTokensCmd(t, homedirW1, fmt.Sprintf("send fungible -r %s --type %s --amount 6 --address 0x%X -k 1", rpcUrl, typeID1, w2key.PubKey)) //split (9=>6+3)
@@ -228,38 +228,38 @@ func TestWalletCreateFungibleTokenTypeAndTokenAndSendCmd_IntegrationTest(t *test
 	name := "Long name for AB"
 
 	// create type
-	execTokensCmd(t, homedir, fmt.Sprintf("new-type fungible  --symbol %s --name %s -r %s --type %s --decimals %v", symbol, name, rpcUrl, typeID, decimals))
+	execTokensCmd(t, homedir, fmt.Sprintf("new-type fungible --symbol %s --name %s -r %s --type %s --decimals %v", symbol, name, rpcUrl, typeID, decimals))
 
 	// non-existing id
 	nonExistingTypeId := tokens.NewFungibleTokenID(nil, []byte{0x11})
 
 	// verify error
-	execTokensCmdWithError(t, homedir, fmt.Sprintf("new fungible  -r %s --type %s --amount 3", rpcUrl, nonExistingTypeId), fmt.Sprintf("invalid token type id: %s", nonExistingTypeId))
+	execTokensCmdWithError(t, homedir, fmt.Sprintf("new fungible -r %s --type %s --amount 3", rpcUrl, nonExistingTypeId), fmt.Sprintf("invalid token type id: %s", nonExistingTypeId))
 
 	// new token creation fails
-	execTokensCmdWithError(t, homedir, fmt.Sprintf("new fungible  -r %s --type %s --amount 0", rpcUrl, typeID), "0 is not valid amount")
-	execTokensCmdWithError(t, homedir, fmt.Sprintf("new fungible  -r %s --type %s --amount 00.000", rpcUrl, typeID), "0 is not valid amount")
-	execTokensCmdWithError(t, homedir, fmt.Sprintf("new fungible  -r %s --type %s --amount 00.0.00", rpcUrl, typeID), "more than one comma")
-	execTokensCmdWithError(t, homedir, fmt.Sprintf("new fungible  -r %s --type %s --amount .00", rpcUrl, typeID), "missing integer part")
-	execTokensCmdWithError(t, homedir, fmt.Sprintf("new fungible  -r %s --type %s --amount a.00", rpcUrl, typeID), "invalid amount string")
-	execTokensCmdWithError(t, homedir, fmt.Sprintf("new fungible  -r %s --type %s --amount 0.0a", rpcUrl, typeID), "invalid amount string")
-	execTokensCmdWithError(t, homedir, fmt.Sprintf("new fungible  -r %s --type %s --amount 1.1111", rpcUrl, typeID), "invalid precision")
+	execTokensCmdWithError(t, homedir, fmt.Sprintf("new fungible -r %s --type %s --amount 0", rpcUrl, typeID), "0 is not valid amount")
+	execTokensCmdWithError(t, homedir, fmt.Sprintf("new fungible -r %s --type %s --amount 00.000", rpcUrl, typeID), "0 is not valid amount")
+	execTokensCmdWithError(t, homedir, fmt.Sprintf("new fungible -r %s --type %s --amount 00.0.00", rpcUrl, typeID), "more than one comma")
+	execTokensCmdWithError(t, homedir, fmt.Sprintf("new fungible -r %s --type %s --amount .00", rpcUrl, typeID), "missing integer part")
+	execTokensCmdWithError(t, homedir, fmt.Sprintf("new fungible -r %s --type %s --amount a.00", rpcUrl, typeID), "invalid amount string")
+	execTokensCmdWithError(t, homedir, fmt.Sprintf("new fungible -r %s --type %s --amount 0.0a", rpcUrl, typeID), "invalid amount string")
+	execTokensCmdWithError(t, homedir, fmt.Sprintf("new fungible -r %s --type %s --amount 1.1111", rpcUrl, typeID), "invalid precision")
 
 	// out of range because decimals = 3 the value is equal to 18446744073709551615000
-	execTokensCmdWithError(t, homedir, fmt.Sprintf("new fungible  -r %s --type %s --amount 18446744073709551615", rpcUrl, typeID), "out of range")
+	execTokensCmdWithError(t, homedir, fmt.Sprintf("new fungible -r %s --type %s --amount 18446744073709551615", rpcUrl, typeID), "out of range")
 
 	// creation succeeds
-	execTokensCmd(t, homedir, fmt.Sprintf("new fungible  -r %s --type %s --amount 3", rpcUrl, typeID))
-	execTokensCmd(t, homedir, fmt.Sprintf("new fungible  -r %s --type %s --amount 1.1", rpcUrl, typeID))
-	execTokensCmd(t, homedir, fmt.Sprintf("new fungible  -r %s --type %s --amount 1.11", rpcUrl, typeID))
-	execTokensCmd(t, homedir, fmt.Sprintf("new fungible  -r %s --type %s --amount 1.111", rpcUrl, typeID))
+	execTokensCmd(t, homedir, fmt.Sprintf("new fungible -r %s --type %s --amount 3", rpcUrl, typeID))
+	execTokensCmd(t, homedir, fmt.Sprintf("new fungible -r %s --type %s --amount 1.1", rpcUrl, typeID))
+	execTokensCmd(t, homedir, fmt.Sprintf("new fungible -r %s --type %s --amount 1.11", rpcUrl, typeID))
+	execTokensCmd(t, homedir, fmt.Sprintf("new fungible -r %s --type %s --amount 1.111", rpcUrl, typeID))
 	require.Eventually(t, testpartition.BlockchainContains(tokensPart, crit(3000)), test.WaitDuration, test.WaitTick)
 	require.Eventually(t, testpartition.BlockchainContains(tokensPart, crit(1100)), test.WaitDuration, test.WaitTick)
 	require.Eventually(t, testpartition.BlockchainContains(tokensPart, crit(1110)), test.WaitDuration, test.WaitTick)
 	require.Eventually(t, testpartition.BlockchainContains(tokensPart, crit(1111)), test.WaitDuration, test.WaitTick)
 
 	// mint tokens from w1 and set the owner to w2
-	execTokensCmd(t, homedir, fmt.Sprintf("new fungible  -r %s --type %s --amount 2.222 --bearer-clause ptpkh:0x%X", rpcUrl, typeID, w2key.PubKeyHash.Sha256))
+	execTokensCmd(t, homedir, fmt.Sprintf("new fungible -r %s --type %s --amount 2.222 --bearer-clause ptpkh:0x%X", rpcUrl, typeID, w2key.PubKeyHash.Sha256))
 	require.Eventually(t, testpartition.BlockchainContains(tokensPart, crit(2222)), test.WaitDuration, test.WaitTick)
 	testutils.VerifyStdout(t, execTokensCmd(t, homedirW2, fmt.Sprintf("list fungible -r %s", rpcUrl)), "amount='2.222'")
 
@@ -337,7 +337,7 @@ func TestFungibleTokens_LockUnlock_Integration(t *testing.T) {
 			return false
 		}
 	}
-	execTokensCmd(t, homedirW1, fmt.Sprintf("new fungible  -r %s --type %s --amount 5", rpcUrl, typeID))
+	execTokensCmd(t, homedirW1, fmt.Sprintf("new fungible -r %s --type %s --amount 5", rpcUrl, typeID))
 	require.Eventually(t, testpartition.BlockchainContains(tokensPartition, crit(5)), test.WaitDuration, test.WaitTick)
 
 	// get minted token id

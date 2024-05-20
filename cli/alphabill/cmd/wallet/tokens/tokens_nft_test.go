@@ -29,11 +29,11 @@ func TestNFTs_Integration(t *testing.T) {
 	network := NewAlphabillNetwork(t)
 	_, err := network.abNetwork.GetNodePartition(money.DefaultSystemID)
 	require.NoError(t, err)
-	tokenPartition, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemID)
+	tokensPartition, err := network.abNetwork.GetNodePartition(tokens.DefaultSystemID)
 	require.NoError(t, err)
 	homedirW1 := network.homeDir
 	w1key2 := network.walletKey2
-	rpcUrl := tokenPartition.Nodes[0].AddrRPC
+	rpcUrl := tokensPartition.Nodes[0].AddrRPC
 	rpcClient := network.tokensRpcClient
 	ctx := network.ctx
 
@@ -65,15 +65,15 @@ func TestNFTs_Integration(t *testing.T) {
 
 	// mint NFT
 	stdout := execTokensCmd(t, homedirW1, fmt.Sprintf("new non-fungible -k 2 -r %s --type %s", rpcUrl, typeID))
-	require.Eventually(t, testpartition.BlockchainContains(tokenPartition, func(tx *types.TransactionOrder) bool {
-		return tx.PayloadType() == tokens.PayloadTypeMintNFT && bytes.Equal(tx.UnitID(), typeID)
-	}), test.WaitDuration, test.WaitTick)
 	nftID := extractTokenID(t, stdout.Lines[0])
+	require.Eventually(t, testpartition.BlockchainContains(tokensPartition, func(tx *types.TransactionOrder) bool {
+		return tx.PayloadType() == tokens.PayloadTypeMintNFT && bytes.Equal(tx.UnitID(), nftID)
+	}), test.WaitDuration, test.WaitTick)
 	ensureTokenIndexed(t, ctx, rpcClient, w1key2.PubKeyHash.Sha256, nftID)
 
 	// transfer NFT
 	execTokensCmd(t, homedirW1, fmt.Sprintf("send non-fungible -k 2 -r %s --token-identifier %s --address 0x%X", rpcUrl, nftID, w2key.PubKey))
-	require.Eventually(t, testpartition.BlockchainContains(tokenPartition, func(tx *types.TransactionOrder) bool {
+	require.Eventually(t, testpartition.BlockchainContains(tokensPartition, func(tx *types.TransactionOrder) bool {
 		return tx.PayloadType() == tokens.PayloadTypeTransferNFT && bytes.Equal(tx.UnitID(), nftID)
 	}), test.WaitDuration, test.WaitTick)
 	ensureTokenIndexed(t, ctx, rpcClient, w2key.PubKeyHash.Sha256, nftID)
@@ -138,7 +138,7 @@ func TestNFTDataUpdateCmd_Integration(t *testing.T) {
 	stdout := execTokensCmd(t, homedir, fmt.Sprintf("new non-fungible -r %s --type %s --data-file %s", rpcUrl, typeID, tmpfile.Name()))
 	nftID := extractTokenID(t, stdout.Lines[0])
 	require.Eventually(t, testpartition.BlockchainContains(tokenPartition, func(tx *types.TransactionOrder) bool {
-		if tx.PayloadType() == tokens.PayloadTypeMintNFT && bytes.Equal(tx.UnitID(), typeID) {
+		if tx.PayloadType() == tokens.PayloadTypeMintNFT && bytes.Equal(tx.UnitID(), nftID) {
 			mintNonFungibleAttr := &tokens.MintNonFungibleTokenAttributes{}
 			require.NoError(t, tx.UnmarshalAttributes(mintNonFungibleAttr))
 			require.Equal(t, data, mintNonFungibleAttr.Data)
@@ -250,7 +250,7 @@ func TestNFT_LockUnlock_Integration(t *testing.T) {
 	stdout := execTokensCmd(t, homedirW1, fmt.Sprintf("new non-fungible -k 1 -r %s --type %s", rpcUrl, typeID))
 	nftID := extractTokenID(t, stdout.Lines[0])
 	require.Eventually(t, testpartition.BlockchainContains(tokensPartition, func(tx *types.TransactionOrder) bool {
-		return tx.PayloadType() == tokens.PayloadTypeMintNFT && bytes.Equal(tx.UnitID(), typeID)
+		return tx.PayloadType() == tokens.PayloadTypeMintNFT && bytes.Equal(tx.UnitID(), nftID)
 	}), test.WaitDuration, test.WaitTick)
 	ensureTokenIndexed(t, ctx, rpcClient, w1key.PubKeyHash.Sha256, nftID)
 

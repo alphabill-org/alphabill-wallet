@@ -104,7 +104,7 @@ func (w *Wallet) GetAccountManager() account.Manager {
 	return w.am
 }
 
-func (w *Wallet) NewFungibleType(ctx context.Context, accNr uint64, attrs CreateFungibleTokenTypeAttributes, typeId TokenTypeID, subtypePredicateArgs []*PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) NewFungibleType(ctx context.Context, accountNumber uint64, attrs CreateFungibleTokenTypeAttributes, typeId TokenTypeID, subtypePredicateArgs []*PredicateInput) (*SubmissionResult, error) {
 	w.log.Info("Creating new fungible token type")
 	if typeId == nil {
 		var err error
@@ -121,8 +121,8 @@ func (w *Wallet) NewFungibleType(ctx context.Context, accNr uint64, attrs Create
 	if !typeId.HasType(tokens.FungibleTokenTypeUnitType) {
 		return nil, fmt.Errorf("invalid token type ID: expected unit type is 0x%X", tokens.FungibleTokenTypeUnitType)
 	}
-	if attrs.ParentTypeId != nil && !bytes.Equal(attrs.ParentTypeId, NoParent) {
-		parentType, err := w.GetTokenType(ctx, attrs.ParentTypeId)
+	if attrs.ParentTypeID != nil && !bytes.Equal(attrs.ParentTypeID, NoParent) {
+		parentType, err := w.GetTokenType(ctx, attrs.ParentTypeID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get parent type: %w", err)
 		}
@@ -130,7 +130,7 @@ func (w *Wallet) NewFungibleType(ctx context.Context, accNr uint64, attrs Create
 			return nil, fmt.Errorf("parent type requires %d decimal places, got %d", parentType.DecimalPlaces, attrs.DecimalPlaces)
 		}
 	}
-	sub, err := w.newType(ctx, accNr, tokens.PayloadTypeCreateFungibleTokenType, attrs.ToCBOR(), typeId, subtypePredicateArgs)
+	sub, err := w.newType(ctx, accountNumber, tokens.PayloadTypeCreateFungibleTokenType, attrs.ToCBOR(), typeId, subtypePredicateArgs)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +140,7 @@ func (w *Wallet) NewFungibleType(ctx context.Context, accNr uint64, attrs Create
 	return &SubmissionResult{TokenTypeID: sub.UnitID}, nil
 }
 
-func (w *Wallet) NewNonFungibleType(ctx context.Context, accNr uint64, attrs CreateNonFungibleTokenTypeAttributes, typeId TokenTypeID, subtypePredicateArgs []*PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) NewNonFungibleType(ctx context.Context, accountNumber uint64, attrs CreateNonFungibleTokenTypeAttributes, typeId TokenTypeID, subtypePredicateArgs []*PredicateInput) (*SubmissionResult, error) {
 	w.log.Info("Creating new NFT type")
 	if typeId == nil {
 		var err error
@@ -158,7 +158,7 @@ func (w *Wallet) NewNonFungibleType(ctx context.Context, accNr uint64, attrs Cre
 		return nil, fmt.Errorf("invalid token type ID: expected unit type is 0x%X", tokens.NonFungibleTokenTypeUnitType)
 	}
 
-	sub, err := w.newType(ctx, accNr, tokens.PayloadTypeCreateNFTType, attrs.ToCBOR(), typeId, subtypePredicateArgs)
+	sub, err := w.newType(ctx, accountNumber, tokens.PayloadTypeCreateNFTType, attrs.ToCBOR(), typeId, subtypePredicateArgs)
 	if err != nil {
 		return nil, err
 	}
@@ -168,51 +168,52 @@ func (w *Wallet) NewNonFungibleType(ctx context.Context, accNr uint64, attrs Cre
 	return &SubmissionResult{TokenTypeID: sub.UnitID}, nil
 }
 
-func (w *Wallet) NewFungibleToken(ctx context.Context, accNr uint64, unitID TokenTypeID, amount uint64, bearerPredicate wallet.Predicate, mintPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) NewFungibleToken(ctx context.Context, accountNumber uint64, typeID TokenTypeID, amount uint64, bearerPredicate wallet.Predicate, mintPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
 	w.log.Info("Creating new fungible token")
 	attrs := &tokens.MintFungibleTokenAttributes{
 		Bearer:                           bearerPredicate,
+		TypeID:                           typeID,
 		Value:                            amount,
 		Nonce:                            0,
 		TokenCreationPredicateSignatures: nil,
 	}
-
-	var err error
-	sub, err := w.newToken(ctx, accNr, tokens.PayloadTypeMintFungibleToken, attrs, unitID, mintPredicateArgs)
+	sub, err := w.newToken(ctx, accountNumber, tokens.PayloadTypeMintFungibleToken, attrs, mintPredicateArgs, tokens.NewFungibleTokenID)
 	if err != nil {
 		return nil, err
 	}
+	r := &SubmissionResult{TokenID: sub.UnitID, TokenTypeID: typeID}
 	if sub.Confirmed() {
-		newTokenID := sub.Proof.TxRecord.ServerMetadata.TargetUnits[0]
-		return &SubmissionResult{TokenID: newTokenID, TokenTypeID: sub.UnitID, FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee, Proofs: []*wallet.Proof{sub.Proof}}, nil
+		r.FeeSum = sub.Proof.TxRecord.ServerMetadata.ActualFee
+		r.Proofs = []*wallet.Proof{sub.Proof}
 	}
-	return &SubmissionResult{TokenTypeID: sub.UnitID}, nil
+	return r, nil
 }
 
-func (w *Wallet) NewNFT(ctx context.Context, accNr uint64, attrs MintNonFungibleTokenAttributes, typeID TokenTypeID, mintPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) NewNFT(ctx context.Context, accountNumber uint64, attrs *tokens.MintNonFungibleTokenAttributes, mintPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
 	w.log.Info("Creating new NFT")
 	if len(attrs.Name) > nameMaxSize {
 		return nil, errInvalidNameLength
 	}
-	if len(attrs.Uri) > uriMaxSize {
+	if len(attrs.URI) > uriMaxSize {
 		return nil, errInvalidURILength
 	}
-	if attrs.Uri != "" && !util.IsValidURI(attrs.Uri) {
-		return nil, fmt.Errorf("URI '%s' is invalid", attrs.Uri)
+	if attrs.URI != "" && !util.IsValidURI(attrs.URI) {
+		return nil, fmt.Errorf("URI '%s' is invalid", attrs.URI)
 	}
 	if len(attrs.Data) > dataMaxSize {
 		return nil, errInvalidDataLength
 	}
 
-	sub, err := w.newToken(ctx, accNr, tokens.PayloadTypeMintNFT, attrs.ToCBOR(), typeID, mintPredicateArgs)
+	sub, err := w.newToken(ctx, accountNumber, tokens.PayloadTypeMintNFT, attrs, mintPredicateArgs, tokens.NewNonFungibleTokenID)
 	if err != nil {
 		return nil, err
 	}
+	r := &SubmissionResult{TokenID: sub.UnitID, TokenTypeID: attrs.TypeID}
 	if sub.Confirmed() {
-		newTokenID := sub.Proof.TxRecord.ServerMetadata.TargetUnits[0]
-		return &SubmissionResult{TokenID: newTokenID, TokenTypeID: sub.UnitID, FeeSum: sub.Proof.TxRecord.ServerMetadata.ActualFee, Proofs: []*wallet.Proof{sub.Proof}}, nil
+		r.FeeSum = sub.Proof.TxRecord.ServerMetadata.ActualFee
+		r.Proofs = []*wallet.Proof{sub.Proof}
 	}
-	return &SubmissionResult{TokenTypeID: sub.UnitID}, nil
+	return r, nil
 }
 
 func (w *Wallet) ListTokenTypes(ctx context.Context, accountNumber uint64, kind Kind) ([]*TokenUnitType, error) {

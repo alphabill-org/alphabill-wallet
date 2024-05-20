@@ -161,7 +161,7 @@ func TestTokensRpcClient(t *testing.T) {
 			mocksrv.WithOwnerUnit(&rpc.Unit[any]{
 				UnitID: nftTokenID,
 				Data: tokentxs.NonFungibleTokenData{
-					NftType: nftTokenTypeID,
+					TypeID:  nftTokenTypeID,
 					Name:    nftTokenUnit.NftName,
 					T:       100,
 					Counter: nftTokenUnit.Counter,
@@ -226,7 +226,7 @@ func TestTokensRpcClient(t *testing.T) {
 					Symbol:        tokenType.Symbol,
 					Name:          tokenType.Name,
 					DecimalPlaces: tokenType.DecimalPlaces,
-					ParentTypeId:  tokenType.ParentTypeID,
+					ParentTypeID:  tokenType.ParentTypeID,
 				},
 			})
 		}
