@@ -5,11 +5,10 @@ import (
 	"fmt"
 
 	tokentxs "github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
-	"github.com/alphabill-org/alphabill/rpc"
-
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	"github.com/alphabill-org/alphabill-wallet/wallet/tokens"
+	"github.com/alphabill-org/alphabill/rpc"
 )
 
 // TokensClient defines typed wrappers for the Alphabill RPC API.
@@ -114,7 +113,7 @@ func (c *TokensClient) getTokenUnit(ctx context.Context, tokenID tokens.TokenID)
 		}
 
 		var nftType *rpc.Unit[tokentxs.NonFungibleTokenTypeData]
-		if err := c.c.CallContext(ctx, &nftType, "state_getUnit", nft.Data.NftType, false); err != nil {
+		if err := c.c.CallContext(ctx, &nftType, "state_getUnit", nft.Data.TypeID, false); err != nil {
 			return nil, err
 		}
 		if nftType == nil {
@@ -125,7 +124,7 @@ func (c *TokensClient) getTokenUnit(ctx context.Context, tokenID tokens.TokenID)
 			// common
 			ID:       nft.UnitID,
 			Symbol:   nftType.Data.Symbol,
-			TypeID:   nft.Data.NftType,
+			TypeID:   nft.Data.TypeID,
 			TypeName: nftType.Data.Name,
 			Owner:    nft.OwnerPredicate,
 			Counter:  nft.Data.Counter,
@@ -156,7 +155,7 @@ func (c *TokensClient) getTokenType(ctx context.Context, typeID tokens.TokenType
 		}
 		return &tokens.TokenUnitType{
 			ID:                       ftType.UnitID,
-			ParentTypeID:             ftType.Data.ParentTypeId,
+			ParentTypeID:             ftType.Data.ParentTypeID,
 			Symbol:                   ftType.Data.Symbol,
 			Name:                     ftType.Data.Name,
 			Icon:                     ftType.Data.Icon,
@@ -176,7 +175,7 @@ func (c *TokensClient) getTokenType(ctx context.Context, typeID tokens.TokenType
 		}
 		return &tokens.TokenUnitType{
 			ID:                       nftType.UnitID,
-			ParentTypeID:             nftType.Data.ParentTypeId,
+			ParentTypeID:             nftType.Data.ParentTypeID,
 			Symbol:                   nftType.Data.Symbol,
 			Name:                     nftType.Data.Name,
 			Icon:                     nftType.Data.Icon,

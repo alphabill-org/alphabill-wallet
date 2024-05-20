@@ -67,11 +67,11 @@ func (w *Wallet) Shutdown() {
 	w.am.Close()
 }
 
-func (w *Wallet) SendEvmTx(ctx context.Context, accNr uint64, attrs *evm.TxAttributes) (*evmclient.Result, error) {
-	if accNr < 1 {
-		return nil, fmt.Errorf("invalid account number: %d", accNr)
+func (w *Wallet) SendEvmTx(ctx context.Context, accountNumber uint64, attrs *evm.TxAttributes) (*evmclient.Result, error) {
+	if accountNumber < 1 {
+		return nil, fmt.Errorf("invalid account number: %d", accountNumber)
 	}
-	acc, err := w.am.GetAccountKey(accNr - 1)
+	acc, err := w.am.GetAccountKey(accountNumber - 1)
 	if err != nil {
 		return nil, fmt.Errorf("account key read failed: %w", err)
 	}
@@ -124,11 +124,11 @@ func (w *Wallet) SendEvmTx(ctx context.Context, accNr uint64, attrs *evm.TxAttri
 	}, nil
 }
 
-func (w *Wallet) EvmCall(ctx context.Context, accNr uint64, attrs *evm.CallEVMRequest) (*evmclient.Result, error) {
-	if accNr < 1 {
-		return nil, fmt.Errorf("invalid account number: %d", accNr)
+func (w *Wallet) EvmCall(ctx context.Context, accountNumber uint64, attrs *evm.CallEVMRequest) (*evmclient.Result, error) {
+	if accountNumber < 1 {
+		return nil, fmt.Errorf("invalid account number: %d", accountNumber)
 	}
-	acc, err := w.am.GetAccountKey(accNr - 1)
+	acc, err := w.am.GetAccountKey(accountNumber - 1)
 	if err != nil {
 		return nil, fmt.Errorf("account key read failed: %w", err)
 	}
@@ -148,11 +148,11 @@ func (w *Wallet) EvmCall(ctx context.Context, accNr uint64, attrs *evm.CallEVMRe
 	}, nil
 }
 
-func (w *Wallet) GetBalance(ctx context.Context, accNr uint64) (*big.Int, error) {
-	if accNr < 1 {
-		return nil, fmt.Errorf("invalid account number: %d", accNr)
+func (w *Wallet) GetBalance(ctx context.Context, accountNumber uint64) (*big.Int, error) {
+	if accountNumber < 1 {
+		return nil, fmt.Errorf("invalid account number: %d", accountNumber)
 	}
-	acc, err := w.am.GetAccountKey(accNr - 1)
+	acc, err := w.am.GetAccountKey(accountNumber - 1)
 	if err != nil {
 		return nil, fmt.Errorf("account key read failed: %w", err)
 	}
