@@ -25,7 +25,7 @@ var (
 )
 
 func TestCreateTransferFC(t *testing.T) {
-	tx, err := createTransferFC(maxFee, unitID, targetUnitID, 100, 200, 0)
+	tx, err := createTransferFC(maxFee, unitID, targetUnitID, 200, 0)
 
 	require.NoError(t, err)
 	require.NotNil(t, tx)

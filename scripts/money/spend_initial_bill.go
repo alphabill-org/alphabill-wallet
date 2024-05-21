@@ -85,7 +85,7 @@ func execInitialBill(ctx context.Context, rpcClient api.RpcClient, timeout uint6
 	fcrID := mwtypes.FeeCreditRecordIDFormOwnerPredicate(nil, templates.AlwaysTrueBytes())
 
 	// create transferFC
-	transferFC, err := createTransferFC(feeAmount+txFee, billID, fcrID, roundNumber, absoluteTimeout, counter)
+	transferFC, err := createTransferFC(feeAmount+txFee, billID, fcrID, absoluteTimeout, counter)
 	if err != nil {
 		return fmt.Errorf("creating transfer FC transaction: %w", err)
 	}
@@ -143,14 +143,13 @@ func execInitialBill(ctx context.Context, rpcClient api.RpcClient, timeout uint6
 	return nil
 }
 
-func createTransferFC(feeAmount uint64, unitID []byte, targetUnitID []byte, t1, t2, counter uint64) (*types.TransactionOrder, error) {
+func createTransferFC(feeAmount uint64, unitID []byte, targetUnitID []byte, latestAdditionTime, counter uint64) (*types.TransactionOrder, error) {
 	attr, err := cbor.Marshal(
 		&fc.TransferFeeCreditAttributes{
 			Amount:                 feeAmount,
 			TargetSystemIdentifier: 1,
 			TargetRecordID:         targetUnitID,
-			EarliestAdditionTime:   t1,
-			LatestAdditionTime:     t2,
+			LatestAdditionTime:     latestAdditionTime,
 			Counter:                counter,
 		},
 	)
@@ -163,7 +162,7 @@ func createTransferFC(feeAmount uint64, unitID []byte, targetUnitID []byte, t1, 
 			Type:           fc.PayloadTypeTransferFeeCredit,
 			UnitID:         unitID,
 			Attributes:     attr,
-			ClientMetadata: &types.ClientMetadata{Timeout: t2, MaxTransactionFee: 1},
+			ClientMetadata: &types.ClientMetadata{Timeout: latestAdditionTime, MaxTransactionFee: 1},
 		},
 		OwnerProof: nil,
 	}

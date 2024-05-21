@@ -190,13 +190,12 @@ func NewUnlockFCTx(ac *account.AccountKey, systemID types.SystemID, fcb *api.Fee
 	return SignPayload(txPayload, ac)
 }
 
-func NewTransferFCTx(amount uint64, targetRecordID []byte, targetUnitCounter *uint64, k *account.AccountKey, moneySystemID, targetSystemID types.SystemID, unitID []byte, counter, timeout, t1, t2 uint64) (*types.TransactionOrder, error) {
+func NewTransferFCTx(amount uint64, targetRecordID []byte, targetUnitCounter *uint64, k *account.AccountKey, moneySystemID, targetSystemID types.SystemID, unitID []byte, counter, timeout, latestAdditionTime uint64) (*types.TransactionOrder, error) {
 	attr := &fc.TransferFeeCreditAttributes{
 		Amount:                 amount,
 		TargetSystemIdentifier: targetSystemID,
 		TargetRecordID:         targetRecordID,
-		EarliestAdditionTime:   t1,
-		LatestAdditionTime:     t2,
+		LatestAdditionTime:     latestAdditionTime,
 		TargetUnitCounter:      targetUnitCounter,
 		Counter:                counter,
 	}

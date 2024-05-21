@@ -98,7 +98,6 @@ func TestAddFeeCredit_TokensPartitionOK(t *testing.T) {
 	var attr *fc.TransferFeeCreditAttributes
 	err = res.Proofs[0].TransferFC.TxRecord.TransactionOrder.UnmarshalAttributes(&attr)
 	require.NoError(t, err)
-	require.EqualValues(t, 1000, attr.EarliestAdditionTime)
 	require.EqualValues(t, 1000+transferFCLatestAdditionTime, attr.LatestAdditionTime)
 }
 

@@ -14,7 +14,7 @@ import (
 
 func AddFeeCredit(t *testing.T, amount uint64, systemID types.SystemID, accountKey *account.AccountKey, unitID []byte, unitCounter uint64, fcrID []byte, fcrCounter *uint64, node *testpartition.NodePartition) {
 	// create transferFC tx
-	transferFCTx, err := txbuilder.NewTransferFCTx(amount, fcrID, fcrCounter, accountKey, systemID, systemID, unitID, unitCounter, 10000, 0, 10000)
+	transferFCTx, err := txbuilder.NewTransferFCTx(amount, fcrID, fcrCounter, accountKey, systemID, systemID, unitID, unitCounter, 10000, 10000)
 	require.NoError(t, err)
 
 	// submit transferFC tx

@@ -587,7 +587,6 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 	if err != nil {
 		return fmt.Errorf("failed to fetch target partition round number: %w", err)
 	}
-	earliestAdditionTime := targetRoundNumber
 	latestAdditionTime := targetRoundNumber + transferFCLatestAdditionTime
 
 	// create transferFC transaction
@@ -612,7 +611,6 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 		feeCtx.TargetBillID,
 		feeCtx.TargetBillCounter,
 		moneyTimeout,
-		earliestAdditionTime,
 		latestAdditionTime,
 	)
 	if err != nil {
