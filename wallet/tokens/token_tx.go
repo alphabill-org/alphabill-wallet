@@ -43,16 +43,15 @@ func (f *cachingRoundNumberFetcher) getRoundNumber(ctx context.Context) (uint64,
 	return f.roundNumber, nil
 }
 
-func (w *Wallet) newType(ctx context.Context, accNr uint64, payloadType string, attrs AttrWithSubTypeCreationInputs, typeId TokenTypeID, subtypePredicateArgs []*PredicateInput) (*txsubmitter.TxSubmission, error) {
-	if accNr < 1 {
-		return nil, fmt.Errorf("invalid account number: %d", accNr)
+func (w *Wallet) newType(ctx context.Context, accountNumber uint64, payloadType string, attrs AttrWithSubTypeCreationInputs, typeId TokenTypeID, subtypePredicateArgs []*PredicateInput) (*txsubmitter.TxSubmission, error) {
+	if accountNumber < 1 {
+		return nil, fmt.Errorf("invalid account number: %d", accountNumber)
 	}
-	acc, err := w.am.GetAccountKey(accNr - 1)
+	acc, err := w.am.GetAccountKey(accountNumber - 1)
 	if err != nil {
 		return nil, err
 	}
-	err = w.ensureFeeCredit(ctx, acc, 1)
-	if err != nil {
+	if err = w.ensureFeeCredit(ctx, acc, 1); err != nil {
 		return nil, err
 	}
 	sub, err := w.prepareTxSubmission(ctx, payloadType, attrs, typeId, acc, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
@@ -67,8 +66,7 @@ func (w *Wallet) newType(ctx context.Context, accNr uint64, payloadType string, 
 	if err != nil {
 		return nil, err
 	}
-	err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
-	if err != nil {
+	if err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx); err != nil {
 		return nil, err
 	}
 	return sub, nil
@@ -94,19 +92,25 @@ func preparePredicateSignatures(am account.Manager, args []*PredicateInput, tx *
 	return signatures, nil
 }
 
-func (w *Wallet) newToken(ctx context.Context, accNr uint64, payloadType string, attrs MintAttr, unitID TokenTypeID, mintPredicateArgs []*PredicateInput) (*txsubmitter.TxSubmission, error) {
-	if accNr < 1 {
-		return nil, fmt.Errorf("invalid account number: %d", accNr)
+func (w *Wallet) newToken(ctx context.Context, accountNumber uint64, payloadType string, attrs MintAttr, mintPredicateArgs []*PredicateInput, idGenFunc func(shardPart []byte, unitPart []byte) types.UnitID) (*txsubmitter.TxSubmission, error) {
+	if accountNumber < 1 {
+		return nil, fmt.Errorf("invalid account number: %d", accountNumber)
 	}
-	key, err := w.am.GetAccountKey(accNr - 1)
+	key, err := w.am.GetAccountKey(accountNumber - 1)
 	if err != nil {
 		return nil, err
 	}
-	err = w.ensureFeeCredit(ctx, key, 1)
-	if err != nil {
+	if err := w.ensureFeeCredit(ctx, key, 1); err != nil {
 		return nil, err
 	}
-	sub, err := w.prepareTxSubmission(ctx, payloadType, attrs, unitID, key, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
+	sub, err := w.prepareTxSubmission(ctx, payloadType, attrs, nil, key, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
+		// generate token identifier, needs to be generated before signatures
+		unitPart, err := tokens.HashForNewTokenID(attrs, tx.Payload.ClientMetadata, crypto.SHA256)
+		if err != nil {
+			return err
+		}
+		tx.Payload.UnitID = idGenFunc(attrs.GetTypeID(), unitPart)
+
 		signatures, err := preparePredicateSignatures(w.am, mintPredicateArgs, tx, attrs)
 		if err != nil {
 			return err
@@ -118,21 +122,24 @@ func (w *Wallet) newToken(ctx context.Context, accNr uint64, payloadType string,
 	if err != nil {
 		return nil, err
 	}
-	err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
-	if err != nil {
+	if err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx); err != nil {
 		return nil, err
 	}
 	return sub, nil
 }
 
-func (w *Wallet) prepareTxSubmission(ctx context.Context, payloadType string, attrs types.SigBytesProvider, unitId types.UnitID, ac *account.AccountKey, rn roundNumberFetcher, txps txPreprocessor) (*txsubmitter.TxSubmission, error) {
-	w.log.InfoContext(ctx, fmt.Sprintf("Preparing to send token tx, UnitID=%s", unitId))
+func (w *Wallet) prepareTxSubmission(ctx context.Context, payloadType string, attrs types.SigBytesProvider, unitID types.UnitID, ac *account.AccountKey, rn roundNumberFetcher, txps txPreprocessor) (*txsubmitter.TxSubmission, error) {
+	if unitID != nil {
+		w.log.InfoContext(ctx, fmt.Sprintf("Preparing to send token tx, UnitID=%s", unitID))
+	} else {
+		w.log.InfoContext(ctx, fmt.Sprintf("Preparing to send %s token tx", payloadType))
+	}
 
 	roundNumber, err := rn(ctx)
 	if err != nil {
 		return nil, err
 	}
-	tx := createTx(w.systemID, payloadType, unitId, roundNumber+txTimeoutRoundCount, twtypes.FeeCreditRecordIDFormPublicKeyHash(nil, ac.PubKeyHash.Sha256))
+	tx := createTx(w.systemID, payloadType, unitID, roundNumber+txTimeoutRoundCount, twtypes.FeeCreditRecordIDFormPublicKeyHash(nil, ac.PubKeyHash.Sha256))
 	if txps != nil {
 		// set fields before tx is signed
 		err = txps(tx)
@@ -155,7 +162,7 @@ func (w *Wallet) prepareTxSubmission(ctx context.Context, payloadType string, at
 
 	// convert again for hashing as the tx might have been modified
 	txSub := &txsubmitter.TxSubmission{
-		UnitID:      unitId,
+		UnitID:      tx.UnitID(),
 		Transaction: tx,
 		TxHash:      tx.Hash(crypto.SHA256),
 	}
@@ -216,7 +223,7 @@ func newNonFungibleTransferTxAttrs(token *TokenUnit, receiverPubKey []byte) *tok
 		NewBearer:                    BearerPredicateFromPubKey(receiverPubKey),
 		Nonce:                        token.Nonce,
 		Counter:                      token.Counter,
-		NFTTypeID:                    token.TypeID,
+		TypeID:                       token.TypeID,
 		InvariantPredicateSignatures: nil,
 	}
 }

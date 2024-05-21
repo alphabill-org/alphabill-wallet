@@ -9,8 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/spf13/cobra"
-
+	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	sdktypes "github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
@@ -20,6 +19,7 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	tokenswallet "github.com/alphabill-org/alphabill-wallet/wallet/tokens"
+	"github.com/spf13/cobra"
 )
 
 const (
@@ -199,7 +199,7 @@ func execTokenCmdNewTypeFungible(cmd *cobra.Command, config *types.WalletConfig)
 		Name:                     name,
 		Icon:                     icon,
 		DecimalPlaces:            decimals,
-		ParentTypeId:             parentType,
+		ParentTypeID:             parentType,
 		SubTypeCreationPredicate: subTypeCreationPredicate,
 		TokenCreationPredicate:   mintTokenPredicate,
 		InvariantPredicate:       invariantPredicate,
@@ -287,7 +287,7 @@ func execTokenCmdNewTypeNonFungible(cmd *cobra.Command, config *types.WalletConf
 		Symbol:                   symbol,
 		Name:                     name,
 		Icon:                     icon,
-		ParentTypeId:             parentType,
+		ParentTypeID:             parentType,
 		SubTypeCreationPredicate: subTypeCreationPredicate,
 		TokenCreationPredicate:   mintTokenPredicate,
 		InvariantPredicate:       invariantPredicate,
@@ -456,15 +456,16 @@ func execTokenCmdNewTokenNonFungible(cmd *cobra.Command, config *types.WalletCon
 	if err != nil {
 		return err
 	}
-	a := tokenswallet.MintNonFungibleTokenAttributes{
+	a := &tokens.MintNonFungibleTokenAttributes{
+		TypeID:              typeID,
 		Name:                name,
-		Uri:                 uri,
+		URI:                 uri,
 		Data:                data,
 		Bearer:              bearerPredicate,
 		DataUpdatePredicate: dataUpdatePredicate,
 		Nonce:               0,
 	}
-	result, err := tw.NewNFT(cmd.Context(), accountNumber, a, typeID, ci)
+	result, err := tw.NewNFT(cmd.Context(), accountNumber, a, ci)
 	if err != nil {
 		return err
 	}
@@ -862,21 +863,21 @@ func execTokenCmdList(cmd *cobra.Command, config *types.WalletConfig, accountNum
 		}
 	}
 	accounts := make([]uint64, 0, len(res))
-	for accNr := range res {
-		accounts = append(accounts, accNr)
+	for accountNumber := range res {
+		accounts = append(accounts, accountNumber)
 	}
 	sort.Slice(accounts, func(i, j int) bool {
 		return accounts[i] < accounts[j]
 	})
 
 	atLeastOneFound := false
-	for _, accNr := range accounts {
-		toks := res[accNr]
+	for _, accountNumber := range accounts {
+		toks := res[accountNumber]
 		var ownerKey string
-		if accNr == 0 {
+		if accountNumber == 0 {
 			ownerKey = "Tokens spendable by anyone:"
 		} else {
-			ownerKey = fmt.Sprintf("Tokens owned by account #%v", accNr)
+			ownerKey = fmt.Sprintf("Tokens owned by account #%v", accountNumber)
 		}
 		config.Base.ConsoleWriter.Println(ownerKey)
 		sort.Slice(toks, func(i, j int) bool {
