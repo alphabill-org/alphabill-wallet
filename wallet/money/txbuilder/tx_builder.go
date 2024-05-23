@@ -219,13 +219,14 @@ func NewAddFCTx(unitID []byte, transferFC *wallet.Proof, ac *account.AccountKey,
 	return SignPayload(txPayload, ac)
 }
 
-func NewCloseFCTx(systemID types.SystemID, unitID []byte, timeout uint64, amount uint64, targetUnitID []byte, targetUnitCounter uint64, k *account.AccountKey) (*types.TransactionOrder, error) {
+func NewCloseFCTx(systemID types.SystemID, fcb *api.FeeCreditBill, timeout uint64, targetUnitID []byte, targetUnitCounter uint64, k *account.AccountKey) (*types.TransactionOrder, error) {
 	attr := &fc.CloseFeeCreditAttributes{
-		Amount:            amount,
 		TargetUnitID:      targetUnitID,
 		TargetUnitCounter: targetUnitCounter,
+		Amount:            fcb.Balance(),
+		Counter:           fcb.Counter(),
 	}
-	txPayload, err := txbuilder.NewTxPayload(systemID, fc.PayloadTypeCloseFeeCredit, unitID, timeout, nil, nil, attr)
+	txPayload, err := txbuilder.NewTxPayload(systemID, fc.PayloadTypeCloseFeeCredit, fcb.ID, timeout, nil, nil, attr)
 	if err != nil {
 		return nil, err
 	}

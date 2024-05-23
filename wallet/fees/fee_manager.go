@@ -892,9 +892,7 @@ func (w *FeeManager) sendCloseFCTx(ctx context.Context, accountKey *account.Acco
 	}
 
 	// create closeFC transaction
-	tx, err := txbuilder.NewCloseFCTx(
-		w.targetPartitionSystemID, fcb.ID, targetPartitionTimeout, fcb.Balance(),
-		feeCtx.TargetBillID, feeCtx.TargetBillCounter, accountKey)
+	tx, err := txbuilder.NewCloseFCTx(w.targetPartitionSystemID, fcb, targetPartitionTimeout, feeCtx.TargetBillID, feeCtx.TargetBillCounter, accountKey)
 	if err != nil {
 		return fmt.Errorf("failed to create closeFC transaction: %w", err)
 	}
