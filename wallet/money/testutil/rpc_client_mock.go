@@ -10,8 +10,9 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
-	mwtypes "github.com/alphabill-org/alphabill-wallet/wallet/money/types"
 )
+
+const transferFCLatestAdditionTime = 65536 // relative timeout after which transferFC unit becomes unusable
 
 type (
 	RpcClientMock struct {
@@ -174,7 +175,7 @@ func NewMoneyBill(unitIDPart []byte, billData *money.BillData) *api.Bill {
 }
 
 func NewMoneyFCR(pubKeyHash []byte, fcrData *fc.FeeCreditRecord) *api.FeeCreditBill {
-	fcrID := mwtypes.FeeCreditRecordIDFormPublicKeyHash(nil, pubKeyHash)
+	fcrID := money.NewFeeCreditRecordIDFromPublicKeyHash(nil, pubKeyHash, 1000+transferFCLatestAdditionTime)
 	return &api.FeeCreditBill{
 		ID:              fcrID,
 		FeeCreditRecord: fcrData,

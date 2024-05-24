@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
@@ -17,8 +19,6 @@ import (
 	evmwallet "github.com/alphabill-org/alphabill-wallet/wallet/evm"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
-	mwtypes "github.com/alphabill-org/alphabill-wallet/wallet/money/types"
-	twtypes "github.com/alphabill-org/alphabill-wallet/wallet/tokens/types"
 	"github.com/spf13/cobra"
 )
 
@@ -420,10 +420,12 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 			feeManagerDB,
 			moneyInfo.SystemID,
 			moneyClient,
-			mwtypes.FeeCreditRecordIDFormPublicKey,
+			money.NewFeeCreditRecordIDFromPublicKey,
+			money.FeeCreditRecordUnitType,
 			moneyInfo.SystemID,
 			moneyClient,
-			mwtypes.FeeCreditRecordIDFormPublicKey,
+			money.NewFeeCreditRecordIDFromPublicKey,
+			money.FeeCreditRecordUnitType,
 			logger,
 		), nil
 	case clitypes.TokensType:
@@ -446,10 +448,12 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 			feeManagerDB,
 			moneyInfo.SystemID,
 			moneyClient,
-			mwtypes.FeeCreditRecordIDFormPublicKey,
+			money.NewFeeCreditRecordIDFromPublicKey,
+			money.FeeCreditRecordUnitType,
 			tokenInfo.SystemID,
 			tokensClient,
-			twtypes.FeeCreditRecordIDFromPublicKey,
+			tokens.NewFeeCreditRecordIDFromPublicKey,
+			tokens.FeeCreditRecordUnitType,
 			logger,
 		), nil
 	case clitypes.EvmType:
@@ -472,10 +476,12 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 			feeManagerDB,
 			moneyInfo.SystemID,
 			moneyClient,
-			mwtypes.FeeCreditRecordIDFormPublicKey,
+			money.NewFeeCreditRecordIDFromPublicKey,
+			money.FeeCreditRecordUnitType,
 			evmInfo.SystemID,
 			evmClient,
-			evmwallet.FeeCreditRecordIDFromPublicKey,
+			evmwallet.NewFeeCreditRecordIDFromPublicKey,
+			nil,
 			logger,
 		), nil
 	default:
