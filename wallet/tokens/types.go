@@ -4,16 +4,18 @@ import (
 	"crypto"
 	"encoding/hex"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
-	"github.com/alphabill-org/alphabill/predicates/templates"
-	"github.com/alphabill-org/alphabill/txsystem/tokens"
-	"github.com/alphabill-org/alphabill/types"
-	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
+	"github.com/alphabill-org/alphabill-go-base/types"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
 const (
@@ -22,6 +24,7 @@ const (
 	predicateFalse = "false"
 	predicatePtpkh = "ptpkh"
 	hexPrefix      = "0x"
+	filePrefix     = "@"
 )
 
 type (
@@ -37,7 +40,7 @@ type (
 		Name                     string
 		Icon                     *Icon
 		DecimalPlaces            uint32
-		ParentTypeId             TokenTypeID
+		ParentTypeID             TokenTypeID
 		SubTypeCreationPredicate wallet.Predicate
 		TokenCreationPredicate   wallet.Predicate
 		InvariantPredicate       wallet.Predicate
@@ -52,7 +55,7 @@ type (
 		Symbol                   string
 		Name                     string
 		Icon                     *Icon
-		ParentTypeId             TokenTypeID
+		ParentTypeID             TokenTypeID
 		SubTypeCreationPredicate wallet.Predicate
 		TokenCreationPredicate   wallet.Predicate
 		InvariantPredicate       wallet.Predicate
@@ -60,17 +63,19 @@ type (
 	}
 
 	MintNonFungibleTokenAttributes struct {
+		TypeID              types.UnitID
 		Name                string
-		NftType             TokenTypeID
 		Uri                 string
 		Data                []byte
 		Bearer              wallet.Predicate
 		DataUpdatePredicate wallet.Predicate
+		Nonce               uint64
 	}
 
 	MintAttr interface {
 		types.SigBytesProvider
 		SetBearer([]byte)
+		GetTypeID() types.UnitID
 		SetTokenCreationPredicateSignatures([][]byte)
 	}
 
@@ -85,10 +90,10 @@ type (
 	}
 )
 
-func ParsePredicates(arguments []string, keyNr uint64, am account.Manager) ([]*PredicateInput, error) {
+func ParsePredicateArguments(arguments []string, keyNr uint64, am account.Manager) ([]*PredicateInput, error) {
 	creationInputs := make([]*PredicateInput, 0, len(arguments))
 	for _, argument := range arguments {
-		input, err := parsePredicate(argument, keyNr, am)
+		input, err := parsePredicateArgument(argument, keyNr, am)
 		if err != nil {
 			return nil, err
 		}
@@ -97,56 +102,67 @@ func ParsePredicates(arguments []string, keyNr uint64, am account.Manager) ([]*P
 	return creationInputs, nil
 }
 
-// parsePredicate uses the following format:
-// empty|true|false|empty produce an empty predicate argument
-// ptpkh (provided key #) or ptpkh:n (n > 0) produce an argument with the signed transaction by the given key
-func parsePredicate(argument string, keyNr uint64, am account.Manager) (*PredicateInput, error) {
-	if len(argument) == 0 || argument == predicateEmpty || argument == predicateTrue || argument == predicateFalse {
+/*
+parsePredicateArgument parses the "argument" using following format:
+  - empty | true | false -> will produce an empty predicate argument;
+  - ptpkh (provided key #) or ptpkh:n -> will return either the default account number ("keyNr" param)
+    or the user provided key index (the "n" part converted to int, must be greater than zero);
+  - @filename -> will load content of the file to be used as predicate argument;
+*/
+func parsePredicateArgument(argument string, keyNr uint64, am account.Manager) (*PredicateInput, error) {
+	switch {
+	case len(argument) == 0 || argument == predicateEmpty || argument == predicateTrue || argument == predicateFalse:
 		return &PredicateInput{Argument: nil}, nil
-	}
-	var err error
-	if strings.HasPrefix(argument, predicatePtpkh) {
+	case strings.HasPrefix(argument, predicatePtpkh):
 		if split := strings.Split(argument, ":"); len(split) == 2 {
-			keyStr := split[1]
-			if strings.HasPrefix(strings.ToLower(keyStr), hexPrefix) {
-				return nil, fmt.Errorf("invalid creation input: '%s'", argument)
-			} else {
-				keyNr, err = strconv.ParseUint(keyStr, 10, 64)
-				if err != nil {
-					return nil, fmt.Errorf("invalid creation input: '%s': %w", argument, err)
-				}
+			var err error
+			if keyNr, err = strconv.ParseUint(split[1], 10, 64); err != nil {
+				return nil, fmt.Errorf("invalid key number: '%s': %w", argument, err)
 			}
 		}
 		if keyNr < 1 {
 			return nil, fmt.Errorf("invalid key number: %v in '%s'", keyNr, argument)
 		}
-		_, err := am.GetAccountKey(keyNr - 1)
-		if err != nil {
+		if _, err := am.GetAccountKey(keyNr - 1); err != nil {
 			return nil, err
 		}
 		return &PredicateInput{AccountNumber: keyNr}, nil
-
-	}
-	if strings.HasPrefix(argument, hexPrefix) {
+	case strings.HasPrefix(argument, hexPrefix):
 		decoded, err := DecodeHexOrEmpty(argument)
 		if err != nil {
 			return nil, err
 		}
 		return &PredicateInput{Argument: decoded}, nil
+	case strings.HasPrefix(argument, filePrefix):
+		filename, err := filepath.Abs(strings.TrimPrefix(argument, filePrefix))
+		if err != nil {
+			return nil, err
+		}
+		buf, err := os.ReadFile(filepath.Clean(filename))
+		if err != nil {
+			return nil, err
+		}
+		return &PredicateInput{Argument: buf}, nil
+	default:
+		return nil, fmt.Errorf("invalid predicate argument: %q", argument)
 	}
-	return nil, fmt.Errorf("invalid creation input: '%s'", argument)
 }
 
 func ParsePredicateClause(clause string, keyNr uint64, am account.Manager) ([]byte, error) {
-	if len(clause) == 0 || clause == predicateTrue {
+	switch {
+	case len(clause) == 0 || clause == predicateTrue:
 		return templates.AlwaysTrueBytes(), nil
-	}
-	if clause == predicateFalse {
+	case clause == predicateFalse:
 		return templates.AlwaysFalseBytes(), nil
-	}
-
-	var err error
-	if strings.HasPrefix(clause, predicatePtpkh) {
+	case strings.HasPrefix(clause, hexPrefix):
+		return DecodeHexOrEmpty(clause)
+	case strings.HasPrefix(clause, filePrefix):
+		filename, err := filepath.Abs(strings.TrimPrefix(clause, filePrefix))
+		if err != nil {
+			return nil, err
+		}
+		return os.ReadFile(filepath.Clean(filename))
+	case strings.HasPrefix(clause, predicatePtpkh):
 		if split := strings.Split(clause, ":"); len(split) == 2 {
 			keyStr := split[1]
 			if strings.HasPrefix(strings.ToLower(keyStr), hexPrefix) {
@@ -159,6 +175,7 @@ func ParsePredicateClause(clause string, keyNr uint64, am account.Manager) ([]by
 				}
 				return templates.NewP2pkh256BytesFromKeyHash(keyHash), nil
 			} else {
+				var err error
 				keyNr, err = strconv.ParseUint(keyStr, 10, 64)
 				if err != nil {
 					return nil, fmt.Errorf("invalid predicate clause: '%s': %w", clause, err)
@@ -173,11 +190,8 @@ func ParsePredicateClause(clause string, keyNr uint64, am account.Manager) ([]by
 			return nil, err
 		}
 		return templates.NewP2pkh256BytesFromKeyHash(accountKey.PubKeyHash.Sha256), nil
+	}
 
-	}
-	if strings.HasPrefix(clause, hexPrefix) {
-		return DecodeHexOrEmpty(clause)
-	}
 	return nil, fmt.Errorf("invalid predicate clause: '%s'", clause)
 }
 
@@ -187,11 +201,11 @@ func (c *CreateFungibleTokenTypeAttributes) ToCBOR() *tokens.CreateFungibleToken
 		icon = &tokens.Icon{Type: c.Icon.Type, Data: c.Icon.Data}
 	}
 	return &tokens.CreateFungibleTokenTypeAttributes{
+		Symbol:                   c.Symbol,
 		Name:                     c.Name,
 		Icon:                     icon,
-		Symbol:                   c.Symbol,
 		DecimalPlaces:            c.DecimalPlaces,
-		ParentTypeID:             c.ParentTypeId,
+		ParentTypeID:             c.ParentTypeID,
 		SubTypeCreationPredicate: c.SubTypeCreationPredicate,
 		TokenCreationPredicate:   c.TokenCreationPredicate,
 		InvariantPredicate:       c.InvariantPredicate,
@@ -207,7 +221,7 @@ func (c *CreateNonFungibleTokenTypeAttributes) ToCBOR() *tokens.CreateNonFungibl
 		Symbol:                   c.Symbol,
 		Name:                     c.Name,
 		Icon:                     icon,
-		ParentTypeID:             c.ParentTypeId,
+		ParentTypeID:             c.ParentTypeID,
 		SubTypeCreationPredicate: c.SubTypeCreationPredicate,
 		TokenCreationPredicate:   c.TokenCreationPredicate,
 		InvariantPredicate:       c.InvariantPredicate,
@@ -217,12 +231,12 @@ func (c *CreateNonFungibleTokenTypeAttributes) ToCBOR() *tokens.CreateNonFungibl
 
 func (a *MintNonFungibleTokenAttributes) ToCBOR() *tokens.MintNonFungibleTokenAttributes {
 	return &tokens.MintNonFungibleTokenAttributes{
+		Bearer:              a.Bearer,
 		Name:                a.Name,
-		NFTTypeID:           a.NftType,
 		URI:                 a.Uri,
 		Data:                a.Data,
-		Bearer:              a.Bearer,
 		DataUpdatePredicate: a.DataUpdatePredicate,
+		Nonce:               a.Nonce,
 	}
 }
 
@@ -274,6 +288,8 @@ type (
 		TypeID   TokenTypeID `json:"typeId"`
 		TypeName string      `json:"typeName"`
 		Owner    types.Bytes `json:"owner"`
+		Nonce    types.Bytes `json:"nonce,omitempty"`
+		Counter  uint64      `json:"counter"`
 		Locked   uint64      `json:"locked"`
 
 		// fungible only
@@ -288,8 +304,7 @@ type (
 		NftDataUpdatePredicate wallet.Predicate `json:"nftDataUpdatePredicate,omitempty"`
 
 		// meta
-		Kind   Kind          `json:"kind"`
-		TxHash wallet.TxHash `json:"txHash"`
+		Kind Kind `json:"kind"`
 	}
 
 	TokenID     = types.UnitID

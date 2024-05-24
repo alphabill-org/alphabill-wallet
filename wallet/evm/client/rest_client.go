@@ -10,11 +10,12 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
+	"path"
 	"time"
 
-	"github.com/alphabill-org/alphabill/types"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/evm"
+	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/fxamacker/cbor/v2"
 	"github.com/shopspring/decimal"
 
 	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
@@ -63,8 +64,8 @@ func WeiToAlpha(wei *big.Int) uint64 {
 }
 
 // GetFeeCreditBill - simulates fee credit bill on EVM
-func (e *EvmClient) GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*sdk.Bill, error) {
-	balanceStr, backlink, err := e.GetBalance(ctx, unitID)
+func (e *EvmClient) GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*Bill, error) {
+	balanceStr, counter, err := e.GetBalance(ctx, unitID)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return nil, nil
@@ -75,10 +76,10 @@ func (e *EvmClient) GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (
 	if !ok {
 		return nil, fmt.Errorf("account %s has invalid balance %v", hexutil.Encode(unitID), balanceStr)
 	}
-	return &sdk.Bill{
-		Id:     unitID,
-		Value:  WeiToAlpha(balanceWei),
-		TxHash: backlink,
+	return &Bill{
+		Id:      unitID,
+		Value:   WeiToAlpha(balanceWei),
+		Counter: counter,
 	}, nil
 }
 
@@ -87,7 +88,7 @@ func (e *EvmClient) GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (
 
 // PostTransaction post node transaction
 func (e *EvmClient) PostTransaction(ctx context.Context, tx *types.TransactionOrder) error {
-	b, err := cbor.Marshal(tx)
+	b, err := types.Cbor.Marshal(tx)
 	if err != nil {
 		return fmt.Errorf("failed to encode transactions: %w", err)
 	}
@@ -98,12 +99,12 @@ func (e *EvmClient) PostTransaction(ctx context.Context, tx *types.TransactionOr
 }
 
 // GetRoundNumber returns node round number
-func (e *EvmClient) GetRoundNumber(ctx context.Context) (*sdk.RoundNumber, error) {
+func (e *EvmClient) GetRoundNumber(ctx context.Context) (*RoundNumber, error) {
 	var round uint64
 	if err := e.get(ctx, e.getURL(apiPathPrefix, "rounds/latest"), &round, false); err != nil {
 		return nil, fmt.Errorf("get round-number request failed: %w", err)
 	}
-	return &sdk.RoundNumber{RoundNumber: round, LastIndexedRoundNumber: round}, nil
+	return &RoundNumber{RoundNumber: round, LastIndexedRoundNumber: round}, nil
 }
 
 // GetTxProof - get transaction proof for tx hash. NB! node must be configured to run with indexer.
@@ -127,19 +128,19 @@ func (e *EvmClient) GetTxProof(ctx context.Context, _ types.UnitID, txHash sdk.T
 }
 
 // GetBalance - reads account balance
-func (e *EvmClient) GetBalance(ctx context.Context, ethAddr []byte) (string, []byte, error) {
+func (e *EvmClient) GetBalance(ctx context.Context, ethAddr []byte) (string, uint64, error) {
 	resp := &struct {
-		_        struct{} `cbor:",toarray"`
-		Balance  string
-		Backlink []byte
+		_       struct{} `cbor:",toarray"`
+		Balance string
+		Counter uint64
 	}{}
 
 	addr := e.getURL(apiPathPrefix, evmApiSubPrefix, "balance", hex.EncodeToString(ethAddr))
 	err := e.get(ctx, addr, &resp, false)
 	if err != nil {
-		return "", nil, err
+		return "", 0, err
 	}
-	return resp.Balance, resp.Backlink, nil
+	return resp.Balance, resp.Counter, nil
 }
 
 // GetTransactionCount reads account nonce
@@ -157,14 +158,14 @@ func (e *EvmClient) GetTransactionCount(ctx context.Context, ethAddr []byte) (ui
 }
 
 // Call execute smart contract tx without storing the result in blockchain. Can be used to simulate tx or to read state.
-func (e *EvmClient) Call(ctx context.Context, callAttr *CallAttributes) (*ProcessingDetails, error) {
-	b, err := cbor.Marshal(callAttr)
+func (e *EvmClient) Call(ctx context.Context, callAttr *evm.CallEVMRequest) (*evm.ProcessingDetails, error) {
+	b, err := types.Cbor.Marshal(callAttr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode transactions: %w", err)
 	}
 	callEVMResponse := &struct {
 		_       struct{} `cbor:",toarray"`
-		Details *ProcessingDetails
+		Details *evm.ProcessingDetails
 	}{}
 	addr := e.getURL(apiPathPrefix, evmApiSubPrefix, "call")
 	if err = e.post(ctx, addr, bytes.NewReader(b), http.StatusOK, callEVMResponse); err != nil {
@@ -188,7 +189,12 @@ func (e *EvmClient) GetGasPrice(ctx context.Context) (string, error) {
 }
 
 func (e *EvmClient) getURL(pathElements ...string) *url.URL {
-	return sdk.GetURL(e.addr, pathElements...)
+	return buildURL(e.addr, pathElements...)
+}
+
+func buildURL(url url.URL, pathElements ...string) *url.URL {
+	url.Path = path.Join(pathElements...)
+	return &url
 }
 
 /*
@@ -207,7 +213,7 @@ func (e *EvmClient) get(ctx context.Context, addr *url.URL, data any, allowEmpty
 	req.Header.Set("User-Agent", clientUserAgent)
 	rsp, err := e.hc.Do(req)
 	if err != nil {
-		return fmt.Errorf("request to backend failed: %w", err)
+		return fmt.Errorf("request to rpc node failed: %w", err)
 	}
 	if err = decodeResponse(rsp, http.StatusOK, data, allowEmptyResponse); err != nil {
 		return err
@@ -244,7 +250,7 @@ func decodeResponse(rsp *http.Response, successStatus int, data any, allowEmptyR
 		if data == nil {
 			return nil
 		}
-		err := cbor.NewDecoder(rsp.Body).Decode(data)
+		err := types.Cbor.Decode(rsp.Body, data)
 		if err != nil && (!errors.Is(err, io.EOF) || !allowEmptyResponse) {
 			return fmt.Errorf("failed to decode response body: %w", err)
 		}
@@ -258,7 +264,7 @@ func decodeResponse(rsp *http.Response, successStatus int, data any, allowEmptyR
 			_   struct{} `cbor:",toarray"`
 			Err string
 		}{}
-		if err := cbor.NewDecoder(rsp.Body).Decode(errInfo); err != nil {
+		if err := types.Cbor.Decode(rsp.Body, errInfo); err != nil {
 			return fmt.Errorf("%s", rsp.Status)
 		}
 		return fmt.Errorf("%s, %s", rsp.Status, errInfo.Err)

@@ -6,21 +6,18 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"reflect"
 	"sort"
 	"testing"
 	"time"
 
-	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils/net"
-	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
-	testevent "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition/event"
-	abcrypto "github.com/alphabill-org/alphabill/crypto"
+	abcrypto "github.com/alphabill-org/alphabill-go-base/crypto"
+	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill/keyvaluedb"
 	"github.com/alphabill-org/alphabill/keyvaluedb/boltdb"
 	"github.com/alphabill-org/alphabill/keyvaluedb/memorydb"
-	"github.com/alphabill-org/alphabill/logger"
 	"github.com/alphabill-org/alphabill/network"
 	"github.com/alphabill-org/alphabill/network/protocol/genesis"
 	"github.com/alphabill-org/alphabill/observability"
@@ -31,12 +28,16 @@ import (
 	"github.com/alphabill-org/alphabill/rootchain/partitions"
 	"github.com/alphabill-org/alphabill/state"
 	"github.com/alphabill-org/alphabill/txsystem"
-	"github.com/alphabill-org/alphabill/types"
 	libp2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/stretchr/testify/require"
+
+	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils/net"
+	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
+	testevent "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition/event"
 )
 
 // AlphabillNetwork for integration tests
@@ -48,7 +49,7 @@ type AlphabillNetwork struct {
 
 type RootPartition struct {
 	rcGenesis *genesis.RootGenesis
-	TrustBase map[string]abcrypto.Verifier
+	TrustBase types.RootTrustBase
 	Nodes     []*rootNode
 	obs       testobserve.Factory
 }
@@ -58,9 +59,9 @@ type NodePartition struct {
 	SystemName       string
 	partitionGenesis *genesis.PartitionGenesis
 	genesisState     *state.State
-	txSystemFunc     func(trustBase map[string]abcrypto.Verifier) txsystem.TransactionSystem
+	txSystemFunc     func(trustBase types.RootTrustBase) txsystem.TransactionSystem
 	ctx              context.Context
-	tb               map[string]abcrypto.Verifier
+	tb               types.RootTrustBase
 	Nodes            []*PartitionNode
 	obs              testobserve.Factory
 }
@@ -74,7 +75,6 @@ type PartitionNode struct {
 	genesis      *genesis.PartitionNode
 	EventHandler *testevent.TestEventHandler
 	confOpts     []partition.NodeOption
-	AddrGRPC     string
 	AddrRPC      string
 	proofDB      keyvaluedb.KeyValueDB
 	OwnerIndexer *partition.OwnerIndexer
@@ -127,7 +127,6 @@ func newRootPartition(nofRootNodes uint8, nodePartitions []*NodePartition) (*Roo
 	if err != nil {
 		return nil, fmt.Errorf("create signer failed, %w", err)
 	}
-	trustBase := make(map[string]abcrypto.Verifier)
 	rootNodes := make([]*rootNode, nofRootNodes)
 	rootGenesisFiles := make([]*genesis.RootGenesis, nofRootNodes)
 	for i := 0; i < int(nofRootNodes); i++ {
@@ -159,11 +158,6 @@ func newRootPartition(nofRootNodes uint8, nodePartitions []*NodePartition) (*Roo
 		if err != nil {
 			return nil, err
 		}
-		ver, err := rootSigners[i].Verifier()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get root node verifier, %w", err)
-		}
-		trustBase[id.String()] = ver
 		rootGenesisFiles[i] = rg
 		rootNodes[i] = &rootNode{
 			genesis:    rg,
@@ -182,6 +176,10 @@ func newRootPartition(nofRootNodes uint8, nodePartitions []*NodePartition) (*Roo
 				part.partitionGenesis = pg
 			}
 		}
+	}
+	trustBase, err := rootGenesis.GenerateTrustBase()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate trust base from genesis: %w", err)
 	}
 	return &RootPartition{
 		rcGenesis: rootGenesis,
@@ -218,7 +216,7 @@ func (r *RootPartition) start(ctx context.Context) error {
 	// start root nodes
 	for i, rn := range r.Nodes {
 		rootPeer := rootPeers[i]
-		log := r.obs.DefaultLogger().With(logger.NodeID(rootPeer.ID()))
+		log := r.obs.DefaultLogger().With(slog.Any("node_id", rootPeer.ID()))
 		obs := observability.WithLogger(r.obs.DefaultObserver(), log)
 		// this is a unit test set-up pre-populate store with addresses, create separate test for node discovery
 		for _, p := range rootPeers {
@@ -237,7 +235,11 @@ func (r *RootPartition) start(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to init consensus network, %w", err)
 		}
-		cm, err := abdrc.NewDistributedAbConsensusManager(rootPeer.ID(), r.rcGenesis, partitionStore, rootConsensusNet, rn.RootSigner, obs)
+		trustBase, err := r.rcGenesis.GenerateTrustBase()
+		if err != nil {
+			return fmt.Errorf("failed to generate trust base from genesis: %w", err)
+		}
+		cm, err := abdrc.NewDistributedAbConsensusManager(rootPeer.ID(), r.rcGenesis, trustBase, partitionStore, rootConsensusNet, rn.RootSigner, obs)
 		if err != nil {
 			return fmt.Errorf("consensus manager initialization failed, %w", err)
 		}
@@ -258,7 +260,7 @@ func (r *RootPartition) start(ctx context.Context) error {
 	return nil
 }
 
-func NewPartition(t *testing.T, systemName string, nodeCount uint8, txSystemProvider func(trustBase map[string]abcrypto.Verifier) txsystem.TransactionSystem, systemIdentifier types.SystemID, state *state.State) (abPartition *NodePartition, err error) {
+func NewPartition(t *testing.T, systemName string, nodeCount uint8, txSystemProvider func(trustBase types.RootTrustBase) txsystem.TransactionSystem, systemIdentifier types.SystemID, state *state.State) (abPartition *NodePartition, err error) {
 	if nodeCount < 1 {
 		return nil, fmt.Errorf("invalid count of partition Nodes: %d", nodeCount)
 	}
@@ -316,7 +318,7 @@ func NewPartition(t *testing.T, systemName string, nodeCount uint8, txSystemProv
 func (n *NodePartition) start(t *testing.T, ctx context.Context, bootNodes []peer.AddrInfo) error {
 	n.ctx = ctx
 	// start Nodes
-	trustBase, err := genesis.NewValidatorTrustBase(n.partitionGenesis.RootValidators)
+	trustBase, err := n.partitionGenesis.GenerateRootTrustBase()
 	if err != nil {
 		return fmt.Errorf("failed to extract root trust base from genesis file, %w", err)
 	}
@@ -353,7 +355,7 @@ func (n *NodePartition) start(t *testing.T, ctx context.Context, bootNodes []pee
 	// make sure node network (to other nodes and root nodes) is initiated
 	for _, nd := range n.Nodes {
 		if ok := eventually(
-			func() bool { return len(nd.GetPeer().Network().Peers()) >= len(n.Nodes) },
+			func() bool { return len(nd.Peer().Network().Peers()) >= len(n.Nodes) },
 			2*time.Second, 100*time.Millisecond); !ok {
 			return fmt.Errorf("network not initialized")
 		}
@@ -362,13 +364,18 @@ func (n *NodePartition) start(t *testing.T, ctx context.Context, bootNodes []pee
 }
 
 func (n *NodePartition) startNode(ctx context.Context, pn *PartitionNode) error {
-	log := n.obs.DefaultLogger().With(logger.NodeID(pn.peerConf.ID))
+	log := n.obs.DefaultLogger().With(slog.Any("node_id", pn.peerConf.ID))
+	trustBase, err := n.partitionGenesis.GenerateRootTrustBase()
+	if err != nil {
+		return fmt.Errorf("failed to generate trust base from genesis: %w", err)
+	}
 	node, err := partition.NewNode(
 		ctx,
 		pn.peerConf,
 		pn.signer,
 		n.txSystemFunc(n.tb),
 		n.partitionGenesis,
+		trustBase,
 		nil,
 		observability.WithLogger(n.obs.DefaultObserver(), log),
 		pn.confOpts...,

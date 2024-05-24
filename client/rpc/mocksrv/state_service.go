@@ -4,9 +4,8 @@ import (
 	"context"
 	"crypto"
 
+	"github.com/alphabill-org/alphabill-go-base/types"
 	abrpc "github.com/alphabill-org/alphabill/rpc"
-	"github.com/alphabill-org/alphabill/types"
-	"github.com/fxamacker/cbor/v2"
 )
 
 type (
@@ -120,7 +119,7 @@ func (s *StateServiceMock) SendTransaction(ctx context.Context, tx types.Bytes) 
 		return nil, s.Err
 	}
 	var txo *types.TransactionOrder
-	if err := cbor.Unmarshal(tx, &txo); err != nil {
+	if err := types.Cbor.Unmarshal(tx, &txo); err != nil {
 		return nil, err
 	}
 	txHash := txo.Hash(crypto.SHA256)
@@ -140,11 +139,11 @@ func (s *StateServiceMock) GetTransactionProof(ctx context.Context, txHash types
 
 	sentTxo, ok := s.SentTxs[string(txHash)]
 	if ok {
-		txrBytes, err := cbor.Marshal(&types.TransactionRecord{TransactionOrder: sentTxo, ServerMetadata: &types.ServerMetadata{ActualFee: 1}})
+		txrBytes, err := types.Cbor.Marshal(&types.TransactionRecord{TransactionOrder: sentTxo, ServerMetadata: &types.ServerMetadata{ActualFee: 1}})
 		if err != nil {
 			return nil, err
 		}
-		txProofBytes, err := cbor.Marshal(&types.TxProof{})
+		txProofBytes, err := types.Cbor.Marshal(&types.TxProof{})
 		if err != nil {
 			return nil, err
 		}

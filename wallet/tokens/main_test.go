@@ -8,11 +8,12 @@ import (
 	"math"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/hash"
-	"github.com/alphabill-org/alphabill/predicates/templates"
-	"github.com/alphabill-org/alphabill/txsystem/fc/unit"
-	"github.com/alphabill-org/alphabill/txsystem/tokens"
-	"github.com/alphabill-org/alphabill/types"
+	"github.com/alphabill-org/alphabill-go-base/hash"
+	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
+	"github.com/alphabill-org/alphabill-go-base/types"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
 
@@ -33,7 +34,7 @@ func Test_GetRoundNumber_OK(t *testing.T) {
 			return 42, nil
 		},
 	}
-	w, err := New(tokens.DefaultSystemIdentifier, rpcClient, nil, false, nil, observe.DefaultLogger())
+	w, err := New(tokens.DefaultSystemID, rpcClient, nil, false, nil, observe.DefaultLogger())
 	require.NoError(t, err)
 
 	roundNumber, err := w.GetRoundNumber(context.Background())
@@ -45,9 +46,9 @@ func Test_GetFeeCreditBill_OK(t *testing.T) {
 	t.Parallel()
 
 	observe := observability.NewFactory(t)
-	expectedFCB := &api.FeeCreditBill{ID: []byte{1}, FeeCreditRecord: &unit.FeeCreditRecord{Balance: 100}}
+	expectedFCB := &api.FeeCreditBill{ID: []byte{1}, FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100}}
 	rpcClient := &mockTokensRpcClient{}
-	w, err := New(tokens.DefaultSystemIdentifier, rpcClient, nil, false, nil, observe.DefaultLogger())
+	w, err := New(tokens.DefaultSystemID, rpcClient, nil, false, nil, observe.DefaultLogger())
 	require.NoError(t, err)
 
 	// verify that correct fee credit bill is returned
@@ -186,7 +187,7 @@ func Test_ListTokenTypes(t *testing.T) {
 func TestNewTypes(t *testing.T) {
 	t.Parallel()
 
-	recTxs := make(map[string]*types.TransactionOrder, 0)
+	recTxs := make(map[string]*types.TransactionOrder)
 	rpcClient := &mockTokensRpcClient{
 		getTypeHierarchy: func(ctx context.Context, id TokenTypeID) ([]*TokenUnitType, error) {
 			tx, found := recTxs[string(id)]
@@ -218,9 +219,9 @@ func TestNewTypes(t *testing.T) {
 		getFeeCreditRecord: func(ctx context.Context, unitID types.UnitID, includeProof bool) (*api.FeeCreditBill, error) {
 			return &api.FeeCreditBill{
 				ID: []byte{1},
-				FeeCreditRecord: &unit.FeeCreditRecord{
-					Balance:  100000,
-					Backlink: []byte{2},
+				FeeCreditRecord: &fc.FeeCreditRecord{
+					Balance: 100000,
+					Counter: 2,
 				},
 			}, nil
 		},
@@ -228,26 +229,26 @@ func TestNewTypes(t *testing.T) {
 	tw := initTestWallet(t, rpcClient)
 
 	t.Run("fungible type", func(t *testing.T) {
-		typeId := tokens.NewFungibleTokenTypeID(nil, test.RandomBytes(32))
+		typeID := tokens.NewFungibleTokenTypeID(nil, test.RandomBytes(32))
 		a := CreateFungibleTokenTypeAttributes{
 			Symbol:                   "AB",
 			Name:                     "Long name for AB",
 			Icon:                     &Icon{Type: "image/png", Data: []byte{1}},
 			DecimalPlaces:            0,
-			ParentTypeId:             nil,
+			ParentTypeID:             nil,
 			SubTypeCreationPredicate: wallet.Predicate(templates.AlwaysFalseBytes()),
 			TokenCreationPredicate:   wallet.Predicate(templates.AlwaysTrueBytes()),
 			InvariantPredicate:       wallet.Predicate(templates.AlwaysTrueBytes()),
 		}
-		result, err := tw.NewFungibleType(context.Background(), 1, a, typeId, nil)
+		result, err := tw.NewFungibleType(context.Background(), 1, a, typeID, nil)
 		require.NoError(t, err)
 		require.NotNil(t, result)
-		require.EqualValues(t, typeId, result.GetUnit())
-		tx, found := recTxs[string(typeId)]
+		require.EqualValues(t, typeID, result.GetUnit())
+		tx, found := recTxs[string(typeID)]
 		require.True(t, found)
 		newFungibleTx := &tokens.CreateFungibleTokenTypeAttributes{}
 		require.NoError(t, tx.UnmarshalAttributes(newFungibleTx))
-		require.Equal(t, typeId, tx.UnitID())
+		require.Equal(t, typeID, tx.UnitID())
 		require.Equal(t, a.Symbol, newFungibleTx.Symbol)
 		require.Equal(t, a.Name, newFungibleTx.Name)
 		require.Equal(t, a.Icon.Type, newFungibleTx.Icon.Type)
@@ -260,7 +261,7 @@ func TestNewTypes(t *testing.T) {
 			Symbol:                   "AB",
 			Name:                     "Long name for AB",
 			DecimalPlaces:            2,
-			ParentTypeId:             typeId,
+			ParentTypeID:             typeID,
 			SubTypeCreationPredicate: wallet.Predicate(templates.AlwaysFalseBytes()),
 			TokenCreationPredicate:   wallet.Predicate(templates.AlwaysTrueBytes()),
 			InvariantPredicate:       wallet.Predicate(templates.AlwaysTrueBytes()),
@@ -288,7 +289,7 @@ func TestNewTypes(t *testing.T) {
 			Symbol:                   "ABNFT",
 			Name:                     "Long name for ABNFT",
 			Icon:                     &Icon{Type: "image/svg", Data: []byte{2}},
-			ParentTypeId:             nil,
+			ParentTypeID:             nil,
 			SubTypeCreationPredicate: wallet.Predicate(templates.AlwaysFalseBytes()),
 			TokenCreationPredicate:   wallet.Predicate(templates.AlwaysTrueBytes()),
 			InvariantPredicate:       wallet.Predicate(templates.AlwaysTrueBytes()),
@@ -333,7 +334,7 @@ func TestMintFungibleToken(t *testing.T) {
 		getFeeCreditRecord: func(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
 			return &api.FeeCreditBill{
 				ID:              []byte{1},
-				FeeCreditRecord: &unit.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
+				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Counter: 2},
 			}, nil
 		},
 	}
@@ -342,37 +343,36 @@ func TestMintFungibleToken(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name  string
-		accNr uint64
+		name          string
+		accountNumber uint64
 	}{
 		{
-			name:  "pub key bearer predicate, account 1",
-			accNr: uint64(1),
+			name:          "pub key bearer predicate, account 1",
+			accountNumber: uint64(1),
 		},
 		{
-			name:  "pub key bearer predicate, account 2",
-			accNr: uint64(2),
+			name:          "pub key bearer predicate, account 2",
+			accountNumber: uint64(2),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			typeId := test.RandomBytes(33)
+			typeID := test.RandomBytes(33)
 			amount := uint64(100)
-			key, err := tw.am.GetAccountKey(tt.accNr - 1)
+			key, err := tw.am.GetAccountKey(tt.accountNumber - 1)
 			require.NoError(t, err)
-			result, err := tw.NewFungibleToken(context.Background(), tt.accNr, typeId, amount, bearerPredicateFromHash(key.PubKeyHash.Sha256), nil)
+			result, err := tw.NewFungibleToken(context.Background(), tt.accountNumber, typeID, amount, bearerPredicateFromHash(key.PubKeyHash.Sha256), nil)
 			require.NoError(t, err)
 			tx := recTxs[len(recTxs)-1]
-			newToken := &tokens.MintFungibleTokenAttributes{}
+			attr := &tokens.MintFungibleTokenAttributes{}
 			require.NotNil(t, result)
 			require.EqualValues(t, tx.UnitID(), result.GetUnit())
-			require.NoError(t, tx.UnmarshalAttributes(newToken))
+			require.NoError(t, tx.UnmarshalAttributes(attr))
 			require.NotEqual(t, []byte{0}, tx.UnitID())
 			require.Len(t, tx.UnitID(), 33)
-			require.EqualValues(t, typeId, newToken.TypeID)
-			require.Equal(t, amount, newToken.Value)
-			require.EqualValues(t, templates.NewP2pkh256BytesFromKeyHash(key.PubKeyHash.Sha256), newToken.Bearer)
+			require.Equal(t, amount, attr.Value)
+			require.EqualValues(t, templates.NewP2pkh256BytesFromKeyHash(key.PubKeyHash.Sha256), attr.Bearer)
 		})
 	}
 }
@@ -397,7 +397,7 @@ func TestSendFungible(t *testing.T) {
 		getFeeCreditRecord: func(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
 			return &api.FeeCreditBill{
 				ID:              []byte{1},
-				FeeCreditRecord: &unit.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
+				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Counter: 2},
 			}, nil
 		},
 		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
@@ -454,11 +454,11 @@ func TestSendFungible(t *testing.T) {
 					case tokens.PayloadTypeTransferFungibleToken:
 						attrs := &tokens.TransferFungibleTokenAttributes{}
 						require.NoError(t, tx.UnmarshalAttributes(attrs))
-						total += attrs.GetValue()
+						total += attrs.Value
 					case tokens.PayloadTypeSplitFungibleToken:
 						attrs := &tokens.SplitFungibleTokenAttributes{}
 						require.NoError(t, tx.UnmarshalAttributes(attrs))
-						total += attrs.GetTargetValue()
+						total += attrs.TargetValue
 					default:
 						t.Errorf("unexpected tx type: %s", tx.PayloadType())
 					}
@@ -491,7 +491,7 @@ func TestSendFungible(t *testing.T) {
 			},
 		},
 		{
-			name:         "total balance uint64 overflow, transfer is submitted with maxuint64",
+			name:         "total balance uint64 overflow, transfer is submitted with MaxUint64",
 			tokenTypeID:  typeIdForOverflow,
 			targetAmount: math.MaxUint64,
 			verifyTransactions: func(t *testing.T) {
@@ -540,37 +540,36 @@ func TestSendFungible(t *testing.T) {
 }
 
 func TestMintNFT_InvalidInputs(t *testing.T) {
-	tokenID := test.RandomBytes(32)
-	accNr := uint64(1)
+	accountNumber := uint64(1)
 	tests := []struct {
 		name       string
-		attrs      MintNonFungibleTokenAttributes
+		attrs      tokens.MintNonFungibleTokenAttributes
 		wantErrStr string
 	}{
 		{
 			name: "invalid name",
-			attrs: MintNonFungibleTokenAttributes{
+			attrs: tokens.MintNonFungibleTokenAttributes{
 				Name: test.RandomString(257),
 			},
 			wantErrStr: "name exceeds the maximum allowed size of 256 bytes",
 		},
 		{
 			name: "invalid URI",
-			attrs: MintNonFungibleTokenAttributes{
-				Uri: "invalid_uri",
+			attrs: tokens.MintNonFungibleTokenAttributes{
+				URI: "invalid_uri",
 			},
 			wantErrStr: "URI 'invalid_uri' is invalid",
 		},
 		{
 			name: "URI exceeds maximum allowed length",
-			attrs: MintNonFungibleTokenAttributes{
-				Uri: string(test.RandomBytes(4097)),
+			attrs: tokens.MintNonFungibleTokenAttributes{
+				URI: string(test.RandomBytes(4097)),
 			},
 			wantErrStr: "URI exceeds the maximum allowed size of 4096 bytes",
 		},
 		{
 			name: "data exceeds maximum allowed length",
-			attrs: MintNonFungibleTokenAttributes{
+			attrs: tokens.MintNonFungibleTokenAttributes{
 				Data: test.RandomBytes(65537),
 			},
 			wantErrStr: "data exceeds the maximum allowed size of 65536 bytes",
@@ -578,8 +577,8 @@ func TestMintNFT_InvalidInputs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			wallet := &Wallet{log: logger.New(t)}
-			got, err := wallet.NewNFT(context.Background(), accNr, tt.attrs, tokenID, nil)
+			w := &Wallet{log: logger.New(t)}
+			got, err := w.NewNFT(context.Background(), accountNumber, &tt.attrs, nil)
 			require.ErrorContains(t, err, tt.wantErrStr)
 			require.Nil(t, got)
 		})
@@ -599,7 +598,7 @@ func TestMintNFT(t *testing.T) {
 		getFeeCreditRecord: func(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
 			return &api.FeeCreditBill{
 				ID:              []byte{1},
-				FeeCreditRecord: &unit.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
+				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Counter: 2},
 			}, nil
 		},
 	}
@@ -609,34 +608,36 @@ func TestMintNFT(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		accNr         uint64
-		tokenID       TokenID
-		validateOwner func(t *testing.T, accNr uint64, tok *tokens.MintNonFungibleTokenAttributes)
+		accountNumber uint64
+		typeID        TokenTypeID
+		validateOwner func(t *testing.T, accountNumber uint64, tok *tokens.MintNonFungibleTokenAttributes)
 	}{
 		{
-			name:  "pub key bearer predicate, account 1",
-			accNr: uint64(1),
-			validateOwner: func(t *testing.T, accNr uint64, tok *tokens.MintNonFungibleTokenAttributes) {
-				key, err := tw.am.GetAccountKey(accNr - 1)
+			name:          "pub key bearer predicate, account 1",
+			accountNumber: uint64(1),
+			typeID:        tokens.NewNonFungibleTokenTypeID(nil, test.RandomBytes(32)),
+			validateOwner: func(t *testing.T, accountNumber uint64, tok *tokens.MintNonFungibleTokenAttributes) {
+				key, err := tw.am.GetAccountKey(accountNumber - 1)
 				require.NoError(t, err)
 				require.EqualValues(t, templates.NewP2pkh256BytesFromKeyHash(key.PubKeyHash.Sha256), tok.Bearer)
 			},
 		},
 		{
-			name:    "pub key bearer predicate, account 1, predefined token ID",
-			accNr:   uint64(1),
-			tokenID: test.RandomBytes(33),
-			validateOwner: func(t *testing.T, accNr uint64, tok *tokens.MintNonFungibleTokenAttributes) {
-				key, err := tw.am.GetAccountKey(accNr - 1)
+			name:          "pub key bearer predicate, account 1, predefined token ID",
+			accountNumber: uint64(1),
+			typeID:        tokens.NewNonFungibleTokenTypeID(nil, test.RandomBytes(32)),
+			validateOwner: func(t *testing.T, accountNumber uint64, tok *tokens.MintNonFungibleTokenAttributes) {
+				key, err := tw.am.GetAccountKey(accountNumber - 1)
 				require.NoError(t, err)
 				require.EqualValues(t, templates.NewP2pkh256BytesFromKeyHash(key.PubKeyHash.Sha256), tok.Bearer)
 			},
 		},
 		{
-			name:  "pub key bearer predicate, account 2",
-			accNr: uint64(2),
-			validateOwner: func(t *testing.T, accNr uint64, tok *tokens.MintNonFungibleTokenAttributes) {
-				key, err := tw.am.GetAccountKey(accNr - 1)
+			name:          "pub key bearer predicate, account 2",
+			accountNumber: uint64(2),
+			typeID:        tokens.NewNonFungibleTokenTypeID(nil, test.RandomBytes(32)),
+			validateOwner: func(t *testing.T, accountNumber uint64, tok *tokens.MintNonFungibleTokenAttributes) {
+				key, err := tw.am.GetAccountKey(accountNumber - 1)
 				require.NoError(t, err)
 				require.EqualValues(t, templates.NewP2pkh256BytesFromKeyHash(key.PubKeyHash.Sha256), tok.Bearer)
 			},
@@ -645,30 +646,26 @@ func TestMintNFT(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			key, err := tw.am.GetAccountKey(tt.accNr - 1)
+			key, err := tw.am.GetAccountKey(tt.accountNumber - 1)
 			require.NoError(t, err)
-			typeId := []byte{1}
-			a := MintNonFungibleTokenAttributes{
+			a := &tokens.MintNonFungibleTokenAttributes{
+				TypeID:              tt.typeID,
 				Bearer:              bearerPredicateFromHash(key.PubKeyHash.Sha256),
-				NftType:             typeId,
-				Uri:                 "https://alphabill.org",
+				URI:                 "https://alphabill.org",
 				Data:                nil,
 				DataUpdatePredicate: wallet.Predicate(templates.AlwaysTrueBytes()),
 			}
-			result, err := tw.NewNFT(context.Background(), tt.accNr, a, tt.tokenID, nil)
+			result, err := tw.NewNFT(context.Background(), tt.accountNumber, a, nil)
 			require.NoError(t, err)
 			tx := recTxs[len(recTxs)-1]
-			newToken := &tokens.MintNonFungibleTokenAttributes{}
 			require.NotNil(t, result)
 			require.EqualValues(t, tx.UnitID(), result.GetUnit())
-			require.NoError(t, tx.UnmarshalAttributes(newToken))
 			require.NotEqual(t, []byte{0}, tx.UnitID())
 			require.Len(t, tx.UnitID(), 33)
-			if tt.tokenID != nil {
-				require.EqualValues(t, tt.tokenID, tx.UnitID())
-			}
-			require.EqualValues(t, typeId, newToken.NFTTypeID)
-			tt.validateOwner(t, tt.accNr, newToken)
+
+			attr := &tokens.MintNonFungibleTokenAttributes{}
+			require.NoError(t, tx.UnmarshalAttributes(attr))
+			tt.validateOwner(t, tt.accountNumber, attr)
 		})
 	}
 }
@@ -690,7 +687,7 @@ func TestTransferNFT(t *testing.T) {
 		getFeeCreditRecord: func(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
 			return &api.FeeCreditBill{
 				ID:              []byte{1},
-				FeeCreditRecord: &unit.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
+				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Counter: 2},
 			}, nil
 		},
 	}
@@ -704,14 +701,14 @@ func TestTransferNFT(t *testing.T) {
 		name          string
 		token         *TokenUnit
 		key           wallet.PubKey
-		validateOwner func(t *testing.T, accNr uint64, key wallet.PubKey, tok *tokens.TransferNonFungibleTokenAttributes)
+		validateOwner func(t *testing.T, accountNumber uint64, key wallet.PubKey, tok *tokens.TransferNonFungibleTokenAttributes)
 		wantErr       string
 	}{
 		{
 			name:  "to 'always true' predicate",
 			token: &TokenUnit{ID: test.RandomBytes(32), Kind: NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32)},
 			key:   nil,
-			validateOwner: func(t *testing.T, accNr uint64, key wallet.PubKey, tok *tokens.TransferNonFungibleTokenAttributes) {
+			validateOwner: func(t *testing.T, accountNumber uint64, key wallet.PubKey, tok *tokens.TransferNonFungibleTokenAttributes) {
 				require.EqualValues(t, templates.AlwaysTrueBytes(), tok.NewBearer)
 			},
 		},
@@ -719,7 +716,7 @@ func TestTransferNFT(t *testing.T) {
 			name:  "to public key hash predicate",
 			token: &TokenUnit{ID: test.RandomBytes(32), Kind: NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32)},
 			key:   first(hexutil.Decode("0x0290a43bc454babf1ea8b0b76fcbb01a8f27a989047cf6d6d76397cc4756321e64")),
-			validateOwner: func(t *testing.T, accNr uint64, key wallet.PubKey, tok *tokens.TransferNonFungibleTokenAttributes) {
+			validateOwner: func(t *testing.T, accountNumber uint64, key wallet.PubKey, tok *tokens.TransferNonFungibleTokenAttributes) {
 				require.EqualValues(t, templates.NewP2pkh256BytesFromKeyHash(hash.Sum256(key)), tok.NewBearer)
 			},
 		},
@@ -761,7 +758,7 @@ func TestUpdateNFTData(t *testing.T) {
 		getFeeCreditRecord: func(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
 			return &api.FeeCreditBill{
 				ID:              []byte{1},
-				FeeCreditRecord: &unit.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
+				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Counter: 2},
 			}, nil
 		},
 	}
@@ -774,10 +771,10 @@ func TestUpdateNFTData(t *testing.T) {
 		return newTransfer
 	}
 
-	tok := &TokenUnit{ID: test.RandomBytes(32), Kind: NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32), TxHash: test.RandomBytes(32)}
+	tok := &TokenUnit{ID: test.RandomBytes(32), Kind: NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32), Counter: 0}
 	tokenz[string(tok.ID)] = tok
 
-	// test data, backlink and predicate inputs are submitted correctly
+	// test data, counter and predicate inputs are submitted correctly
 	data := test.RandomBytes(64)
 	result, err := tw.UpdateNFTData(context.Background(), 1, tok.ID, data, []*PredicateInput{{Argument: nil}})
 	require.NoError(t, err)
@@ -787,7 +784,7 @@ func TestUpdateNFTData(t *testing.T) {
 
 	dataUpdate := parseNFTDataUpdate(t, tx)
 	require.Equal(t, data, dataUpdate.Data)
-	require.EqualValues(t, tok.TxHash, dataUpdate.Backlink)
+	require.Equal(t, tok.Counter, dataUpdate.Counter)
 	require.Equal(t, [][]byte{nil}, dataUpdate.DataUpdateSignatures)
 
 	// test that wallet not only sends the tx, but also reads it correctly
@@ -805,7 +802,7 @@ func TestUpdateNFTData(t *testing.T) {
 	require.Len(t, dataUpdate.DataUpdateSignatures[1], 103)
 
 	// test that locked token tx is not sent
-	lockedToken := &TokenUnit{ID: test.RandomBytes(32), Kind: NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32), TxHash: test.RandomBytes(32), Locked: 1}
+	lockedToken := &TokenUnit{ID: test.RandomBytes(32), Kind: NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32), Counter: 0, Locked: 1}
 	tokenz[string(tok.ID)] = lockedToken
 	result, err = tw.UpdateNFTData(context.Background(), 1, tok.ID, data2, []*PredicateInput{{Argument: nil}, {AccountNumber: 1}})
 	require.ErrorContains(t, err, "token is locked")
@@ -829,7 +826,7 @@ func TestLockToken(t *testing.T) {
 		getFeeCreditRecord: func(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
 			return &api.FeeCreditBill{
 				ID:              []byte{1},
-				FeeCreditRecord: &unit.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
+				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Counter: 2},
 			}, nil
 		},
 	}
@@ -869,7 +866,7 @@ func TestUnlockToken(t *testing.T) {
 		getFeeCreditRecord: func(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
 			return &api.FeeCreditBill{
 				ID:              []byte{1},
-				FeeCreditRecord: &unit.FeeCreditRecord{Balance: 100000, Backlink: []byte{2}},
+				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Counter: 2},
 			}, nil
 		},
 	}
@@ -913,7 +910,7 @@ func TestSendFungibleByID(t *testing.T) {
 		getFeeCreditRecord: func(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
 			return &api.FeeCreditBill{
 				ID: []byte{1},
-				FeeCreditRecord: &unit.FeeCreditRecord{
+				FeeCreditRecord: &fc.FeeCreditRecord{
 					Balance: 50,
 				},
 			}, nil

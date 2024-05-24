@@ -12,9 +12,10 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/alphabill-org/alphabill-go-base/txsystem/evm"
+	"github.com/alphabill-org/alphabill-go-base/types"
+
 	testtransaction "github.com/alphabill-org/alphabill/txsystem/testutils/transaction"
-	"github.com/alphabill-org/alphabill/types"
-	"github.com/fxamacker/cbor/v2"
 	"github.com/stretchr/testify/require"
 
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
@@ -24,7 +25,7 @@ import (
 func writeCBORResponse(t *testing.T, w http.ResponseWriter, response any, statusCode int) {
 	w.Header().Set("Content-Type", "application/cbor")
 	w.WriteHeader(statusCode)
-	if err := cbor.NewEncoder(w).Encode(response); err != nil {
+	if err := types.Cbor.Encode(w, response); err != nil {
 		t.Errorf("Failed to write response body, CBOR error: %v", err)
 	}
 }
@@ -35,7 +36,7 @@ func writeCBORResponse(t *testing.T, w http.ResponseWriter, response any, status
 func writeCBORError(t *testing.T, w http.ResponseWriter, e error, code int) {
 	w.Header().Set("Content-Type", "application/cbor")
 	w.WriteHeader(code)
-	if err := cbor.NewEncoder(w).Encode(struct {
+	if err := types.Cbor.Encode(w, struct {
 		_   struct{} `cbor:",toarray"`
 		Err string
 	}{
@@ -48,7 +49,7 @@ func writeCBORError(t *testing.T, w http.ResponseWriter, e error, code int) {
 func createTxOrder(t *testing.T) *types.TransactionOrder {
 	transaction := testtransaction.NewTransactionOrder(t,
 		testtransaction.WithAttributes([]byte{0, 0, 0, 0, 0, 0, 0}),
-		testtransaction.WithUnitId([]byte{0, 0, 0, 1}),
+		testtransaction.WithUnitID([]byte{0, 0, 0, 1}),
 		testtransaction.WithSystemID(1),
 		testtransaction.WithOwnerProof([]byte{0, 0, 0, 2}),
 		testtransaction.WithClientMetadata(&types.ClientMetadata{Timeout: 100}),
@@ -74,22 +75,22 @@ func TestEvmClient_GetBalance(t *testing.T) {
 					}
 					w := httptest.NewRecorder()
 					response := struct {
-						_        struct{} `cbor:",toarray"`
-						Balance  string
-						Backlink []byte
+						_       struct{} `cbor:",toarray"`
+						Balance string
+						Counter uint64
 					}{
-						Balance:  "13000000",
-						Backlink: nil,
+						Balance: "13000000",
+						Counter: 0,
 					}
 					writeCBORResponse(t, w, response, http.StatusOK)
 					return w.Result(), nil
 				},
 			}},
 		}
-		amount, backlink, err := cli.GetBalance(context.Background(), addr)
+		amount, counter, err := cli.GetBalance(context.Background(), addr)
 		require.NoError(t, err)
 		require.EqualValues(t, "13000000", amount)
-		require.Nil(t, backlink)
+		require.EqualValues(t, 0, counter)
 	})
 	t.Run("not found", func(t *testing.T) {
 		cli := &EvmClient{
@@ -98,22 +99,22 @@ func TestEvmClient_GetBalance(t *testing.T) {
 				do: func(r *http.Request) (*http.Response, error) {
 					w := httptest.NewRecorder()
 					response := struct {
-						_        struct{} `cbor:",toarray"`
-						Balance  string
-						Backlink []byte
+						_       struct{} `cbor:",toarray"`
+						Balance string
+						Counter uint64
 					}{
-						Balance:  "130000001",
-						Backlink: []byte{1, 2, 3, 4, 5},
+						Balance: "130000001",
+						Counter: 12345,
 					}
 					writeCBORResponse(t, w, response, http.StatusOK)
 					return w.Result(), nil
 				},
 			}},
 		}
-		amount, backlink, err := cli.GetBalance(context.Background(), addr)
+		amount, counter, err := cli.GetBalance(context.Background(), addr)
 		require.NoError(t, err)
 		require.EqualValues(t, "130000001", amount)
-		require.EqualValues(t, backlink, []byte{1, 2, 3, 4, 5})
+		require.EqualValues(t, counter, 12345)
 	})
 	t.Run("not found", func(t *testing.T) {
 		cli := &EvmClient{
@@ -126,10 +127,10 @@ func TestEvmClient_GetBalance(t *testing.T) {
 				},
 			}},
 		}
-		amount, backlink, err := cli.GetBalance(context.Background(), addr)
+		amount, counter, err := cli.GetBalance(context.Background(), addr)
 		require.ErrorIs(t, err, ErrNotFound)
 		require.EqualValues(t, "", amount)
-		require.Nil(t, backlink)
+		require.EqualValues(t, 0, counter)
 	})
 }
 
@@ -150,12 +151,12 @@ func TestEvmClient_GetFeeCreditBill(t *testing.T) {
 					}
 					w := httptest.NewRecorder()
 					response := struct {
-						_        struct{} `cbor:",toarray"`
-						Balance  string
-						Backlink []byte
+						_       struct{} `cbor:",toarray"`
+						Balance string
+						Counter uint64
 					}{
-						Balance:  "1300000000000000",
-						Backlink: []byte{1, 2, 3, 4, 5},
+						Balance: "1300000000000000",
+						Counter: 12345,
 					}
 					writeCBORResponse(t, w, response, http.StatusOK)
 					return w.Result(), nil
@@ -168,7 +169,7 @@ func TestEvmClient_GetFeeCreditBill(t *testing.T) {
 		value := new(big.Int)
 		value.SetString("1300000000000000", 10)
 		require.EqualValues(t, WeiToAlpha(value), fcrBill.Value)
-		require.EqualValues(t, []byte{1, 2, 3, 4, 5}, fcrBill.TxHash)
+		require.EqualValues(t, 12345, fcrBill.Counter)
 	})
 }
 
@@ -241,9 +242,9 @@ func TestEvmClient_Call(t *testing.T) {
 					w := httptest.NewRecorder()
 					callEVMResponse := &struct {
 						_                 struct{} `cbor:",toarray"`
-						ProcessingDetails *ProcessingDetails
+						ProcessingDetails *evm.ProcessingDetails
 					}{
-						ProcessingDetails: &ProcessingDetails{ErrorDetails: "some error occurred"},
+						ProcessingDetails: &evm.ProcessingDetails{ErrorDetails: "some error occurred"},
 					}
 					writeCBORResponse(t, w, callEVMResponse, http.StatusOK)
 					return w.Result(), nil
@@ -251,7 +252,7 @@ func TestEvmClient_Call(t *testing.T) {
 			}},
 		}
 
-		attr := &CallAttributes{}
+		attr := &evm.CallEVMRequest{}
 		result, err := cli.Call(context.Background(), attr)
 		require.NoError(t, err)
 		require.NotNil(t, result)
@@ -269,7 +270,7 @@ func TestEvmClient_Call(t *testing.T) {
 				},
 			}},
 		}
-		attr := &CallAttributes{}
+		attr := &evm.CallEVMRequest{}
 		result, err := cli.Call(context.Background(), attr)
 		require.ErrorContains(t, err, "transaction send failed: 400 Bad Request, not a valid transaction")
 		require.Nil(t, result)
@@ -316,7 +317,7 @@ func TestEvmClient_GetRoundNumber(t *testing.T) {
 		}
 	}
 
-	t.Run("backend returns empty response body", func(t *testing.T) {
+	t.Run("rpc node returns empty response body", func(t *testing.T) {
 		cli := createClient(t, ``)
 		rn, err := cli.GetRoundNumber(context.Background())
 		require.EqualError(t, err, `get round-number request failed: failed to decode response body: cbor: cannot unmarshal UTF-8 text string into Go value of type uint64`)

@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/alphabill-org/alphabill/txsystem/fc/unit"
-	"github.com/alphabill-org/alphabill/txsystem/money"
-	"github.com/alphabill-org/alphabill/types"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-base/types"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 )
@@ -28,7 +28,7 @@ type (
 
 	FeeCreditBill struct {
 		ID              types.UnitID
-		FeeCreditRecord *unit.FeeCreditRecord
+		FeeCreditRecord *fc.FeeCreditRecord
 	}
 
 	RpcClient interface {
@@ -37,6 +37,7 @@ type (
 		GetFeeCreditRecord(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*FeeCreditBill, error)
 		GetUnitsByOwnerID(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error)
 		GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TransactionRecord, *types.TxProof, error)
+		SendTransaction(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
 	}
 )
 
@@ -47,11 +48,11 @@ func (b *FeeCreditBill) IsLocked() bool {
 	return b.FeeCreditRecord.IsLocked()
 }
 
-func (b *FeeCreditBill) Backlink() []byte {
+func (b *FeeCreditBill) Counter() uint64 {
 	if b == nil {
-		return nil
+		return 0
 	}
-	return b.FeeCreditRecord.GetBacklink()
+	return b.FeeCreditRecord.GetCounter()
 }
 
 func (b *FeeCreditBill) Balance() uint64 {
@@ -74,14 +75,14 @@ func (b *Bill) IsLocked() bool {
 	return b.BillData.IsLocked()
 }
 
-func (b *Bill) Backlink() []byte {
+func (b *Bill) Counter() uint64 {
 	if b == nil {
-		return nil
+		return 0
 	}
 	if b.BillData == nil {
-		return nil
+		return 0
 	}
-	return b.BillData.Backlink
+	return b.BillData.Counter
 }
 
 func (b *Bill) Value() uint64 {
@@ -115,10 +116,7 @@ func FetchBills(ctx context.Context, c RpcClient, ownerID []byte) ([]*Bill, erro
 
 func FetchBill(ctx context.Context, c RpcClient, unitID types.UnitID) (*Bill, error) {
 	bill, err := c.GetBill(ctx, unitID, false)
-	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			return nil, nil
-		}
+	if err != nil && !errors.Is(err, ErrNotFound) {
 		return nil, err
 	}
 	return bill, nil

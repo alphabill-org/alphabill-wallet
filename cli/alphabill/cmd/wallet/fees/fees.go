@@ -4,9 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
-
-	"github.com/spf13/cobra"
 
 	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
@@ -17,9 +16,10 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	evmwallet "github.com/alphabill-org/alphabill-wallet/wallet/evm"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
-	moneywallet "github.com/alphabill-org/alphabill-wallet/wallet/money"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
-	tokenswallet "github.com/alphabill-org/alphabill-wallet/wallet/tokens"
+	mwtypes "github.com/alphabill-org/alphabill-wallet/wallet/money/types"
+	twtypes "github.com/alphabill-org/alphabill-wallet/wallet/tokens/types"
+	"github.com/spf13/cobra"
 )
 
 // NewFeesCmd creates a new cobra command for the wallet fees component.
@@ -85,7 +85,7 @@ func addFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Observe)
+	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Logger)
 	if err != nil {
 		return fmt.Errorf("failed to create fee credit manager: %w", err)
 	}
@@ -125,7 +125,7 @@ func listFeesCmdExec(cmd *cobra.Command, config *feesConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Observe)
+	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -165,7 +165,7 @@ func reclaimFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Observe)
+	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -212,7 +212,7 @@ func lockFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Observe)
+	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -264,7 +264,7 @@ func unlockFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Observe)
+	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -398,7 +398,7 @@ func (c *feesConfig) getTargetPartitionUrl() string {
 
 // Creates a fees.FeeManager that needs to be closed with the Close() method.
 // Does not close the account.Manager passed as an argument.
-func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager, feeManagerDB fees.FeeManagerDB, obs clitypes.Observability) (*fees.FeeManager, error) {
+func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager, feeManagerDB fees.FeeManagerDB, logger *slog.Logger) (*fees.FeeManager, error) {
 	moneyClient, err := rpc.DialContext(ctx, c.getMoneyRpcUrl())
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial money rpc url: %w", err)
@@ -410,7 +410,7 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 	}
 	moneyTypeVar := clitypes.MoneyType
 	if !strings.HasPrefix(moneyInfo.Name, moneyTypeVar.String()) {
-		return nil, errors.New("invalid wallet backend API URL provided for money partition")
+		return nil, errors.New("invalid rpc url provided for money partition")
 	}
 
 	switch c.targetPartitionType {
@@ -420,11 +420,11 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 			feeManagerDB,
 			moneyInfo.SystemID,
 			moneyClient,
-			moneywallet.FeeCreditRecordIDFormPublicKey,
+			mwtypes.FeeCreditRecordIDFormPublicKey,
 			moneyInfo.SystemID,
 			moneyClient,
-			moneywallet.FeeCreditRecordIDFormPublicKey,
-			obs.Logger(),
+			mwtypes.FeeCreditRecordIDFormPublicKey,
+			logger,
 		), nil
 	case clitypes.TokensType:
 		tokensRpcUrl := c.getTargetPartitionRpcUrl()
@@ -439,18 +439,18 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 		}
 		tokenTypeVar := clitypes.TokensType
 		if !strings.HasPrefix(tokenInfo.Name, tokenTypeVar.String()) {
-			return nil, errors.New("invalid wallet backend API URL provided for tokens partition")
+			return nil, errors.New("invalid rpc url provided for tokens partition")
 		}
 		return fees.NewFeeManager(
 			am,
 			feeManagerDB,
 			moneyInfo.SystemID,
 			moneyClient,
-			moneywallet.FeeCreditRecordIDFormPublicKey,
+			mwtypes.FeeCreditRecordIDFormPublicKey,
 			tokenInfo.SystemID,
 			tokensClient,
-			tokenswallet.FeeCreditRecordIDFromPublicKey,
-			obs.Logger(),
+			twtypes.FeeCreditRecordIDFromPublicKey,
+			logger,
 		), nil
 	case clitypes.EvmType:
 		evmRpcUrl := c.getTargetPartitionRpcUrl()
@@ -472,11 +472,11 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 			feeManagerDB,
 			moneyInfo.SystemID,
 			moneyClient,
-			moneywallet.FeeCreditRecordIDFormPublicKey,
+			mwtypes.FeeCreditRecordIDFormPublicKey,
 			evmInfo.SystemID,
 			evmClient,
 			evmwallet.FeeCreditRecordIDFromPublicKey,
-			obs.Logger(),
+			logger,
 		), nil
 	default:
 		panic(`invalid "partition" flag value: ` + c.targetPartitionType)

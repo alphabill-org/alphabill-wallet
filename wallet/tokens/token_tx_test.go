@@ -5,7 +5,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/types"
+	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
@@ -19,7 +19,7 @@ func TestConfirmUnitsTx_skip(t *testing.T) {
 			return nil, nil
 		},
 	}
-	batch := txsubmitter.NewBatch(nil, rpcClient, logger.New(t))
+	batch := txsubmitter.NewBatch(rpcClient, logger.New(t))
 	batch.Add(txsubmitter.New(&types.TransactionOrder{Payload: &types.Payload{ClientMetadata: &types.ClientMetadata{Timeout: 1}}}))
 	err := batch.SendTx(context.Background(), false)
 	require.NoError(t, err)
@@ -42,7 +42,7 @@ func TestConfirmUnitsTx_ok(t *testing.T) {
 			return &types.TransactionRecord{}, &types.TxProof{}, nil
 		},
 	}
-	batch := txsubmitter.NewBatch(nil, rpcClient, logger.New(t))
+	batch := txsubmitter.NewBatch(rpcClient, logger.New(t))
 	batch.Add(txsubmitter.New(&types.TransactionOrder{Payload: &types.Payload{ClientMetadata: &types.ClientMetadata{Timeout: 101}}}))
 	err := batch.SendTx(context.Background(), true)
 	require.NoError(t, err)
@@ -73,7 +73,7 @@ func TestConfirmUnitsTx_timeout(t *testing.T) {
 			return nil, nil, nil
 		},
 	}
-	batch := txsubmitter.NewBatch(nil, rpcClient, logger.New(t))
+	batch := txsubmitter.NewBatch(rpcClient, logger.New(t))
 	sub1 := txsubmitter.New(&types.TransactionOrder{Payload: &types.Payload{ClientMetadata: &types.ClientMetadata{Timeout: 101}}})
 	sub1.TxHash = randomTxHash1
 	batch.Add(sub1)

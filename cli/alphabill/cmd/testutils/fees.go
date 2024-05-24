@@ -3,18 +3,18 @@ package testutils
 import (
 	"testing"
 
-	"github.com/alphabill-org/alphabill/types"
+	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/stretchr/testify/require"
 
 	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
-	txbuilder "github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
 )
 
-func AddFeeCredit(t *testing.T, amount uint64, systemID types.SystemID, accountKey *account.AccountKey, unitID, unitBacklink []byte, fcrID, fcrBacklink []byte, node *testpartition.NodePartition) {
+func AddFeeCredit(t *testing.T, amount uint64, systemID types.SystemID, accountKey *account.AccountKey, unitID []byte, unitCounter uint64, fcrID []byte, fcrCounter *uint64, node *testpartition.NodePartition) {
 	// create transferFC tx
-	transferFCTx, err := txbuilder.NewTransferFCTx(amount, fcrID, fcrBacklink, accountKey, systemID, systemID, unitID, unitBacklink, 10000, 0, 10000)
+	transferFCTx, err := txbuilder.NewTransferFCTx(amount, fcrID, fcrCounter, accountKey, systemID, systemID, unitID, unitCounter, 10000, 0, 10000)
 	require.NoError(t, err)
 
 	// submit transferFC tx

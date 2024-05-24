@@ -6,10 +6,10 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill/rpc"
-	"github.com/alphabill-org/alphabill/txsystem/fc/unit"
-	"github.com/alphabill-org/alphabill/txsystem/money"
-	"github.com/alphabill-org/alphabill/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/client/rpc/mocksrv"
@@ -41,9 +41,9 @@ func TestRpcClient(t *testing.T) {
 		bill := &api.Bill{
 			ID: []byte{1},
 			BillData: &money.BillData{
-				V:        192,
-				T:        168,
-				Backlink: []byte{1, 2, 3, 4, 5},
+				V:       192,
+				T:       168,
+				Counter: 123,
 			},
 		}
 		service.Units = map[string]*rpc.Unit[any]{
@@ -77,10 +77,10 @@ func TestRpcClient(t *testing.T) {
 		service.Reset()
 		fcb := &api.FeeCreditBill{
 			ID: []byte{1},
-			FeeCreditRecord: &unit.FeeCreditRecord{
-				Balance:  192,
-				Timeout:  168,
-				Backlink: []byte{1, 2, 3, 4, 5},
+			FeeCreditRecord: &fc.FeeCreditRecord{
+				Balance: 192,
+				Timeout: 168,
+				Counter: 12345,
 			},
 		}
 		service.Units = map[string]*rpc.Unit[any]{

@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-base/types"
+
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	"github.com/alphabill-org/alphabill/rpc"
-	"github.com/alphabill-org/alphabill/txsystem/fc/unit"
-	"github.com/alphabill-org/alphabill/txsystem/money"
-	"github.com/alphabill-org/alphabill/types"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
-	"github.com/fxamacker/cbor/v2"
 )
 
 // Client defines typed wrappers for the Alphabill RPC API.
@@ -69,7 +69,7 @@ func (c *Client) GetBill(ctx context.Context, unitID types.UnitID, includeStateP
 // GetFeeCreditRecord returns fee credit bill for the given bill id.
 // Returns api.ErrNotFound if the fee credit bill does not exist.
 func (c *Client) GetFeeCreditRecord(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
-	var u *rpc.Unit[unit.FeeCreditRecord]
+	var u *rpc.Unit[fc.FeeCreditRecord]
 	if err := c.c.CallContext(ctx, &u, "state_getUnit", unitID, includeStateProof); err != nil {
 		return nil, err
 	}
@@ -112,11 +112,11 @@ func (c *Client) GetTransactionProof(ctx context.Context, txHash types.Bytes) (*
 		return nil, nil, api.ErrNotFound
 	}
 	var txRecord *types.TransactionRecord
-	if err = cbor.Unmarshal(res.TxRecord, &txRecord); err != nil {
+	if err = types.Cbor.Unmarshal(res.TxRecord, &txRecord); err != nil {
 		return nil, nil, fmt.Errorf("failed to decode tx record: %w", err)
 	}
 	var txProof *types.TxProof
-	if err = cbor.Unmarshal(res.TxProof, &txProof); err != nil {
+	if err = types.Cbor.Unmarshal(res.TxProof, &txProof); err != nil {
 		return nil, nil, fmt.Errorf("failed to decode tx proof: %w", err)
 	}
 	return txRecord, txProof, nil
@@ -133,18 +133,14 @@ func (c *Client) GetBlock(ctx context.Context, roundNumber uint64) (*types.Block
 		return nil, api.ErrNotFound
 	}
 	var block *types.Block
-	if err := cbor.Unmarshal(res, &block); err != nil {
+	if err := types.Cbor.Unmarshal(res, &block); err != nil {
 		return nil, fmt.Errorf("failed to decode block: %w", err)
 	}
 	return block, nil
 }
 
 func encodeCbor(v interface{}) (types.Bytes, error) {
-	enc, err := cbor.CanonicalEncOptions().EncMode()
-	if err != nil {
-		return nil, err
-	}
-	data, err := enc.Marshal(v)
+	data, err := types.Cbor.Marshal(v)
 	if err != nil {
 		return nil, err
 	}

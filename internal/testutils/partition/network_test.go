@@ -4,13 +4,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alphabill-org/alphabill-go-base/types"
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	testtxsystem "github.com/alphabill-org/alphabill-wallet/internal/testutils/txsystem"
-	"github.com/alphabill-org/alphabill/crypto"
 	"github.com/alphabill-org/alphabill/state"
 	"github.com/alphabill-org/alphabill/txsystem"
 	testtransaction "github.com/alphabill-org/alphabill/txsystem/testutils/transaction"
-	"github.com/alphabill-org/alphabill/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,7 +18,7 @@ const systemIdentifier types.SystemID = 0x1020401
 func TestNewNetwork_Ok(t *testing.T) {
 	genesisState := state.NewEmptyState()
 	counterPartition, err := NewPartition(t, "counter node", 3,
-		func(_ map[string]crypto.Verifier) txsystem.TransactionSystem {
+		func(_ types.RootTrustBase) txsystem.TransactionSystem {
 			txs := &testtxsystem.CounterTxSystem{}
 			txs.Commit(genesisState.CommittedUC())
 			return txs

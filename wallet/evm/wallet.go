@@ -8,12 +8,11 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/alphabill-org/alphabill/crypto"
-	"github.com/alphabill-org/alphabill/predicates/templates"
-	"github.com/alphabill-org/alphabill/types"
-	"github.com/fxamacker/cbor/v2"
+	"github.com/alphabill-org/alphabill-go-base/crypto"
+	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/evm"
+	"github.com/alphabill-org/alphabill-go-base/types"
 
-	sdk "github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	evmclient "github.com/alphabill-org/alphabill-wallet/wallet/evm/client"
 )
@@ -23,10 +22,10 @@ const txTimeoutBlockCount = 10
 type (
 	evmClient interface {
 		Client
-		Call(ctx context.Context, callAttr *evmclient.CallAttributes) (*evmclient.ProcessingDetails, error)
+		Call(ctx context.Context, callAttr *evm.CallEVMRequest) (*evm.ProcessingDetails, error)
 		GetTransactionCount(ctx context.Context, ethAddr []byte) (uint64, error)
-		GetBalance(ctx context.Context, ethAddr []byte) (string, []byte, error)
-		GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*sdk.Bill, error)
+		GetBalance(ctx context.Context, ethAddr []byte) (string, uint64, error)
+		GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*evmclient.Bill, error)
 		GetGasPrice(ctx context.Context) (string, error)
 	}
 	Wallet struct {
@@ -68,11 +67,11 @@ func (w *Wallet) Shutdown() {
 	w.am.Close()
 }
 
-func (w *Wallet) SendEvmTx(ctx context.Context, accNr uint64, attrs *evmclient.TxAttributes) (*evmclient.Result, error) {
-	if accNr < 1 {
-		return nil, fmt.Errorf("invalid account number: %d", accNr)
+func (w *Wallet) SendEvmTx(ctx context.Context, accountNumber uint64, attrs *evm.TxAttributes) (*evmclient.Result, error) {
+	if accountNumber < 1 {
+		return nil, fmt.Errorf("invalid account number: %d", accountNumber)
 	}
-	acc, err := w.am.GetAccountKey(accNr - 1)
+	acc, err := w.am.GetAccountKey(accountNumber - 1)
 	if err != nil {
 		return nil, fmt.Errorf("account key read failed: %w", err)
 	}
@@ -114,7 +113,7 @@ func (w *Wallet) SendEvmTx(ctx context.Context, accNr uint64, attrs *evmclient.T
 	if proof == nil || proof.TxRecord == nil {
 		return nil, fmt.Errorf("unexpected result")
 	}
-	var details evmclient.ProcessingDetails
+	var details evm.ProcessingDetails
 	if err = proof.TxRecord.UnmarshalProcessingDetails(&details); err != nil {
 		return nil, fmt.Errorf("failed to de-serialize evm execution result: %w", err)
 	}
@@ -125,11 +124,11 @@ func (w *Wallet) SendEvmTx(ctx context.Context, accNr uint64, attrs *evmclient.T
 	}, nil
 }
 
-func (w *Wallet) EvmCall(ctx context.Context, accNr uint64, attrs *evmclient.CallAttributes) (*evmclient.Result, error) {
-	if accNr < 1 {
-		return nil, fmt.Errorf("invalid account number: %d", accNr)
+func (w *Wallet) EvmCall(ctx context.Context, accountNumber uint64, attrs *evm.CallEVMRequest) (*evmclient.Result, error) {
+	if accountNumber < 1 {
+		return nil, fmt.Errorf("invalid account number: %d", accountNumber)
 	}
-	acc, err := w.am.GetAccountKey(accNr - 1)
+	acc, err := w.am.GetAccountKey(accountNumber - 1)
 	if err != nil {
 		return nil, fmt.Errorf("account key read failed: %w", err)
 	}
@@ -149,11 +148,11 @@ func (w *Wallet) EvmCall(ctx context.Context, accNr uint64, attrs *evmclient.Cal
 	}, nil
 }
 
-func (w *Wallet) GetBalance(ctx context.Context, accNr uint64) (*big.Int, error) {
-	if accNr < 1 {
-		return nil, fmt.Errorf("invalid account number: %d", accNr)
+func (w *Wallet) GetBalance(ctx context.Context, accountNumber uint64) (*big.Int, error) {
+	if accountNumber < 1 {
+		return nil, fmt.Errorf("invalid account number: %d", accountNumber)
 	}
-	acc, err := w.am.GetAccountKey(accNr - 1)
+	acc, err := w.am.GetAccountKey(accountNumber - 1)
 	if err != nil {
 		return nil, fmt.Errorf("account key read failed: %w", err)
 	}
@@ -201,7 +200,7 @@ func (w *Wallet) verifyFeeCreditBalance(ctx context.Context, acc *account.Accoun
 }
 
 func newTxPayload(systemID types.SystemID, txType string, unitID []byte, timeout uint64, attr interface{}) (*types.Payload, error) {
-	attrBytes, err := cbor.Marshal(attr)
+	attrBytes, err := types.Cbor.Marshal(attr)
 	if err != nil {
 		return nil, err
 	}

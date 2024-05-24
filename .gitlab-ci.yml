@@ -86,7 +86,7 @@ build:
     - .go-cache
     - .go-dependency
   script:
-    - make build
+    - make build spend-initial-bill
   artifacts:
     paths:
       - build

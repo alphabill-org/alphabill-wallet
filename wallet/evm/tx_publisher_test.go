@@ -4,8 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/alphabill-org/alphabill-go-base/types"
+	"github.com/alphabill-org/alphabill-wallet/wallet/evm/client"
 	testtransaction "github.com/alphabill-org/alphabill/txsystem/testutils/transaction"
-	"github.com/alphabill-org/alphabill/types"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet"
@@ -22,7 +23,7 @@ type MockClient struct {
 func createTxOrder(t *testing.T) *types.TransactionOrder {
 	transaction := testtransaction.NewTransactionOrder(t,
 		testtransaction.WithAttributes([]byte{0, 0, 0, 0, 0, 0, 0}),
-		testtransaction.WithUnitId([]byte{0, 0, 0, 1}),
+		testtransaction.WithUnitID([]byte{0, 0, 0, 1}),
 		testtransaction.WithSystemID(3),
 		testtransaction.WithOwnerProof([]byte{0, 0, 0, 2}),
 		testtransaction.WithClientMetadata(&types.ClientMetadata{Timeout: 3}),
@@ -38,9 +39,9 @@ func NewClientMock(round uint64, proof *wallet.Proof) Client {
 	}
 }
 
-func (m *MockClient) GetRoundNumber(ctx context.Context) (*wallet.RoundNumber, error) {
+func (m *MockClient) GetRoundNumber(ctx context.Context) (*client.RoundNumber, error) {
 	defer func() { m.RoundNr++ }()
-	return &wallet.RoundNumber{
+	return &client.RoundNumber{
 		RoundNumber:            m.RoundNr,
 		LastIndexedRoundNumber: m.RoundNr,
 	}, m.RoundNrError

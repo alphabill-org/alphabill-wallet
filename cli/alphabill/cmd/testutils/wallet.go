@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/hash"
-	"github.com/alphabill-org/alphabill/txsystem/tokens"
+	"github.com/alphabill-org/alphabill-go-base/hash"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
@@ -69,7 +69,7 @@ func CreateNewTokenWallet(t *testing.T, addr string) (*tokenswallet.Wallet, stri
 	require.NoError(t, err)
 	t.Cleanup(rpcClient.Close)
 	tokensRpcClient := rpc.NewTokensClient(rpcClient)
-	w, err := tokenswallet.New(tokens.DefaultSystemIdentifier, tokensRpcClient, am, false, nil, o.DefaultLogger())
+	w, err := tokenswallet.New(tokens.DefaultSystemID, tokensRpcClient, am, false, nil, o.DefaultLogger())
 	require.NoError(t, err)
 	require.NotNil(t, w)
 	t.Cleanup(w.Shutdown)

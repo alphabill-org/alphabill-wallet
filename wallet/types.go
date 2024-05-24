@@ -1,8 +1,8 @@
 package wallet
 
 import (
-	"github.com/alphabill-org/alphabill/hash"
-	"github.com/alphabill-org/alphabill/types"
+	"github.com/alphabill-org/alphabill-go-base/hash"
+	"github.com/alphabill-org/alphabill-go-base/types"
 )
 
 const (
@@ -12,58 +12,25 @@ const (
 	LockReasonManual
 )
 
-type TxHash []byte
+type (
+	TxHash     []byte
+	Predicate  []byte
+	PubKey     []byte
+	PubKeyHash []byte
 
-type Transactions struct {
-	_            struct{} `cbor:",toarray"`
-	Transactions []*types.TransactionOrder
-}
+	// Proof wrapper struct around TxRecord and TxProof
+	Proof struct {
+		_        struct{}                 `cbor:",toarray"`
+		TxRecord *types.TransactionRecord `json:"txRecord"`
+		TxProof  *types.TxProof           `json:"txProof"`
+	}
 
-type Predicate []byte
-
-type PubKey []byte
-
-type PubKeyHash []byte
-
-// TxProof type alias for block.TxProof, can be removed once block package is moved out of internal
-type TxProof = types.TxProof
-
-// Proof wrapper struct around TxRecord and TxProof
-type Proof struct {
-	_        struct{}                 `cbor:",toarray"`
-	TxRecord *types.TransactionRecord `json:"txRecord"`
-	TxProof  *types.TxProof           `json:"txProof"`
-}
+	LockReason uint64
+)
 
 func (pk PubKey) Hash() PubKeyHash {
 	return hash.Sum256(pk)
 }
-
-type (
-	TxHistoryRecord struct {
-		_            struct{} `cbor:",toarray"`
-		UnitID       types.UnitID
-		TxHash       TxHash
-		CounterParty []byte
-		Timeout      uint64
-		State        TxHistoryRecordState
-		Kind         TxHistoryRecordKind
-	}
-
-	TxHistoryRecordState byte
-	TxHistoryRecordKind  byte
-)
-
-const (
-	OUTGOING TxHistoryRecordKind = iota
-	INCOMING
-)
-
-const (
-	UNCONFIRMED TxHistoryRecordState = iota
-	CONFIRMED
-	FAILED
-)
 
 func (p *Proof) GetActualFee() uint64 {
 	if p == nil {
@@ -71,8 +38,6 @@ func (p *Proof) GetActualFee() uint64 {
 	}
 	return p.TxRecord.GetActualFee()
 }
-
-type LockReason uint64
 
 func (r LockReason) String() string {
 	switch r {
@@ -86,9 +51,4 @@ func (r LockReason) String() string {
 		return "manually locked by user"
 	}
 	return ""
-}
-
-type RoundNumber struct {
-	RoundNumber            uint64 `json:"roundNumber,string"`            // last known round number
-	LastIndexedRoundNumber uint64 `json:"lastIndexedRoundNumber,string"` // last indexed round number
 }

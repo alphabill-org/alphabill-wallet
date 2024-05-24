@@ -8,8 +8,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/alphabill-org/alphabill/logger"
-	"github.com/alphabill-org/alphabill/types"
+	"github.com/alphabill-org/alphabill-go-base/types"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
@@ -24,7 +23,6 @@ type (
 	}
 
 	TxSubmissionBatch struct {
-		sender      wallet.PubKey
 		submissions []*TxSubmission
 		maxTimeout  uint64
 		rpcClient   RpcClient
@@ -46,10 +44,9 @@ func New(tx *types.TransactionOrder) *TxSubmission {
 	}
 }
 
-func (s *TxSubmission) ToBatch(backend RpcClient, sender wallet.PubKey, log *slog.Logger) *TxSubmissionBatch {
+func (s *TxSubmission) ToBatch(rpcClient RpcClient, log *slog.Logger) *TxSubmissionBatch {
 	return &TxSubmissionBatch{
-		sender:      sender,
-		rpcClient:   backend,
+		rpcClient:   rpcClient,
 		submissions: []*TxSubmission{s},
 		maxTimeout:  s.Transaction.Timeout(),
 		log:         log,
@@ -60,9 +57,8 @@ func (s *TxSubmission) Confirmed() bool {
 	return s.Proof != nil
 }
 
-func NewBatch(sender wallet.PubKey, rpcClient RpcClient, log *slog.Logger) *TxSubmissionBatch {
+func NewBatch(rpcClient RpcClient, log *slog.Logger) *TxSubmissionBatch {
 	return &TxSubmissionBatch{
-		sender:    sender,
 		rpcClient: rpcClient,
 		log:       log,
 	}
@@ -77,14 +73,6 @@ func (t *TxSubmissionBatch) Add(sub *TxSubmission) {
 
 func (t *TxSubmissionBatch) Submissions() []*TxSubmission {
 	return t.submissions
-}
-
-func (t *TxSubmissionBatch) transactions() []*types.TransactionOrder {
-	txs := make([]*types.TransactionOrder, 0, len(t.submissions))
-	for _, sub := range t.submissions {
-		txs = append(txs, sub.Transaction)
-	}
-	return txs
 }
 
 func (t *TxSubmissionBatch) SendTx(ctx context.Context, confirmTx bool) error {
@@ -126,7 +114,7 @@ func (t *TxSubmissionBatch) confirmUnitsTx(ctx context.Context) error {
 					return err
 				}
 				if txRecord != nil && txProof != nil {
-					t.log.DebugContext(ctx, "Unit is confirmed", logger.UnitID(sub.UnitID))
+					t.log.DebugContext(ctx, fmt.Sprintf("Tx confirmed: hash=%X, unitID=%X", sub.TxHash, sub.UnitID))
 					sub.Proof = &wallet.Proof{TxRecord: txRecord, TxProof: txProof}
 				}
 			}
@@ -136,10 +124,11 @@ func (t *TxSubmissionBatch) confirmUnitsTx(ctx context.Context) error {
 		if unconfirmed {
 			// If this was the last attempt to get proofs, log the ones that timed out.
 			if roundNumber > t.maxTimeout {
-				t.log.InfoContext(ctx, "Tx confirmation timeout is reached", logger.Round(roundNumber))
+				t.log.InfoContext(ctx, fmt.Sprintf("Tx confirmation timeout is reached: round=%d", roundNumber))
+
 				for _, sub := range t.submissions {
 					if !sub.Confirmed() {
-						t.log.InfoContext(ctx, fmt.Sprintf("Tx not confirmed for hash=%X", sub.TxHash), logger.UnitID(sub.UnitID))
+						t.log.InfoContext(ctx, fmt.Sprintf("Tx not confirmed: hash=%X, unitID=%X", sub.TxHash, sub.UnitID))
 					}
 				}
 				return errors.New("confirmation timeout")

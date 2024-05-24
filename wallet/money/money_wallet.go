@@ -7,19 +7,20 @@ import (
 	"log/slog"
 	"sort"
 
-	abcrypto "github.com/alphabill-org/alphabill/crypto"
-	"github.com/alphabill-org/alphabill/hash"
-	"github.com/alphabill-org/alphabill/predicates/templates"
-	"github.com/alphabill-org/alphabill/txsystem/money"
-	"github.com/alphabill-org/alphabill/types"
-
+	abcrypto "github.com/alphabill-org/alphabill-go-base/crypto"
+	"github.com/alphabill-org/alphabill-go-base/hash"
+	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/dc"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
+	mwtypes "github.com/alphabill-org/alphabill-wallet/wallet/money/types"
+	"github.com/alphabill-org/alphabill-wallet/wallet/txpublisher"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 )
 
@@ -33,7 +34,7 @@ type (
 		am            account.Manager
 		rpcClient     RpcClient
 		feeManager    *fees.FeeManager
-		TxPublisher   *TxPublisher
+		txPublisher   *txpublisher.TxPublisher
 		dustCollector *dc.DustCollector
 		log           *slog.Logger
 	}
@@ -52,6 +53,7 @@ type (
 		Receivers           []ReceiverData
 		WaitForConfirmation bool
 		AccountIndex        uint64
+		ReferenceNumber     []byte
 	}
 
 	ReceiverData struct {
@@ -81,14 +83,14 @@ func CreateNewWallet(am account.Manager, mnemonic string) error {
 }
 
 func LoadExistingWallet(am account.Manager, feeManagerDB fees.FeeManagerDB, rpcClient RpcClient, log *slog.Logger) (*Wallet, error) {
-	moneySystemID := money.DefaultSystemIdentifier
-	moneyTxPublisher := NewTxPublisher(rpcClient, log)
-	feeManager := fees.NewFeeManager(am, feeManagerDB, moneySystemID, rpcClient, FeeCreditRecordIDFormPublicKey, moneySystemID, rpcClient, FeeCreditRecordIDFormPublicKey, log)
+	moneySystemID := money.DefaultSystemID
+	moneyTxPublisher := txpublisher.NewTxPublisher(rpcClient, log)
+	feeManager := fees.NewFeeManager(am, feeManagerDB, moneySystemID, rpcClient, mwtypes.FeeCreditRecordIDFormPublicKey, moneySystemID, rpcClient, mwtypes.FeeCreditRecordIDFormPublicKey, log)
 	dustCollector := dc.NewDustCollector(moneySystemID, maxBillsForDustCollection, txTimeoutBlockCount, rpcClient, log)
 	return &Wallet{
 		am:            am,
 		rpcClient:     rpcClient,
-		TxPublisher:   moneyTxPublisher,
+		txPublisher:   moneyTxPublisher,
 		feeManager:    feeManager,
 		dustCollector: dustCollector,
 		log:           log,
@@ -102,7 +104,7 @@ func (w *Wallet) GetAccountManager() account.Manager {
 func (w *Wallet) SystemID() types.SystemID {
 	// TODO: return the default "AlphaBill Money System ID" for now
 	// but this should come from config (base wallet? AB client?)
-	return money.DefaultSystemIdentifier
+	return money.DefaultSystemID
 }
 
 // Close terminates connection to alphabill node, closes account manager and cancels any background goroutines.
@@ -202,7 +204,7 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*wallet.Proof, error)
 		return nil, errors.New("insufficient balance for transaction")
 	}
 	timeout := roundNumber + txTimeoutBlockCount
-	batch := txsubmitter.NewBatch(k.PubKey, w.rpcClient, w.log)
+	batch := txsubmitter.NewBatch(w.rpcClient, w.log)
 
 	var txs []*types.TransactionOrder
 	if len(cmd.Receivers) > 1 {
@@ -229,14 +231,14 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*wallet.Proof, error)
 			})
 		}
 		remainingValue := largestBill.Value() - totalAmount
-		tx, err := tx_builder.NewSplitTx(targetUnits, remainingValue, k, w.SystemID(), largestBill, timeout, fcb.ID)
+		tx, err := txbuilder.NewSplitTx(targetUnits, remainingValue, k, w.SystemID(), largestBill, timeout, fcb.ID, cmd.ReferenceNumber)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create N-way split tx: %w", err)
 		}
 		txs = append(txs, tx)
 	} else {
 		// if single receiver then perform up to N transfers (until target amount is reached)
-		txs, err = tx_builder.CreateTransactions(cmd.Receivers[0].PubKey, cmd.Receivers[0].Amount, w.SystemID(), bills, k, timeout, fcb.ID)
+		txs, err = txbuilder.CreateTransactions(cmd.Receivers[0].PubKey, cmd.Receivers[0].Amount, w.SystemID(), bills, k, timeout, fcb.ID, cmd.ReferenceNumber)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create transactions: %w", err)
 		}
@@ -246,7 +248,7 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*wallet.Proof, error)
 		batch.Add(txsubmitter.New(tx))
 	}
 
-	txsCost := tx_builder.MaxFee * uint64(len(batch.Submissions()))
+	txsCost := txbuilder.MaxFee * uint64(len(batch.Submissions()))
 	if fcb.Balance() < txsCost {
 		return nil, errors.New("insufficient fee credit balance for transaction(s)")
 	}
@@ -263,8 +265,8 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*wallet.Proof, error)
 }
 
 // SendTx sends tx and waits for confirmation, returns tx proof
-func (w *Wallet) SendTx(ctx context.Context, tx *types.TransactionOrder, senderPubKey []byte) (*wallet.Proof, error) {
-	return w.TxPublisher.SendTx(ctx, tx, senderPubKey)
+func (w *Wallet) SendTx(ctx context.Context, tx *types.TransactionOrder) (*wallet.Proof, error) {
+	return w.txPublisher.SendTx(ctx, tx)
 }
 
 // AddFeeCredit creates fee credit for the given amount.
@@ -288,7 +290,7 @@ func (w *Wallet) GetFeeCredit(ctx context.Context, cmd fees.GetFeeCreditCmd) (*a
 	if err != nil {
 		return nil, fmt.Errorf("failed to load account key: %w", err)
 	}
-	return w.GetFeeCreditBill(ctx, money.NewFeeCreditRecordID(nil, accountKey.PubKeyHash.Sha256))
+	return w.GetFeeCreditBill(ctx, mwtypes.FeeCreditRecordIDFormPublicKeyHash(nil, accountKey.PubKeyHash.Sha256))
 }
 
 // GetFeeCreditBill returns fee credit bill for given unitID,

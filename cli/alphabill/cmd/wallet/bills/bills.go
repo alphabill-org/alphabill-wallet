@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/alphabill-org/alphabill/network/protocol/genesis"
-	moneytx "github.com/alphabill-org/alphabill/txsystem/money"
-	"github.com/alphabill-org/alphabill/types"
-	"github.com/spf13/cobra"
+	moneysdk "github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-base/types"
 
 	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
@@ -16,16 +14,11 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
-	txbuilder "github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
-)
-
-type (
-	// TrustBase json schema for trust base file.
-	TrustBase struct {
-		RootValidators []*genesis.PublicKeyInfo `json:"root_validators"`
-	}
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
+	mwtypes "github.com/alphabill-org/alphabill-wallet/wallet/money/types"
+	"github.com/alphabill-org/alphabill-wallet/wallet/txpublisher"
+	"github.com/spf13/cobra"
 )
 
 // NewBillsCmd creates a new cobra command for the wallet bills component.
@@ -52,7 +45,7 @@ func listCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 	cmd.Flags().StringVarP(&config.RpcUrl, args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "rpc node url")
 	cmd.Flags().Uint64VarP(&config.Key, args.KeyCmdName, "k", 0, "specifies which account bills to list (default: all accounts)")
 	cmd.Flags().BoolVarP(&config.ShowUnswapped, args.ShowUnswappedCmdName, "s", false, "includes unswapped dust bills in output")
-	cmd.Flags().MarkHidden(args.ShowUnswappedCmdName)
+	_ = cmd.Flags().MarkHidden(args.ShowUnswappedCmdName)
 	return cmd
 }
 
@@ -130,7 +123,7 @@ func lockCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 	cmd.Flags().StringVarP(&config.RpcUrl, args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "rpc node url")
 	cmd.Flags().Uint64VarP(&config.Key, args.KeyCmdName, "k", 1, "account number of the bill to lock")
 	cmd.Flags().Var(&config.BillID, args.BillIdCmdName, "id of the bill to lock")
-	cmd.Flags().Uint32Var(&config.SystemID, args.SystemIdentifierCmdName, uint32(moneytx.DefaultSystemIdentifier), "system identifier")
+	cmd.Flags().Uint32Var(&config.SystemID, args.SystemIdentifierCmdName, uint32(moneysdk.DefaultSystemID), "system identifier")
 	return cmd
 }
 
@@ -161,7 +154,7 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 		return errors.New("invalid rpc url provided for money partition")
 	}
 
-	fcrID := money.FeeCreditRecordIDFormPublicKey(nil, accountKey.PubKey)
+	fcrID := mwtypes.FeeCreditRecordIDFormPublicKey(nil, accountKey.PubKey)
 	fcb, err := moneyClient.GetFeeCreditRecord(cmd.Context(), fcrID, false)
 	if err != nil && !errors.Is(err, api.ErrNotFound) {
 		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
@@ -180,12 +173,12 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch round number: %w", err)
 	}
-	tx, err := txbuilder.NewLockTx(accountKey, types.SystemID(config.SystemID), bill.ID, bill.Backlink(), wallet.LockReasonManual, roundNumber+10)
+	tx, err := txbuilder.NewLockTx(accountKey, types.SystemID(config.SystemID), bill.ID, bill.Counter(), wallet.LockReasonManual, roundNumber+10)
 	if err != nil {
 		return fmt.Errorf("failed to create lock tx: %w", err)
 	}
-	moneyTxPublisher := money.NewTxPublisher(moneyClient, config.WalletConfig.Base.Observe.Logger())
-	_, err = moneyTxPublisher.SendTx(cmd.Context(), tx, accountKey.PubKey)
+	moneyTxPublisher := txpublisher.NewTxPublisher(moneyClient, config.WalletConfig.Base.Logger)
+	_, err = moneyTxPublisher.SendTx(cmd.Context(), tx)
 	if err != nil {
 		return fmt.Errorf("failed to send lock tx: %w", err)
 	}
@@ -205,7 +198,7 @@ func unlockCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 	cmd.Flags().StringVarP(&config.RpcUrl, args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "rpc node url")
 	cmd.Flags().Uint64VarP(&config.Key, args.KeyCmdName, "k", 1, "account number of the bill to unlock")
 	cmd.Flags().Var(&config.BillID, args.BillIdCmdName, "id of the bill to unlock")
-	cmd.Flags().Uint32Var(&config.SystemID, args.SystemIdentifierCmdName, uint32(moneytx.DefaultSystemIdentifier), "system identifier")
+	cmd.Flags().Uint32Var(&config.SystemID, args.SystemIdentifierCmdName, uint32(moneysdk.DefaultSystemID), "system identifier")
 	return cmd
 }
 
@@ -236,7 +229,7 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 		return errors.New("invalid rpc url provided for money partition")
 	}
 
-	fcrID := money.FeeCreditRecordIDFormPublicKey(nil, accountKey.PubKey)
+	fcrID := mwtypes.FeeCreditRecordIDFormPublicKey(nil, accountKey.PubKey)
 	fcb, err := moneyClient.GetFeeCreditRecord(cmd.Context(), fcrID, false)
 	if err != nil && !errors.Is(err, api.ErrNotFound) {
 		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
@@ -261,8 +254,8 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to create unlock tx: %w", err)
 	}
-	moneyTxPublisher := money.NewTxPublisher(moneyClient, config.WalletConfig.Base.Observe.Logger())
-	_, err = moneyTxPublisher.SendTx(cmd.Context(), tx, accountKey.PubKey)
+	moneyTxPublisher := txpublisher.NewTxPublisher(moneyClient, config.WalletConfig.Base.Logger)
+	_, err = moneyTxPublisher.SendTx(cmd.Context(), tx)
 	if err != nil {
 		return fmt.Errorf("failed to send unlock tx: %w", err)
 	}

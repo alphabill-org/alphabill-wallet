@@ -8,19 +8,17 @@ import (
 	"log/slog"
 	"math"
 
-	"github.com/alphabill-org/alphabill-wallet/wallet/tokens/backend"
-	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
-	"github.com/alphabill-org/alphabill/txsystem/tokens"
-	"github.com/alphabill-org/alphabill/types"
-	"github.com/alphabill-org/alphabill/util"
-	"github.com/fxamacker/cbor/v2"
-	"go.opentelemetry.io/otel/trace"
-
+	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
+	"github.com/alphabill-org/alphabill-go-base/types"
+	"github.com/alphabill-org/alphabill-go-base/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/tx_builder"
+	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
+	twtypes "github.com/alphabill-org/alphabill-wallet/wallet/tokens/types"
+	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -108,6 +106,14 @@ func newSingleResult(sub *txsubmitter.TxSubmission, accNr uint64) *SubmissionRes
 	return res
 }
 
+func (r *SubmissionResult) GetProofs() []*wallet.Proof {
+	proofs := make([]*wallet.Proof, len(r.Submissions))
+	for i, sub := range r.Submissions {
+		proofs[i] = sub.Proof
+	}
+	return proofs
+}
+
 func (r *SubmissionResult) GetUnit() types.UnitID {
 	if len(r.Submissions) == 0 || len(r.Submissions) > 1 {
 		return nil
@@ -119,7 +125,7 @@ func (w *Wallet) GetAccountManager() account.Manager {
 	return w.am
 }
 
-func (w *Wallet) NewFungibleType(ctx context.Context, accNr uint64, attrs CreateFungibleTokenTypeAttributes, typeId TokenTypeID, subtypePredicateArgs []*PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) NewFungibleType(ctx context.Context, accountNumber uint64, attrs CreateFungibleTokenTypeAttributes, typeId TokenTypeID, subtypePredicateArgs []*PredicateInput) (*SubmissionResult, error) {
 	w.log.Info("Creating new fungible token type")
 	if typeId == nil {
 		var err error
@@ -136,8 +142,8 @@ func (w *Wallet) NewFungibleType(ctx context.Context, accNr uint64, attrs Create
 	if !typeId.HasType(tokens.FungibleTokenTypeUnitType) {
 		return nil, fmt.Errorf("invalid token type ID: expected unit type is 0x%X", tokens.FungibleTokenTypeUnitType)
 	}
-	if attrs.ParentTypeId != nil && !bytes.Equal(attrs.ParentTypeId, NoParent) {
-		parentType, err := w.GetTokenType(ctx, attrs.ParentTypeId)
+	if attrs.ParentTypeID != nil && !bytes.Equal(attrs.ParentTypeID, NoParent) {
+		parentType, err := w.GetTokenType(ctx, attrs.ParentTypeID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get parent type: %w", err)
 		}
@@ -145,15 +151,15 @@ func (w *Wallet) NewFungibleType(ctx context.Context, accNr uint64, attrs Create
 			return nil, fmt.Errorf("parent type requires %d decimal places, got %d", parentType.DecimalPlaces, attrs.DecimalPlaces)
 		}
 	}
-	sub, err := w.newType(ctx, accNr, tokens.PayloadTypeCreateFungibleTokenType, attrs.ToCBOR(), typeId, subtypePredicateArgs)
+	sub, err := w.newType(ctx, accountNumber, tokens.PayloadTypeCreateFungibleTokenType, attrs.ToCBOR(), typeId, subtypePredicateArgs)
 	if err != nil {
 		return nil, err
 	}
 
-	return newSingleResult(sub, accNr), nil
+	return newSingleResult(sub, accountNumber), nil
 }
 
-func (w *Wallet) NewNonFungibleType(ctx context.Context, accNr uint64, attrs CreateNonFungibleTokenTypeAttributes, typeId TokenTypeID, subtypePredicateArgs []*PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) NewNonFungibleType(ctx context.Context, accountNumber uint64, attrs CreateNonFungibleTokenTypeAttributes, typeId TokenTypeID, subtypePredicateArgs []*PredicateInput) (*SubmissionResult, error) {
 	w.log.Info("Creating new NFT type")
 	if typeId == nil {
 		var err error
@@ -171,61 +177,49 @@ func (w *Wallet) NewNonFungibleType(ctx context.Context, accNr uint64, attrs Cre
 		return nil, fmt.Errorf("invalid token type ID: expected unit type is 0x%X", tokens.NonFungibleTokenTypeUnitType)
 	}
 
-	sub, err := w.newType(ctx, accNr, tokens.PayloadTypeCreateNFTType, attrs.ToCBOR(), typeId, subtypePredicateArgs)
+	sub, err := w.newType(ctx, accountNumber, tokens.PayloadTypeCreateNFTType, attrs.ToCBOR(), typeId, subtypePredicateArgs)
 	if err != nil {
 		return nil, err
 	}
-	return newSingleResult(sub, accNr), nil
+	return newSingleResult(sub, accountNumber), nil
 }
 
-func (w *Wallet) NewFungibleToken(ctx context.Context, accNr uint64, typeId TokenTypeID, amount uint64, bearerPredicate wallet.Predicate, mintPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) NewFungibleToken(ctx context.Context, accountNumber uint64, typeID TokenTypeID, amount uint64, bearerPredicate wallet.Predicate, mintPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
 	w.log.Info("Creating new fungible token")
 	attrs := &tokens.MintFungibleTokenAttributes{
 		Bearer:                           bearerPredicate,
-		TypeID:                           typeId,
+		TypeID:                           typeID,
 		Value:                            amount,
+		Nonce:                            0,
 		TokenCreationPredicateSignatures: nil,
 	}
-
-	var err error
-	tokenID, err := tokens.NewRandomFungibleTokenID(nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed generate fungible token ID: %w", err)
-	}
-	sub, err := w.newToken(ctx, accNr, tokens.PayloadTypeMintFungibleToken, attrs, tokenID, mintPredicateArgs)
+	sub, err := w.newToken(ctx, accountNumber, tokens.PayloadTypeMintFungibleToken, attrs, mintPredicateArgs, tokens.NewFungibleTokenID)
 	if err != nil {
 		return nil, err
 	}
-	return newSingleResult(sub, accNr), nil
+	return newSingleResult(sub, accountNumber), nil
 }
 
-func (w *Wallet) NewNFT(ctx context.Context, accNr uint64, attrs MintNonFungibleTokenAttributes, tokenID TokenID, mintPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) NewNFT(ctx context.Context, accountNumber uint64, attrs *tokens.MintNonFungibleTokenAttributes, mintPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
 	w.log.Info("Creating new NFT")
 	if len(attrs.Name) > nameMaxSize {
 		return nil, errInvalidNameLength
 	}
-	if len(attrs.Uri) > uriMaxSize {
+	if len(attrs.URI) > uriMaxSize {
 		return nil, errInvalidURILength
 	}
-	if attrs.Uri != "" && !util.IsValidURI(attrs.Uri) {
-		return nil, fmt.Errorf("URI '%s' is invalid", attrs.Uri)
+	if attrs.URI != "" && !util.IsValidURI(attrs.URI) {
+		return nil, fmt.Errorf("URI '%s' is invalid", attrs.URI)
 	}
 	if len(attrs.Data) > dataMaxSize {
 		return nil, errInvalidDataLength
 	}
-	if tokenID == nil {
-		var err error
-		tokenID, err = tokens.NewRandomNonFungibleTokenID(nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed generate non-fungible token ID: %w", err)
-		}
-	}
 
-	sub, err := w.newToken(ctx, accNr, tokens.PayloadTypeMintNFT, attrs.ToCBOR(), tokenID, mintPredicateArgs)
+	sub, err := w.newToken(ctx, accountNumber, tokens.PayloadTypeMintNFT, attrs, mintPredicateArgs, tokens.NewNonFungibleTokenID)
 	if err != nil {
 		return nil, err
 	}
-	return newSingleResult(sub, accNr), nil
+	return newSingleResult(sub, accountNumber), nil
 }
 
 func (w *Wallet) ListTokenTypes(ctx context.Context, accountNumber uint64, kind Kind) ([]*TokenUnitType, error) {
@@ -346,14 +340,14 @@ func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID 
 			return err
 		}
 		attrs.SetInvariantPredicateSignatures(signatures)
-		tx.Payload.Attributes, err = cbor.Marshal(attrs)
+		tx.Payload.Attributes, err = types.Cbor.Marshal(attrs)
 		return err
 	})
 	if err != nil {
 		return nil, err
 	}
-	err = sub.ToBatch(w.rpcClient, key.PubKey, w.log).SendTx(ctx, w.confirmTx)
-	return newSingleResult(sub, accountNumber), nil
+	err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
+	return newSingleResult(sub, accountNumber), err
 }
 
 func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId TokenTypeID, targetAmount uint64, receiverPubKey []byte, invariantPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
@@ -420,16 +414,14 @@ func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId 
 		if err != nil {
 			return nil, err
 		}
-		if err = sub.ToBatch(w.rpcClient, acc.PubKey, w.log).SendTx(ctx, w.confirmTx); err != nil {
-			return nil, err
-		}
+		err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
 		return newSingleResult(sub, accountNumber), err
 	} else {
 		return w.doSendMultiple(ctx, targetAmount, matchingTokens, acc, receiverPubKey, invariantPredicateArgs)
 	}
 }
 
-func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenID []byte, data []byte, updatePredicateArgs []*PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenID TokenID, data []byte, updatePredicateArgs []*PredicateInput) (*SubmissionResult, error) {
 	if accountNumber < 1 {
 		return nil, fmt.Errorf("invalid account number: %d", accountNumber)
 	}
@@ -454,7 +446,7 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 
 	attrs := &tokens.UpdateNonFungibleTokenAttributes{
 		Data:                 data,
-		Backlink:             t.TxHash,
+		Counter:              t.Counter,
 		DataUpdateSignatures: nil,
 	}
 
@@ -464,18 +456,18 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 			return err
 		}
 		attrs.SetDataUpdateSignatures(signatures)
-		tx.Payload.Attributes, err = cbor.Marshal(attrs)
+		tx.Payload.Attributes, err = types.Cbor.Marshal(attrs)
 		return err
 	})
 	if err != nil {
 		return nil, err
 	}
-	err = sub.ToBatch(w.rpcClient, acc.PubKey, w.log).SendTx(ctx, w.confirmTx)
+	err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
 	return newSingleResult(sub, accountNumber), nil
 }
 
 // SendFungibleByID sends fungible tokens by given unit ID, if amount matches, does the transfer, otherwise splits the token
-func (w *Wallet) SendFungibleByID(ctx context.Context, accountNumber uint64, tokenID backend.TokenID, targetAmount uint64, receiverPubKey []byte, invariantPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) SendFungibleByID(ctx context.Context, accountNumber uint64, tokenID TokenID, targetAmount uint64, receiverPubKey []byte, invariantPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
 	if accountNumber < 1 {
 		return nil, fmt.Errorf("invalid account number: %d", accountNumber)
 	}
@@ -498,7 +490,7 @@ func (w *Wallet) SendFungibleByID(ctx context.Context, accountNumber uint64, tok
 	if err != nil {
 		return nil, err
 	}
-	err = sub.ToBatch(w.rpcClient, acc.PubKey, w.log).SendTx(ctx, w.confirmTx)
+	err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
 	return newSingleResult(sub, accountNumber), err
 }
 
@@ -510,7 +502,7 @@ func (w *Wallet) BurnTokens(ctx context.Context, accountNumber uint64, tokensToB
 	if err != nil {
 		return 0, 0, nil, err
 	}
-	return w.burnTokensForDC(ctx, acc, tokensToBurn, nil, nil, invariantPredicateArgs)
+	return w.burnTokensForDC(ctx, acc, tokensToBurn, 0, nil, invariantPredicateArgs)
 }
 
 // GetFeeCredit returns fee credit bill for given account,
@@ -520,7 +512,7 @@ func (w *Wallet) GetFeeCredit(ctx context.Context, cmd fees.GetFeeCreditCmd) (*a
 	if err != nil {
 		return nil, err
 	}
-	return w.GetFeeCreditBill(ctx, tokens.NewFeeCreditRecordID(nil, ac.PubKeyHash.Sha256))
+	return w.GetFeeCreditBill(ctx, twtypes.FeeCreditRecordIDFormPublicKeyHash(nil, ac.PubKeyHash.Sha256))
 }
 
 // GetFeeCreditBill returns fee credit bill for given unitID
@@ -546,14 +538,14 @@ func (w *Wallet) ReclaimFeeCredit(ctx context.Context, cmd fees.ReclaimFeeCmd) (
 }
 
 func (w *Wallet) ensureFeeCredit(ctx context.Context, accountKey *account.AccountKey, txCount int) error {
-	fcb, err := w.GetFeeCreditBill(ctx, tokens.NewFeeCreditRecordID(nil, accountKey.PubKeyHash.Sha256))
+	fcb, err := w.GetFeeCreditBill(ctx, twtypes.FeeCreditRecordIDFormPublicKeyHash(nil, accountKey.PubKeyHash.Sha256))
 	if err != nil {
 		return err
 	}
 	if fcb == nil {
 		return ErrNoFeeCredit
 	}
-	maxFee := uint64(txCount) * tx_builder.MaxFee
+	maxFee := uint64(txCount) * txbuilder.MaxFee
 	if fcb.Balance() < maxFee {
 		return ErrInsufficientFeeCredit
 	}
@@ -577,20 +569,20 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID []
 	if token.IsLocked() {
 		return nil, errors.New("token is already locked")
 	}
-	attrs := newLockTxAttrs(token.TxHash, wallet.LockReasonManual)
+	attrs := newLockTxAttrs(token.Counter, wallet.LockReasonManual)
 	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeLockToken, attrs, tokenID, key, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.am, ib, tx, attrs)
 		if err != nil {
 			return err
 		}
 		attrs.InvariantPredicateSignatures = signatures
-		tx.Payload.Attributes, err = cbor.Marshal(attrs)
+		tx.Payload.Attributes, err = types.Cbor.Marshal(attrs)
 		return err
 	})
 	if err != nil {
 		return nil, err
 	}
-	err = sub.ToBatch(w.rpcClient, key.PubKey, w.log).SendTx(ctx, w.confirmTx)
+	err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
 	return newSingleResult(sub, accountNumber), err
 }
 
@@ -610,19 +602,19 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	if !token.IsLocked() {
 		return nil, errors.New("token is already unlocked")
 	}
-	attrs := newUnlockTxAttrs(token.TxHash)
+	attrs := newUnlockTxAttrs(token.Counter)
 	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeUnlockToken, attrs, tokenID, key, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.am, ib, tx, attrs)
 		if err != nil {
 			return err
 		}
 		attrs.InvariantPredicateSignatures = signatures
-		tx.Payload.Attributes, err = cbor.Marshal(attrs)
+		tx.Payload.Attributes, err = types.Cbor.Marshal(attrs)
 		return err
 	})
 	if err != nil {
 		return nil, err
 	}
-	err = sub.ToBatch(w.rpcClient, key.PubKey, w.log).SendTx(ctx, w.confirmTx)
+	err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
 	return newSingleResult(sub, accountNumber), err
 }

@@ -2,21 +2,18 @@ package wallet
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
-	"strconv"
+	"strings"
 
-	"github.com/alphabill-org/alphabill/logger"
-	"github.com/alphabill-org/alphabill/observability"
-	moneytx "github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/spf13/cobra"
 	"github.com/tyler-smith/go-bip39"
-	"go.opentelemetry.io/otel/attribute"
-	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
-	"go.opentelemetry.io/otel/trace"
+
+	sdkmoney "github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	sdktypes "github.com/alphabill-org/alphabill-go-base/types"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
@@ -24,6 +21,7 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/bills"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/evm"
 	clifees "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/fees"
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/orchestration"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/tokens"
 	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	"github.com/alphabill-org/alphabill-wallet/util"
@@ -32,32 +30,21 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/money"
 )
 
-type Factory interface {
-	Logger(cfg *logger.LogConfiguration) (*slog.Logger, error)
-	Observability(metrics, traces string) (observability.MeterAndTracer, error)
-}
-
 // NewWalletCmd creates a new cobra command for the wallet component.
-func NewWalletCmd(baseConfig *types.BaseConfiguration, obsF Factory) *cobra.Command {
+func NewWalletCmd(baseConfig *types.BaseConfiguration) *cobra.Command {
 	config := &types.WalletConfig{Base: baseConfig}
 	var walletCmd = &cobra.Command{
 		Use:   "wallet",
 		Short: "cli for managing alphabill wallet",
 		PersistentPreRunE: func(ccmd *cobra.Command, args []string) error {
 			// initialize config so that baseConf.HomeDir gets configured
-			if err := types.InitializeConfig(ccmd, baseConfig, obsF); err != nil {
+			if err := types.InitializeConfig(ccmd, baseConfig); err != nil {
 				return fmt.Errorf("initializing base configuration: %w", err)
 			}
-
-			ctx, span := config.Tracer().Start(ccmd.Context(), "execute.wallet.cmd", trace.WithAttributes(semconv.ProcessCommandArgs(os.Args...)))
-			ccmd.SetContext(ctx)
-			// when command returns error the PostRun hooks are not triggered so use OnFinalize to end the span
-			cobra.OnFinalize(func() { span.End() })
 
 			if err := InitWalletConfig(ccmd, config); err != nil {
 				return fmt.Errorf("initializing wallet configuration: %w", err)
 			}
-			span.SetAttributes(attribute.String("wallet.home", config.WalletHomeDir))
 			return nil
 		},
 	}
@@ -71,6 +58,7 @@ func NewWalletCmd(baseConfig *types.BaseConfiguration, obsF Factory) *cobra.Comm
 	walletCmd.AddCommand(AddKeyCmd(config))
 	walletCmd.AddCommand(tokens.NewTokenCmd(config))
 	walletCmd.AddCommand(evm.NewEvmCmd(config))
+	walletCmd.AddCommand(orchestration.NewCmd(config))
 	// add passwords flags for (encrypted)wallet
 	//walletCmd.PersistentFlags().BoolP(passwordPromptCmdName, "p", false, passwordPromptUsage)
 	//walletCmd.PersistentFlags().String(passwordArgCmdName, "", passwordArgUsage)
@@ -144,11 +132,13 @@ func SendCmd(config *types.WalletConfig) *cobra.Command {
 		"amounts")
 	cmd.Flags().StringSliceP(args.AmountCmdName, "v", nil, "the amount(s) to send to the "+
 		"receiver(s), must match with addresses")
+	cmd.Flags().String(args.ReferenceNumber, "", `user defined "reference number" of the transfer, up to 32 bytes. Prefix the value with "0x" `+
+		"to pass hex encoded binary data, without it the value will be treated as (UTF-8 encoded) string and used as-is. "+
+		"If the command results in more than one transaction all of them use the same reference number")
 	cmd.Flags().StringP(args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "rpc node url")
 	cmd.Flags().Uint64P(args.KeyCmdName, "k", 1, "which key to use for sending the transaction")
-	// use string instead of boolean as boolean requires equals sign between name and value e.g. w=[true|false]
-	cmd.Flags().StringP(args.WaitForConfCmdName, "w", "true", "waits for transaction confirmation "+
-		"on the blockchain, otherwise just broadcasts the transaction")
+	args.AddWaitForProofFlags(cmd, cmd.Flags())
+
 	if err := cmd.MarkFlagRequired(args.AddressCmdName); err != nil {
 		panic(err)
 	}
@@ -159,9 +149,6 @@ func SendCmd(config *types.WalletConfig) *cobra.Command {
 }
 
 func ExecSendCmd(ctx context.Context, cmd *cobra.Command, config *types.WalletConfig) error {
-	ctx, span := config.Tracer().Start(ctx, "execSendCmd")
-	defer span.End()
-
 	rpcUrl, err := cmd.Flags().GetString(args.RpcUrl)
 	if err != nil {
 		return err
@@ -182,7 +169,7 @@ func ExecSendCmd(ctx context.Context, cmd *cobra.Command, config *types.WalletCo
 	}
 	defer feeManagerDB.Close()
 
-	w, err := money.LoadExistingWallet(am, feeManagerDB, rpcClient, config.Base.Observe.Logger())
+	w, err := money.LoadExistingWallet(am, feeManagerDB, rpcClient, config.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -195,11 +182,8 @@ func ExecSendCmd(ctx context.Context, cmd *cobra.Command, config *types.WalletCo
 	if accountNumber == 0 {
 		return fmt.Errorf("invalid parameter for flag %q: 0 is not a valid account key", args.KeyCmdName)
 	}
-	waitForConfStr, err := cmd.Flags().GetString(args.WaitForConfCmdName)
-	if err != nil {
-		return err
-	}
-	waitForConf, err := strconv.ParseBool(waitForConfStr)
+
+	waitForConf, proofFile, err := args.WaitForProofArg(cmd)
 	if err != nil {
 		return err
 	}
@@ -211,11 +195,15 @@ func ExecSendCmd(ctx context.Context, cmd *cobra.Command, config *types.WalletCo
 	if err != nil {
 		return err
 	}
-	receivers, err := GroupPubKeysAndAmounts(receiverPubKeys, receiverAmounts)
+	receivers, err := groupPubKeysAndAmounts(receiverPubKeys, receiverAmounts)
 	if err != nil {
 		return err
 	}
-	proofs, err := w.Send(ctx, money.SendCmd{Receivers: receivers, WaitForConfirmation: waitForConf, AccountIndex: accountNumber - 1})
+	refNumber, err := parseReferenceNumberArg(cmd)
+	if err != nil {
+		return err
+	}
+	proofs, err := w.Send(ctx, money.SendCmd{Receivers: receivers, WaitForConfirmation: waitForConf, AccountIndex: accountNumber - 1, ReferenceNumber: refNumber})
 	if err != nil {
 		return err
 	}
@@ -227,6 +215,16 @@ func ExecSendCmd(ctx context.Context, cmd *cobra.Command, config *types.WalletCo
 			feeSum += proof.TxRecord.ServerMetadata.GetActualFee()
 		}
 		config.Base.ConsoleWriter.Println("Paid", util.AmountToString(feeSum, 8), "fees for transaction(s).")
+		if proofFile != "" {
+			w, err := os.Create(proofFile)
+			if err != nil {
+				return fmt.Errorf("creating file for transaction proof: %w", err)
+			}
+			if err := sdktypes.Cbor.Encode(w, proofs); err != nil {
+				return fmt.Errorf("encoding transaction proofs as CBOR: %w", err)
+			}
+			config.Base.ConsoleWriter.Println("Transaction proof(s) saved to file:" + proofFile)
+		}
 	} else {
 		config.Base.ConsoleWriter.Println("Successfully sent transaction(s)")
 	}
@@ -253,14 +251,11 @@ func GetBalanceCmd(config *types.WalletConfig) *cobra.Command {
 }
 
 func ExecGetBalanceCmd(cmd *cobra.Command, config *types.WalletConfig) error {
-	ctx, span := config.Tracer().Start(cmd.Context(), "execGetBalanceCmd")
-	defer span.End()
-
 	rpcUrl, err := cmd.Flags().GetString(args.RpcUrl)
 	if err != nil {
 		return err
 	}
-	rpcClient, err := rpc.DialContext(ctx, args.BuildRpcUrl(rpcUrl))
+	rpcClient, err := rpc.DialContext(cmd.Context(), args.BuildRpcUrl(rpcUrl))
 	if err != nil {
 		return fmt.Errorf("failed to dial rpc url: %w", err)
 	}
@@ -278,7 +273,7 @@ func ExecGetBalanceCmd(cmd *cobra.Command, config *types.WalletConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	w, err := money.LoadExistingWallet(am, feeManagerDB, rpcClient, config.Base.Observe.Logger())
+	w, err := money.LoadExistingWallet(am, feeManagerDB, rpcClient, config.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -304,7 +299,7 @@ func ExecGetBalanceCmd(cmd *cobra.Command, config *types.WalletConfig) error {
 		quiet = false // quiet is supposed to work only when total or key flag is provided
 	}
 	if accountNumber == 0 {
-		totals, sum, err := w.GetBalances(ctx, money.GetBalanceCmd{CountDCBills: showUnswapped})
+		totals, sum, err := w.GetBalances(cmd.Context(), money.GetBalanceCmd{CountDCBills: showUnswapped})
 		if err != nil {
 			return err
 		}
@@ -320,7 +315,7 @@ func ExecGetBalanceCmd(cmd *cobra.Command, config *types.WalletConfig) error {
 			config.Base.ConsoleWriter.Println(fmt.Sprintf("Total %s", sumStr))
 		}
 	} else {
-		balance, err := w.GetBalance(ctx, money.GetBalanceCmd{AccountIndex: accountNumber - 1, CountDCBills: showUnswapped})
+		balance, err := w.GetBalance(cmd.Context(), money.GetBalanceCmd{AccountIndex: accountNumber - 1, CountDCBills: showUnswapped})
 		if err != nil {
 			return err
 		}
@@ -409,7 +404,7 @@ func ExecCollectDust(cmd *cobra.Command, config *types.WalletConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	w, err := money.LoadExistingWallet(am, feeManagerDB, rpcClient, config.Base.Observe.Logger())
+	w, err := money.LoadExistingWallet(am, feeManagerDB, rpcClient, config.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -423,7 +418,7 @@ func ExecCollectDust(cmd *cobra.Command, config *types.WalletConfig) error {
 	}
 	for _, dcResult := range dcResults {
 		if dcResult.DustCollectionResult != nil {
-			attr := &moneytx.SwapDCAttributes{}
+			attr := &sdkmoney.SwapDCAttributes{}
 			err := dcResult.DustCollectionResult.SwapProof.TxRecord.TransactionOrder.UnmarshalAttributes(attr)
 			if err != nil {
 				return fmt.Errorf("failed to unmarshal swap tx proof: %w", err)
@@ -487,9 +482,9 @@ func InitWalletConfig(cmd *cobra.Command, config *types.WalletConfig) error {
 	return nil
 }
 
-func GroupPubKeysAndAmounts(pubKeys []string, amounts []string) ([]money.ReceiverData, error) {
+func groupPubKeysAndAmounts(pubKeys []string, amounts []string) ([]money.ReceiverData, error) {
 	if len(pubKeys) != len(amounts) {
-		return nil, fmt.Errorf("must specify the same amount of addresses and amounts")
+		return nil, fmt.Errorf("must specify the same amount of addresses and amounts (got %d vs %d)", len(pubKeys), len(amounts))
 	}
 	var receivers []money.ReceiverData
 	for i := 0; i < len(pubKeys); i++ {
@@ -507,4 +502,28 @@ func GroupPubKeysAndAmounts(pubKeys []string, amounts []string) ([]money.Receive
 		})
 	}
 	return receivers, nil
+}
+
+func parseReferenceNumberArg(cmd *cobra.Command) ([]byte, error) {
+	input, err := cmd.Flags().GetString(args.ReferenceNumber)
+	if err != nil {
+		return nil, fmt.Errorf("reading %q flag: %w", args.ReferenceNumber, err)
+	}
+
+	return parseReferenceNumber(input)
+}
+
+func parseReferenceNumber(input string) (ref []byte, err error) {
+	if strings.HasPrefix(input, "0x") {
+		if ref, err = hex.DecodeString(input[2:]); err != nil {
+			return nil, fmt.Errorf("decoding reference number from hex string to binary: %w", err)
+		}
+	} else {
+		ref = []byte(input)
+	}
+
+	if n := len(ref); n > 32 {
+		return nil, fmt.Errorf("maximum allowed length of the reference number is 32 bytes, argument is %d bytes", n)
+	}
+	return ref, nil
 }

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/alphabill-org/alphabill/predicates/templates"
+	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 

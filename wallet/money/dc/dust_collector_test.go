@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/txsystem/fc/unit"
-	"github.com/alphabill-org/alphabill/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
@@ -19,12 +19,12 @@ func TestDC_OK(t *testing.T) {
 	require.NoError(t, err)
 	targetBillID := money.NewBillID(nil, []byte{3})
 	moneyClient := testutil.NewRpcClientMock(
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Backlink: []byte{2}})),
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{3}, &money.BillData{V: 3, Backlink: []byte{3}})),
-		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Counter: 1})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Counter: 2})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{3}, &money.BillData{V: 3, Counter: 3})),
+		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &fc.FeeCreditRecord{Balance: 100, Counter: 100})),
 	)
-	dc := NewDustCollector(money.DefaultSystemIdentifier, 10, 10, moneyClient, logger.New(t))
+	dc := NewDustCollector(money.DefaultSystemID, 10, 10, moneyClient, logger.New(t))
 
 	// when dc runs
 	dcResult, err := dc.CollectDust(context.Background(), accountKeys.AccountKey)
@@ -43,14 +43,14 @@ func TestDC_OK(t *testing.T) {
 }
 
 func TestDCWontRunForSingleBill(t *testing.T) {
-	// create backend with single bill
+	// create rpc client mock with single bill
 	accountKeys, err := account.NewKeys("dinosaur simple verify deliver bless ridge monkey design venue six problem lucky")
 	require.NoError(t, err)
 	moneyClient := testutil.NewRpcClientMock(
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
-		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Counter: 1})),
+		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &fc.FeeCreditRecord{Balance: 100, Counter: 100})),
 	)
-	dc := NewDustCollector(money.DefaultSystemIdentifier, 10, 10, moneyClient, logger.New(t))
+	dc := NewDustCollector(money.DefaultSystemID, 10, 10, moneyClient, logger.New(t))
 
 	// when dc runs
 	dcResult, err := dc.CollectDust(context.Background(), accountKeys.AccountKey)
@@ -67,12 +67,12 @@ func TestAllBillsAreSwapped_WhenWalletBillCountEqualToMaxBillCount(t *testing.T)
 	require.NoError(t, err)
 	targetBillID := money.NewBillID(nil, []byte{3})
 	moneyClient := testutil.NewRpcClientMock(
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Backlink: []byte{2}})),
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{3}, &money.BillData{V: 3, Backlink: []byte{3}})),
-		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Counter: 1})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Counter: 2})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{3}, &money.BillData{V: 3, Counter: 3})),
+		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &fc.FeeCreditRecord{Balance: 100, Counter: 100})),
 	)
-	w := NewDustCollector(money.DefaultSystemIdentifier, maxBillsPerDC, 10, moneyClient, logger.New(t))
+	w := NewDustCollector(money.DefaultSystemID, maxBillsPerDC, 10, moneyClient, logger.New(t))
 
 	// when dc runs
 	dcResult, err := w.CollectDust(context.Background(), accountKeys.AccountKey)
@@ -94,19 +94,19 @@ func TestAllBillsAreSwapped_WhenWalletBillCountEqualToMaxBillCount(t *testing.T)
 }
 
 func TestOnlyFirstNBillsAreSwapped_WhenBillCountOverLimit(t *testing.T) {
-	// create backend with bills = max dust collection bill count
+	// create rpc client mock with bills = max dust collection bill count
 	maxBillsPerDC := 3
 	accountKeys, err := account.NewKeys("dinosaur simple verify deliver bless ridge monkey design venue six problem lucky")
 	require.NoError(t, err)
 	targetBillID := money.NewBillID(nil, []byte{4})
 	moneyClient := testutil.NewRpcClientMock(
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Backlink: []byte{1}})),
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Backlink: []byte{2}})),
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{3}, &money.BillData{V: 3, Backlink: []byte{3}})),
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{4}, &money.BillData{V: 4, Backlink: []byte{4}})),
-		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &unit.FeeCreditRecord{Balance: 100, Backlink: []byte{100}})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Counter: 1})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Counter: 2})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{3}, &money.BillData{V: 3, Counter: 3})),
+		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{4}, &money.BillData{V: 4, Counter: 4})),
+		testutil.WithOwnerFeeCreditBill(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &fc.FeeCreditRecord{Balance: 100, Counter: 100})),
 	)
-	w := NewDustCollector(money.DefaultSystemIdentifier, maxBillsPerDC, 10, moneyClient, logger.New(t))
+	w := NewDustCollector(money.DefaultSystemID, maxBillsPerDC, 10, moneyClient, logger.New(t))
 
 	// when dc runs
 	dcResult, err := w.CollectDust(context.Background(), accountKeys.AccountKey)

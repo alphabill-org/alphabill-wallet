@@ -3,30 +3,25 @@ package testutils
 import (
 	"context"
 	"crypto"
-	"log/slog"
 	"net"
 	"net/http"
 	"testing"
 
-	abcrypto "github.com/alphabill-org/alphabill/crypto"
-	"github.com/alphabill-org/alphabill/network/protocol/genesis"
+	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
+	sdkmoney "github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	sdktokens "github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
+	"github.com/alphabill-org/alphabill-go-base/types"
+
 	"github.com/alphabill-org/alphabill/partition"
-	"github.com/alphabill-org/alphabill/predicates/templates"
 	abrpc "github.com/alphabill-org/alphabill/rpc"
-	"github.com/alphabill-org/alphabill/rpc/alphabill"
 	"github.com/alphabill-org/alphabill/state"
 	"github.com/alphabill-org/alphabill/txsystem"
 	"github.com/alphabill-org/alphabill/txsystem/money"
 	"github.com/alphabill-org/alphabill/txsystem/tokens"
 	"github.com/stretchr/testify/require"
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/health"
-	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
-	testlogger "github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
 	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
 	testpartition "github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
@@ -36,18 +31,18 @@ const DefaultT2Timeout = uint32(2500)
 
 func CreateMoneyPartition(t *testing.T, genesisConfig *testutil.MoneyGenesisConfig, nodeCount uint8) *testpartition.NodePartition {
 	genesisState := testutil.MoneyGenesisState(t, genesisConfig)
-	moneyPart, err := testpartition.NewPartition(t, "money node", nodeCount, func(tb map[string]abcrypto.Verifier) txsystem.TransactionSystem {
+	moneyPart, err := testpartition.NewPartition(t, "money node", nodeCount, func(tb types.RootTrustBase) txsystem.TransactionSystem {
 		genesisState = genesisState.Clone()
 		system, err := money.NewTxSystem(
 			testobserve.Default(t),
-			money.WithSystemIdentifier(money.DefaultSystemIdentifier),
+			money.WithSystemIdentifier(sdkmoney.DefaultSystemID),
 			money.WithHashAlgorithm(crypto.SHA256),
-			money.WithSystemDescriptionRecords([]*genesis.SystemDescriptionRecord{
+			money.WithSystemDescriptionRecords([]*types.SystemDescriptionRecord{
 				{
-					SystemIdentifier: money.DefaultSystemIdentifier,
+					SystemIdentifier: sdkmoney.DefaultSystemID,
 					T2Timeout:        DefaultT2Timeout,
-					FeeCreditBill: &genesis.FeeCreditBill{
-						UnitID:         money.NewBillID(nil, []byte{2}),
+					FeeCreditBill: &types.FeeCreditBill{
+						UnitID:         sdkmoney.NewBillID(nil, []byte{2}),
 						OwnerPredicate: templates.AlwaysTrueBytes(),
 					},
 				},
@@ -57,7 +52,7 @@ func CreateMoneyPartition(t *testing.T, genesisConfig *testutil.MoneyGenesisConf
 		)
 		require.NoError(t, err)
 		return system
-	}, money.DefaultSystemIdentifier, genesisState)
+	}, sdkmoney.DefaultSystemID, genesisState)
 	require.NoError(t, err)
 	return moneyPart
 }
@@ -70,65 +65,10 @@ func StartAlphabill(t *testing.T, partitions []*testpartition.NodePartition) *te
 	return abNetwork
 }
 
-func StartPartitionGRPCServers(t *testing.T, partition *testpartition.NodePartition) {
-	for _, n := range partition.Nodes {
-		n.AddrGRPC = startGRPCServer(t, n.Node, testlogger.NOP())
-	}
-	// wait for partition servers to start
-	for _, n := range partition.Nodes {
-		require.Eventually(t, func() bool {
-			_, err := n.LatestBlockNumber()
-			return err == nil
-		}, test.WaitDuration, test.WaitTick)
-	}
-}
-
-func startGRPCServer(t *testing.T, node *partition.Node, log *slog.Logger) string {
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-
-	grpcServer, err := initGRPCServer(node, &grpcServerConfiguration{
-		address:               listener.Addr().String(),
-		maxGetBlocksBatchSize: defaultMaxGetBlocksBatchSize,
-		maxRecvMsgSize:        defaultMaxRecvMsgSize,
-		maxSendMsgSize:        defaultMaxSendMsgSize,
-	}, testobserve.Default(t), log)
-	require.NoError(t, err)
-
-	t.Cleanup(func() {
-		grpcServer.GracefulStop()
-	})
-
-	go func() {
-		require.NoError(t, grpcServer.Serve(listener), "gRPC server exited with error")
-	}()
-
-	return listener.Addr().String()
-}
-
-func initGRPCServer(node *partition.Node, cfg *grpcServerConfiguration, obs partition.Observability, log *slog.Logger) (*grpc.Server, error) {
-	grpcServer := grpc.NewServer(
-		grpc.MaxSendMsgSize(cfg.maxSendMsgSize),
-		grpc.MaxRecvMsgSize(cfg.maxRecvMsgSize),
-		grpc.KeepaliveParams(cfg.grpcKeepAliveServerParameters()),
-		grpc.UnaryInterceptor(abrpc.InstrumentMetricsUnaryServerInterceptor(obs.Meter(abrpc.MetricsScopeGRPCAPI), log)),
-		grpc.StatsHandler(otelgrpc.NewServerHandler(otelgrpc.WithTracerProvider(obs.TracerProvider()))),
-	)
-	grpc_health_v1.RegisterHealthServer(grpcServer, health.NewServer())
-
-	rpcServer, err := abrpc.NewGRPCServer(node, obs, abrpc.WithMaxGetBlocksBatchSize(cfg.maxGetBlocksBatchSize))
-	if err != nil {
-		return nil, err
-	}
-
-	alphabill.RegisterAlphabillServiceServer(grpcServer, rpcServer)
-	return grpcServer, nil
-}
-
 func CreateTokensPartition(t *testing.T) *testpartition.NodePartition {
 	tokensState := state.NewEmptyState()
 	network, err := testpartition.NewPartition(t, "tokens node", 1,
-		func(tb map[string]abcrypto.Verifier) txsystem.TransactionSystem {
+		func(tb types.RootTrustBase) txsystem.TransactionSystem {
 			tokensState = tokensState.Clone()
 			system, err := tokens.NewTxSystem(
 				testobserve.Default(t),
@@ -137,7 +77,7 @@ func CreateTokensPartition(t *testing.T) *testpartition.NodePartition {
 			)
 			require.NoError(t, err)
 			return system
-		}, tokens.DefaultSystemIdentifier, tokensState,
+		}, sdktokens.DefaultSystemID, tokensState,
 	)
 	require.NoError(t, err)
 	return network
@@ -204,7 +144,7 @@ func InitRpcServer(node *partition.Node, nodeName string, cfg *abrpc.ServerConfi
 		},
 		{
 			Namespace: "admin",
-			Service:   abrpc.NewAdminAPI(node, nodeName, node.GetPeer(), obs.Logger()),
+			Service:   abrpc.NewAdminAPI(node, nodeName, node.Peer(), obs.Logger()),
 		},
 	}
 	httpServer, err := abrpc.NewHTTPServer(cfg, obs)

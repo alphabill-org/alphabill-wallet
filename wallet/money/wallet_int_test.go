@@ -2,21 +2,15 @@ package money
 
 import (
 	"context"
-	"crypto"
 	"net"
 	"net/http"
 	"testing"
 	"time"
 
-	abcrypto "github.com/alphabill-org/alphabill/crypto"
-	"github.com/alphabill-org/alphabill/network/protocol/genesis"
-	"github.com/alphabill-org/alphabill/predicates/templates"
-	"github.com/alphabill-org/alphabill/rpc"
-	"github.com/alphabill-org/alphabill/txsystem"
-	"github.com/alphabill-org/alphabill/txsystem/money"
-	ethrpc "github.com/ethereum/go-ethereum/rpc"
-	"github.com/stretchr/testify/require"
-
+	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
+	testsig "github.com/alphabill-org/alphabill-go-base/testutils/sig"
+	sdkmoney "github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-base/types"
 	rpcclient "github.com/alphabill-org/alphabill-wallet/client/rpc"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	testfees "github.com/alphabill-org/alphabill-wallet/internal/testutils/fees"
@@ -25,12 +19,13 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
+	mwtypes "github.com/alphabill-org/alphabill-wallet/wallet/money/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
-)
-
-var (
-	fcrID     = money.NewFeeCreditRecordID(nil, []byte{1})
-	fcrAmount = uint64(1e8)
+	"github.com/alphabill-org/alphabill/rpc"
+	"github.com/alphabill-org/alphabill/txsystem"
+	"github.com/alphabill-org/alphabill/txsystem/money"
+	ethrpc "github.com/ethereum/go-ethereum/rpc"
+	"github.com/stretchr/testify/require"
 )
 
 /*
@@ -41,6 +36,7 @@ wallet account 2 and 3 should have only single bill
 */
 func TestCollectDustInMultiAccountWallet(t *testing.T) {
 	observe := testobserve.Default(t)
+	signer, _ := testsig.CreateSignerAndVerifier(t)
 
 	// setup account
 	dir := t.TempDir()
@@ -54,12 +50,12 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 
 	// start server
 	genesisConfig := &testutil.MoneyGenesisConfig{
-		InitialBillID:    money.NewBillID(nil, []byte{1}),
+		InitialBillID:    sdkmoney.NewBillID(nil, []byte{1}),
 		InitialBillValue: 10000 * 1e8,
 		InitialBillOwner: templates.NewP2pkh256BytesFromKey(accKey.PubKey),
 	}
 	network := startMoneyOnlyAlphabillPartition(t, genesisConfig)
-	moneyPart, err := network.GetNodePartition(money.DefaultSystemIdentifier)
+	moneyPart, err := network.GetNodePartition(sdkmoney.DefaultSystemID)
 	require.NoError(t, err)
 	addr := initRPCServer(t, moneyPart.Nodes[0])
 
@@ -85,14 +81,16 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 	require.NoError(t, err)
 
 	// create fee credit for initial bill transfer
-	transferFC := testfees.CreateFeeCredit(t, genesisConfig.InitialBillID, fcrID, fcrAmount, accKey.PrivKey, accKey.PubKey, network)
-	initialBillBacklink := transferFC.Hash(crypto.SHA256)
+	fcrID := mwtypes.FeeCreditRecordIDFormPublicKeyHash(nil, accKey.PubKeyHash.Sha256)
+	fcrAmount := uint64(1e8)
+	_ = testfees.CreateFeeCredit(t, signer, genesisConfig.InitialBillID, fcrID, fcrAmount, accKey, network)
+	initialBillCounter := uint64(1)
 	initialBillValue := genesisConfig.InitialBillValue - fcrAmount
 
 	// transfer initial bill to wallet 1
-	transferInitialBillTx, err := testutil.CreateInitialBillTransferTx(accKey, genesisConfig.InitialBillID, fcrID, initialBillValue, 10000, initialBillBacklink)
+	transferInitialBillTx, err := testutil.CreateInitialBillTransferTx(accKey, genesisConfig.InitialBillID, fcrID, initialBillValue, 10000, initialBillCounter)
 	require.NoError(t, err)
-	batch := txsubmitter.NewBatch(accKey.PubKey, w.rpcClient, observe.Logger())
+	batch := txsubmitter.NewBatch(w.rpcClient, observe.Logger())
 	batch.Add(txsubmitter.New(transferInitialBillTx))
 	err = batch.SendTx(ctx, false)
 	require.NoError(t, err)
@@ -152,17 +150,17 @@ func startMoneyOnlyAlphabillPartition(t *testing.T, genesisConfig *testutil.Mone
 	genesisConfig.DCMoneySupplyValue = 10000 * 1e8
 	genesisConfig.SDRs = createSDRs()
 	genesisState := testutil.MoneyGenesisState(t, genesisConfig)
-	mPart, err := testpartition.NewPartition(t, "money node", 1, func(tb map[string]abcrypto.Verifier) txsystem.TransactionSystem {
+	mPart, err := testpartition.NewPartition(t, "money node", 1, func(tb types.RootTrustBase) txsystem.TransactionSystem {
 		system, err := money.NewTxSystem(
 			testobserve.Default(t),
-			money.WithSystemIdentifier(money.DefaultSystemIdentifier),
+			money.WithSystemIdentifier(sdkmoney.DefaultSystemID),
 			money.WithSystemDescriptionRecords(createSDRs()),
 			money.WithTrustBase(tb),
 			money.WithState(genesisState),
 		)
 		require.NoError(t, err)
 		return system
-	}, money.DefaultSystemIdentifier, genesisState)
+	}, sdkmoney.DefaultSystemID, genesisState)
 	require.NoError(t, err)
 	abNet, err := testpartition.NewAlphabillPartition([]*testpartition.NodePartition{mPart})
 	require.NoError(t, err)
@@ -199,12 +197,12 @@ func initRPCServer(t *testing.T, partitionNode *testpartition.PartitionNode) str
 	return listener.Addr().String()
 }
 
-func createSDRs() []*genesis.SystemDescriptionRecord {
-	return []*genesis.SystemDescriptionRecord{{
-		SystemIdentifier: money.DefaultSystemIdentifier,
+func createSDRs() []*types.SystemDescriptionRecord {
+	return []*types.SystemDescriptionRecord{{
+		SystemIdentifier: sdkmoney.DefaultSystemID,
 		T2Timeout:        2500,
-		FeeCreditBill: &genesis.FeeCreditBill{
-			UnitID:         money.NewBillID(nil, []byte{2}),
+		FeeCreditBill: &types.FeeCreditBill{
+			UnitID:         sdkmoney.NewBillID(nil, []byte{2}),
 			OwnerPredicate: templates.AlwaysTrueBytes(),
 		},
 	}}

@@ -6,9 +6,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/txsystem/evm"
-	"github.com/alphabill-org/alphabill/types"
-	"github.com/fxamacker/cbor/v2"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/evm"
+	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/stretchr/testify/require"
 
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
@@ -38,11 +37,11 @@ func newClientMock() *evmClientMock {
 	return &evmClientMock{}
 }
 
-func (e *evmClientMock) GetRoundNumber(ctx context.Context) (*wallet.RoundNumber, error) {
+func (e *evmClientMock) GetRoundNumber(ctx context.Context) (*evmclient.RoundNumber, error) {
 	if e.SimulateErr != nil {
 		return nil, e.SimulateErr
 	}
-	return &wallet.RoundNumber{RoundNumber: 3, LastIndexedRoundNumber: 3}, nil
+	return &evmclient.RoundNumber{RoundNumber: 3, LastIndexedRoundNumber: 3}, nil
 }
 
 func (e *evmClientMock) PostTransaction(ctx context.Context, tx *types.TransactionOrder) error {
@@ -56,10 +55,10 @@ func (e *evmClientMock) GetTxProof(ctx context.Context, unitID types.UnitID, txH
 	if e.SimulateErr != nil {
 		return nil, e.SimulateErr
 	}
-	details := evmclient.ProcessingDetails{
+	details := evm.ProcessingDetails{
 		ErrorDetails: "some error string",
 	}
-	encoded, _ := cbor.Marshal(details)
+	encoded, _ := types.Cbor.Marshal(details)
 	return &wallet.Proof{
 		TxRecord: &types.TransactionRecord{
 			TransactionOrder: &types.TransactionOrder{},
@@ -74,11 +73,11 @@ func (e *evmClientMock) GetTxProof(ctx context.Context, unitID types.UnitID, txH
 	}, nil
 }
 
-func (e *evmClientMock) Call(ctx context.Context, callAttr *evmclient.CallAttributes) (*evmclient.ProcessingDetails, error) {
+func (e *evmClientMock) Call(ctx context.Context, callAttr *evm.CallEVMRequest) (*evm.ProcessingDetails, error) {
 	if e.SimulateErr != nil {
 		return nil, e.SimulateErr
 	}
-	return &evmclient.ProcessingDetails{
+	return &evm.ProcessingDetails{
 		ErrorDetails: "actual execution failed",
 	}, nil
 }
@@ -90,24 +89,24 @@ func (e *evmClientMock) GetTransactionCount(ctx context.Context, ethAddr []byte)
 	return uint64(1), nil
 }
 
-func (e *evmClientMock) GetBalance(ctx context.Context, ethAddr []byte) (string, []byte, error) {
+func (e *evmClientMock) GetBalance(ctx context.Context, ethAddr []byte) (string, uint64, error) {
 	if e.SimulateErr != nil {
-		return "", nil, e.SimulateErr
+		return "", 0, e.SimulateErr
 	}
 	if e.noFcb {
-		return "", nil, evmclient.ErrNotFound
+		return "", 0, evmclient.ErrNotFound
 	}
-	return "100000", test.RandomBytes(32), nil
+	return "100000", 0, nil
 }
 
-func (e *evmClientMock) GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*wallet.Bill, error) {
+func (e *evmClientMock) GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*evmclient.Bill, error) {
 	if e.SimulateErr != nil {
 		return nil, e.SimulateErr
 	}
 	if e.noFcb {
 		return nil, nil
 	}
-	return &wallet.Bill{
+	return &evmclient.Bill{
 		Id:    unitID,
 		Value: 100 * 1e8,
 	}, nil
@@ -129,7 +128,7 @@ func createTestWallet(t *testing.T) (*Wallet, *evmClientMock) {
 	require.NoError(t, err)
 	clientMock := newClientMock()
 	return &Wallet{
-		systemID: evm.DefaultEvmTxSystemIdentifier,
+		systemID: evm.DefaultSystemID,
 		am:       am,
 		restCli:  clientMock,
 	}, clientMock
@@ -216,7 +215,7 @@ func TestWallet_EvmCall(t *testing.T) {
 	require.NotNil(t, w)
 	require.NotNil(t, clientMock)
 	ctx := context.Background()
-	attrs := &evmclient.CallAttributes{}
+	attrs := &evm.CallEVMRequest{}
 	res, err := w.EvmCall(ctx, 1, attrs)
 	require.ErrorContains(t, err, "account key read failed: account does not exist")
 	require.Nil(t, res)
@@ -265,7 +264,7 @@ func TestWallet_SendEvmTx(t *testing.T) {
 	require.NotNil(t, w)
 	require.NotNil(t, clientMock)
 	ctx := context.Background()
-	attrs := &evmclient.TxAttributes{}
+	attrs := &evm.TxAttributes{}
 	res, err := w.SendEvmTx(ctx, 1, attrs)
 	require.ErrorContains(t, err, "account key read failed: account does not exist")
 	require.Nil(t, res)

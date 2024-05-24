@@ -6,14 +6,15 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/alphabill-org/alphabill/types"
+	"github.com/alphabill-org/alphabill-go-base/types"
+	"github.com/alphabill-org/alphabill-wallet/wallet/evm/client"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 )
 
 type (
 	Client interface {
-		GetRoundNumber(ctx context.Context) (*wallet.RoundNumber, error)
+		GetRoundNumber(ctx context.Context) (*client.RoundNumber, error)
 		PostTransaction(ctx context.Context, tx *types.TransactionOrder) error
 		GetTxProof(ctx context.Context, unitID types.UnitID, txHash wallet.TxHash) (*wallet.Proof, error)
 	}
@@ -22,9 +23,9 @@ type (
 	}
 )
 
-func NewTxPublisher(backendClient Client) *TxPublisher {
+func NewTxPublisher(restClient Client) *TxPublisher {
 	return &TxPublisher{
-		cli: backendClient,
+		cli: restClient,
 	}
 }
 
