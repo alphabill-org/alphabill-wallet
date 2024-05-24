@@ -25,6 +25,11 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 )
 
+const (
+	transferFCLatestAdditionTime = 65536
+	fcrTimeout                   = 1000 + transferFCLatestAdditionTime
+)
+
 func Test_GetRoundNumber_OK(t *testing.T) {
 	t.Parallel()
 
@@ -225,6 +230,11 @@ func TestNewTypes(t *testing.T) {
 				},
 			}, nil
 		},
+		getUnitsByOwnerID: func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
+			// by default returns only the fee credit record id
+			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			return []types.UnitID{fcrID}, nil
+		},
 	}
 	tw := initTestWallet(t, rpcClient)
 
@@ -337,6 +347,11 @@ func TestMintFungibleToken(t *testing.T) {
 				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Counter: 2},
 			}, nil
 		},
+		getUnitsByOwnerID: func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
+			// by default returns only the fee credit record id
+			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			return []types.UnitID{fcrID}, nil
+		},
 	}
 	tw := initTestWallet(t, rpcClient)
 	_, _, err := tw.am.AddAccount()
@@ -399,6 +414,11 @@ func TestSendFungible(t *testing.T) {
 				ID:              []byte{1},
 				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Counter: 2},
 			}, nil
+		},
+		getUnitsByOwnerID: func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
+			// by default returns only the fee credit record id
+			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			return []types.UnitID{fcrID}, nil
 		},
 		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
 			recTxs = append(recTxs, tx)
@@ -601,6 +621,11 @@ func TestMintNFT(t *testing.T) {
 				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Counter: 2},
 			}, nil
 		},
+		getUnitsByOwnerID: func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
+			// by default returns only the fee credit record id
+			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			return []types.UnitID{fcrID}, nil
+		},
 	}
 	tw := initTestWallet(t, rpcClient)
 	_, _, err := tw.am.AddAccount()
@@ -690,6 +715,11 @@ func TestTransferNFT(t *testing.T) {
 				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Counter: 2},
 			}, nil
 		},
+		getUnitsByOwnerID: func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
+			// by default returns only the fee credit record id
+			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			return []types.UnitID{fcrID}, nil
+		},
 	}
 	tw := initTestWallet(t, rpcClient)
 
@@ -761,6 +791,11 @@ func TestUpdateNFTData(t *testing.T) {
 				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Counter: 2},
 			}, nil
 		},
+		getUnitsByOwnerID: func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
+			// by default returns only the fee credit record id
+			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			return []types.UnitID{fcrID}, nil
+		},
 	}
 	tw := initTestWallet(t, rpcClient)
 
@@ -829,6 +864,11 @@ func TestLockToken(t *testing.T) {
 				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Counter: 2},
 			}, nil
 		},
+		getUnitsByOwnerID: func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
+			// by default returns only the fee credit record id
+			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			return []types.UnitID{fcrID}, nil
+		},
 	}
 	tw := initTestWallet(t, rpcClient)
 
@@ -868,6 +908,11 @@ func TestUnlockToken(t *testing.T) {
 				ID:              []byte{1},
 				FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100000, Counter: 2},
 			}, nil
+		},
+		getUnitsByOwnerID: func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
+			// by default returns only the fee credit record id
+			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			return []types.UnitID{fcrID}, nil
 		},
 	}
 	tw := initTestWallet(t, rpcClient)

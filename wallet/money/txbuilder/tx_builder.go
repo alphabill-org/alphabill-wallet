@@ -14,7 +14,6 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
-	mwtypes "github.com/alphabill-org/alphabill-wallet/wallet/money/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txbuilder"
 )
 
@@ -68,7 +67,7 @@ func NewTransferTx(receiverPubKey []byte, k *account.AccountKey, systemID types.
 		TargetValue: bill.Value(),
 		Counter:     bill.Counter(),
 	}
-	txPayload, err := txbuilder.NewTxPayload(systemID, money.PayloadTypeTransfer, bill.ID, timeout, fcrID, refNo, attr)
+	txPayload, err := txbuilder.NewTxPayload(systemID, money.PayloadTypeTransfer, bill.ID, fcrID, timeout, refNo, attr)
 	if err != nil {
 		return nil, err
 	}
@@ -82,29 +81,28 @@ func NewSplitTx(targetUnits []*money.TargetUnit, remainingValue uint64, k *accou
 		RemainingValue: remainingValue,
 		Counter:        bill.Counter(),
 	}
-	txPayload, err := txbuilder.NewTxPayload(systemID, money.PayloadTypeSplit, bill.ID, timeout, fcrID, refNo, attr)
+	txPayload, err := txbuilder.NewTxPayload(systemID, money.PayloadTypeSplit, bill.ID, fcrID, timeout, refNo, attr)
 	if err != nil {
 		return nil, err
 	}
 	return SignPayload(txPayload, k)
 }
 
-func NewDustTx(ac *account.AccountKey, systemID types.SystemID, bill *api.Bill, targetBillID []byte, targetUnitCounter, timeout uint64) (*types.TransactionOrder, error) {
+func NewDustTx(ac *account.AccountKey, systemID types.SystemID, fcrID types.UnitID, bill *api.Bill, targetBillID []byte, targetUnitCounter, timeout uint64) (*types.TransactionOrder, error) {
 	attr := &money.TransferDCAttributes{
 		TargetUnitID:      targetBillID,
 		TargetUnitCounter: targetUnitCounter,
 		Value:             bill.Value(),
 		Counter:           bill.Counter(),
 	}
-	fcrID := mwtypes.FeeCreditRecordIDFormPublicKeyHash(nil, ac.PubKeyHash.Sha256)
-	txPayload, err := txbuilder.NewTxPayload(systemID, money.PayloadTypeTransDC, bill.ID, timeout, fcrID, nil, attr)
+	txPayload, err := txbuilder.NewTxPayload(systemID, money.PayloadTypeTransDC, bill.ID, fcrID, timeout, nil, attr)
 	if err != nil {
 		return nil, err
 	}
 	return SignPayload(txPayload, ac)
 }
 
-func NewSwapTx(k *account.AccountKey, systemID types.SystemID, dcProofs []*wallet.Proof, targetUnitID []byte, timeout uint64) (*types.TransactionOrder, error) {
+func NewSwapTx(k *account.AccountKey, systemID types.SystemID, fcrID types.UnitID, dcProofs []*wallet.Proof, targetUnitID []byte, timeout uint64) (*types.TransactionOrder, error) {
 	if len(dcProofs) == 0 {
 		return nil, errors.New("cannot create swap transaction as no dust transfer proofs exist")
 	}
@@ -130,8 +128,7 @@ func NewSwapTx(k *account.AccountKey, systemID types.SystemID, dcProofs []*walle
 		DcTransferProofs: dustTransferProofs,
 		TargetValue:      billValueSum,
 	}
-	fcrID := mwtypes.FeeCreditRecordIDFormPublicKeyHash(nil, k.PubKeyHash.Sha256)
-	swapTx, err := txbuilder.NewTxPayload(systemID, money.PayloadTypeSwapDC, targetUnitID, timeout, fcrID, nil, attr)
+	swapTx, err := txbuilder.NewTxPayload(systemID, money.PayloadTypeSwapDC, targetUnitID, fcrID, timeout, nil, attr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build swap transaction: %w", err)
 	}
@@ -142,25 +139,23 @@ func NewSwapTx(k *account.AccountKey, systemID types.SystemID, dcProofs []*walle
 	return payload, nil
 }
 
-func NewLockTx(ac *account.AccountKey, systemID types.SystemID, unitID []byte, counter uint64, lockStatus, timeout uint64) (*types.TransactionOrder, error) {
+func NewLockTx(ac *account.AccountKey, systemID types.SystemID, unitID, fcrID types.UnitID, counter uint64, lockStatus, timeout uint64) (*types.TransactionOrder, error) {
 	attr := &money.LockAttributes{
 		LockStatus: lockStatus,
 		Counter:    counter,
 	}
-	fcrID := mwtypes.FeeCreditRecordIDFormPublicKeyHash(nil, ac.PubKeyHash.Sha256)
-	txPayload, err := txbuilder.NewTxPayload(systemID, money.PayloadTypeLock, unitID, timeout, fcrID, nil, attr)
+	txPayload, err := txbuilder.NewTxPayload(systemID, money.PayloadTypeLock, unitID, fcrID, timeout, nil, attr)
 	if err != nil {
 		return nil, err
 	}
 	return SignPayload(txPayload, ac)
 }
 
-func NewUnlockTx(ac *account.AccountKey, systemID types.SystemID, b *api.Bill, timeout uint64) (*types.TransactionOrder, error) {
+func NewUnlockTx(ac *account.AccountKey, systemID types.SystemID, b *api.Bill, fcrID types.UnitID, timeout uint64) (*types.TransactionOrder, error) {
 	attr := &money.UnlockAttributes{
 		Counter: b.Counter(),
 	}
-	fcrID := mwtypes.FeeCreditRecordIDFormPublicKeyHash(nil, ac.PubKeyHash.Sha256)
-	txPayload, err := txbuilder.NewTxPayload(systemID, money.PayloadTypeUnlock, b.ID, timeout, fcrID, nil, attr)
+	txPayload, err := txbuilder.NewTxPayload(systemID, money.PayloadTypeUnlock, b.ID, fcrID, timeout, nil, attr)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +167,7 @@ func NewLockFCTx(ac *account.AccountKey, systemID types.SystemID, fcb *api.FeeCr
 		LockStatus: lockStatus,
 		Counter:    fcb.Counter(),
 	}
-	txPayload, err := txbuilder.NewTxPayload(systemID, fc.PayloadTypeLockFeeCredit, fcb.ID, timeout, nil, nil, attr)
+	txPayload, err := txbuilder.NewTxPayload(systemID, fc.PayloadTypeLockFeeCredit, fcb.ID, nil, timeout, nil, attr)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +178,7 @@ func NewUnlockFCTx(ac *account.AccountKey, systemID types.SystemID, fcb *api.Fee
 	attr := &fc.UnlockFeeCreditAttributes{
 		Counter: fcb.Counter(),
 	}
-	txPayload, err := txbuilder.NewTxPayload(systemID, fc.PayloadTypeUnlockFeeCredit, fcb.ID, timeout, nil, nil, attr)
+	txPayload, err := txbuilder.NewTxPayload(systemID, fc.PayloadTypeUnlockFeeCredit, fcb.ID, nil, timeout, nil, attr)
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +194,7 @@ func NewTransferFCTx(amount uint64, targetRecordID []byte, targetUnitCounter *ui
 		TargetUnitCounter:      targetUnitCounter,
 		Counter:                counter,
 	}
-	txPayload, err := txbuilder.NewTxPayload(moneySystemID, fc.PayloadTypeTransferFeeCredit, unitID, timeout, nil, nil, attr)
+	txPayload, err := txbuilder.NewTxPayload(moneySystemID, fc.PayloadTypeTransferFeeCredit, unitID, nil, timeout, nil, attr)
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +207,7 @@ func NewAddFCTx(unitID []byte, transferFC *wallet.Proof, ac *account.AccountKey,
 		FeeCreditTransfer:       transferFC.TxRecord,
 		FeeCreditTransferProof:  transferFC.TxProof,
 	}
-	txPayload, err := txbuilder.NewTxPayload(systemID, fc.PayloadTypeAddFeeCredit, unitID, timeout, nil, nil, attr)
+	txPayload, err := txbuilder.NewTxPayload(systemID, fc.PayloadTypeAddFeeCredit, unitID, nil, timeout, nil, attr)
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +221,7 @@ func NewCloseFCTx(systemID types.SystemID, fcb *api.FeeCreditBill, timeout uint6
 		Amount:            fcb.Balance(),
 		Counter:           fcb.Counter(),
 	}
-	txPayload, err := txbuilder.NewTxPayload(systemID, fc.PayloadTypeCloseFeeCredit, fcb.ID, timeout, nil, nil, attr)
+	txPayload, err := txbuilder.NewTxPayload(systemID, fc.PayloadTypeCloseFeeCredit, fcb.ID, nil, timeout, nil, attr)
 	if err != nil {
 		return nil, err
 	}
@@ -239,7 +234,7 @@ func NewReclaimFCTx(systemID types.SystemID, unitID []byte, timeout uint64, fcPr
 		CloseFeeCreditProof:    fcProof.TxProof,
 		Counter:                counter,
 	}
-	txPayload, err := txbuilder.NewTxPayload(systemID, fc.PayloadTypeReclaimFeeCredit, unitID, timeout, nil, nil, attr)
+	txPayload, err := txbuilder.NewTxPayload(systemID, fc.PayloadTypeReclaimFeeCredit, unitID, nil, timeout, nil, attr)
 	if err != nil {
 		return nil, err
 	}
