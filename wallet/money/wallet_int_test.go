@@ -2,7 +2,6 @@ package money
 
 import (
 	"context"
-	"crypto"
 	"net"
 	"net/http"
 	"testing"
@@ -95,11 +94,7 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 	transferInitialBillTx, err := testutil.CreateInitialBillTransferTx(accKey, genesisConfig.InitialBillID, fcrID, initialBillValue, 10000, initialBillCounter)
 	require.NoError(t, err)
 	batch := txsubmitter.NewBatch(w.rpcClient, observe.Logger())
-	batch.Add(&txsubmitter.TxSubmission{
-		UnitID:      transferInitialBillTx.UnitID(),
-		TxHash:      transferInitialBillTx.Hash(crypto.SHA256),
-		Transaction: transferInitialBillTx,
-	})
+	batch.Add(txsubmitter.New(transferInitialBillTx))
 	err = batch.SendTx(ctx, false)
 	require.NoError(t, err)
 	require.Eventually(t, testpartition.BlockchainContainsTx(moneyPart, transferInitialBillTx), test.WaitDuration, test.WaitTick)

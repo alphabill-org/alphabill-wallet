@@ -2,7 +2,6 @@ package dc
 
 import (
 	"context"
-	"crypto"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -122,11 +121,7 @@ func (w *DustCollector) submitDCBatch(ctx context.Context, k *account.AccountKey
 		if err != nil {
 			return nil, fmt.Errorf("failed to build dust transfer transaction: %w", err)
 		}
-		dcBatch.Add(&txsubmitter.TxSubmission{
-			UnitID:      tx.UnitID(),
-			TxHash:      tx.Hash(crypto.SHA256),
-			Transaction: tx,
-		})
+		dcBatch.Add(txsubmitter.New(tx))
 	}
 
 	// send dc batch
@@ -163,11 +158,7 @@ func (w *DustCollector) swapDCBills(ctx context.Context, k *account.AccountKey, 
 
 	// create tx submitter batch
 	dcBatch := txsubmitter.NewBatch(w.moneyClient, w.log)
-	sub := &txsubmitter.TxSubmission{
-		UnitID:      swapTx.UnitID(),
-		TxHash:      swapTx.Hash(crypto.SHA256),
-		Transaction: swapTx,
-	}
+	sub := txsubmitter.New(swapTx)
 	dcBatch.Add(sub)
 
 	// send swap tx
@@ -190,13 +181,8 @@ func (w *DustCollector) lockTargetBill(ctx context.Context, k *account.AccountKe
 	}
 	// lock target bill server side
 	w.log.InfoContext(ctx, fmt.Sprintf("locking target bill in node %x", targetBill.ID))
-	lockTxHash := lockTx.Hash(crypto.SHA256)
 	lockTxBatch := txsubmitter.NewBatch(w.moneyClient, w.log)
-	lockTxBatch.Add(&txsubmitter.TxSubmission{
-		UnitID:      lockTx.UnitID(),
-		TxHash:      lockTxHash,
-		Transaction: lockTx,
-	})
+	lockTxBatch.Add(txsubmitter.New(lockTx))
 	if err := lockTxBatch.SendTx(ctx, true); err != nil {
 		return nil, fmt.Errorf("failed to send or confirm lock tx: %w", err)
 	}

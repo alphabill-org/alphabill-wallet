@@ -2,6 +2,7 @@ package txsubmitter
 
 import (
 	"context"
+	"crypto"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -34,6 +35,14 @@ type (
 		GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TransactionRecord, *types.TxProof, error)
 	}
 )
+
+func New(tx *types.TransactionOrder) *TxSubmission {
+	return &TxSubmission{
+		UnitID:      tx.UnitID(),
+		TxHash:      tx.Hash(crypto.SHA256),
+		Transaction: tx,
+	}
+}
 
 func (s *TxSubmission) ToBatch(rpcClient RpcClient, log *slog.Logger) *TxSubmissionBatch {
 	return &TxSubmissionBatch{
