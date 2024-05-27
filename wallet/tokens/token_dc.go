@@ -49,7 +49,8 @@ func (w *Wallet) CollectDust(ctx context.Context, accountNumber uint64, allowedT
 func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, typedTokens []*TokenUnit, invariantPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
 	batchCount := ((len(typedTokens) - 1) / maxBurnBatchSize) + 1
 	txCount := len(typedTokens) + batchCount*2 // +lock fee and join fee for every batch
-	if err := w.ensureFeeCredit(ctx, acc.AccountKey, txCount); err != nil {
+	fcrID, err := w.ensureFeeCredit(ctx, acc.AccountKey, txCount)
+	if err != nil {
 		return nil, err
 	}
 	// first token to be joined into
@@ -83,20 +84,20 @@ func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, typedTokens [
 		}
 
 		var lockFee uint64
-		lockFee, err = w.lockTokenForDC(ctx, acc.AccountKey, targetTokenID, targetTokenCounter, invariantPredicateArgs)
+		lockFee, err = w.lockTokenForDC(ctx, acc.AccountKey, fcrID, targetTokenID, targetTokenCounter, invariantPredicateArgs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to lock target token: %w", err)
 		}
 
 		targetTokenCounter += 1
-		burnBatchAmount, burnFee, proofs, err := w.burnTokensForDC(ctx, acc.AccountKey, burnBatch, targetTokenCounter, targetTokenID, invariantPredicateArgs)
+		burnBatchAmount, burnFee, proofs, err := w.burnTokensForDC(ctx, acc.AccountKey, burnBatch, targetTokenCounter, targetTokenID, fcrID, invariantPredicateArgs)
 		if err != nil {
 			return nil, err
 		}
 
 		// if there's more to burn, update counter to continue
 		var joinFee uint64
-		joinFee, err = w.joinTokenForDC(ctx, acc.AccountKey, proofs, targetTokenCounter, targetTokenID, invariantPredicateArgs)
+		joinFee, err = w.joinTokenForDC(ctx, acc.AccountKey, proofs, targetTokenCounter, targetTokenID, fcrID, invariantPredicateArgs)
 		if err != nil {
 			return nil, err
 		}
@@ -108,7 +109,7 @@ func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, typedTokens [
 	return &SubmissionResult{FeeSum: totalFees}, nil
 }
 
-func (w *Wallet) joinTokenForDC(ctx context.Context, acc *account.AccountKey, burnProofs []*wallet.Proof, targetTokenCounter uint64, targetTokenID types.UnitID, invariantPredicateArgs []*PredicateInput) (uint64, error) {
+func (w *Wallet) joinTokenForDC(ctx context.Context, acc *account.AccountKey, burnProofs []*wallet.Proof, targetTokenCounter uint64, targetTokenID, fcrID types.UnitID, invariantPredicateArgs []*PredicateInput) (uint64, error) {
 	// explicitly sort proofs by unit ids in increasing order
 	sort.Slice(burnProofs, func(i, j int) bool {
 		a := burnProofs[i].TxRecord.TransactionOrder.UnitID()
@@ -129,7 +130,7 @@ func (w *Wallet) joinTokenForDC(ctx context.Context, acc *account.AccountKey, bu
 		InvariantPredicateSignatures: nil,
 	}
 
-	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeJoinFungibleToken, joinAttrs, targetTokenID, acc, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
+	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeJoinFungibleToken, joinAttrs, targetTokenID, fcrID, acc, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.GetAccountManager(), invariantPredicateArgs, tx, joinAttrs)
 		if err != nil {
 			return err
@@ -147,7 +148,7 @@ func (w *Wallet) joinTokenForDC(ctx context.Context, acc *account.AccountKey, bu
 	return sub.Proof.TxRecord.ServerMetadata.ActualFee, nil
 }
 
-func (w *Wallet) burnTokensForDC(ctx context.Context, acc *account.AccountKey, tokensToBurn []*TokenUnit, targetTokenCounter uint64, targetTokenID types.UnitID, invariantPredicateArgs []*PredicateInput) (uint64, uint64, []*wallet.Proof, error) {
+func (w *Wallet) burnTokensForDC(ctx context.Context, acc *account.AccountKey, tokensToBurn []*TokenUnit, targetTokenCounter uint64, targetTokenID, fcrID types.UnitID, invariantPredicateArgs []*PredicateInput) (uint64, uint64, []*wallet.Proof, error) {
 	burnBatch := txsubmitter.NewBatch(w.rpcClient, w.log)
 	rnFetcher := &cachingRoundNumberFetcher{delegate: w.GetRoundNumber}
 	burnBatchAmount := uint64(0)
@@ -155,7 +156,7 @@ func (w *Wallet) burnTokensForDC(ctx context.Context, acc *account.AccountKey, t
 	for _, token := range tokensToBurn {
 		burnBatchAmount += token.Amount
 		attrs := newBurnTxAttrs(token, targetTokenCounter, targetTokenID)
-		sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeBurnFungibleToken, attrs, token.ID, acc, rnFetcher.getRoundNumber, func(tx *types.TransactionOrder) error {
+		sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeBurnFungibleToken, attrs, token.ID, fcrID, acc, rnFetcher.getRoundNumber, func(tx *types.TransactionOrder) error {
 			signatures, err := preparePredicateSignatures(w.GetAccountManager(), invariantPredicateArgs, tx, attrs)
 			if err != nil {
 				return err
@@ -214,13 +215,13 @@ func (w *Wallet) getTokensForDC(ctx context.Context, key wallet.PubKey, allowedT
 	return tokensByTypes, nil
 }
 
-func (w *Wallet) lockTokenForDC(ctx context.Context, acc *account.AccountKey, targetTokenID types.UnitID, targetTokenCounter uint64, invariantPredicateArgs []*PredicateInput) (uint64, error) {
+func (w *Wallet) lockTokenForDC(ctx context.Context, acc *account.AccountKey, fcrID types.UnitID, targetTokenID types.UnitID, targetTokenCounter uint64, invariantPredicateArgs []*PredicateInput) (uint64, error) {
 	attr := &tokens.LockTokenAttributes{
 		LockStatus: wallet.LockReasonCollectDust,
 		Counter:    targetTokenCounter,
 	}
 
-	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeLockToken, attr, targetTokenID, acc, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
+	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeLockToken, attr, targetTokenID, fcrID, acc, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.GetAccountManager(), invariantPredicateArgs, tx, attr)
 		if err != nil {
 			return err

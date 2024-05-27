@@ -26,9 +26,9 @@ func generateAddress(pubKeyBytes []byte) (common.Address, error) {
 	return addr, nil
 }
 
-// FeeCreditRecordIDFromPublicKey - create fee credit id from public key. For EVM shard part is ignored for now
+// NewFeeCreditRecordIDFromPublicKey - create fee credit id from public key. For EVM shard part is ignored for now
 // as it is not meant to shard.
-func FeeCreditRecordIDFromPublicKey(_, pubKey []byte) types.UnitID {
+func NewFeeCreditRecordIDFromPublicKey(_, pubKey []byte, _ uint64) types.UnitID {
 	if pubKey == nil {
 		return common.Address{}.Bytes()
 	}

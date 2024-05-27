@@ -20,7 +20,6 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/dc"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
-	mwtypes "github.com/alphabill-org/alphabill-wallet/wallet/money/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txpublisher"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 )
@@ -76,17 +75,18 @@ type (
 	}
 )
 
-// CreateNewWallet creates a new wallet. To synchronize wallet with a node call Sync.
-// Shutdown needs to be called to release resources used by wallet.
-// If mnemonic seed is empty then new mnemonic will ge generated, otherwise wallet is restored using given mnemonic.
-func CreateNewWallet(am account.Manager, mnemonic string) error {
+// GenerateKeys generates the first account key and stores it in the account manager along with the mnemonic seed,
+// does nothing if the account manager already contains keys.
+// If the mnemonic seed is empty then a random mnemonic will be used.
+func GenerateKeys(am account.Manager, mnemonic string) error {
 	return createMoneyWallet(mnemonic, am)
 }
 
-func LoadExistingWallet(am account.Manager, feeManagerDB fees.FeeManagerDB, rpcClient RpcClient, log *slog.Logger) (*Wallet, error) {
+// NewWallet creates a new money wallet from specified parameters. The account manager must contain pre-generated keys.
+func NewWallet(am account.Manager, feeManagerDB fees.FeeManagerDB, rpcClient RpcClient, log *slog.Logger) (*Wallet, error) {
 	moneySystemID := money.DefaultSystemID
 	moneyTxPublisher := txpublisher.NewTxPublisher(rpcClient, log)
-	feeManager := fees.NewFeeManager(am, feeManagerDB, moneySystemID, rpcClient, mwtypes.FeeCreditRecordIDFormPublicKey, moneySystemID, rpcClient, mwtypes.FeeCreditRecordIDFormPublicKey, log)
+	feeManager := fees.NewFeeManager(am, feeManagerDB, moneySystemID, rpcClient, money.NewFeeCreditRecordIDFromPublicKey, money.FeeCreditRecordUnitType, moneySystemID, rpcClient, money.NewFeeCreditRecordIDFromPublicKey, money.FeeCreditRecordUnitType, log)
 	dustCollector := dc.NewDustCollector(moneySystemID, maxBillsForDustCollection, txTimeoutBlockCount, rpcClient, log)
 	return &Wallet{
 		am:            am,
@@ -295,13 +295,26 @@ func (w *Wallet) GetFeeCredit(ctx context.Context, cmd fees.GetFeeCreditCmd) (*a
 	if err != nil {
 		return nil, fmt.Errorf("failed to load account key: %w", err)
 	}
-	return w.GetFeeCreditBill(ctx, mwtypes.FeeCreditRecordIDFormPublicKeyHash(nil, accountKey.PubKeyHash.Sha256))
+	unitIDs, err := w.rpcClient.GetUnitsByOwnerID(ctx, accountKey.PubKeyHash.Sha256)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch units: %w", err)
+	}
+	for _, unitID := range unitIDs {
+		if unitID.HasType(money.FeeCreditRecordUnitType) {
+			fcb, err := w.GetFeeCreditBill(ctx, unitID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to fetch fee credit bill: %w", err)
+			}
+			return fcb, nil
+		}
+	}
+	return nil, nil
 }
 
 // GetFeeCreditBill returns fee credit bill for given unitID,
 // returns nil if fee credit bill has not been created yet.
 func (w *Wallet) GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*api.FeeCreditBill, error) {
-	return api.FetchFeeCreditBill(ctx, w.rpcClient, unitID)
+	return api.FetchFeeCreditBillByUnitID(ctx, w.rpcClient, unitID)
 }
 
 // CollectDust starts the dust collector process for the requested accounts in the wallet.
@@ -404,4 +417,10 @@ func createMoneyWallet(mnemonic string, am account.Manager) error {
 		}
 	}
 	return nil
+}
+
+// FetchFeeCreditBill finds the first fee credit record in money partition for the given account key,
+// returns nil if fee credit record does not exist.
+func FetchFeeCreditBill(ctx context.Context, c RpcClient, accountKey *account.AccountKey) (*api.FeeCreditBill, error) {
+	return api.FetchFeeCreditBillByOwnerID(ctx, c, accountKey.PubKeyHash.Sha256, money.FeeCreditRecordUnitType)
 }

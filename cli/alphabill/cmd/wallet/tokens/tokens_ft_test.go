@@ -23,9 +23,7 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	moneywallet "github.com/alphabill-org/alphabill-wallet/wallet/money"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
-	mwtypes "github.com/alphabill-org/alphabill-wallet/wallet/money/types"
 	tokenswallet "github.com/alphabill-org/alphabill-wallet/wallet/tokens"
-	twtypes "github.com/alphabill-org/alphabill-wallet/wallet/tokens/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -431,11 +429,11 @@ func NewAlphabillNetwork(t *testing.T) *AlphabillNetwork {
 	require.NoError(t, err)
 	defer feeManagerDB.Close()
 
-	moneyWallet, err := moneywallet.LoadExistingWallet(am, feeManagerDB, moneyRpcClient, log)
+	moneyWallet, err := moneywallet.NewWallet(am, feeManagerDB, moneyRpcClient, log)
 	require.NoError(t, err)
 	defer moneyWallet.Close()
 
-	tokenFeeManager := fees.NewFeeManager(am, feeManagerDB, money.DefaultSystemID, moneyRpcClient, mwtypes.FeeCreditRecordIDFormPublicKey, tokens.DefaultSystemID, tokensRpcClient, twtypes.FeeCreditRecordIDFromPublicKey, log)
+	tokenFeeManager := fees.NewFeeManager(am, feeManagerDB, money.DefaultSystemID, moneyRpcClient, money.NewFeeCreditRecordIDFromPublicKey, money.FeeCreditRecordUnitType, tokens.DefaultSystemID, tokensRpcClient, tokens.NewFeeCreditRecordIDFromPublicKey, tokens.FeeCreditRecordUnitType, log)
 	defer tokenFeeManager.Close()
 
 	tokensWallet, err := tokenswallet.New(tokens.DefaultSystemID, tokensRpcClient, am, true, tokenFeeManager, log)
@@ -472,7 +470,7 @@ func loadMoneyWallet(t *testing.T, walletDir string, moneyRpcClient *rpc.Client)
 	require.NoError(t, err)
 	t.Cleanup(func() { feeManagerDB.Close() })
 
-	moneyWallet, err := moneywallet.LoadExistingWallet(am, feeManagerDB, moneyRpcClient, testobserve.Default(t).Logger())
+	moneyWallet, err := moneywallet.NewWallet(am, feeManagerDB, moneyRpcClient, testobserve.Default(t).Logger())
 	require.NoError(t, err)
 	t.Cleanup(moneyWallet.Close)
 
@@ -488,7 +486,7 @@ func loadTokensWallet(t *testing.T, walletDir string, moneyRpcClient *rpc.Client
 	require.NoError(t, err)
 	t.Cleanup(func() { feeManagerDB.Close() })
 
-	tokenFeeManager := fees.NewFeeManager(am, feeManagerDB, money.DefaultSystemID, moneyRpcClient, mwtypes.FeeCreditRecordIDFormPublicKey, tokens.DefaultSystemID, tokensRpcClient, twtypes.FeeCreditRecordIDFromPublicKey, testobserve.Default(t).Logger())
+	tokenFeeManager := fees.NewFeeManager(am, feeManagerDB, money.DefaultSystemID, moneyRpcClient, money.NewFeeCreditRecordIDFromPublicKey, money.FeeCreditRecordUnitType, tokens.DefaultSystemID, tokensRpcClient, tokens.NewFeeCreditRecordIDFromPublicKey, tokens.FeeCreditRecordUnitType, testobserve.Default(t).Logger())
 	t.Cleanup(tokenFeeManager.Close)
 
 	tokensWallet, err := tokenswallet.New(tokens.DefaultSystemID, tokensRpcClient, am, true, tokenFeeManager, testobserve.Default(t).Logger())

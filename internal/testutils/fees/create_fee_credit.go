@@ -17,13 +17,14 @@ import (
 )
 
 // CreateFeeCredit creates fee credit to be able to spend initial bill
-func CreateFeeCredit(t *testing.T, signer abcrypto.Signer, initialBillID, fcrID types.UnitID, fcrAmount uint64, accountKey *account.AccountKey, network *testpartition.AlphabillNetwork) *types.TransactionOrder {
+func CreateFeeCredit(t *testing.T, signer abcrypto.Signer, initialBillID, fcrID types.UnitID, fcrAmount, latestAdditionTime uint64, accountKey *account.AccountKey, network *testpartition.AlphabillNetwork) *types.TransactionOrder {
 	// send transferFC
 	transferFC := testfc.NewTransferFC(t, signer,
 		testfc.NewTransferFCAttr(t, signer,
 			testfc.WithCounter(0),
 			testfc.WithAmount(fcrAmount),
 			testfc.WithTargetRecordID(fcrID),
+			testfc.WithLatestAdditionTime(latestAdditionTime),
 		),
 		testtransaction.WithUnitID(initialBillID),
 		testtransaction.WithPayloadType(fc.PayloadTypeTransferFeeCredit),

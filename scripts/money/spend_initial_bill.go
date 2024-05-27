@@ -15,7 +15,6 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
 	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
-	mwtypes "github.com/alphabill-org/alphabill-wallet/wallet/money/types"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/fxamacker/cbor/v2"
 )
@@ -67,25 +66,25 @@ func main() {
 	}
 	defer rpcClient.Close()
 
-	err = execInitialBill(ctx, rpcClient, *timeout, billID, *billValue, pubKey, *counter)
+	// calculate fee credit record id
+	roundNumber, err := rpcClient.GetRoundNumber(ctx)
 	if err != nil {
+		log.Fatal(err)
+	}
+	latestAdditionTime := roundNumber + *timeout
+	fcrID := money.NewFeeCreditRecordIDFromOwnerPredicate(nil, templates.AlwaysTrueBytes(), latestAdditionTime)
+
+	if err = execInitialBill(ctx, rpcClient, billID, fcrID, *billValue, latestAdditionTime, pubKey, *counter); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func execInitialBill(ctx context.Context, rpcClient api.RpcClient, timeout uint64, billID types.UnitID, billValue uint64, pubKey []byte, counter uint64) error {
-	roundNumber, err := rpcClient.GetRoundNumber(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting round number: %w", err)
-	}
-	absoluteTimeout := roundNumber + timeout
-
+func execInitialBill(ctx context.Context, rpcClient api.RpcClient, billID, fcrID types.UnitID, billValue, latestAdditionTime uint64, pubKey []byte, counter uint64) error {
 	txFee := uint64(1)
 	feeAmount := uint64(2)
-	fcrID := mwtypes.FeeCreditRecordIDFormOwnerPredicate(nil, templates.AlwaysTrueBytes())
 
 	// create transferFC
-	transferFC, err := createTransferFC(feeAmount+txFee, billID, fcrID, roundNumber, absoluteTimeout, counter)
+	transferFC, err := createTransferFC(feeAmount+txFee, billID, fcrID, latestAdditionTime, counter)
 	if err != nil {
 		return fmt.Errorf("creating transfer FC transaction: %w", err)
 	}
@@ -104,7 +103,7 @@ func execInitialBill(ctx context.Context, rpcClient api.RpcClient, timeout uint6
 	}
 
 	// create addFC
-	addFC, err := createAddFC(fcrID, templates.AlwaysTrueBytes(), transferFCProof.TxRecord, transferFCProof.TxProof, absoluteTimeout, feeAmount)
+	addFC, err := createAddFC(fcrID, templates.AlwaysTrueBytes(), transferFCProof.TxRecord, transferFCProof.TxProof, latestAdditionTime, feeAmount)
 	if err != nil {
 		return fmt.Errorf("creating add FC transaction: %w", err)
 	}
@@ -123,7 +122,7 @@ func execInitialBill(ctx context.Context, rpcClient api.RpcClient, timeout uint6
 	}
 
 	// create transfer tx
-	transferTx, err := createTransferTx(pubKey, billID, billValue-feeAmount-txFee, fcrID, absoluteTimeout, counter+1)
+	transferTx, err := createTransferTx(pubKey, billID, billValue-feeAmount-txFee, fcrID, latestAdditionTime, counter+1)
 	if err != nil {
 		return fmt.Errorf("creating transfer transaction: %w", err)
 	}
@@ -143,14 +142,13 @@ func execInitialBill(ctx context.Context, rpcClient api.RpcClient, timeout uint6
 	return nil
 }
 
-func createTransferFC(feeAmount uint64, unitID []byte, targetUnitID []byte, t1, t2, counter uint64) (*types.TransactionOrder, error) {
+func createTransferFC(feeAmount uint64, unitID []byte, targetUnitID []byte, latestAdditionTime, counter uint64) (*types.TransactionOrder, error) {
 	attr, err := cbor.Marshal(
 		&fc.TransferFeeCreditAttributes{
 			Amount:                 feeAmount,
 			TargetSystemIdentifier: 1,
 			TargetRecordID:         targetUnitID,
-			EarliestAdditionTime:   t1,
-			LatestAdditionTime:     t2,
+			LatestAdditionTime:     latestAdditionTime,
 			Counter:                counter,
 		},
 	)
@@ -163,14 +161,14 @@ func createTransferFC(feeAmount uint64, unitID []byte, targetUnitID []byte, t1, 
 			Type:           fc.PayloadTypeTransferFeeCredit,
 			UnitID:         unitID,
 			Attributes:     attr,
-			ClientMetadata: &types.ClientMetadata{Timeout: t2, MaxTransactionFee: 1},
+			ClientMetadata: &types.ClientMetadata{Timeout: latestAdditionTime, MaxTransactionFee: 1},
 		},
 		OwnerProof: nil,
 	}
 	return tx, nil
 }
 
-func createAddFC(unitID []byte, ownerCondition []byte, transferFC *types.TransactionRecord, transferFCProof *types.TxProof, timeout uint64, maxFee uint64) (*types.TransactionOrder, error) {
+func createAddFC(unitID []byte, ownerCondition []byte, transferFC *types.TransactionRecord, transferFCProof *types.TxProof, latestAdditionTime uint64, maxFee uint64) (*types.TransactionOrder, error) {
 	attr, err := cbor.Marshal(
 		&fc.AddFeeCreditAttributes{
 			FeeCreditTransfer:       transferFC,
@@ -187,7 +185,7 @@ func createAddFC(unitID []byte, ownerCondition []byte, transferFC *types.Transac
 			Type:           fc.PayloadTypeAddFeeCredit,
 			UnitID:         unitID,
 			Attributes:     attr,
-			ClientMetadata: &types.ClientMetadata{Timeout: timeout, MaxTransactionFee: maxFee},
+			ClientMetadata: &types.ClientMetadata{Timeout: latestAdditionTime, MaxTransactionFee: maxFee},
 		},
 		OwnerProof: nil,
 	}, nil

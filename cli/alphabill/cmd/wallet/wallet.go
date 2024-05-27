@@ -105,8 +105,8 @@ func ExecCreateCmd(cmd *cobra.Command, config *types.WalletConfig) (err error) {
 	}
 	defer am.Close()
 
-	if err := money.CreateNewWallet(am, mnemonic); err != nil {
-		return fmt.Errorf("failed to create new wallet: %w", err)
+	if err := money.GenerateKeys(am, mnemonic); err != nil {
+		return fmt.Errorf("failed to generate keys: %w", err)
 	}
 
 	if mnemonic == "" {
@@ -169,7 +169,7 @@ func ExecSendCmd(ctx context.Context, cmd *cobra.Command, config *types.WalletCo
 	}
 	defer feeManagerDB.Close()
 
-	w, err := money.LoadExistingWallet(am, feeManagerDB, rpcClient, config.Base.Logger)
+	w, err := money.NewWallet(am, feeManagerDB, rpcClient, config.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -273,7 +273,7 @@ func ExecGetBalanceCmd(cmd *cobra.Command, config *types.WalletConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	w, err := money.LoadExistingWallet(am, feeManagerDB, rpcClient, config.Base.Logger)
+	w, err := money.NewWallet(am, feeManagerDB, rpcClient, config.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -404,7 +404,7 @@ func ExecCollectDust(cmd *cobra.Command, config *types.WalletConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	w, err := money.LoadExistingWallet(am, feeManagerDB, rpcClient, config.Base.Logger)
+	w, err := money.NewWallet(am, feeManagerDB, rpcClient, config.Base.Logger)
 	if err != nil {
 		return err
 	}
