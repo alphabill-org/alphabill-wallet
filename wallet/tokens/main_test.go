@@ -253,7 +253,7 @@ func TestNewTypes(t *testing.T) {
 		result, err := tw.NewFungibleType(context.Background(), 1, a, typeID, nil)
 		require.NoError(t, err)
 		require.NotNil(t, result)
-		require.EqualValues(t, typeID, result.TokenTypeID)
+		require.EqualValues(t, typeID, result.GetUnit())
 		tx, found := recTxs[string(typeID)]
 		require.True(t, found)
 		newFungibleTx := &tokens.CreateFungibleTokenTypeAttributes{}
@@ -290,7 +290,7 @@ func TestNewTypes(t *testing.T) {
 
 		//check typeId generation if typeId parameter is nil
 		result, _ = tw.NewFungibleType(context.Background(), 1, a, nil, nil)
-		require.True(t, result.TokenTypeID.HasType(tokens.FungibleTokenTypeUnitType))
+		require.True(t, result.GetUnit().HasType(tokens.FungibleTokenTypeUnitType))
 	})
 
 	t.Run("non-fungible type", func(t *testing.T) {
@@ -307,7 +307,7 @@ func TestNewTypes(t *testing.T) {
 		result, err := tw.NewNonFungibleType(context.Background(), 1, a, typeId, nil)
 		require.NoError(t, err)
 		require.NotNil(t, result)
-		require.EqualValues(t, typeId, result.TokenTypeID)
+		require.EqualValues(t, typeId, result.GetUnit())
 		tx, found := recTxs[string(typeId)]
 		require.True(t, found)
 		newNFTTx := &tokens.CreateNonFungibleTokenTypeAttributes{}
@@ -327,7 +327,7 @@ func TestNewTypes(t *testing.T) {
 
 		//check typeId generation if typeId parameter is nil
 		result, _ = tw.NewNonFungibleType(context.Background(), 1, a, nil, nil)
-		require.True(t, result.TokenTypeID.HasType(tokens.NonFungibleTokenTypeUnitType))
+		require.True(t, result.GetUnit().HasType(tokens.NonFungibleTokenTypeUnitType))
 	})
 }
 
@@ -382,9 +382,9 @@ func TestMintFungibleToken(t *testing.T) {
 			tx := recTxs[len(recTxs)-1]
 			attr := &tokens.MintFungibleTokenAttributes{}
 			require.NotNil(t, result)
-			require.EqualValues(t, tx.UnitID(), result.TokenID)
-			require.EqualValues(t, typeID, result.TokenTypeID)
+			require.EqualValues(t, tx.UnitID(), result.GetUnit())
 			require.NoError(t, tx.UnmarshalAttributes(attr))
+			require.NotEqual(t, []byte{0}, tx.UnitID())
 			require.Len(t, tx.UnitID(), 33)
 			require.Equal(t, amount, attr.Value)
 			require.EqualValues(t, templates.NewP2pkh256BytesFromKeyHash(key.PubKeyHash.Sha256), attr.Bearer)
@@ -684,9 +684,9 @@ func TestMintNFT(t *testing.T) {
 			require.NoError(t, err)
 			tx := recTxs[len(recTxs)-1]
 			require.NotNil(t, result)
+			require.EqualValues(t, tx.UnitID(), result.GetUnit())
+			require.NotEqual(t, []byte{0}, tx.UnitID())
 			require.Len(t, tx.UnitID(), 33)
-			require.Equal(t, tx.UnitID(), result.TokenID)
-			require.Equal(t, tt.typeID, result.TokenTypeID)
 
 			attr := &tokens.MintNonFungibleTokenAttributes{}
 			require.NoError(t, tx.UnmarshalAttributes(attr))
@@ -932,6 +932,70 @@ func TestUnlockToken(t *testing.T) {
 	require.True(t, found)
 	require.EqualValues(t, token.ID, tx.UnitID())
 	require.Equal(t, tokens.PayloadTypeUnlockToken, tx.PayloadType())
+}
+
+func TestSendFungibleByID(t *testing.T) {
+	t.Parallel()
+
+	token := &TokenUnit{
+		ID:     test.RandomBytes(32),
+		Kind:   Fungible,
+		Symbol: "AB",
+		TypeID: test.RandomBytes(32),
+		Amount: 100,
+	}
+
+	be := &mockTokensRpcClient{
+		getToken: func(ctx context.Context, id TokenID) (*TokenUnit, error) {
+			if bytes.Equal(id, token.ID) {
+				return token, nil
+			}
+			return nil, fmt.Errorf("not found")
+		},
+		getFeeCreditRecord: func(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
+			return &api.FeeCreditBill{
+				ID: []byte{1},
+				FeeCreditRecord: &fc.FeeCreditRecord{
+					Balance: 50,
+				},
+			}, nil
+		},
+		getUnitsByOwnerID: func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
+			// by default returns only the fee credit record id
+			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			return []types.UnitID{fcrID}, nil
+		},
+		sendTransaction: func(ctx context.Context, txs *types.TransactionOrder) ([]byte, error) {
+			return nil, nil
+		},
+		getRoundNumber: func(ctx context.Context) (uint64, error) {
+			return 1, nil
+		},
+	}
+
+	// Initialize the wallet
+	wallet := initTestWallet(t, be)
+
+	// Test sending fungible token by ID
+	sub, err := wallet.SendFungibleByID(context.Background(), 1, token.ID, 50, nil, nil)
+	require.NoError(t, err)
+	// ensure it's a split
+	require.Equal(t, tokens.PayloadTypeSplitFungibleToken, sub.Submissions[0].Transaction.PayloadType())
+
+	sub, err = wallet.SendFungibleByID(context.Background(), 1, token.ID, 100, nil, nil)
+	require.NoError(t, err)
+	// ensure it's a transfer
+	require.Equal(t, tokens.PayloadTypeTransferFungibleToken, sub.Submissions[0].Transaction.PayloadType())
+
+	// Test sending fungible token by ID with insufficient balance
+	_, err = wallet.SendFungibleByID(context.Background(), 1, token.ID, 200, nil, nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "insufficient FT value")
+
+	// Test sending fungible token by ID with invalid account number
+	_, err = wallet.SendFungibleByID(context.Background(), 0, token.ID, 50, nil, nil)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid account number")
 }
 
 func initTestWallet(t *testing.T, rpcClient RpcClient) *Wallet {

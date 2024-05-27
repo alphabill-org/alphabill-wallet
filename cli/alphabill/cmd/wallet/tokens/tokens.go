@@ -208,11 +208,11 @@ func execTokenCmdNewTypeFungible(cmd *cobra.Command, config *types.WalletConfig)
 	if err != nil {
 		return err
 	}
-	config.Base.ConsoleWriter.Println(fmt.Sprintf("Sent request for new fungible token type with id=%s", result.TokenTypeID))
+	config.Base.ConsoleWriter.Println(fmt.Sprintf("Sent request for new fungible token type with id=%s", result.GetUnit()))
 	if result.FeeSum > 0 {
 		config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for transaction(s).", util.AmountToString(result.FeeSum, 8)))
 	}
-	if err := saveTxProofs(cmd, result.Proofs, config.Base.ConsoleWriter); err != nil {
+	if err := saveTxProofs(cmd, result.GetProofs(), config.Base.ConsoleWriter); err != nil {
 		return fmt.Errorf("saving transaction proof(s): %w", err)
 	}
 	return nil
@@ -297,11 +297,11 @@ func execTokenCmdNewTypeNonFungible(cmd *cobra.Command, config *types.WalletConf
 	if err != nil {
 		return err
 	}
-	config.Base.ConsoleWriter.Println(fmt.Sprintf("Sent request for new NFT type with id=%s", result.TokenTypeID))
+	config.Base.ConsoleWriter.Println(fmt.Sprintf("Sent request for new NFT type with id=%s", result.GetUnit()))
 	if result.FeeSum > 0 {
 		config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for transaction(s).", util.AmountToString(result.FeeSum, 8)))
 	}
-	if err := saveTxProofs(cmd, result.Proofs, config.Base.ConsoleWriter); err != nil {
+	if err := saveTxProofs(cmd, result.GetProofs(), config.Base.ConsoleWriter); err != nil {
 		return fmt.Errorf("saving transaction proof(s): %w", err)
 	}
 	return nil
@@ -385,11 +385,11 @@ func execTokenCmdNewTokenFungible(cmd *cobra.Command, config *types.WalletConfig
 		return err
 	}
 
-	config.Base.ConsoleWriter.Println(fmt.Sprintf("Sent request for new fungible token with id=%s", result.TokenID))
+	config.Base.ConsoleWriter.Println(fmt.Sprintf("Sent request for new fungible token with id=%s", result.GetUnit()))
 	if result.FeeSum > 0 {
 		config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for transaction(s).", util.AmountToString(result.FeeSum, 8)))
 	}
-	if err := saveTxProofs(cmd, result.Proofs, config.Base.ConsoleWriter); err != nil {
+	if err := saveTxProofs(cmd, result.GetProofs(), config.Base.ConsoleWriter); err != nil {
 		return fmt.Errorf("saving transaction proof(s): %w", err)
 	}
 	return nil
@@ -469,11 +469,11 @@ func execTokenCmdNewTokenNonFungible(cmd *cobra.Command, config *types.WalletCon
 	if err != nil {
 		return err
 	}
-	config.Base.ConsoleWriter.Println(fmt.Sprintf("Sent request for new non-fungible token with id=%s", result.TokenID))
+	config.Base.ConsoleWriter.Println(fmt.Sprintf("Sent request for new non-fungible token with id=%s", result.GetUnit()))
 	if result.FeeSum > 0 {
 		config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for transaction(s).", util.AmountToString(result.FeeSum, 8)))
 	}
-	if err := saveTxProofs(cmd, result.Proofs, config.Base.ConsoleWriter); err != nil {
+	if err := saveTxProofs(cmd, result.GetProofs(), config.Base.ConsoleWriter); err != nil {
 		return fmt.Errorf("saving transaction proof(s): %w", err)
 	}
 	return nil
@@ -586,7 +586,7 @@ func execTokenCmdSendFungible(cmd *cobra.Command, config *types.WalletConfig) er
 	if result.FeeSum > 0 {
 		config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for transaction(s).", util.AmountToString(result.FeeSum, 8)))
 	}
-	if err := saveTxProofs(cmd, result.Proofs, config.Base.ConsoleWriter); err != nil {
+	if err := saveTxProofs(cmd, result.GetProofs(), config.Base.ConsoleWriter); err != nil {
 		return fmt.Errorf("saving transaction proof(s): %w", err)
 	}
 	return err
@@ -647,7 +647,7 @@ func execTokenCmdSendNonFungible(cmd *cobra.Command, config *types.WalletConfig)
 	if result.FeeSum > 0 {
 		config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for transaction(s).", util.AmountToString(result.FeeSum, 8)))
 	}
-	if err := saveTxProofs(cmd, result.Proofs, config.Base.ConsoleWriter); err != nil {
+	if err := saveTxProofs(cmd, result.GetProofs(), config.Base.ConsoleWriter); err != nil {
 		return fmt.Errorf("saving transaction proof(s): %w", err)
 	}
 	return err
@@ -701,12 +701,12 @@ func execTokenCmdDC(cmd *cobra.Command, config *types.WalletConfig, accountNumbe
 	if err != nil {
 		return err
 	}
-	for _, result := range results {
-		if len(result.SubmissionResults) == 0 {
-			config.Base.ConsoleWriter.Println(fmt.Sprintf("Nothing to swap on account #%d", result.AccountNumber))
+	for idx, result := range results {
+		if len(result) == 0 {
+			config.Base.ConsoleWriter.Println(fmt.Sprintf("Nothing to swap on account #%d", idx+1))
 		} else {
-			for _, dcResult := range result.SubmissionResults {
-				config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for dust collection on Account number %d.", util.AmountToString(dcResult.FeeSum, 8), result.AccountNumber))
+			for _, dcResult := range result {
+				config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for dust collection on Account number %d.", util.AmountToString(dcResult.FeeSum, 8), idx+1))
 			}
 		}
 	}
@@ -765,7 +765,7 @@ func execTokenCmdUpdateNFTData(cmd *cobra.Command, config *types.WalletConfig) e
 	if result.FeeSum > 0 {
 		config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for transaction(s).", util.AmountToString(result.FeeSum, 8)))
 	}
-	if err := saveTxProofs(cmd, result.Proofs, config.Base.ConsoleWriter); err != nil {
+	if err := saveTxProofs(cmd, result.GetProofs(), config.Base.ConsoleWriter); err != nil {
 		return fmt.Errorf("saving transaction proof(s): %w", err)
 	}
 	return err
@@ -1012,7 +1012,7 @@ func execTokenCmdLock(cmd *cobra.Command, config *types.WalletConfig) error {
 	if result.FeeSum > 0 {
 		config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for transaction(s).", util.AmountToString(result.FeeSum, 8)))
 	}
-	if err := saveTxProofs(cmd, result.Proofs, config.Base.ConsoleWriter); err != nil {
+	if err := saveTxProofs(cmd, result.GetProofs(), config.Base.ConsoleWriter); err != nil {
 		return fmt.Errorf("saving transaction proof(s): %w", err)
 	}
 	return nil
@@ -1062,7 +1062,7 @@ func execTokenCmdUnlock(cmd *cobra.Command, config *types.WalletConfig) error {
 	if result.FeeSum > 0 {
 		config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for transaction(s).", util.AmountToString(result.FeeSum, 8)))
 	}
-	if err := saveTxProofs(cmd, result.Proofs, config.Base.ConsoleWriter); err != nil {
+	if err := saveTxProofs(cmd, result.GetProofs(), config.Base.ConsoleWriter); err != nil {
 		return fmt.Errorf("saving transaction proof(s): %w", err)
 	}
 	return err

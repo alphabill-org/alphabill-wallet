@@ -2,7 +2,6 @@ package money
 
 import (
 	"context"
-	"crypto"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -246,11 +245,7 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*wallet.Proof, error)
 	}
 
 	for _, tx := range txs {
-		batch.Add(&txsubmitter.TxSubmission{
-			UnitID:      tx.UnitID(),
-			TxHash:      tx.Hash(crypto.SHA256),
-			Transaction: tx,
-		})
+		batch.Add(txsubmitter.New(tx))
 	}
 
 	txsCost := txbuilder.MaxFee * uint64(len(batch.Submissions()))
