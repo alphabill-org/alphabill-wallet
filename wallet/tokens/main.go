@@ -115,10 +115,10 @@ func (r *SubmissionResult) GetProofs() []*wallet.Proof {
 }
 
 func (r *SubmissionResult) GetUnit() types.UnitID {
-	if len(r.Submissions) == 0 || len(r.Submissions) > 1 {
-		return nil
+	if len(r.Submissions) == 1 {
+		return r.Submissions[0].UnitID
 	}
-	return r.Submissions[0].UnitID
+	return nil
 }
 
 func (w *Wallet) GetAccountManager() account.Manager {
