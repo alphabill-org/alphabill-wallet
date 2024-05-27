@@ -16,7 +16,6 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
-	twtypes "github.com/alphabill-org/alphabill-wallet/wallet/tokens/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -125,21 +124,21 @@ func (w *Wallet) GetAccountManager() account.Manager {
 	return w.am
 }
 
-func (w *Wallet) NewFungibleType(ctx context.Context, accountNumber uint64, attrs CreateFungibleTokenTypeAttributes, typeId TokenTypeID, subtypePredicateArgs []*PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) NewFungibleType(ctx context.Context, accountNumber uint64, attrs CreateFungibleTokenTypeAttributes, typeID TokenTypeID, subtypePredicateArgs []*PredicateInput) (*SubmissionResult, error) {
 	w.log.Info("Creating new fungible token type")
-	if typeId == nil {
+	if typeID == nil {
 		var err error
-		typeId, err = tokens.NewRandomFungibleTokenTypeID(nil)
+		typeID, err = tokens.NewRandomFungibleTokenTypeID(nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate fungible token type ID: %w", err)
 		}
 	}
 
-	if len(typeId) != tokens.UnitIDLength {
+	if len(typeID) != tokens.UnitIDLength {
 		return nil, fmt.Errorf("invalid token type ID: expected hex length is %d characters (%d bytes)",
 			tokens.UnitIDLength*2, tokens.UnitIDLength)
 	}
-	if !typeId.HasType(tokens.FungibleTokenTypeUnitType) {
+	if !typeID.HasType(tokens.FungibleTokenTypeUnitType) {
 		return nil, fmt.Errorf("invalid token type ID: expected unit type is 0x%X", tokens.FungibleTokenTypeUnitType)
 	}
 	if attrs.ParentTypeID != nil && !bytes.Equal(attrs.ParentTypeID, NoParent) {
@@ -151,7 +150,7 @@ func (w *Wallet) NewFungibleType(ctx context.Context, accountNumber uint64, attr
 			return nil, fmt.Errorf("parent type requires %d decimal places, got %d", parentType.DecimalPlaces, attrs.DecimalPlaces)
 		}
 	}
-	sub, err := w.newType(ctx, accountNumber, tokens.PayloadTypeCreateFungibleTokenType, attrs.ToCBOR(), typeId, subtypePredicateArgs)
+	sub, err := w.newType(ctx, accountNumber, tokens.PayloadTypeCreateFungibleTokenType, attrs.ToCBOR(), typeID, subtypePredicateArgs)
 	if err != nil {
 		return nil, err
 	}
@@ -322,7 +321,7 @@ func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID 
 	if err != nil {
 		return nil, err
 	}
-	err = w.ensureFeeCredit(ctx, key, 1)
+	fcrID, err := w.ensureFeeCredit(ctx, key, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -334,7 +333,7 @@ func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID 
 		return nil, errors.New("token is locked")
 	}
 	attrs := newNonFungibleTransferTxAttrs(token, receiverPubKey)
-	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeTransferNFT, attrs, tokenID, key, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
+	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeTransferNFT, attrs, tokenID, fcrID, key, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.am, invariantPredicateArgs, tx, attrs)
 		if err != nil {
 			return err
@@ -362,7 +361,7 @@ func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId 
 		return nil, err
 	}
 	acc := accs[0]
-	err = w.ensureFeeCredit(ctx, acc.AccountKey, 1)
+	fcrID, err := w.ensureFeeCredit(ctx, acc.AccountKey, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -410,14 +409,14 @@ func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId 
 	}
 	// optimization: first try to make a single operation instead of iterating through all tokens in doSendMultiple
 	if closestMatch.Amount >= targetAmount {
-		sub, err := w.prepareSplitOrTransferTx(ctx, acc.AccountKey, targetAmount, closestMatch, receiverPubKey, invariantPredicateArgs, w.GetRoundNumber)
+		sub, err := w.prepareSplitOrTransferTx(ctx, acc.AccountKey, targetAmount, closestMatch, fcrID, receiverPubKey, invariantPredicateArgs, w.GetRoundNumber)
 		if err != nil {
 			return nil, err
 		}
 		err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
 		return newSingleResult(sub, accountNumber), err
 	} else {
-		return w.doSendMultiple(ctx, targetAmount, matchingTokens, acc, receiverPubKey, invariantPredicateArgs)
+		return w.doSendMultiple(ctx, targetAmount, matchingTokens, acc, fcrID, receiverPubKey, invariantPredicateArgs)
 	}
 }
 
@@ -429,7 +428,7 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 	if err != nil {
 		return nil, err
 	}
-	err = w.ensureFeeCredit(ctx, acc, 1)
+	fcrID, err := w.ensureFeeCredit(ctx, acc, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -450,7 +449,7 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 		DataUpdateSignatures: nil,
 	}
 
-	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeUpdateNFT, attrs, tokenID, acc, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
+	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeUpdateNFT, attrs, tokenID, fcrID, acc, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.am, updatePredicateArgs, tx, attrs)
 		if err != nil {
 			return err
@@ -475,7 +474,7 @@ func (w *Wallet) SendFungibleByID(ctx context.Context, accountNumber uint64, tok
 	if err != nil {
 		return nil, err
 	}
-	err = w.ensureFeeCredit(ctx, acc, 1)
+	fcrID, err := w.ensureFeeCredit(ctx, acc, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -486,7 +485,7 @@ func (w *Wallet) SendFungibleByID(ctx context.Context, accountNumber uint64, tok
 	if targetAmount > token.Amount {
 		return nil, fmt.Errorf("insufficient FT value: got %v, need %v", token.Amount, targetAmount)
 	}
-	sub, err := w.prepareSplitOrTransferTx(ctx, acc, targetAmount, token, receiverPubKey, invariantPredicateArgs, w.GetRoundNumber)
+	sub, err := w.prepareSplitOrTransferTx(ctx, acc, targetAmount, token, fcrID, receiverPubKey, invariantPredicateArgs, w.GetRoundNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -502,7 +501,11 @@ func (w *Wallet) BurnTokens(ctx context.Context, accountNumber uint64, tokensToB
 	if err != nil {
 		return 0, 0, nil, err
 	}
-	return w.burnTokensForDC(ctx, acc, tokensToBurn, 0, nil, invariantPredicateArgs)
+	fcrID, err := w.ensureFeeCredit(ctx, acc, 1)
+	if err != nil {
+		return 0, 0, nil, err
+	}
+	return w.burnTokensForDC(ctx, acc, tokensToBurn, 0, nil, fcrID, invariantPredicateArgs)
 }
 
 // GetFeeCredit returns fee credit bill for given account,
@@ -512,12 +515,12 @@ func (w *Wallet) GetFeeCredit(ctx context.Context, cmd fees.GetFeeCreditCmd) (*a
 	if err != nil {
 		return nil, err
 	}
-	return w.GetFeeCreditBill(ctx, twtypes.FeeCreditRecordIDFormPublicKeyHash(nil, ac.PubKeyHash.Sha256))
+	return api.FetchFeeCreditBillByOwnerID(ctx, w.rpcClient, ac.PubKeyHash.Sha256, tokens.FeeCreditRecordUnitType)
 }
 
 // GetFeeCreditBill returns fee credit bill for given unitID
 // can return nil if fee credit bill has not been created yet.
-func (w *Wallet) GetFeeCreditBill(ctx context.Context, unitID []byte) (*api.FeeCreditBill, error) {
+func (w *Wallet) GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*api.FeeCreditBill, error) {
 	fcb, err := w.rpcClient.GetFeeCreditRecord(ctx, unitID, false)
 	if err != nil && !errors.Is(err, api.ErrNotFound) {
 		return nil, err
@@ -537,19 +540,19 @@ func (w *Wallet) ReclaimFeeCredit(ctx context.Context, cmd fees.ReclaimFeeCmd) (
 	return w.feeManager.ReclaimFeeCredit(ctx, cmd)
 }
 
-func (w *Wallet) ensureFeeCredit(ctx context.Context, accountKey *account.AccountKey, txCount int) error {
-	fcb, err := w.GetFeeCreditBill(ctx, twtypes.FeeCreditRecordIDFormPublicKeyHash(nil, accountKey.PubKeyHash.Sha256))
+func (w *Wallet) ensureFeeCredit(ctx context.Context, accountKey *account.AccountKey, txCount int) ([]byte, error) {
+	fcb, err := api.FetchFeeCreditBillByOwnerID(ctx, w.rpcClient, accountKey.PubKeyHash.Sha256, tokens.FeeCreditRecordUnitType)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("failed to fetch fee credit bill: %w", err)
 	}
 	if fcb == nil {
-		return ErrNoFeeCredit
+		return nil, ErrNoFeeCredit
 	}
 	maxFee := uint64(txCount) * txbuilder.MaxFee
 	if fcb.Balance() < maxFee {
-		return ErrInsufficientFeeCredit
+		return nil, ErrInsufficientFeeCredit
 	}
-	return nil
+	return fcb.ID, nil
 }
 
 func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID []byte, ib []*PredicateInput) (*SubmissionResult, error) {
@@ -557,7 +560,7 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID []
 	if err != nil {
 		return nil, err
 	}
-	err = w.ensureFeeCredit(ctx, key, 1)
+	fcrID, err := w.ensureFeeCredit(ctx, key, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -570,7 +573,7 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID []
 		return nil, errors.New("token is already locked")
 	}
 	attrs := newLockTxAttrs(token.Counter, wallet.LockReasonManual)
-	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeLockToken, attrs, tokenID, key, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
+	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeLockToken, attrs, tokenID, fcrID, key, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.am, ib, tx, attrs)
 		if err != nil {
 			return err
@@ -591,7 +594,7 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	if err != nil {
 		return nil, err
 	}
-	err = w.ensureFeeCredit(ctx, key, 1)
+	fcrID, err := w.ensureFeeCredit(ctx, key, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -603,7 +606,7 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 		return nil, errors.New("token is already unlocked")
 	}
 	attrs := newUnlockTxAttrs(token.Counter)
-	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeUnlockToken, attrs, tokenID, key, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
+	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeUnlockToken, attrs, tokenID, fcrID, key, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.am, ib, tx, attrs)
 		if err != nil {
 			return err
@@ -617,4 +620,10 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	}
 	err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
 	return newSingleResult(sub, accountNumber), err
+}
+
+// FetchFeeCreditBill finds the first fee credit record in tokens partition for the given account key,
+// returns nil if fee credit record does not exist.
+func FetchFeeCreditBill(ctx context.Context, c RpcClient, accountKey *account.AccountKey) (*api.FeeCreditBill, error) {
+	return api.FetchFeeCreditBillByOwnerID(ctx, c, accountKey.PubKeyHash.Sha256, tokens.FeeCreditRecordUnitType)
 }

@@ -16,7 +16,6 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
-	mwtypes "github.com/alphabill-org/alphabill-wallet/wallet/money/types"
 	abrpc "github.com/alphabill-org/alphabill/rpc"
 	"github.com/stretchr/testify/require"
 )
@@ -137,7 +136,9 @@ func TestWalletBillsLockUnlockCmd_Ok(t *testing.T) {
 	homedir, accountKey, rpcUrl, abNet := setupNetwork(t, nil)
 
 	// add fee credit
-	testutils.AddFeeCredit(t, 1e8, money.DefaultSystemID, accountKey, testutils.DefaultInitialBillID, 0, mwtypes.FeeCreditRecordIDFormPublicKeyHash(nil, accountKey.PubKeyHash.Sha256), nil, abNet.NodePartitions[money.DefaultSystemID])
+	latestAdditionTime := uint64(10000)
+	fcrID := money.NewFeeCreditRecordIDFromPublicKeyHash(nil, accountKey.PubKeyHash.Sha256, latestAdditionTime)
+	testutils.AddFeeCredit(t, 1e8, money.DefaultSystemID, accountKey, testutils.DefaultInitialBillID, 0, fcrID, nil, latestAdditionTime, abNet.NodePartitions[money.DefaultSystemID])
 
 	// lock bill
 	stdout, err := execBillsCommand(t, homedir, fmt.Sprintf("lock --rpc-url %s --bill-id %s", rpcUrl, money.NewBillID(nil, []byte{1})))

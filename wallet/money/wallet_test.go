@@ -29,7 +29,7 @@ func TestExistingWalletCanBeLoaded(t *testing.T) {
 	rpcClient := testutil.NewRpcClientMock()
 	feeManagerDB, err := fees.NewFeeManagerDB(homedir)
 	require.NoError(t, err)
-	_, err = LoadExistingWallet(am, feeManagerDB, rpcClient, logger.New(t))
+	_, err = NewWallet(am, feeManagerDB, rpcClient, logger.New(t))
 	require.NoError(t, err)
 }
 
@@ -99,13 +99,13 @@ func createTestWallet(t *testing.T, rpcClient RpcClient) *Wallet {
 	am, err := account.NewManager(dir, "", true)
 	require.NoError(t, err)
 
-	err = CreateNewWallet(am, testMnemonic)
+	err = GenerateKeys(am, testMnemonic)
 	require.NoError(t, err)
 
 	feeManagerDB, err := fees.NewFeeManagerDB(dir)
 	require.NoError(t, err)
 
-	w, err := LoadExistingWallet(am, feeManagerDB, rpcClient, logger.New(t))
+	w, err := NewWallet(am, feeManagerDB, rpcClient, logger.New(t))
 	require.NoError(t, err)
 
 	return w

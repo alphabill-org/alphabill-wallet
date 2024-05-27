@@ -9,7 +9,7 @@ import (
 const MaxFee = uint64(1)
 
 // NewTxPayload creates a new transaction payload.
-func NewTxPayload(systemID types.SystemID, txType string, unitID types.UnitID, timeout uint64, fcrID []byte, refNo []byte, attr interface{}) (*types.Payload, error) {
+func NewTxPayload(systemID types.SystemID, txType string, unitID, fcrID types.UnitID, timeout uint64, refNo []byte, attr interface{}) (*types.Payload, error) {
 	attrBytes, err := types.Cbor.Marshal(attr)
 	if err != nil {
 		return nil, err

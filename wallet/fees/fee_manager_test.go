@@ -9,13 +9,13 @@ import (
 	testsig "github.com/alphabill-org/alphabill-go-base/testutils/sig"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
-	mwtypes "github.com/alphabill-org/alphabill-wallet/wallet/money/types"
 	"github.com/alphabill-org/alphabill/txsystem/fc/testutils"
 	testtransaction "github.com/alphabill-org/alphabill/txsystem/testutils/transaction"
 	"github.com/stretchr/testify/require"
@@ -98,7 +98,6 @@ func TestAddFeeCredit_TokensPartitionOK(t *testing.T) {
 	var attr *fc.TransferFeeCreditAttributes
 	err = res.Proofs[0].TransferFC.TxRecord.TransactionOrder.UnmarshalAttributes(&attr)
 	require.NoError(t, err)
-	require.EqualValues(t, 1000, attr.EarliestAdditionTime)
 	require.EqualValues(t, 1000+transferFCLatestAdditionTime, attr.LatestAdditionTime)
 }
 
@@ -1234,11 +1233,11 @@ func TestUnlockFeeCredit(t *testing.T) {
 }
 
 func newMoneyPartitionFeeManager(am account.Manager, db FeeManagerDB, moneyClient RpcClient, log *slog.Logger) *FeeManager {
-	return NewFeeManager(am, db, moneySystemID, moneyClient, testFeeCreditRecordIDFromPublicKey, moneySystemID, moneyClient, testFeeCreditRecordIDFromPublicKey, log)
+	return NewFeeManager(am, db, moneySystemID, moneyClient, testFeeCreditRecordIDFromPublicKey, money.FeeCreditRecordUnitType, moneySystemID, moneyClient, testFeeCreditRecordIDFromPublicKey, money.FeeCreditRecordUnitType, log)
 }
 
 func newTokensPartitionFeeManager(am account.Manager, db FeeManagerDB, moneyClient RpcClient, tokensClient RpcClient, log *slog.Logger) *FeeManager {
-	return NewFeeManager(am, db, moneySystemID, moneyClient, testFeeCreditRecordIDFromPublicKey, tokensSystemID, tokensClient, testFeeCreditRecordIDFromPublicKey, log)
+	return NewFeeManager(am, db, moneySystemID, moneyClient, testFeeCreditRecordIDFromPublicKey, money.FeeCreditRecordUnitType, tokensSystemID, tokensClient, testFeeCreditRecordIDFromPublicKey, tokens.FeeCreditRecordUnitType, log)
 }
 
 func newAccountManager(t *testing.T) account.Manager {
@@ -1256,8 +1255,8 @@ func createFeeManagerDB(t *testing.T) *BoltStore {
 	return feeManagerDB
 }
 
-func testFeeCreditRecordIDFromPublicKey(shardPart, pubKey []byte) types.UnitID {
-	return mwtypes.FeeCreditRecordIDFormPublicKey(shardPart, pubKey)
+func testFeeCreditRecordIDFromPublicKey(shardPart, pubKey []byte, latestAdditionTime uint64) types.UnitID {
+	return money.NewFeeCreditRecordIDFromPublicKey(shardPart, pubKey, latestAdditionTime)
 }
 
 func newMoneyFCB(accountKey *account.AccountKey, fcr *fc.FeeCreditRecord) *api.FeeCreditBill {

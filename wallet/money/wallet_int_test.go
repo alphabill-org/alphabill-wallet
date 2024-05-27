@@ -19,13 +19,16 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
-	mwtypes "github.com/alphabill-org/alphabill-wallet/wallet/money/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 	"github.com/alphabill-org/alphabill/rpc"
 	"github.com/alphabill-org/alphabill/txsystem"
 	"github.com/alphabill-org/alphabill/txsystem/money"
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	fcrLatestAdditionTime = 66536
 )
 
 /*
@@ -43,7 +46,7 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 	am, err := account.NewManager(dir, "", true)
 	require.NoError(t, err)
 	defer am.Close()
-	err = CreateNewWallet(am, "")
+	err = GenerateKeys(am, "")
 	require.NoError(t, err)
 	accKey, err := am.GetAccountKey(0)
 	require.NoError(t, err)
@@ -70,7 +73,7 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 	require.NoError(t, err)
 	defer feeManagerDB.Close()
 
-	w, err := LoadExistingWallet(am, feeManagerDB, moneyClient, observe.Logger())
+	w, err := NewWallet(am, feeManagerDB, moneyClient, observe.Logger())
 	require.NoError(t, err)
 	defer w.Close()
 
@@ -81,9 +84,9 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 	require.NoError(t, err)
 
 	// create fee credit for initial bill transfer
-	fcrID := mwtypes.FeeCreditRecordIDFormPublicKeyHash(nil, accKey.PubKeyHash.Sha256)
+	fcrID := sdkmoney.NewFeeCreditRecordIDFromPublicKeyHash(nil, accKey.PubKeyHash.Sha256, fcrLatestAdditionTime)
 	fcrAmount := uint64(1e8)
-	_ = testfees.CreateFeeCredit(t, signer, genesisConfig.InitialBillID, fcrID, fcrAmount, accKey, network)
+	_ = testfees.CreateFeeCredit(t, signer, genesisConfig.InitialBillID, fcrID, fcrAmount, fcrLatestAdditionTime, accKey, network)
 	initialBillCounter := uint64(1)
 	initialBillValue := genesisConfig.InitialBillValue - fcrAmount
 
