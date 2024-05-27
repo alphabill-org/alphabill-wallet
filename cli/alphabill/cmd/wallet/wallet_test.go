@@ -8,14 +8,13 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/util"
-	abrpc "github.com/alphabill-org/alphabill/rpc"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/stretchr/testify/require"
-
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	"github.com/alphabill-org/alphabill-wallet/client/rpc/mocksrv"
 	moneywallet "github.com/alphabill-org/alphabill-wallet/wallet/money"
+	abrpc "github.com/alphabill-org/alphabill/rpc"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/stretchr/testify/require"
 )
 
 func TestWalletCreateCmd(t *testing.T) {
@@ -181,7 +180,7 @@ func TestSendingFailsWithInsufficientBalance(t *testing.T) {
 			OwnerPredicate: testutils.TestPubKey0Hash(t),
 		}),
 		mocksrv.WithOwnerUnit(&abrpc.Unit[any]{
-			UnitID:         money.NewFeeCreditRecordID(nil, testutils.TestPubKey0Hash(t)),
+			UnitID:         money.NewFeeCreditRecordIDFromPublicKeyHash(nil, testutils.TestPubKey0Hash(t), 1000),
 			Data:           fc.FeeCreditRecord{Balance: 1e8},
 			OwnerPredicate: testutils.TestPubKey0Hash(t),
 		}),

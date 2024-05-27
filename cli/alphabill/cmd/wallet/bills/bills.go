@@ -7,14 +7,13 @@ import (
 
 	moneysdk "github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
-
 	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
 	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money"
+	moneywallet "github.com/alphabill-org/alphabill-wallet/wallet/money"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txpublisher"
@@ -153,10 +152,8 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if !strings.HasPrefix(infoResponse.Name, moneyTypeVar.String()) {
 		return errors.New("invalid rpc url provided for money partition")
 	}
-
-	fcrID := money.FeeCreditRecordIDFormPublicKey(nil, accountKey.PubKey)
-	fcb, err := moneyClient.GetFeeCreditRecord(cmd.Context(), fcrID, false)
-	if err != nil && !errors.Is(err, api.ErrNotFound) {
+	fcb, err := moneywallet.FetchFeeCreditBill(cmd.Context(), moneyClient, accountKey)
+	if err != nil {
 		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
 	}
 	if fcb.Balance() < txbuilder.MaxFee {
@@ -173,7 +170,7 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch round number: %w", err)
 	}
-	tx, err := txbuilder.NewLockTx(accountKey, types.SystemID(config.SystemID), bill.ID, bill.Counter(), wallet.LockReasonManual, roundNumber+10)
+	tx, err := txbuilder.NewLockTx(accountKey, types.SystemID(config.SystemID), bill.ID, fcb.ID, bill.Counter(), wallet.LockReasonManual, roundNumber+10)
 	if err != nil {
 		return fmt.Errorf("failed to create lock tx: %w", err)
 	}
@@ -229,9 +226,8 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 		return errors.New("invalid rpc url provided for money partition")
 	}
 
-	fcrID := money.FeeCreditRecordIDFormPublicKey(nil, accountKey.PubKey)
-	fcb, err := moneyClient.GetFeeCreditRecord(cmd.Context(), fcrID, false)
-	if err != nil && !errors.Is(err, api.ErrNotFound) {
+	fcb, err := moneywallet.FetchFeeCreditBill(cmd.Context(), moneyClient, accountKey)
+	if err != nil {
 		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
 	}
 	if fcb.Balance() < txbuilder.MaxFee {
@@ -250,7 +246,7 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch round number: %w", err)
 	}
-	tx, err := txbuilder.NewUnlockTx(accountKey, types.SystemID(config.SystemID), bill, roundNumber+10)
+	tx, err := txbuilder.NewUnlockTx(accountKey, types.SystemID(config.SystemID), bill, fcb.ID, roundNumber+10)
 	if err != nil {
 		return fmt.Errorf("failed to create unlock tx: %w", err)
 	}

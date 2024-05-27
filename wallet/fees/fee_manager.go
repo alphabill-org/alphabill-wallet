@@ -42,8 +42,8 @@ type (
 		GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TransactionRecord, *types.TxProof, error)
 	}
 
-	// GenerateFcrIDFromPublicKey function to generate fee credit UnitID from shard number nad public key
-	GenerateFcrIDFromPublicKey func(shardPart, pubKey []byte) types.UnitID
+	// GenerateFcrID function to generate fee credit record ID
+	GenerateFcrID func(shardPart, pubKey []byte, latestAdditionTime uint64) types.UnitID
 
 	FeeManagerDB interface {
 		GetAddFeeContext(accountID []byte) (*AddFeeCreditCtx, error)
@@ -61,14 +61,16 @@ type (
 		log *slog.Logger
 
 		// money partition fields
-		moneySystemID         types.SystemID
-		moneyClient           RpcClient
-		moneyPartitionFcrIDFn GenerateFcrIDFromPublicKey
+		moneySystemID             types.SystemID
+		moneyClient               RpcClient
+		moneyPartitionFcrIDFn     GenerateFcrID
+		moneyPartitionFcrUnitType []byte
 
 		// target partition fields
-		targetPartitionSystemID types.SystemID
-		targetPartitionClient   RpcClient
-		targetPartitionFcrIDFn  GenerateFcrIDFromPublicKey
+		targetPartitionSystemID    types.SystemID
+		targetPartitionClient      RpcClient
+		targetPartitionFcrIDFn     GenerateFcrID
+		targetPartitionFcrUnitType []byte
 	}
 
 	GetFeeCreditCmd struct {
@@ -116,11 +118,12 @@ type (
 	}
 
 	AddFeeCreditCtx struct {
-		TargetPartitionID types.SystemID          `json:"targetPartitionId"`         // target partition id where the fee is being added to
-		TargetBillID      []byte                  `json:"targetBillId"`              // transferFC target bill id
-		TargetBillCounter uint64                  `json:"targetBillCounter"`         // transferFC target bill counter
-		TargetAmount      uint64                  `json:"targetAmount"`              // the amount to add to the fee credit bill
-		LockingDisabled   bool                    `json:"lockingDisabled,omitempty"` // user defined flag if we should lock fee credit record when adding fees
+		TargetPartitionID types.SystemID          `json:"targetPartitionId"`           // target partition id where the fee is being added to
+		TargetBillID      []byte                  `json:"targetBillId"`                // transferFC target bill id
+		TargetBillCounter uint64                  `json:"targetBillCounter"`           // transferFC target bill counter
+		TargetAmount      uint64                  `json:"targetAmount"`                // the amount to add to the fee credit bill
+		LockingDisabled   bool                    `json:"lockingDisabled,omitempty"`   // user defined flag if we should lock fee credit record when adding fees
+		FeeCreditRecordID []byte                  `json:"feeCreditRecordId,omitempty"` // the fee credit record id used in current fee credit process
 		LockFCTx          *types.TransactionOrder `json:"lockFCTx,omitempty"`
 		LockFCProof       *wallet.Proof           `json:"lockFCProof,omitempty"`
 		TransferFCTx      *types.TransactionOrder `json:"transferFCTx,omitempty"`
@@ -152,32 +155,38 @@ type (
 //   - systemID
 //   - rpc node client
 //   - fee credit record id generation function
+//   - fee credit record unit type part
 //
 // - target partition:
 //   - systemID
 //   - rpc node client
 //   - fee credit record id generation function
+//   - fee credit record unit type part
 func NewFeeManager(
 	am account.Manager,
 	db FeeManagerDB,
 	moneySystemID types.SystemID,
 	moneyClient RpcClient,
-	moneyPartitionFcrIDFn GenerateFcrIDFromPublicKey,
+	moneyPartitionFcrIDFn GenerateFcrID,
+	moneyPartitionFcrUnitType []byte,
 	targetPartitionSystemID types.SystemID,
 	targetPartitionClient RpcClient,
-	fcrIDFn GenerateFcrIDFromPublicKey,
+	targetPartitionFcrIDFn GenerateFcrID,
+	targetPartitionFcrUnitType []byte,
 	log *slog.Logger,
 ) *FeeManager {
 	return &FeeManager{
-		am:                      am,
-		db:                      db,
-		moneySystemID:           moneySystemID,
-		moneyClient:             moneyClient,
-		moneyPartitionFcrIDFn:   moneyPartitionFcrIDFn,
-		targetPartitionSystemID: targetPartitionSystemID,
-		targetPartitionClient:   targetPartitionClient,
-		targetPartitionFcrIDFn:  fcrIDFn,
-		log:                     log,
+		am:                         am,
+		db:                         db,
+		moneySystemID:              moneySystemID,
+		moneyClient:                moneyClient,
+		moneyPartitionFcrIDFn:      moneyPartitionFcrIDFn,
+		moneyPartitionFcrUnitType:  moneyPartitionFcrUnitType,
+		targetPartitionSystemID:    targetPartitionSystemID,
+		targetPartitionClient:      targetPartitionClient,
+		targetPartitionFcrIDFn:     targetPartitionFcrIDFn,
+		targetPartitionFcrUnitType: targetPartitionFcrUnitType,
+		log:                        log,
 	}
 }
 
@@ -587,27 +596,33 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 	if err != nil {
 		return fmt.Errorf("failed to fetch target partition round number: %w", err)
 	}
-	earliestAdditionTime := targetRoundNumber
 	latestAdditionTime := targetRoundNumber + transferFCLatestAdditionTime
 
 	// create transferFC transaction
 	w.log.InfoContext(ctx, "sending transfer fee credit transaction")
-	fcrID := w.targetPartitionFcrIDFn(nil, accountKey.PubKey)
 	fcb, err := w.fetchTargetPartitionFCB(ctx, accountKey)
 	if err != nil {
 		return fmt.Errorf("faild to fetch fee credit bill: %w", err)
 	}
+	var targetUnitCounter *uint64
+	var fcrID []byte
+	if fcb != nil {
+		c := fcb.Counter()
+		targetUnitCounter = &c
+		fcrID = fcb.ID
+	} else {
+		fcrID = w.targetPartitionFcrIDFn(nil, accountKey.PubKey, latestAdditionTime)
+	}
 	tx, err := txbuilder.NewTransferFCTx(
 		feeCtx.TargetAmount,
 		fcrID,
-		fcb.Backlink(),
+		targetUnitCounter,
 		accountKey,
 		w.moneySystemID,
 		w.targetPartitionSystemID,
 		feeCtx.TargetBillID,
 		feeCtx.TargetBillCounter,
 		moneyTimeout,
-		earliestAdditionTime,
 		latestAdditionTime,
 	)
 	if err != nil {
@@ -616,6 +631,7 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 
 	// store transferFC transaction write-ahead log
 	feeCtx.TransferFCTx = tx
+	feeCtx.FeeCreditRecordID = fcrID
 	if err := w.db.SetAddFeeContext(accountKey.PubKey, feeCtx); err != nil {
 		return fmt.Errorf("failed to store transferFC write-ahead log: %w", err)
 	}
@@ -684,9 +700,8 @@ func (w *FeeManager) sendAddFCTx(ctx context.Context, accountKey *account.Accoun
 		return err
 	}
 
-	// create addFC transaction
-	fcrID := w.targetPartitionFcrIDFn(nil, accountKey.PubKey)
-	addFCTx, err := txbuilder.NewAddFCTx(fcrID, feeCtx.TransferFCProof, accountKey, w.targetPartitionSystemID, timeout)
+	// need to use same FCR that was calculated form transferFC timeout, best to store it in WAL
+	addFCTx, err := txbuilder.NewAddFCTx(feeCtx.FeeCreditRecordID, feeCtx.TransferFCProof, accountKey, w.targetPartitionSystemID, timeout)
 	if err != nil {
 		return fmt.Errorf("failed to create addFC transaction: %w", err)
 	}
@@ -824,6 +839,7 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 		accountKey,
 		w.moneySystemID,
 		feeCtx.TargetBillID,
+		moneyFCB.ID,
 		feeCtx.TargetBillCounter,
 		wallet.LockReasonReclaimFees,
 		timeout,
@@ -889,9 +905,7 @@ func (w *FeeManager) sendCloseFCTx(ctx context.Context, accountKey *account.Acco
 	}
 
 	// create closeFC transaction
-	tx, err := txbuilder.NewCloseFCTx(
-		w.targetPartitionSystemID, fcb.ID, targetPartitionTimeout, fcb.Balance(),
-		feeCtx.TargetBillID, feeCtx.TargetBillCounter, accountKey)
+	tx, err := txbuilder.NewCloseFCTx(w.targetPartitionSystemID, fcb, targetPartitionTimeout, feeCtx.TargetBillID, feeCtx.TargetBillCounter, accountKey)
 	if err != nil {
 		return fmt.Errorf("failed to create closeFC transaction: %w", err)
 	}
@@ -1025,13 +1039,11 @@ func (w *FeeManager) sumValues(bills []*api.Bill) uint64 {
 }
 
 func (w *FeeManager) fetchTargetPartitionFCB(ctx context.Context, accountKey *account.AccountKey) (*api.FeeCreditBill, error) {
-	fcrID := w.targetPartitionFcrIDFn(nil, accountKey.PubKey)
-	return api.FetchFeeCreditBill(ctx, w.targetPartitionClient, fcrID)
+	return api.FetchFeeCreditBillByOwnerID(ctx, w.targetPartitionClient, accountKey.PubKeyHash.Sha256, w.targetPartitionFcrUnitType)
 }
 
 func (w *FeeManager) fetchMoneyPartitionFCB(ctx context.Context, accountKey *account.AccountKey) (*api.FeeCreditBill, error) {
-	fcrID := w.moneyPartitionFcrIDFn(nil, accountKey.PubKey)
-	return api.FetchFeeCreditBill(ctx, w.moneyClient, fcrID)
+	return api.FetchFeeCreditBillByOwnerID(ctx, w.moneyClient, accountKey.PubKeyHash.Sha256, w.moneyPartitionFcrUnitType)
 }
 
 func (w *FeeManager) unlockFeeCreditRecord(ctx context.Context, accountKey *account.AccountKey) (*wallet.Proof, error) {
@@ -1069,7 +1081,14 @@ func (w *FeeManager) unlockBill(ctx context.Context, accountKey *account.Account
 				if err != nil {
 					return nil, err
 				}
-				unlockTx, err := txbuilder.NewUnlockTx(accountKey, w.moneySystemID, b, timeout)
+				fcb, err := api.FetchFeeCreditBillByOwnerID(ctx, w.moneyClient, accountKey.PubKeyHash.Sha256, w.moneyPartitionFcrUnitType)
+				if err != nil {
+					return nil, fmt.Errorf("failed to fetch fee credit bill")
+				}
+				if fcb == nil {
+					return nil, fmt.Errorf("fee credit bill not found")
+				}
+				unlockTx, err := txbuilder.NewUnlockTx(accountKey, w.moneySystemID, b, fcb.ID, timeout)
 				if err != nil {
 					return nil, fmt.Errorf("failed to create unlock tx: %w", err)
 				}

@@ -24,7 +24,7 @@ type (
 		Client
 		Call(ctx context.Context, callAttr *evm.CallEVMRequest) (*evm.ProcessingDetails, error)
 		GetTransactionCount(ctx context.Context, ethAddr []byte) (uint64, error)
-		GetBalance(ctx context.Context, ethAddr []byte) (string, []byte, error)
+		GetBalance(ctx context.Context, ethAddr []byte) (string, uint64, error)
 		GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*evmclient.Bill, error)
 		GetGasPrice(ctx context.Context) (string, error)
 	}
@@ -67,11 +67,11 @@ func (w *Wallet) Shutdown() {
 	w.am.Close()
 }
 
-func (w *Wallet) SendEvmTx(ctx context.Context, accNr uint64, attrs *evm.TxAttributes) (*evmclient.Result, error) {
-	if accNr < 1 {
-		return nil, fmt.Errorf("invalid account number: %d", accNr)
+func (w *Wallet) SendEvmTx(ctx context.Context, accountNumber uint64, attrs *evm.TxAttributes) (*evmclient.Result, error) {
+	if accountNumber < 1 {
+		return nil, fmt.Errorf("invalid account number: %d", accountNumber)
 	}
-	acc, err := w.am.GetAccountKey(accNr - 1)
+	acc, err := w.am.GetAccountKey(accountNumber - 1)
 	if err != nil {
 		return nil, fmt.Errorf("account key read failed: %w", err)
 	}
@@ -124,11 +124,11 @@ func (w *Wallet) SendEvmTx(ctx context.Context, accNr uint64, attrs *evm.TxAttri
 	}, nil
 }
 
-func (w *Wallet) EvmCall(ctx context.Context, accNr uint64, attrs *evm.CallEVMRequest) (*evmclient.Result, error) {
-	if accNr < 1 {
-		return nil, fmt.Errorf("invalid account number: %d", accNr)
+func (w *Wallet) EvmCall(ctx context.Context, accountNumber uint64, attrs *evm.CallEVMRequest) (*evmclient.Result, error) {
+	if accountNumber < 1 {
+		return nil, fmt.Errorf("invalid account number: %d", accountNumber)
 	}
-	acc, err := w.am.GetAccountKey(accNr - 1)
+	acc, err := w.am.GetAccountKey(accountNumber - 1)
 	if err != nil {
 		return nil, fmt.Errorf("account key read failed: %w", err)
 	}
@@ -148,11 +148,11 @@ func (w *Wallet) EvmCall(ctx context.Context, accNr uint64, attrs *evm.CallEVMRe
 	}, nil
 }
 
-func (w *Wallet) GetBalance(ctx context.Context, accNr uint64) (*big.Int, error) {
-	if accNr < 1 {
-		return nil, fmt.Errorf("invalid account number: %d", accNr)
+func (w *Wallet) GetBalance(ctx context.Context, accountNumber uint64) (*big.Int, error) {
+	if accountNumber < 1 {
+		return nil, fmt.Errorf("invalid account number: %d", accountNumber)
 	}
-	acc, err := w.am.GetAccountKey(accNr - 1)
+	acc, err := w.am.GetAccountKey(accountNumber - 1)
 	if err != nil {
 		return nil, fmt.Errorf("account key read failed: %w", err)
 	}

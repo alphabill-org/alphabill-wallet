@@ -4,14 +4,13 @@ import (
 	"testing"
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
-	abrpc "github.com/alphabill-org/alphabill/rpc"
-	"github.com/stretchr/testify/require"
-
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/fees"
 
 	"github.com/alphabill-org/alphabill-wallet/client/rpc/mocksrv"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
+	abrpc "github.com/alphabill-org/alphabill/rpc"
+	"github.com/stretchr/testify/require"
 )
 
 func TestWalletBillsListCmd_EmptyWallet(t *testing.T) {

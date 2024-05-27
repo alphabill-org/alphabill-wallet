@@ -65,7 +65,7 @@ func WeiToAlpha(wei *big.Int) uint64 {
 
 // GetFeeCreditBill - simulates fee credit bill on EVM
 func (e *EvmClient) GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*Bill, error) {
-	balanceStr, backlink, err := e.GetBalance(ctx, unitID)
+	balanceStr, counter, err := e.GetBalance(ctx, unitID)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return nil, nil
@@ -77,9 +77,9 @@ func (e *EvmClient) GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (
 		return nil, fmt.Errorf("account %s has invalid balance %v", hexutil.Encode(unitID), balanceStr)
 	}
 	return &Bill{
-		Id:     unitID,
-		Value:  WeiToAlpha(balanceWei),
-		TxHash: backlink,
+		Id:      unitID,
+		Value:   WeiToAlpha(balanceWei),
+		Counter: counter,
 	}, nil
 }
 
@@ -128,19 +128,19 @@ func (e *EvmClient) GetTxProof(ctx context.Context, _ types.UnitID, txHash sdk.T
 }
 
 // GetBalance - reads account balance
-func (e *EvmClient) GetBalance(ctx context.Context, ethAddr []byte) (string, []byte, error) {
+func (e *EvmClient) GetBalance(ctx context.Context, ethAddr []byte) (string, uint64, error) {
 	resp := &struct {
-		_        struct{} `cbor:",toarray"`
-		Balance  string
-		Backlink []byte
+		_       struct{} `cbor:",toarray"`
+		Balance string
+		Counter uint64
 	}{}
 
 	addr := e.getURL(apiPathPrefix, evmApiSubPrefix, "balance", hex.EncodeToString(ethAddr))
 	err := e.get(ctx, addr, &resp, false)
 	if err != nil {
-		return "", nil, err
+		return "", 0, err
 	}
-	return resp.Balance, resp.Backlink, nil
+	return resp.Balance, resp.Counter, nil
 }
 
 // GetTransactionCount reads account nonce

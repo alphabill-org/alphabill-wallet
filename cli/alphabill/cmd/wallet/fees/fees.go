@@ -7,8 +7,8 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/spf13/cobra"
-
+	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
@@ -18,9 +18,8 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	evmwallet "github.com/alphabill-org/alphabill-wallet/wallet/evm"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
-	moneywallet "github.com/alphabill-org/alphabill-wallet/wallet/money"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
-	tokenswallet "github.com/alphabill-org/alphabill-wallet/wallet/tokens"
+	"github.com/spf13/cobra"
 )
 
 // NewFeesCmd creates a new cobra command for the wallet fees component.
@@ -421,10 +420,12 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 			feeManagerDB,
 			moneyInfo.SystemID,
 			moneyClient,
-			moneywallet.FeeCreditRecordIDFormPublicKey,
+			money.NewFeeCreditRecordIDFromPublicKey,
+			money.FeeCreditRecordUnitType,
 			moneyInfo.SystemID,
 			moneyClient,
-			moneywallet.FeeCreditRecordIDFormPublicKey,
+			money.NewFeeCreditRecordIDFromPublicKey,
+			money.FeeCreditRecordUnitType,
 			logger,
 		), nil
 	case clitypes.TokensType:
@@ -447,10 +448,12 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 			feeManagerDB,
 			moneyInfo.SystemID,
 			moneyClient,
-			moneywallet.FeeCreditRecordIDFormPublicKey,
+			money.NewFeeCreditRecordIDFromPublicKey,
+			money.FeeCreditRecordUnitType,
 			tokenInfo.SystemID,
 			tokensClient,
-			tokenswallet.FeeCreditRecordIDFromPublicKey,
+			tokens.NewFeeCreditRecordIDFromPublicKey,
+			tokens.FeeCreditRecordUnitType,
 			logger,
 		), nil
 	case clitypes.EvmType:
@@ -473,10 +476,12 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 			feeManagerDB,
 			moneyInfo.SystemID,
 			moneyClient,
-			moneywallet.FeeCreditRecordIDFormPublicKey,
+			money.NewFeeCreditRecordIDFromPublicKey,
+			money.FeeCreditRecordUnitType,
 			evmInfo.SystemID,
 			evmClient,
-			evmwallet.FeeCreditRecordIDFromPublicKey,
+			evmwallet.NewFeeCreditRecordIDFromPublicKey,
+			nil,
 			logger,
 		), nil
 	default:

@@ -10,7 +10,6 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
-
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 )
 
@@ -33,11 +32,15 @@ type (
 
 	RpcClient interface {
 		GetRoundNumber(ctx context.Context) (uint64, error)
-		GetBill(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*Bill, error)
 		GetFeeCreditRecord(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*FeeCreditBill, error)
 		GetUnitsByOwnerID(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error)
 		GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TransactionRecord, *types.TxProof, error)
 		SendTransaction(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
+	}
+
+	MoneyRpcClient interface {
+		RpcClient
+		GetBill(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*Bill, error)
 	}
 )
 
@@ -48,11 +51,11 @@ func (b *FeeCreditBill) IsLocked() bool {
 	return b.FeeCreditRecord.IsLocked()
 }
 
-func (b *FeeCreditBill) Backlink() []byte {
+func (b *FeeCreditBill) Counter() uint64 {
 	if b == nil {
-		return nil
+		return 0
 	}
-	return b.FeeCreditRecord.GetBacklink()
+	return b.FeeCreditRecord.GetCounter()
 }
 
 func (b *FeeCreditBill) Balance() uint64 {
@@ -95,7 +98,7 @@ func (b *Bill) Value() uint64 {
 	return b.BillData.V
 }
 
-func FetchBills(ctx context.Context, c RpcClient, ownerID []byte) ([]*Bill, error) {
+func FetchBills(ctx context.Context, c MoneyRpcClient, ownerID []byte) ([]*Bill, error) {
 	unitIDs, err := c.GetUnitsByOwnerID(ctx, ownerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch owner units: %w", err)
@@ -114,7 +117,7 @@ func FetchBills(ctx context.Context, c RpcClient, ownerID []byte) ([]*Bill, erro
 	return bills, nil
 }
 
-func FetchBill(ctx context.Context, c RpcClient, unitID types.UnitID) (*Bill, error) {
+func FetchBill(ctx context.Context, c MoneyRpcClient, unitID types.UnitID) (*Bill, error) {
 	bill, err := c.GetBill(ctx, unitID, false)
 	if err != nil && !errors.Is(err, ErrNotFound) {
 		return nil, err
@@ -122,7 +125,27 @@ func FetchBill(ctx context.Context, c RpcClient, unitID types.UnitID) (*Bill, er
 	return bill, nil
 }
 
-func FetchFeeCreditBill(ctx context.Context, c RpcClient, fcrID types.UnitID) (*FeeCreditBill, error) {
+// FetchFeeCreditBillByOwnerID finds the first fee credit record that belongs to the given owner identifier,
+// returns nil if not found.
+func FetchFeeCreditBillByOwnerID(ctx context.Context, c RpcClient, ownerID, fcrUnitType []byte) (*FeeCreditBill, error) {
+	unitIDs, err := c.GetUnitsByOwnerID(ctx, ownerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch units: %w", err)
+	}
+	for _, unitID := range unitIDs {
+		if unitID.HasType(fcrUnitType) {
+			fcr, err := c.GetFeeCreditRecord(ctx, unitID, false)
+			if err != nil && !errors.Is(err, ErrNotFound) {
+				return nil, err
+			}
+			return fcr, nil
+		}
+	}
+	return nil, nil
+}
+
+// FetchFeeCreditBillByUnitID finds the fee credit record by the fee credit record id.
+func FetchFeeCreditBillByUnitID(ctx context.Context, c RpcClient, fcrID types.UnitID) (*FeeCreditBill, error) {
 	fcr, err := c.GetFeeCreditRecord(ctx, fcrID, false)
 	if err != nil && !errors.Is(err, ErrNotFound) {
 		return nil, err

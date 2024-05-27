@@ -17,7 +17,7 @@ func NewAddVarTx(varData orchestration.ValidatorAssignmentRecord, systemID types
 	attr := &orchestration.AddVarAttributes{
 		Var: varData,
 	}
-	txPayload, err := txbuilder.NewTxPayload(systemID, orchestration.PayloadTypeAddVAR, unitID, timeout, nil, nil, attr)
+	txPayload, err := txbuilder.NewTxPayload(systemID, orchestration.PayloadTypeAddVAR, unitID, nil, timeout, nil, attr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tx: %w", err)
 	}

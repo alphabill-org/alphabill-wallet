@@ -61,10 +61,11 @@ func TestNFTs_Integration(t *testing.T) {
 
 	// mint NFT
 	stdout = tokensCmd.Exec(t, "new", "non-fungible", "--key", "2", "--type", typeID.String())
-	require.Eventually(t, testutils.BlockchainContains(tokensPartition, func(tx *types.TransactionOrder) bool {
-		return tx.PayloadType() == tokens.PayloadTypeMintNFT && bytes.Equal(tx.UnitID(), typeID)
-	}), testutils.WaitDuration, testutils.WaitTick)
 	nftID := extractTokenID(t, stdout.Lines[0])
+	require.Eventually(t, testutils.BlockchainContains(tokensPartition, func(tx *types.TransactionOrder) bool {
+		return tx.PayloadType() == tokens.PayloadTypeMintNFT && bytes.Equal(tx.UnitID(), nftID)
+	}), testutils.WaitDuration, testutils.WaitTick)
+
 
 	testutils.VerifyStdoutEventuallyWithTimeout(t,
 		tokensCmd.ExecFunc(t, "list", "non-fungible", "--key", "2"),
@@ -156,7 +157,7 @@ func TestNFTDataUpdateCmd_Integration(t *testing.T) {
 	stdout := tokensCmd.Exec(t, "new", "non-fungible", "--type", typeID.String(), "--data-file", tmpfile.Name())
 	nftID := extractTokenID(t, stdout.Lines[0])
 	require.Eventually(t, testutils.BlockchainContains(tokensPartition, func(tx *types.TransactionOrder) bool {
-		if tx.PayloadType() == tokens.PayloadTypeMintNFT && bytes.Equal(tx.UnitID(), typeID) {
+		if tx.PayloadType() == tokens.PayloadTypeMintNFT && bytes.Equal(tx.UnitID(), nftID) {
 			mintNonFungibleAttr := &tokens.MintNonFungibleTokenAttributes{}
 			require.NoError(t, tx.UnmarshalAttributes(mintNonFungibleAttr))
 			require.Equal(t, data, mintNonFungibleAttr.Data)
@@ -278,7 +279,7 @@ func TestNFT_LockUnlock_Integration(t *testing.T) {
 	stdout := tokensCmd.Exec(t, "new", "non-fungible", "--key", "1", "--type", typeID.String())
 	nftID := extractTokenID(t, stdout.Lines[0])
 	require.Eventually(t, testutils.BlockchainContains(tokensPartition, func(tx *types.TransactionOrder) bool {
-		return tx.PayloadType() == tokens.PayloadTypeMintNFT && bytes.Equal(tx.UnitID(), typeID)
+		return tx.PayloadType() == tokens.PayloadTypeMintNFT && bytes.Equal(tx.UnitID(), nftID)
 	}), testutils.WaitDuration, testutils.WaitTick)
 	testutils.VerifyStdoutEventually(t, tokensCmd.ExecFunc(t, "list", "non-fungible"), fmt.Sprintf("ID='%s'", nftID))
 

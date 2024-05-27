@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"testing"
 
-	sdkcrypto "github.com/alphabill-org/alphabill-go-base/crypto"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	sdkmoney "github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	sdktokens "github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
@@ -37,7 +36,7 @@ type Wallet struct {
 
 func createMoneyPartition(t *testing.T, genesisConfig *testutil.MoneyGenesisConfig, nodeCount uint8) *NodePartition {
 	genesisState := testutil.MoneyGenesisState(t, genesisConfig)
-	moneyPart, err := newPartition(t, "money node", nodeCount, func(tb map[string]sdkcrypto.Verifier) txsystem.TransactionSystem {
+	moneyPart, err := newPartition(t, "money node", nodeCount, func(tb types.RootTrustBase) txsystem.TransactionSystem {
 		genesisState = genesisState.Clone()
 		system, err := money.NewTxSystem(
 			testobserve.Default(t),
@@ -66,7 +65,7 @@ func createMoneyPartition(t *testing.T, genesisConfig *testutil.MoneyGenesisConf
 func CreateTokensPartition(t *testing.T) *NodePartition {
 	tokensState := state.NewEmptyState()
 	network, err := newPartition(t, "tokens node", 1,
-		func(tb map[string]sdkcrypto.Verifier) txsystem.TransactionSystem {
+		func(tb types.RootTrustBase) txsystem.TransactionSystem {
 			tokensState = tokensState.Clone()
 			system, err := tokens.NewTxSystem(
 				testobserve.Default(t),
@@ -83,11 +82,8 @@ func CreateTokensPartition(t *testing.T) *NodePartition {
 
 func CreateOrchestrationPartition(t *testing.T, ownerPredicate types.PredicateBytes) *NodePartition {
 	s := state.NewEmptyState()
-	network, err := newPartition(
-		t,
-		"orchestration node",
-		1,
-		func(tb map[string]sdkcrypto.Verifier) txsystem.TransactionSystem {
+	network, err := newPartition(t,	"orchestration node", 1,
+		func(tb types.RootTrustBase) txsystem.TransactionSystem {
 			s = s.Clone()
 			txSystem, err := orchestration.NewTxSystem(
 				testobserve.Default(t),

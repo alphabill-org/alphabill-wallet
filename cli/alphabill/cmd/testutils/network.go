@@ -45,7 +45,7 @@ type AlphabillNetwork struct {
 
 type rootPartition struct {
 	rcGenesis *genesis.RootGenesis
-	TrustBase map[string]abcrypto.Verifier
+	TrustBase types.RootTrustBase
 	Nodes     []*rootNode
 	obs       testobserve.Factory
 }
@@ -55,9 +55,9 @@ type NodePartition struct {
 	SystemName       string
 	partitionGenesis *genesis.PartitionGenesis
 	genesisState     *state.State
-	txSystemFunc     func(trustBase map[string]abcrypto.Verifier) txsystem.TransactionSystem
+	txSystemFunc     func(trustBase types.RootTrustBase) txsystem.TransactionSystem
 	ctx              context.Context
-	tb               map[string]abcrypto.Verifier
+	tb               types.RootTrustBase
 	Nodes            []*PartitionNode
 	obs              testobserve.Factory
 }
@@ -123,7 +123,6 @@ func newRootPartition(nofRootNodes uint8, nodePartitions []*NodePartition) (*roo
 	if err != nil {
 		return nil, fmt.Errorf("create signer failed, %w", err)
 	}
-	trustBase := make(map[string]abcrypto.Verifier)
 	rootNodes := make([]*rootNode, nofRootNodes)
 	rootGenesisFiles := make([]*genesis.RootGenesis, nofRootNodes)
 	for i := 0; i < int(nofRootNodes); i++ {
@@ -155,11 +154,6 @@ func newRootPartition(nofRootNodes uint8, nodePartitions []*NodePartition) (*roo
 		if err != nil {
 			return nil, err
 		}
-		ver, err := rootSigners[i].Verifier()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get root node verifier, %w", err)
-		}
-		trustBase[id.String()] = ver
 		rootGenesisFiles[i] = rg
 		rootNodes[i] = &rootNode{
 			genesis:    rg,
@@ -178,6 +172,10 @@ func newRootPartition(nofRootNodes uint8, nodePartitions []*NodePartition) (*roo
 				part.partitionGenesis = pg
 			}
 		}
+	}
+	trustBase, err := rootGenesis.GenerateTrustBase()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate trust base from genesis: %w", err)
 	}
 	return &rootPartition{
 		rcGenesis: rootGenesis,
@@ -233,7 +231,11 @@ func (r *rootPartition) start(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to init consensus network, %w", err)
 		}
-		cm, err := abdrc.NewDistributedAbConsensusManager(rootPeer.ID(), r.rcGenesis, partitionStore, rootConsensusNet, rn.RootSigner, obs)
+		trustBase, err := r.rcGenesis.GenerateTrustBase()
+		if err != nil {
+			return fmt.Errorf("failed to generate trust base from genesis: %w", err)
+		}
+		cm, err := abdrc.NewDistributedAbConsensusManager(rootPeer.ID(), r.rcGenesis, trustBase, partitionStore, rootConsensusNet, rn.RootSigner, obs)
 		if err != nil {
 			return fmt.Errorf("consensus manager initialization failed, %w", err)
 		}
@@ -254,7 +256,7 @@ func (r *rootPartition) start(ctx context.Context) error {
 	return nil
 }
 
-func newPartition(t *testing.T, systemName string, nodeCount uint8, txSystemProvider func(trustBase map[string]abcrypto.Verifier) txsystem.TransactionSystem, systemIdentifier types.SystemID, state *state.State) (abPartition *NodePartition, err error) {
+func newPartition(t *testing.T, systemName string, nodeCount uint8, txSystemProvider func(trustBase types.RootTrustBase) txsystem.TransactionSystem, systemIdentifier types.SystemID, state *state.State) (abPartition *NodePartition, err error) {
 	if nodeCount < 1 {
 		return nil, fmt.Errorf("invalid count of partition Nodes: %d", nodeCount)
 	}
@@ -312,7 +314,7 @@ func newPartition(t *testing.T, systemName string, nodeCount uint8, txSystemProv
 func (n *NodePartition) start(t *testing.T, ctx context.Context, bootNodes []peer.AddrInfo) error {
 	n.ctx = ctx
 	// start Nodes
-	trustBase, err := genesis.NewValidatorTrustBase(n.partitionGenesis.RootValidators)
+	trustBase, err := n.partitionGenesis.GenerateRootTrustBase()
 	if err != nil {
 		return fmt.Errorf("failed to extract root trust base from genesis file, %w", err)
 	}
@@ -359,12 +361,17 @@ func (n *NodePartition) start(t *testing.T, ctx context.Context, bootNodes []pee
 
 func (n *NodePartition) startNode(ctx context.Context, pn *PartitionNode) error {
 	log := n.obs.DefaultLogger().With(slog.Any("node_id", pn.peerConf.ID))
+	trustBase, err := n.partitionGenesis.GenerateRootTrustBase()
+	if err != nil {
+		return fmt.Errorf("failed to generate trust base from genesis: %w", err)
+	}
 	node, err := partition.NewNode(
 		ctx,
 		pn.peerConf,
 		pn.signer,
 		n.txSystemFunc(n.tb),
 		n.partitionGenesis,
+		trustBase,
 		nil,
 		observability.WithLogger(n.obs.DefaultObserver(), log),
 		pn.confOpts...,
