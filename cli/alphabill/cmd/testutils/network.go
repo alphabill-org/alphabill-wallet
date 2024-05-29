@@ -257,7 +257,10 @@ func (n *AlphabillNetwork) startMoneyNode(t *testing.T) {
 
 	rpcPort, err := gc.MappedPort(n.ctx, "8001")
 	require.NoError(t, err)
-	n.MoneyRpcUrl = fmt.Sprintf("http://127.0.0.1:%s/rpc", rpcPort.Port())
+	rpcHost, err := gc.Host(n.ctx)
+	require.NoError(t, err)
+
+	n.MoneyRpcUrl = fmt.Sprintf("http://%s:%s/rpc", rpcHost, rpcPort.Port())
 }
 
 func (n *AlphabillNetwork) startTokensNode(t *testing.T) {
@@ -313,8 +316,10 @@ func (n *AlphabillNetwork) startTokensNode(t *testing.T) {
 
 	rpcPort, err := gc.MappedPort(n.ctx, "8001")
 	require.NoError(t, err)
+	rpcHost, err := gc.Host(n.ctx)
+	require.NoError(t, err)
 
-	n.TokensRpcUrl = fmt.Sprintf("http://127.0.0.1:%s/rpc", rpcPort.Port())
+	n.TokensRpcUrl = fmt.Sprintf("http://%s:%s/rpc", rpcHost, rpcPort.Port())
 }
 
 func (n *AlphabillNetwork) startOrchestrationNode(t *testing.T) {
@@ -370,6 +375,8 @@ func (n *AlphabillNetwork) startOrchestrationNode(t *testing.T) {
 
 	rpcPort, err := gc.MappedPort(n.ctx, "8001")
 	require.NoError(t, err)
+	rpcHost, err := gc.ContainerIP(n.ctx)
+	require.NoError(t, err)
 
-	n.OrchestrationRpcUrl = fmt.Sprintf("http://127.0.0.1:%s/rpc", rpcPort.Port())
+	n.OrchestrationRpcUrl = fmt.Sprintf("http://%s:%s/rpc", rpcHost, rpcPort.Port())
 }
