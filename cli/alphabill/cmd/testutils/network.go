@@ -375,7 +375,7 @@ func (n *AlphabillNetwork) startOrchestrationNode(t *testing.T) {
 
 	rpcPort, err := gc.MappedPort(n.ctx, "8001")
 	require.NoError(t, err)
-	rpcHost, err := gc.ContainerIP(n.ctx)
+	rpcHost, err := gc.Host(n.ctx)
 	require.NoError(t, err)
 
 	n.OrchestrationRpcUrl = fmt.Sprintf("http://%s:%s/rpc", rpcHost, rpcPort.Port())
