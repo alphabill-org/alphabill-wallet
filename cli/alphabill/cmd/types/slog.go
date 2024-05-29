@@ -24,16 +24,16 @@ const (
 	fmtCONSOLE = "console"
 )
 
-type logConfiguration struct {
-	level           string
-	format          string
-	outputPath      string
-	timeFormat      string
-	noColor         bool
+type LogConfiguration struct {
+	Level           string
+	Format          string
+	OutputPath      string
+	TimeFormat      string
+	NoColor         bool
 }
 
-func newLogger(cfg *logConfiguration) (*slog.Logger, error) {
-	out, err := filenameToWriter(cfg.outputPath)
+func newLogger(cfg *LogConfiguration) (*slog.Logger, error) {
+	out, err := filenameToWriter(cfg.OutputPath)
 	if err != nil {
 		return nil, fmt.Errorf("creating writer for log output: %w", err)
 	}
@@ -45,30 +45,30 @@ func newLogger(cfg *logConfiguration) (*slog.Logger, error) {
 	return slog.New(h), nil
 }
 
-func (cfg *logConfiguration) handler(out io.Writer) (slog.Handler, error) {
+func (cfg *LogConfiguration) handler(out io.Writer) (slog.Handler, error) {
 	// init defaults for everything still unassigned...
 	cfg.initDefaults(out)
 
 	handlerOptions := &slog.HandlerOptions{
 		AddSource: true,
-		Level:     cfg.logLevel(),
+		Level:     cfg.LogLevel(),
 	}
 
 	var h slog.Handler
-	switch strings.ToLower(cfg.format) {
+	switch strings.ToLower(cfg.Format) {
 	case fmtTEXT:
 		h = slog.NewTextHandler(out, handlerOptions)
 	case fmtJSON:
 		h = slog.NewJSONHandler(out, handlerOptions)
 	case fmtCONSOLE:
 		h = tint.NewHandler(out, &tint.Options{
-			Level:       cfg.logLevel(),
-			NoColor:     cfg.noColor,
-			TimeFormat:  cfg.timeFormat,
+			Level:       cfg.LogLevel(),
+			NoColor:     cfg.NoColor,
+			TimeFormat:  cfg.TimeFormat,
 			AddSource:   false,
 		})
 	default:
-		return nil, fmt.Errorf("unknown log format %q", cfg.format)
+		return nil, fmt.Errorf("unknown log format %q", cfg.Format)
 	}
 
 	return h, nil
@@ -77,33 +77,33 @@ func (cfg *logConfiguration) handler(out io.Writer) (slog.Handler, error) {
 /*
 initDefaults assigns default value to the fields which are unassigned.
 */
-func (cfg *logConfiguration) initDefaults(out io.Writer) {
-	if cfg.level == "" {
-		cfg.level = slog.LevelInfo.String()
+func (cfg *LogConfiguration) initDefaults(out io.Writer) {
+	if cfg.Level == "" {
+		cfg.Level = slog.LevelInfo.String()
 	}
-	if cfg.format == "" {
-		cfg.format = fmtCONSOLE
+	if cfg.Format == "" {
+		cfg.Format = fmtCONSOLE
 	}
 
-	if cfg.timeFormat == "" {
-		switch cfg.format {
+	if cfg.TimeFormat == "" {
+		switch cfg.Format {
 		case fmtCONSOLE:
-			cfg.timeFormat = "15:04:05.0000"
+			cfg.TimeFormat = "15:04:05.0000"
 		default:
-			cfg.timeFormat = "2006-01-02T15:04:05.0000Z0700"
+			cfg.TimeFormat = "2006-01-02T15:04:05.0000Z0700"
 		}
 	}
 
 	f, ok := out.(interface{ Fd() uintptr })
-	cfg.noColor = !(ok && isatty.IsTerminal(f.Fd()))
+	cfg.NoColor = !(ok && isatty.IsTerminal(f.Fd()))
 }
 
-func (cfg *logConfiguration) logLevel() slog.Level {
-	if cfg.outputPath == "discard" || cfg.outputPath == os.DevNull {
+func (cfg *LogConfiguration) LogLevel() slog.Level {
+	if cfg.OutputPath == "discard" || cfg.OutputPath == os.DevNull {
 		return levelNone
 	}
 
-	switch strings.ToLower(cfg.level) {
+	switch strings.ToLower(cfg.Level) {
 	case "warning":
 		return slog.LevelWarn
 	case "trace":
@@ -113,7 +113,7 @@ func (cfg *logConfiguration) logLevel() slog.Level {
 	}
 
 	var lvl slog.Level
-	_ = lvl.UnmarshalText([]byte(cfg.level))
+	_ = lvl.UnmarshalText([]byte(cfg.Level))
 	return lvl
 }
 

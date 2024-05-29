@@ -7,8 +7,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
-	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
@@ -16,10 +14,9 @@ import (
 
 func TestWalletFeesCmds_MoneyPartition(t *testing.T) {
 	// start money partition
-	wallets, abNet := testutils.SetupNetworkWithWallets(t)
-	moneyRpcUrl := abNet.RpcUrl(t, money.DefaultSystemID)
+	wallets, abNet := testutils.SetupNetworkWithWallets(t, false, false)
 
-	feesCmd := newWalletCmdExecutor("fees", "--rpc-url", moneyRpcUrl).WithHome(wallets[0].Homedir)
+	feesCmd := newWalletCmdExecutor("fees", "--rpc-url", abNet.MoneyRpcUrl).WithHome(wallets[0].Homedir)
 
 	// list fees
 	stdout := feesCmd.Exec(t, "list")
@@ -69,15 +66,12 @@ func TestWalletFeesCmds_MoneyPartition(t *testing.T) {
 
 func TestWalletFeesCmds_TokenPartition(t *testing.T) {
 	// start money and tokens partition
-	tokensPartition := testutils.CreateTokensPartition(t)
-	wallets, abNet := testutils.SetupNetworkWithWallets(t, tokensPartition)
-	moneyRpcUrl := abNet.RpcUrl(t, money.DefaultSystemID)
-	tokensRpcUrl := abNet.RpcUrl(t, tokens.DefaultSystemID)
+	wallets, abNet := testutils.SetupNetworkWithWallets(t, true, false)
 
 	feesCmd := newWalletCmdExecutor("fees",
-		"--rpc-url", moneyRpcUrl,
+		"--rpc-url", abNet.MoneyRpcUrl,
 		"--partition", "tokens",
-		"--partition-rpc-url", tokensRpcUrl).WithHome(wallets[0].Homedir)
+		"--partition-rpc-url", abNet.TokensRpcUrl).WithHome(wallets[0].Homedir)
 
 	// list fees on token partition
 	stdout := feesCmd.Exec(t, "list")
@@ -128,11 +122,10 @@ func TestWalletFeesCmds_TokenPartition(t *testing.T) {
 }
 
 func TestWalletFeesCmds_MinimumFeeAmount(t *testing.T) {
-	wallets, abNet := testutils.SetupNetworkWithWallets(t)
-	moneyRpcUrl := abNet.RpcUrl(t, money.DefaultSystemID)
+	wallets, abNet := testutils.SetupNetworkWithWallets(t, false, false)
 
 	feesCmd := newWalletCmdExecutor("fees",
-		"--rpc-url", moneyRpcUrl).WithHome(wallets[0].Homedir)
+		"--rpc-url", abNet.MoneyRpcUrl).WithHome(wallets[0].Homedir)
 
 	// try to add invalid fee amount
 	err := fmt.Sprintf("minimum fee credit amount to add is %s", util.AmountToString(fees.MinimumFeeAmount, 8))
@@ -168,9 +161,9 @@ func TestWalletFeesCmds_MinimumFeeAmount(t *testing.T) {
 }
 
 func TestWalletFeesLockCmds_Ok(t *testing.T) {
-	wallets, abNet := testutils.SetupNetworkWithWallets(t)
-	moneyRpcUrl := abNet.RpcUrl(t, money.DefaultSystemID)
-	feesCmd := newWalletCmdExecutor("fees",	"--rpc-url", moneyRpcUrl).WithHome(wallets[0].Homedir)
+	wallets, abNet := testutils.SetupNetworkWithWallets(t, false, false)
+
+	feesCmd := newWalletCmdExecutor("fees",	"--rpc-url", abNet.MoneyRpcUrl).WithHome(wallets[0].Homedir)
 
 	// create fee credit bill by adding fee credit
 	stdout := feesCmd.Exec(t, "add", "--amount", "1")

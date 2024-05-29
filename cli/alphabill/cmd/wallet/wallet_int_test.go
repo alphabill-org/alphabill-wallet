@@ -2,11 +2,15 @@ package wallet
 
 import (
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/orchestration"
+	baseutil "github.com/alphabill-org/alphabill-go-base/util"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
 
@@ -23,14 +27,13 @@ Test scenario 2.1: wallet-1 account 2 sends one transaction to wallet-1 account 
 Test scenario 3: wallet-1 sends tx without confirming
 */
 func TestSendingMoneyUsingWallets_integration(t *testing.T) {
-	wallets, abNet := testutils.SetupNetworkWithWallets(t)
-	rpcUrl := abNet.RpcUrl(t, money.DefaultSystemID)
+	wallets, abNet := testutils.SetupNetworkWithWallets(t, false, false)
 
-	walletCmd := newWalletCmdExecutor("--rpc-url", rpcUrl).WithHome(wallets[0].Homedir)
+	walletCmd := newWalletCmdExecutor("--rpc-url", abNet.MoneyRpcUrl).WithHome(wallets[0].Homedir)
 
 	// create fee credit for wallet-1
 	feeAmountAlpha := uint64(1)
-	addFeeCredit(t, wallets[0].Homedir, feeAmountAlpha, "money", rpcUrl, rpcUrl)
+	addFeeCredit(t, wallets[0].Homedir, feeAmountAlpha, "money", abNet.MoneyRpcUrl, abNet.MoneyRpcUrl)
 
 	// verify fee credit received
 	w1BalanceBilly := 1e18 - feeAmountAlpha*1e8
@@ -55,7 +58,7 @@ func TestSendingMoneyUsingWallets_integration(t *testing.T) {
 
 	// TS1.2: send bills back to wallet-1
 	// create fee credit for wallet-2
-	addFeeCredit(t, wallets[1].Homedir, feeAmountAlpha, "money", rpcUrl, rpcUrl)
+	addFeeCredit(t, wallets[1].Homedir, feeAmountAlpha, "money", abNet.MoneyRpcUrl, abNet.MoneyRpcUrl)
 
 	// verify fee credit received for wallet-2
 	w2BalanceBilly = w2BalanceBilly - feeAmountAlpha*1e8
@@ -130,14 +133,13 @@ Test scenario:
    w1k2 and w1k3 should have only single bill
 */
 func TestCollectDustInMultiAccountWallet(t *testing.T) {
-	wallets, abNet := testutils.SetupNetworkWithWallets(t)
-	moneyRpcUrl := abNet.RpcUrl(t, money.DefaultSystemID)
-	walletCmd := newWalletCmdExecutor("--rpc-url", moneyRpcUrl).WithHome(wallets[0].Homedir)
+	wallets, abNet := testutils.SetupNetworkWithWallets(t, false, false)
+	walletCmd := newWalletCmdExecutor("--rpc-url", abNet.MoneyRpcUrl).WithHome(wallets[0].Homedir)
 
 	// add fee credit for w1k1
 	walletCmd.Exec(t, "fees", "add",
 		"--amount", "1",
-		"--partition-rpc-url", moneyRpcUrl)
+		"--partition-rpc-url", abNet.MoneyRpcUrl)
 
 	pubKey2Hex := hexutil.Encode(wallets[0].PubKeys[1])
 	pubKey3Hex := addAccount(t, wallets[0].Homedir)
@@ -153,12 +155,12 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 	walletCmd.Exec(t, "fees", "add",
 		"--key", "2",
 		"--amount", "1",
-		"--partition-rpc-url", moneyRpcUrl)
+		"--partition-rpc-url", abNet.MoneyRpcUrl)
 
 	walletCmd.Exec(t, "fees", "add",
 		"--key", "3",
 		"--amount", "1",
-		"--partition-rpc-url", moneyRpcUrl)
+		"--partition-rpc-url", abNet.MoneyRpcUrl)
 
 	walletCmd.Exec(t, "collect-dust", "--key", "0")
 
@@ -169,6 +171,83 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 	// Verify that w1k3 has a single bill with value 19
 	testutils.VerifyStdout(t, walletCmd.Exec(t, "bills", "list", "--key", "3"),
 		util.AmountToString(19*1e8, 8))
+}
+
+func TestWalletBillsLockUnlockCmd_Ok(t *testing.T) {
+	// setup network
+	wallets, abNet := testutils.SetupNetworkWithWallets(t, false, false)
+
+	walletCmd := newWalletCmdExecutor("--rpc-url", abNet.MoneyRpcUrl).WithHome(wallets[0].Homedir)
+
+	// add fee credit
+	stdout := walletCmd.Exec(t, "fees", "add", "--amount=1")
+	require.Equal(t, "Successfully created 1 fee credits on money partition.", stdout.Lines[0])
+
+	// lock bill
+	stdout = walletCmd.Exec(t, "bills", "lock", "--bill-id", money.NewBillID(nil, []byte{1}).String())
+	testutils.VerifyStdout(t, stdout, "Bill locked successfully.")
+
+	// verify bill locked
+	stdout = walletCmd.Exec(t, "bills", "list")
+	testutils.VerifyStdout(t, stdout, "#1 0x000000000000000000000000000000000000000000000000000000000000000100 9'999'999'999.000'000'00 (manually locked by user)")
+
+	// unlock bill
+	stdout = walletCmd.Exec(t, "bills", "unlock", "--bill-id", money.NewBillID(nil, []byte{1}).String())
+	testutils.VerifyStdout(t, stdout, "Bill unlocked successfully.")
+
+	// verify bill unlocked
+	stdout = walletCmd.Exec(t, "bills", "list")
+	testutils.VerifyStdout(t, stdout, "#1 0x000000000000000000000000000000000000000000000000000000000000000100 9'999'999'999.000'000'00")
+}
+
+func TestOrchestration_AddVarOK(t *testing.T) {
+	wallets, net := testutils.SetupNetworkWithWallets(t, false, true)
+
+	varData := orchestration.ValidatorAssignmentRecord{
+		EpochNumber:            0,
+		EpochSwitchRoundNumber: 10000,
+		ValidatorAssignment: orchestration.ValidatorAssignment{
+			Validators: []orchestration.ValidatorInfo{
+				{
+					ValidatorID: []byte{1},
+					Stake:       100,
+				},
+				{
+					ValidatorID: []byte{2},
+					Stake:       100,
+				},
+				{
+					ValidatorID: []byte{3},
+					Stake:       100,
+				},
+			},
+			QuorumSize: 150,
+		},
+	}
+	varFile := writeVarFile(t, wallets[0].Homedir, varData)
+
+	orcCmd := newWalletCmdExecutor("orchestration", "--rpc-url", net.OrchestrationRpcUrl).WithHome(wallets[0].Homedir)
+
+	testutils.VerifyStdout(t, orcCmd.Exec(t, "add-var", "--partition-id", "1", "--var-file", varFile),
+		"Validator Assignment Record added successfully.")
+
+	// TODO: verify with some kind of list-var command?
+	// require.Eventually(t, testutils.BlockchainContains(orchestrationPartition, func(tx *types.TransactionOrder) bool {
+	// 	if tx.PayloadType() == orchestration.PayloadTypeAddVAR {
+	// 		var attrs *orchestration.AddVarAttributes
+	// 		require.NoError(t, tx.UnmarshalAttributes(&attrs))
+	// 		require.Equal(t, varData, attrs.Var)
+	// 		return true
+	// 	}
+	// 	return false
+	// }), testutils.WaitDuration, testutils.WaitTick)
+}
+
+func writeVarFile(t *testing.T, homedir string, varData orchestration.ValidatorAssignmentRecord) string {
+	varFilePath := filepath.Join(homedir, "var-file.json")
+	err := baseutil.WriteJsonFile(varFilePath, &varData)
+	require.NoError(t, err)
+	return varFilePath
 }
 
 func waitForBalanceCLI(t *testing.T, walletCmd *testutils.CmdExecutor, expectedBalance uint64, accountIndex uint64) {

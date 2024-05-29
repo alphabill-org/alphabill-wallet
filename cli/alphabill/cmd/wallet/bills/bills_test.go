@@ -5,7 +5,6 @@ import (
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
-	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/fees"
 
 	"github.com/alphabill-org/alphabill-wallet/client/rpc/mocksrv"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
@@ -120,34 +119,6 @@ func TestWalletBillsListCmd_ShowLockedBills(t *testing.T) {
 	require.Equal(t, stdout.Lines[1], "#1 0x000000000000000000000000000000000000000000000000000000000000000100 1.000'000'00 (locked for adding fees)")
 	require.Equal(t, stdout.Lines[2], "#2 0x000000000000000000000000000000000000000000000000000000000000000200 1.000'000'00 (locked for reclaiming fees)")
 	require.Equal(t, stdout.Lines[3], "#3 0x000000000000000000000000000000000000000000000000000000000000000300 1.000'000'00 (locked for dust collection)")
-}
-
-func TestWalletBillsLockUnlockCmd_Ok(t *testing.T) {
-	// setup network
-	wallets, abNet := testutils.SetupNetworkWithWallets(t)
-	rpcUrl := abNet.RpcUrl(t, money.DefaultSystemID)
-	billsCmd := testutils.NewSubCmdExecutor(NewBillsCmd, "--rpc-url", rpcUrl).WithHome(wallets[0].Homedir)
-	feesCmd := testutils.NewSubCmdExecutor(fees.NewFeesCmd, "--rpc-url", rpcUrl).WithHome(wallets[0].Homedir)
-
-	// add fee credit
-	stdout := feesCmd.Exec(t, "add", "--amount=1")
-	require.Equal(t, "Successfully created 1 fee credits on money partition.", stdout.Lines[0])
-
-	// lock bill
-	stdout = billsCmd.Exec(t, "lock", "--bill-id", money.NewBillID(nil, []byte{1}).String())
-	testutils.VerifyStdout(t, stdout, "Bill locked successfully.")
-
-	// verify bill locked
-	stdout = billsCmd.Exec(t, "list")
-	testutils.VerifyStdout(t, stdout, "#1 0x000000000000000000000000000000000000000000000000000000000000000100 9'999'999'999.000'000'00 (manually locked by user)")
-
-	// unlock bill
-	stdout = billsCmd.Exec(t, "unlock", "--bill-id", money.NewBillID(nil, []byte{1}).String())
-	testutils.VerifyStdout(t, stdout, "Bill unlocked successfully.")
-
-	// verify bill unlocked
-	stdout = billsCmd.Exec(t, "list")
-	testutils.VerifyStdout(t, stdout, "#1 0x000000000000000000000000000000000000000000000000000000000000000100 9'999'999'999.000'000'00")
 }
 
 func TestWalletBillsLockUnlockCmd_Nok(t *testing.T) {

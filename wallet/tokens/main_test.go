@@ -19,7 +19,6 @@ import (
 
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
@@ -33,13 +32,12 @@ const (
 func Test_GetRoundNumber_OK(t *testing.T) {
 	t.Parallel()
 
-	observe := observability.NewFactory(t)
 	rpcClient := &mockTokensRpcClient{
 		getRoundNumber: func(ctx context.Context) (uint64, error) {
 			return 42, nil
 		},
 	}
-	w, err := New(tokens.DefaultSystemID, rpcClient, nil, false, nil, observe.DefaultLogger())
+	w, err := New(tokens.DefaultSystemID, rpcClient, nil, false, nil, logger.New(t))
 	require.NoError(t, err)
 
 	roundNumber, err := w.GetRoundNumber(context.Background())
@@ -50,10 +48,9 @@ func Test_GetRoundNumber_OK(t *testing.T) {
 func Test_GetFeeCreditBill_OK(t *testing.T) {
 	t.Parallel()
 
-	observe := observability.NewFactory(t)
 	expectedFCB := &api.FeeCreditBill{ID: []byte{1}, FeeCreditRecord: &fc.FeeCreditRecord{Balance: 100}}
 	rpcClient := &mockTokensRpcClient{}
-	w, err := New(tokens.DefaultSystemID, rpcClient, nil, false, nil, observe.DefaultLogger())
+	w, err := New(tokens.DefaultSystemID, rpcClient, nil, false, nil, logger.New(t))
 	require.NoError(t, err)
 
 	// verify that correct fee credit bill is returned

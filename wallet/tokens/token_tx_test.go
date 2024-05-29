@@ -53,7 +53,7 @@ func TestConfirmUnitsTx_ok(t *testing.T) {
 func TestConfirmUnitsTx_timeout(t *testing.T) {
 	getRoundNumberCalled := 0
 	getTxProofCalled := 0
-	randomTxHash1 := test.RandomBytes(32)
+	randomTxHash1 := testutils.RandomBytes(32)
 	rpcClient := &mockTokensRpcClient{
 		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
 			return nil, nil

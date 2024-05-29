@@ -1,619 +1,375 @@
 package testutils
 
 import (
+	"bytes"
 	"context"
-	"crypto/rand"
-	"errors"
 	"fmt"
-	"log/slog"
-	"net"
-	"path/filepath"
-	"sort"
+	"io"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
-	abcrypto "github.com/alphabill-org/alphabill-go-base/crypto"
-	"github.com/alphabill-org/alphabill-go-base/types"
-	"github.com/alphabill-org/alphabill/keyvaluedb"
-	"github.com/alphabill-org/alphabill/keyvaluedb/boltdb"
-	"github.com/alphabill-org/alphabill/keyvaluedb/memorydb"
-	"github.com/alphabill-org/alphabill/network"
-	"github.com/alphabill-org/alphabill/network/protocol/genesis"
-	"github.com/alphabill-org/alphabill/observability"
-	"github.com/alphabill-org/alphabill/partition"
-	"github.com/alphabill-org/alphabill/rootchain"
-	"github.com/alphabill-org/alphabill/rootchain/consensus/abdrc"
-	rootgenesis "github.com/alphabill-org/alphabill/rootchain/genesis"
-	"github.com/alphabill-org/alphabill/rootchain/partitions"
-	"github.com/alphabill-org/alphabill/state"
-	"github.com/alphabill-org/alphabill/txsystem"
-	libp2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/libp2p/go-libp2p/core/peerstore"
-	"github.com/multiformats/go-multiaddr"
+	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	"github.com/stretchr/testify/require"
-
-	testobserve "github.com/alphabill-org/alphabill-wallet/internal/testutils/observability"
+	tc "github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/exec"
+	"github.com/testcontainers/testcontainers-go/network"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-// AlphabillNetwork for integration tests
-type AlphabillNetwork struct {
-	NodePartitions map[types.SystemID]*NodePartition
-	RootPartition  *rootPartition
-	ctxCancel      context.CancelFunc
+const defaultAlphabillDockerImage string = "ghcr.io/alphabill-org/alphabill:cf4ff7151d7a7ebba65903b7d827b0740fc878a4"
+
+type (
+	AlphabillNetwork struct {
+		MoneyRpcUrl         string
+		TokensRpcUrl        string
+		OrchestrationRpcUrl string
+
+		ctx                 context.Context
+		genesis             []byte
+		dockerNetwork       string
+		bootstrapNode       string
+	}
+
+	Wallet struct {
+		Homedir string
+		PubKeys [][]byte
+	}
+
+	StdoutLogConsumer struct{}
+)
+
+var nodeWaitStrategy = wait.ForHTTP("/rpc").
+	WithPort("8001").
+	WithHeaders(map[string]string{"Content-Type": "application/json"}).
+	WithBody(strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"state_getRoundNumber"}`)).
+	WithStartupTimeout(5*time.Second)
+
+
+func (lc *StdoutLogConsumer) Accept(l tc.Log) {
+    fmt.Print(string(l.Content))
 }
 
-type rootPartition struct {
-	rcGenesis *genesis.RootGenesis
-	TrustBase types.RootTrustBase
-	Nodes     []*rootNode
-	obs       testobserve.Factory
+func dockerImage() string {
+	image := os.Getenv("AB_TEST_DOCKERIMAGE")
+	if image == "" {
+		return defaultAlphabillDockerImage
+	}
+	return image
 }
 
-type NodePartition struct {
-	systemId         types.SystemID
-	SystemName       string
-	partitionGenesis *genesis.PartitionGenesis
-	genesisState     *state.State
-	txSystemFunc     func(trustBase types.RootTrustBase) txsystem.TransactionSystem
-	ctx              context.Context
-	tb               types.RootTrustBase
-	Nodes            []*PartitionNode
-	obs              testobserve.Factory
+// SetupNetworkWithWallets sets up the Alphabill network and creates two wallets with two keys in both of them.
+// Starts money partition, and optionally tokens and orchestration partitions, with rpc servers up and running.
+// The owner of the initial bill is set to the first key of the first wallet.
+// Returns the created wallets and a reference to the Alphabill network.
+func SetupNetworkWithWallets(t *testing.T, withTokensNode, withOrchestrationNode bool) ([]*Wallet, *AlphabillNetwork) {
+	ctx := context.Background()
+	dockerNetwork, err := network.New(ctx, network.WithCheckDuplicate())
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, dockerNetwork.Remove(ctx))
+	})
+
+	abNet := &AlphabillNetwork{
+		ctx:           ctx,
+		dockerNetwork: dockerNetwork.Name,
+	}
+
+	wallets := setupWallets(t, 2, 2)
+	ownerPredicate := templates.NewP2pkh256BytesFromKey(wallets[0].PubKeys[0])
+
+	abNet.createGenesis(t, ownerPredicate)
+	abNet.startRootNode(t)
+	abNet.startMoneyNode(t)
+
+	if withTokensNode {
+		abNet.startTokensNode(t)
+	}
+	if withOrchestrationNode {
+		abNet.startOrchestrationNode(t)
+	}
+
+	return wallets, abNet
 }
 
-type PartitionNode struct {
-	*partition.Node
-	dbFile       string
-	idxFile      string
-	peerConf     *network.PeerConfiguration
-	signer       abcrypto.Signer
-	genesis      *genesis.PartitionNode
-	EventHandler *TestEventHandler
-	confOpts     []partition.NodeOption
-	AddrRPC      string
-	proofDB      keyvaluedb.KeyValueDB
-	OwnerIndexer *partition.OwnerIndexer
-	cancel       context.CancelFunc
-	done         chan error
+func setupWallets(t *testing.T, walletCount, keyCount int) []*Wallet{
+	var wallets []*Wallet
+	for i := 0; i < walletCount; i++ {
+		am, home := CreateNewWallet(t)
+		defer am.Close()
+
+		pubKey, err := am.GetPublicKey(0)
+		require.NoError(t, err)
+
+		keys := [][]byte{pubKey}
+		for i := 1; i < keyCount; i++ {
+			_, pubKey, err := am.AddAccount()
+			require.NoError(t, err)
+			keys = append(keys, pubKey)
+		}
+
+		wallets = append(wallets, &Wallet{home, keys})
+	}
+	return wallets
 }
 
-type rootNode struct {
-	*rootchain.Node
-	EncKeyPair *network.PeerKeyPair
-	RootSigner abcrypto.Signer
-	genesis    *genesis.RootGenesis
-	id         peer.ID
-	addr       multiaddr.Multiaddr
+func (n *AlphabillNetwork) createGenesis(t *testing.T, ownerPredicate []byte) {
+	cr := tc.ContainerRequest{
+		Image: dockerImage(),
+		WaitingFor: wait.ForExit().WithExitTimeout(5*time.Second),
+		LogConsumerCfg: &tc.LogConsumerConfig{
+			Consumers: []tc.LogConsumer{&StdoutLogConsumer{}},
+		},
+		Files: []tc.ContainerFile{{
+			HostFilePath:      "./testdata/genesis.sh",
+			ContainerFilePath: "/app/genesis.sh",
+			FileMode:          0o755,
+		}},
+		Entrypoint: []string{"genesis.sh"},
+		Cmd: []string{
+			fmt.Sprintf("%X", ownerPredicate),
+		},
+	}
+	gcr := tc.GenericContainerRequest{
+		ContainerRequest: cr,
+		Started:          true,
+	}
+	gc, err := tc.GenericContainer(n.ctx, gcr)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, gc.Terminate(n.ctx))
+	})
 
-	cancel context.CancelFunc
-	done   chan error
+	genesisReader, err := gc.CopyFileFromContainer(n.ctx, "/app/genesis.tar")
+	require.NoError(t, err)
+
+	genesis, err := io.ReadAll(genesisReader)
+	require.NoError(t, err)
+	n.genesis = genesis
 }
 
-func (pn *PartitionNode) Stop() error {
-	pn.cancel()
-	return <-pn.done
+func (n *AlphabillNetwork) startRootNode(t *testing.T) {
+	cr := tc.ContainerRequest{
+		Image: dockerImage(),
+		WaitingFor: wait.ForLog("Starting root node").WithStartupTimeout(5*time.Second),
+		LogConsumerCfg: &tc.LogConsumerConfig{
+			Consumers: []tc.LogConsumer{&StdoutLogConsumer{}},
+		},
+		Entrypoint: []string{
+			"/home/nonroot/alphabill.sh",
+		},
+		Files: []tc.ContainerFile{{
+			HostFilePath: "./testdata/alphabill.sh",
+			ContainerFilePath: "/home/nonroot/alphabill.sh",
+			FileMode: 0o755,
+		}, {
+			Reader: bytes.NewReader(n.genesis),
+			ContainerFilePath: "/home/nonroot/genesis.tar",
+			FileMode: 0o755,
+		}},
+		Cmd: []string{
+			"root",
+			"--home", "/home/nonroot/root1",
+			"--address", "/ip4/0.0.0.0/tcp/8000",
+			"--log-file", "stdout",
+			"--log-level", "info",
+			"--log-format", "text",
+			"--trust-base-file", "/home/nonroot/root-trust-base.json",
+		},
+		Networks: []string{n.dockerNetwork},
+	}
+
+	gcr := tc.GenericContainerRequest{
+		ContainerRequest: cr,
+		Started:          true,
+	}
+	gc, err := tc.GenericContainer(n.ctx, gcr)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		require.NoError(t, gc.Terminate(n.ctx))
+	})
+
+	ip, err := gc.ContainerIP(n.ctx)
+	require.NoError(t, err)
+
+	_, r, err := gc.Exec(n.ctx, []string{
+		"alphabill", "identifier", "--key-file", "/home/nonroot/root1/rootchain/keys.json",
+	}, exec.Multiplexed())
+	require.NoError(t, err)
+
+	id, err := io.ReadAll(r)
+	require.NoError(t, err)
+	n.bootstrapNode = fmt.Sprintf("%s@/ip4/%s/tcp/8000", strings.TrimSpace(string(id)), ip)
 }
 
-func (rn *rootNode) Stop() error {
-	rn.cancel()
-	return <-rn.done
+func (n *AlphabillNetwork) startMoneyNode(t *testing.T) {
+	cr := tc.ContainerRequest{
+		Image: dockerImage(),
+		WaitingFor: nodeWaitStrategy,
+		LogConsumerCfg: &tc.LogConsumerConfig{
+			Consumers: []tc.LogConsumer{&StdoutLogConsumer{}},
+		},
+		Entrypoint: []string{
+			"/home/nonroot/alphabill.sh",
+		},
+		Files: []tc.ContainerFile{{
+			HostFilePath: "./testdata/alphabill.sh",
+			ContainerFilePath: "/home/nonroot/alphabill.sh",
+			FileMode: 0o755,
+		}, {
+			Reader: bytes.NewReader(n.genesis),
+			ContainerFilePath: "/home/nonroot/genesis.tar",
+			FileMode: 0o755,
+		}},
+
+		Cmd: []string{
+			"money",
+			"--home", "/home/nonroot/money1",
+			"--address", "/ip4/0.0.0.0/tcp/8000",
+			"--rpc-server-address", "0.0.0.0:8001",
+			"--log-file", "stdout",
+			"--log-level", "info",
+			"--log-format", "text",
+			"--genesis",  "/home/nonroot/root1/rootchain/partition-genesis-1.json",
+			"--key-file", "/home/nonroot/money1/money/keys.json",
+			"--state",    "/home/nonroot/money1/money/node-genesis-state.cbor",
+			"--db",       "/home/nonroot/money1/money/blocks.db",
+			"--tx-db",    "/home/nonroot/money1/money/tx.db",
+			"--bootnodes", n.bootstrapNode,
+			"--trust-base-file", "/home/nonroot/root-trust-base.json",
+		},
+		Networks: []string{n.dockerNetwork},
+		ExposedPorts: []string{"8001"},
+	}
+
+	gcr := tc.GenericContainerRequest{
+		ContainerRequest: cr,
+		Started:          true,
+	}
+	gc, err := tc.GenericContainer(n.ctx, gcr)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		require.NoError(t, gc.Terminate(n.ctx))
+	})
+
+	rpcPort, err := gc.MappedPort(n.ctx, "8001")
+	require.NoError(t, err)
+	n.MoneyRpcUrl = fmt.Sprintf("http://127.0.0.1:%s/rpc", rpcPort.Port())
 }
 
-const testNetworkTimeout = 600 * time.Millisecond
+func (n *AlphabillNetwork) startTokensNode(t *testing.T) {
+	cr := tc.ContainerRequest{
+		Image: dockerImage(),
+		WaitingFor: nodeWaitStrategy,
+		LogConsumerCfg: &tc.LogConsumerConfig{
+			Consumers: []tc.LogConsumer{&StdoutLogConsumer{}},
+		},
+		Entrypoint: []string{
+			"/home/nonroot/alphabill.sh",
+		},
+		Files: []tc.ContainerFile{{
+			HostFilePath: "./testdata/alphabill.sh",
+			ContainerFilePath: "/home/nonroot/alphabill.sh",
+			FileMode: 0o755,
+		}, {
+			Reader: bytes.NewReader(n.genesis),
+			ContainerFilePath: "/home/nonroot/genesis.tar",
+			FileMode: 0o755,
+		}},
 
-// getGenesisFiles is a helper function to collect all node genesis files
-func getGenesisFiles(nodePartitions []*NodePartition) []*genesis.PartitionNode {
-	var partitionRecords []*genesis.PartitionNode
-	for _, part := range nodePartitions {
-		for _, node := range part.Nodes {
-			partitionRecords = append(partitionRecords, node.genesis)
-		}
+		Cmd: []string{
+			"tokens",
+			"--home", "/home/nonroot/tokens1",
+			"--address", "/ip4/0.0.0.0/tcp/8000",
+			"--rpc-server-address", "0.0.0.0:8001",
+			"--log-file", "stdout",
+			"--log-level", "info",
+			"--log-format", "text",
+			"--genesis",  "/home/nonroot/root1/rootchain/partition-genesis-2.json",
+			"--key-file", "/home/nonroot/tokens1/tokens/keys.json",
+			"--state",    "/home/nonroot/tokens1/tokens/node-genesis-state.cbor",
+			"--db",       "/home/nonroot/tokens1/tokens/blocks.db",
+			"--tx-db",    "/home/nonroot/tokens1/tokens/tx.db",
+			"--bootnodes", n.bootstrapNode,
+			"--trust-base-file", "/home/nonroot/root-trust-base.json",
+		},
+		Networks: []string{n.dockerNetwork},
+		ExposedPorts: []string{"8001"},
 	}
-	return partitionRecords
+
+	gcr := tc.GenericContainerRequest{
+		ContainerRequest: cr,
+		Started:          true,
+	}
+	gc, err := tc.GenericContainer(n.ctx, gcr)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		require.NoError(t, gc.Terminate(n.ctx))
+	})
+
+	rpcPort, err := gc.MappedPort(n.ctx, "8001")
+	require.NoError(t, err)
+
+	n.TokensRpcUrl = fmt.Sprintf("http://127.0.0.1:%s/rpc", rpcPort.Port())
 }
 
-// newRootPartition creates new root partition, requires node partitions with genesis files
-func newRootPartition(nofRootNodes uint8, nodePartitions []*NodePartition) (*rootPartition, error) {
-	encKeyPairs, err := generateKeyPairs(nofRootNodes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate encryption keypairs, %w", err)
-	}
-	rootSigners, err := createSigners(nofRootNodes)
-	if err != nil {
-		return nil, fmt.Errorf("create signer failed, %w", err)
-	}
-	rootNodes := make([]*rootNode, nofRootNodes)
-	rootGenesisFiles := make([]*genesis.RootGenesis, nofRootNodes)
-	for i := 0; i < int(nofRootNodes); i++ {
-		encPubKey, err := libp2pcrypto.UnmarshalSecp256k1PublicKey(encKeyPairs[i].PublicKey)
-		if err != nil {
-			return nil, err
-		}
-		pubKeyBytes, err := encPubKey.Raw()
-		if err != nil {
-			return nil, err
-		}
-		id, err := peer.IDFromPublicKey(encPubKey)
-		if err != nil {
-			return nil, fmt.Errorf("root node id error, %w", err)
-		}
-		nodeGenesisFiles := getGenesisFiles(nodePartitions)
-		pr, err := rootgenesis.NewPartitionRecordFromNodes(nodeGenesisFiles)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create genesis partition record")
-		}
-		rg, _, err := rootgenesis.NewRootGenesis(
-			id.String(),
-			rootSigners[i],
-			pubKeyBytes,
-			pr,
-			rootgenesis.WithTotalNodes(uint32(nofRootNodes)),
-			rootgenesis.WithBlockRate(genesis.MinBlockRateMs),
-			rootgenesis.WithConsensusTimeout(genesis.DefaultConsensusTimeout))
-		if err != nil {
-			return nil, err
-		}
-		rootGenesisFiles[i] = rg
-		rootNodes[i] = &rootNode{
-			genesis:    rg,
-			RootSigner: rootSigners[i],
-			EncKeyPair: encKeyPairs[i],
-		}
-	}
-	rootGenesis, partitionGenesisFiles, err := rootgenesis.MergeRootGenesisFiles(rootGenesisFiles)
-	if err != nil {
-		return nil, fmt.Errorf("failed to finalize root genesis, %w", err)
-	}
-	// update partition genesis files
-	for _, pg := range partitionGenesisFiles {
-		for _, part := range nodePartitions {
-			if part.systemId == pg.SystemDescriptionRecord.SystemIdentifier {
-				part.partitionGenesis = pg
-			}
-		}
-	}
-	trustBase, err := rootGenesis.GenerateTrustBase()
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate trust base from genesis: %w", err)
-	}
-	return &rootPartition{
-		rcGenesis: rootGenesis,
-		TrustBase: trustBase,
-		Nodes:     rootNodes,
-	}, nil
-}
+func (n *AlphabillNetwork) startOrchestrationNode(t *testing.T) {
+	cr := tc.ContainerRequest{
+		Image: dockerImage(),
+		WaitingFor: nodeWaitStrategy,
+		LogConsumerCfg: &tc.LogConsumerConfig{
+			Consumers: []tc.LogConsumer{&StdoutLogConsumer{}},
+		},
+		Entrypoint: []string{
+			"/home/nonroot/alphabill.sh",
+		},
+		Files: []tc.ContainerFile{{
+			HostFilePath: "./testdata/alphabill.sh",
+			ContainerFilePath: "/home/nonroot/alphabill.sh",
+			FileMode: 0o755,
+		}, {
+			Reader: bytes.NewReader(n.genesis),
+			ContainerFilePath: "/home/nonroot/genesis.tar",
+			FileMode: 0o755,
+		}},
 
-func (r *rootPartition) start(ctx context.Context) error {
-	rootNodes := len(r.Nodes)
-	var peerIDs = make([]peer.ID, rootNodes)
-	for i := 0; i < len(peerIDs); i++ {
-		id, err := network.NodeIDFromPublicKeyBytes(r.Nodes[i].EncKeyPair.PublicKey)
-		if err != nil {
-			return fmt.Errorf("peer id from public key failed: %w", err)
-		}
-		peerIDs[i] = id
-	}
-	var rootPeers = make([]*network.Peer, rootNodes)
-	for i := 0; i < len(peerIDs); i++ {
-		port, err := getFreePort()
-		if err != nil {
-			return fmt.Errorf("failed to get free port, %w", err)
-		}
-		peerConf, err := network.NewPeerConfiguration(fmt.Sprintf("/ip4/127.0.0.1/tcp/%v", port), r.Nodes[i].EncKeyPair, nil, peerIDs)
-		if err != nil {
-			return fmt.Errorf("failed to create peer configuration: %w", err)
-		}
-		rootPeers[i], err = network.NewPeer(ctx, peerConf, r.obs.DefaultLogger(), nil)
-		if err != nil {
-			return fmt.Errorf("failed to create root peer node: %w", err)
-		}
-	}
-	// start root nodes
-	for i, rn := range r.Nodes {
-		rootPeer := rootPeers[i]
-		log := r.obs.DefaultLogger().With(slog.Any("node_id", rootPeer.ID()))
-		obs := observability.WithLogger(r.obs.DefaultObserver(), log)
-		// this is a unit test set-up pre-populate store with addresses, create separate test for node discovery
-		for _, p := range rootPeers {
-			rootPeer.Network().Peerstore().AddAddr(p.ID(), p.MultiAddresses()[0], peerstore.PermanentAddrTTL)
-		}
-		rootNet, err := network.NewLibP2PRootChainNetwork(rootPeer, 100, testNetworkTimeout, obs)
-		if err != nil {
-			return fmt.Errorf("failed to init root and partition nodes network, %w", err)
-		}
-		// Initiate partition store
-		partitionStore, err := partitions.NewPartitionStoreFromGenesis(r.rcGenesis.Partitions)
-		if err != nil {
-			return fmt.Errorf("failed to create partition store form root genesis, %w", err)
-		}
-		rootConsensusNet, err := network.NewLibP2RootConsensusNetwork(rootPeer, 100, testNetworkTimeout, obs)
-		if err != nil {
-			return fmt.Errorf("failed to init consensus network, %w", err)
-		}
-		trustBase, err := r.rcGenesis.GenerateTrustBase()
-		if err != nil {
-			return fmt.Errorf("failed to generate trust base from genesis: %w", err)
-		}
-		cm, err := abdrc.NewDistributedAbConsensusManager(rootPeer.ID(), r.rcGenesis, trustBase, partitionStore, rootConsensusNet, rn.RootSigner, obs)
-		if err != nil {
-			return fmt.Errorf("consensus manager initialization failed, %w", err)
-		}
-		rootchainNode, err := rootchain.New(rootPeer, rootNet, partitionStore, cm, obs)
-		if err != nil {
-			return fmt.Errorf("failed to create root node, %w", err)
-		}
-		rn.Node = rootchainNode
-		rn.addr = rootPeers[i].MultiAddresses()[0]
-		rn.id = rootPeer.ID()
-		// start root node
-		nctx, ncfn := context.WithCancel(ctx)
-		rn.cancel = ncfn
-		rn.done = make(chan error, 1)
-		// start root node
-		go func(ec chan error) { ec <- rootchainNode.Run(nctx) }(rn.done)
-	}
-	return nil
-}
-
-func newPartition(t *testing.T, systemName string, nodeCount uint8, txSystemProvider func(trustBase types.RootTrustBase) txsystem.TransactionSystem, systemIdentifier types.SystemID, state *state.State) (abPartition *NodePartition, err error) {
-	if nodeCount < 1 {
-		return nil, fmt.Errorf("invalid count of partition Nodes: %d", nodeCount)
-	}
-	abPartition = &NodePartition{
-		systemId:     systemIdentifier,
-		SystemName:   systemName,
-		txSystemFunc: txSystemProvider,
-		genesisState: state,
-		Nodes:        make([]*PartitionNode, nodeCount),
-		obs:          testobserve.NewFactory(t),
-	}
-	// create peer configurations
-	peerConfs, err := createPeerConfs(nodeCount)
-	if err != nil {
-		return nil, err
-	}
-	// create partition signing keys
-	signers, err := createSigners(nodeCount)
-	if err != nil {
-		return nil, err
-	}
-	for i := 0; i < int(nodeCount); i++ {
-		peerConf := peerConfs[i]
-
-		signer := signers[i]
-		// create partition genesis file
-		nodeGenesis, err := partition.NewNodeGenesis(
-			state,
-			partition.WithPeerID(peerConf.ID),
-			partition.WithSigningKey(signer),
-			partition.WithEncryptionPubKey(peerConf.KeyPair.PublicKey),
-			partition.WithSystemIdentifier(systemIdentifier),
-			partition.WithT2Timeout(2500),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create node genesis, %w", err)
-		}
-		tmpDir := t.TempDir()
-		ownerIndexer := partition.NewOwnerIndexer(abPartition.obs.DefaultLogger())
-		if err := ownerIndexer.LoadState(state); err != nil {
-			return nil, fmt.Errorf("failed to update owner indexer from genesis state: %w", err)
-		}
-		abPartition.Nodes[i] = &PartitionNode{
-			genesis:      nodeGenesis,
-			peerConf:     peerConf,
-			signer:       signer,
-			OwnerIndexer: ownerIndexer,
-			dbFile:       filepath.Join(tmpDir, "blocks.db"),
-			idxFile:      filepath.Join(tmpDir, "tx.db"),
-		}
-	}
-	return abPartition, nil
-}
-
-func (n *NodePartition) start(t *testing.T, ctx context.Context, bootNodes []peer.AddrInfo) error {
-	n.ctx = ctx
-	// start Nodes
-	trustBase, err := n.partitionGenesis.GenerateRootTrustBase()
-	if err != nil {
-		return fmt.Errorf("failed to extract root trust base from genesis file, %w", err)
-	}
-	n.tb = trustBase
-
-	if !n.genesisState.IsCommitted() {
-		if err := n.genesisState.Commit(n.partitionGenesis.Certificate); err != nil {
-			return fmt.Errorf("invalid genesis state: %w", err)
-		}
+		Cmd: []string{
+			"orchestration",
+			"--home", "/home/nonroot/orchestration1",
+			"--address", "/ip4/0.0.0.0/tcp/8000",
+			"--rpc-server-address", "0.0.0.0:8001",
+			"--log-file", "stdout",
+			"--log-level", "info",
+			"--log-format", "text",
+			"--genesis",  "/home/nonroot/root1/rootchain/partition-genesis-4.json",
+			"--key-file", "/home/nonroot/orchestration1/orchestration/keys.json",
+			"--state",    "/home/nonroot/orchestration1/orchestration/node-genesis-state.cbor",
+			"--db",       "/home/nonroot/orchestration1/orchestration/blocks.db",
+			"--tx-db",    "/home/nonroot/orchestration1/orchestration/tx.db",
+			"--bootnodes", n.bootstrapNode,
+			"--trust-base-file", "/home/nonroot/root-trust-base.json",
+		},
+		Networks: []string{n.dockerNetwork},
+		ExposedPorts: []string{"8001"},
 	}
 
-	for _, nd := range n.Nodes {
-		nd.EventHandler = &TestEventHandler{}
-		blockStore, err := boltdb.New(nd.dbFile)
-		if err != nil {
-			return err
-		}
-		t.Cleanup(func() { require.NoError(t, blockStore.Close()) })
-		if nd.proofDB, err = memorydb.New(); err != nil {
-			return fmt.Errorf("creating proofDB: %w", err)
-		}
-		// set root node as bootstrap peer
-		nd.peerConf.BootstrapPeers = bootNodes
-		nd.confOpts = append(nd.confOpts,
-			partition.WithEventHandler(nd.EventHandler.HandleEvent, 100),
-			partition.WithBlockStore(blockStore),
-			partition.WithProofIndex(nd.proofDB, 0),
-			partition.WithOwnerIndex(nd.OwnerIndexer),
-		)
-		if err = n.startNode(ctx, nd); err != nil {
-			return err
-		}
+	gcr := tc.GenericContainerRequest{
+		ContainerRequest: cr,
+		Started:          true,
 	}
-	// make sure node network (to other nodes and root nodes) is initiated
-	for _, nd := range n.Nodes {
-		if ok := eventually(
-			func() bool { return len(nd.Peer().Network().Peers()) >= len(n.Nodes) },
-			2*time.Second, 100*time.Millisecond); !ok {
-			return fmt.Errorf("network not initialized")
-		}
-	}
-	return nil
-}
+	gc, err := tc.GenericContainer(n.ctx, gcr)
+	require.NoError(t, err)
 
-func (n *NodePartition) startNode(ctx context.Context, pn *PartitionNode) error {
-	log := n.obs.DefaultLogger().With(slog.Any("node_id", pn.peerConf.ID))
-	trustBase, err := n.partitionGenesis.GenerateRootTrustBase()
-	if err != nil {
-		return fmt.Errorf("failed to generate trust base from genesis: %w", err)
-	}
-	node, err := partition.NewNode(
-		ctx,
-		pn.peerConf,
-		pn.signer,
-		n.txSystemFunc(n.tb),
-		n.partitionGenesis,
-		trustBase,
-		nil,
-		observability.WithLogger(n.obs.DefaultObserver(), log),
-		pn.confOpts...,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to resume node, %w", err)
-	}
-	nctx, ncfn := context.WithCancel(n.ctx)
-	pn.Node = node
-	pn.cancel = ncfn
-	pn.done = make(chan error, 1)
-	go func(ec chan error) { ec <- node.Run(nctx) }(pn.done)
-	return nil
-}
+	t.Cleanup(func() {
+		require.NoError(t, gc.Terminate(n.ctx))
+	})
 
-func newAlphabillNetwork(nodePartitions []*NodePartition) (*AlphabillNetwork, error) {
-	if len(nodePartitions) < 1 {
-		return nil, fmt.Errorf("no node partitions set, it makes no sense to start with only root")
-	}
-	// create root node(s)
-	rootPartition, err := newRootPartition(1, nodePartitions)
-	if err != nil {
-		return nil, err
-	}
-	nodeParts := make(map[types.SystemID]*NodePartition)
-	for _, part := range nodePartitions {
-		nodeParts[part.systemId] = part
-	}
-	return &AlphabillNetwork{
-		RootPartition:  rootPartition,
-		NodePartitions: nodeParts,
-	}, nil
-}
+	rpcPort, err := gc.MappedPort(n.ctx, "8001")
+	require.NoError(t, err)
 
-func getBootstrapNodes(t *testing.T, root *rootPartition) []peer.AddrInfo {
-	require.NotNil(t, root)
-	bootNodes := make([]peer.AddrInfo, len(root.Nodes))
-	for i, n := range root.Nodes {
-		bootNodes[i] = peer.AddrInfo{ID: n.id, Addrs: []multiaddr.Multiaddr{n.addr}}
-	}
-	return bootNodes
-}
-
-func (a *AlphabillNetwork) start(t *testing.T) error {
-	a.RootPartition.obs = testobserve.NewFactory(t)
-	// create context
-	ctx, ctxCancel := context.WithCancel(context.Background())
-	if err := a.RootPartition.start(ctx); err != nil {
-		ctxCancel()
-		return fmt.Errorf("failed to start root partition, %w", err)
-	}
-	bootNodes := getBootstrapNodes(t, a.RootPartition)
-	for id, part := range a.NodePartitions {
-		// create one event handler per partition
-		if err := part.start(t, ctx, bootNodes); err != nil {
-			ctxCancel()
-			return fmt.Errorf("failed to start partition %s, %w", id, err)
-		}
-	}
-	a.ctxCancel = ctxCancel
-	return nil
-}
-
-func (a *AlphabillNetwork) close() (err error) {
-	a.ctxCancel()
-	// wait and check validator exit
-	for _, part := range a.NodePartitions {
-		// stop all nodes
-		for _, n := range part.Nodes {
-			nodeErr := <-n.done
-			if !errors.Is(nodeErr, context.Canceled) {
-				err = errors.Join(err, nodeErr)
-			}
-		}
-	}
-	// check root exit
-	for _, rnode := range a.RootPartition.Nodes {
-		rootErr := <-rnode.done
-		if !errors.Is(rootErr, context.Canceled) {
-			err = errors.Join(err, rootErr)
-		}
-	}
-	return err
-}
-
-/*
-waitClose closes the AB network and waits for all the nodes to stop.
-It fails the test "t" if nodes do not stop/exit within timeout.
-*/
-func (a *AlphabillNetwork) waitClose(t *testing.T) {
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		if err := a.close(); err != nil {
-			t.Errorf("stopping AB network: %v", err)
-		}
-	}()
-
-	select {
-	case <-done:
-	case <-time.After(3000 * time.Millisecond):
-		t.Error("AB network didn't stop within timeout")
-	}
-}
-
-func (a *AlphabillNetwork) GetNodePartition(sysID types.SystemID) (*NodePartition, error) {
-	part, f := a.NodePartitions[sysID]
-	if !f {
-		return nil, fmt.Errorf("unknown partition %s", sysID)
-	}
-	return part, nil
-}
-
-func (a *AlphabillNetwork) RpcUrl(t *testing.T, systemID types.SystemID) string {
-	partition, ok := a.NodePartitions[systemID]
-	require.True(t, ok)
-	return partition.Nodes[0].AddrRPC
-}
-
-func BlockchainContains(part *NodePartition, criteria func(tx *types.TransactionOrder) bool) func() bool {
-	return func() bool {
-		for _, n := range part.Nodes {
-			number, err := n.LatestBlockNumber()
-			if err != nil {
-				panic(err)
-			}
-			for i := uint64(0); i <= number; i++ {
-				b, err := n.GetBlock(context.Background(), number-i)
-				if err != nil || b == nil {
-					continue
-				}
-				for _, t := range b.Transactions {
-					if criteria(t.TransactionOrder) {
-						return true
-					}
-				}
-			}
-		}
-		return false
-	}
-}
-
-func createSigners(count uint8) ([]abcrypto.Signer, error) {
-	var signers = make([]abcrypto.Signer, count)
-	for i := 0; i < int(count); i++ {
-		s, err := abcrypto.NewInMemorySecp256K1Signer()
-		if err != nil {
-			return nil, err
-		}
-		signers[i] = s
-	}
-	return signers, nil
-}
-
-func createPeerConfs(count uint8) ([]*network.PeerConfiguration, error) {
-	var peerConfs = make([]*network.PeerConfiguration, count)
-
-	// generate connection encryption key pairs
-	keyPairs, err := generateKeyPairs(count)
-	if err != nil {
-		return nil, err
-	}
-
-	var validators = make(peer.IDSlice, count)
-
-	for i := 0; i < int(count); i++ {
-		peerConfs[i], err = network.NewPeerConfiguration(
-			"/ip4/127.0.0.1/tcp/0",
-			keyPairs[i], // connection encryption key. The ID of the node is derived from this keypair.
-			nil,
-			validators, // Persistent peers
-		)
-		if err != nil {
-			return nil, err
-		}
-		validators[i] = peerConfs[i].ID
-	}
-	sort.Sort(validators)
-
-	return peerConfs, nil
-}
-
-func generateKeyPairs(count uint8) ([]*network.PeerKeyPair, error) {
-	var keyPairs = make([]*network.PeerKeyPair, count)
-	for i := 0; i < int(count); i++ {
-		privateKey, publicKey, err := libp2pcrypto.GenerateSecp256k1Key(rand.Reader)
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate key pair %d/%d: %w", i, count, err)
-		}
-		privateKeyBytes, err := privateKey.Raw()
-		if err != nil {
-			return nil, err
-		}
-		pubKeyBytes, err := publicKey.Raw()
-		if err != nil {
-			return nil, err
-		}
-		keyPairs[i] = &network.PeerKeyPair{
-			PublicKey:  pubKeyBytes,
-			PrivateKey: privateKeyBytes,
-		}
-	}
-	return keyPairs, nil
-}
-
-func getFreePort() (int, error) {
-	addr, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
-	if err != nil {
-		return 0, err
-	}
-
-	l, err := net.ListenTCP("tcp", addr)
-	if err != nil {
-		return 0, err
-	}
-	defer func() {
-		_ = l.Close()
-	}()
-	return l.Addr().(*net.TCPAddr).Port, nil
-}
-
-func eventually(condition func() bool, waitFor time.Duration, tick time.Duration) bool {
-	ch := make(chan bool, 1)
-
-	timer := time.NewTimer(waitFor)
-	defer timer.Stop()
-
-	ticker := time.NewTicker(tick)
-	defer ticker.Stop()
-
-	for tick := ticker.C; ; {
-		select {
-		case <-timer.C:
-			return false
-		case <-tick:
-			tick = nil
-			go func() { ch <- condition() }()
-		case v := <-ch:
-			if v {
-				return true
-			}
-			tick = ticker.C
-		}
-	}
+	n.OrchestrationRpcUrl = fmt.Sprintf("http://127.0.0.1:%s/rpc", rpcPort.Port())
 }
