@@ -117,7 +117,7 @@ func setupWallets(t *testing.T, walletCount, keyCount int) []*Wallet{
 func (n *AlphabillNetwork) createGenesis(t *testing.T, ownerPredicate []byte) {
 	cr := tc.ContainerRequest{
 		Image: dockerImage(),
-		WaitingFor: wait.ForExit().WithExitTimeout(5*time.Second),
+		WaitingFor: wait.ForExit().WithExitTimeout(10*time.Second),
 		LogConsumerCfg: &tc.LogConsumerConfig{
 			Consumers: []tc.LogConsumer{&StdoutLogConsumer{}},
 		},

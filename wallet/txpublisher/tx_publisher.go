@@ -34,13 +34,8 @@ func NewTxPublisher(rpcClient RpcClient, log *slog.Logger) *TxPublisher {
 
 // SendTx sends tx and waits for confirmation, returns tx proof
 func (w *TxPublisher) SendTx(ctx context.Context, tx *types.TransactionOrder) (*wallet.Proof, error) {
-	txSub := &txsubmitter.TxSubmission{
-		UnitID:      tx.UnitID(),
-		TxHash:      tx.Hash(crypto.SHA256),
-		Transaction: tx,
-	}
 	w.log.InfoContext(ctx, fmt.Sprintf("Sending tx '%s' with hash: '%X'", tx.PayloadType(), tx.Hash(crypto.SHA256)))
-	txBatch := txSub.ToBatch(w.rpcClient, w.log)
+	txBatch := txsubmitter.New(tx).ToBatch(w.rpcClient, w.log)
 	err := txBatch.SendTx(ctx, true)
 	if err != nil {
 		return nil, err
