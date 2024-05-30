@@ -37,4 +37,4 @@
                --home /home/nonroot/genesis \
                --key-file /home/nonroot/genesis/root1/rootchain/keys.json
 
-tar -cf genesis.tar -C /home/nonroot/genesis .
+cd /home/nonroot && tar -cf genesis.tar -C genesis .

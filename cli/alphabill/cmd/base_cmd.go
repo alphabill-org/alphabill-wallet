@@ -20,7 +20,7 @@ type (
 
 // New creates a new Alphabill wallet application
 func New(opts ...interface{}) *WalletApp {
-	baseCmd, baseConfig := NewBaseCmd()
+	baseCmd, baseConfig := newBaseCmd()
 	app := &WalletApp{baseCmd: baseCmd, baseConf: baseConfig}
 	app.AddSubcommands(opts)
 	return app
@@ -36,7 +36,7 @@ func (a *WalletApp) AddSubcommands(opts []interface{}) {
 	a.baseCmd.AddCommand(tools.NewToolsCmd())
 }
 
-func NewBaseCmd() (*cobra.Command, *types.BaseConfiguration) {
+func newBaseCmd() (*cobra.Command, *types.BaseConfiguration) {
 	config := &types.BaseConfiguration{}
 	// BaseCmd represents the base command when called without any subcommands
 	var baseCmd = &cobra.Command{
