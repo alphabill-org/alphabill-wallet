@@ -1,3 +1,4 @@
+//go:build !nodocker
 package wallet
 
 import (
@@ -285,8 +286,4 @@ func addAccount(t *testing.T, home string) string {
 		}
 	}
 	return ""
-}
-
-func newWalletCmdExecutor(prefixArgs ...string) *testutils.CmdExecutor{
-	return testutils.NewCmdExecutor(NewWalletCmd, prefixArgs...)
 }

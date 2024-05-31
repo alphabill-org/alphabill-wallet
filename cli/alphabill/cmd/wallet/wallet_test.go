@@ -278,3 +278,7 @@ func Test_parseRefNumbers(t *testing.T) {
 		require.Equal(t, []byte{0xAA, 0xBB, 0xCC}, ref)
 	})
 }
+
+func newWalletCmdExecutor(prefixArgs ...string) *testutils.CmdExecutor{
+	return testutils.NewCmdExecutor(NewWalletCmd, prefixArgs...)
+}

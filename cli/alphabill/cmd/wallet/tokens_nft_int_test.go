@@ -1,3 +1,4 @@
+//go:build !nodocker
 package wallet
 
 import (
