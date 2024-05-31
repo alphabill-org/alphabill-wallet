@@ -18,7 +18,7 @@ func TestFeeCreditRecordIDFromPublicKey(t *testing.T) {
 	// shard part can be nil
 	require.EqualValues(t, unitID, NewFeeCreditRecordIDFromPublicKey(nil, pubKey[:], 0))
 	// or any other value, evm will ignore this
-	require.EqualValues(t, unitID, NewFeeCreditRecordIDFromPublicKey(test.RandomBytes(2), pubKey[:], 0))
+	require.EqualValues(t, unitID, NewFeeCreditRecordIDFromPublicKey(testutils.RandomBytes(2), pubKey[:], 0))
 	// if pubkey is nil, unitID returns O address
 	require.EqualValues(t, make([]byte, 20), NewFeeCreditRecordIDFromPublicKey(nil, nil, 0))
 }

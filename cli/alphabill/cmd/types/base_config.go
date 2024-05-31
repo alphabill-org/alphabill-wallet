@@ -84,7 +84,7 @@ func (c *BaseConfiguration) ConfigFileExists() bool {
 initLogger creates Logger based on configuration flags in "cmd".
 */
 func initLogger(cmd *cobra.Command) (*slog.Logger, error) {
-	cfg := &logConfiguration{}
+	cfg := &LogConfiguration{}
 
 	getFlagValueIfSet := func(flagName string, value *string) error {
 		if cmd.Flags().Changed(flagName) {
@@ -96,13 +96,13 @@ func initLogger(cmd *cobra.Command) (*slog.Logger, error) {
 		return nil
 	}
 
-	if err := getFlagValueIfSet(flagNameLogLevel, &cfg.level); err != nil {
+	if err := getFlagValueIfSet(flagNameLogLevel, &cfg.Level); err != nil {
 		return nil, err
 	}
-	if err := getFlagValueIfSet(flagNameLogFormat, &cfg.format); err != nil {
+	if err := getFlagValueIfSet(flagNameLogFormat, &cfg.Format); err != nil {
 		return nil, err
 	}
-	if err := getFlagValueIfSet(flagNameLogOutputFile, &cfg.outputPath); err != nil {
+	if err := getFlagValueIfSet(flagNameLogOutputFile, &cfg.OutputPath); err != nil {
 		return nil, err
 	}
 

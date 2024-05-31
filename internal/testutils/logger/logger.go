@@ -3,21 +3,13 @@ package logger
 import (
 	"io"
 	"log/slog"
-	"math"
 	"os"
 	"testing"
 
-	"github.com/alphabill-org/alphabill/logger"
+	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
+	"github.com/lmittmann/tint"
 	"github.com/neilotoole/slogt"
 )
-
-/*
-NOP returns a logger which doesn't log (ie /dev/null).
-Use it for tests where valid logger is needed but it's output is not needed.
-*/
-func NOP() *slog.Logger {
-	return slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelInfo + math.MinInt}))
-}
 
 /*
 New returns logger for test t on debug level.
@@ -39,43 +31,30 @@ func NewLvl(t testing.TB, level slog.Level) *slog.Logger {
 	return newLogger(t, cfg)
 }
 
-func newLogger(t testing.TB, cfg logger.LogConfiguration) *slog.Logger {
+func newLogger(t testing.TB, cfg types.LogConfiguration) *slog.Logger {
 	opt := slogt.Factory(func(w io.Writer) slog.Handler {
-		h, err := cfg.Handler(w)
-		if err != nil {
-			t.Fatalf("creating handler for logger: %v", err)
-			return nil
-		}
-		return h
+		return tint.NewHandler(w, &tint.Options{
+			Level:       cfg.LogLevel(),
+			NoColor:     cfg.NoColor,
+			TimeFormat:  cfg.TimeFormat,
+			AddSource:   false,
+		})
 	})
 	return slogt.New(t, opt)
 }
 
-func defaultLogCfg() logger.LogConfiguration {
+func defaultLogCfg() types.LogConfiguration {
 	lvl := os.Getenv("AB_TEST_LOG_LEVEL")
 	if lvl == "" {
 		lvl = slog.LevelDebug.String()
 	}
-	return logger.LogConfiguration{
-		Level:        lvl,
-		Format:       "console",
-		TimeFormat:   "15:04:05.0000",
-		PeerIDFormat: "short",
+	return types.LogConfiguration{
+		Level:      lvl,
+		Format:     "console",
+		TimeFormat: "15:04:05.0000",
 		// slogt is logging into bytes.Buffer so can't use w to detect
 		// is the destination console or not (ie for color support).
 		// So by default use colors unless env var disables it.
-		ConsoleSupportsColor: func(w io.Writer) bool { return os.Getenv("AB_TEST_LOG_NO_COLORS") != "true" },
-	}
-}
-
-/*
-LoggerBuilder returns "logger factory" for test t.
-
-Factory function returned by LoggerBuilder returns the same logger for all calls.
-*/
-func LoggerBuilder(t testing.TB) func(*logger.LogConfiguration) (*slog.Logger, error) {
-	logr := newLogger(t, defaultLogCfg())
-	return func(*logger.LogConfiguration) (*slog.Logger, error) {
-		return logr, nil
+		NoColor:    os.Getenv("AB_TEST_LOG_NO_COLORS") == "true",
 	}
 }

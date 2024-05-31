@@ -29,21 +29,22 @@ The default location of configuration file is `$AB_HOME/config.props`
 
 The default `$AB_HOME` is `$HOME/.alphabill`
 
-## Tracing tests
+## Integration tests
 
-To enable trace exporter for test the `AB_TEST_TRACER` environment variable has to be set
-to desired exporter name, ie
+Integration tests use Alphabill docker image to set up the test environment in containers,
+and thus Docker must be installed to run those tests. It is possible to skip such tests with
+the `nodocker` build tag:
 
 ```sh
-AB_TEST_TRACER=otlptracehttp go test ./...
+go test ./... --tags=nodocker
 ```
 
-The test tracing will pick up the same OTEL environment variables linked above except that
-some parameters are already "hardcoded":
+Alphabill docker image used in tests can be configured with `AB_TEST_DOCKERIMAGE`
+environment variable:
 
-- "always_on" sampler is used (`OTEL_TRACES_SAMPLER`);
-- the `otlptracehttp` exporter is created with "insecure client transport"
-  (`OTEL_EXPORTER_OTLP_INSECURE`);
+```sh
+AB_TEST_DOCKERIMAGE=ghcr.io/alphabill-org/alphabill:cf4ff7151d7a7ebba65903b7d827b0740fc878a4 go test ./...
+```
 
 # CI setup
 

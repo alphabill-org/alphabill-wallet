@@ -20,7 +20,7 @@ import (
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
 	cmdtypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	othertestutils "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
 )
 
@@ -60,7 +60,7 @@ func Test_evmCmdDeploy_ok(t *testing.T) {
 		gasPrice: "10000",
 		serverMeta: &types.ServerMetadata{
 			ActualFee:         21000,
-			TargetUnits:       []types.UnitID{test.RandomBytes(20)},
+			TargetUnits:       []types.UnitID{othertestutils.RandomBytes(20)},
 			SuccessIndicator:  types.TxStatusFailed,
 			ProcessingDetails: detailBytes,
 		},
@@ -123,7 +123,7 @@ func Test_evmCmdExecute_ok(t *testing.T) {
 		gasPrice: "10000",
 		serverMeta: &types.ServerMetadata{
 			ActualFee:         21000,
-			TargetUnits:       []types.UnitID{test.RandomBytes(20)},
+			TargetUnits:       []types.UnitID{othertestutils.RandomBytes(20)},
 			SuccessIndicator:  types.TxStatusSuccessful,
 			ProcessingDetails: detailBytes,
 		},
