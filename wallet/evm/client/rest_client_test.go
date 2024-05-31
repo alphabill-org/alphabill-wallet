@@ -14,11 +14,10 @@ import (
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/evm"
 	"github.com/alphabill-org/alphabill-go-base/types"
-
 	testtransaction "github.com/alphabill-org/alphabill/txsystem/testutils/transaction"
 	"github.com/stretchr/testify/require"
 
-	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 )
 
 // writeCBORResponse replies to the request with the given response and HTTP code.
@@ -60,7 +59,7 @@ func createTxOrder(t *testing.T) *types.TransactionOrder {
 
 func TestEvmClient_GetBalance(t *testing.T) {
 	t.Parallel()
-	addr := test.RandomBytes(20)
+	addr := testutils.RandomBytes(20)
 
 	t.Run("valid response", func(t *testing.T) {
 		cli := &EvmClient{
@@ -136,7 +135,7 @@ func TestEvmClient_GetBalance(t *testing.T) {
 
 func TestEvmClient_GetFeeCreditBill(t *testing.T) {
 	t.Parallel()
-	addr := test.RandomBytes(20)
+	addr := testutils.RandomBytes(20)
 
 	t.Run("valid", func(t *testing.T) {
 		cli := &EvmClient{
@@ -175,7 +174,7 @@ func TestEvmClient_GetFeeCreditBill(t *testing.T) {
 
 func TestEvmClient_GetTransactionCount(t *testing.T) {
 	t.Parallel()
-	addr := test.RandomBytes(20)
+	addr := testutils.RandomBytes(20)
 
 	t.Run("valid response", func(t *testing.T) {
 		cli := &EvmClient{
@@ -335,7 +334,7 @@ func TestEvmClient_GetRoundNumber(t *testing.T) {
 
 func TestEvmClient_GetTxProof(t *testing.T) {
 	t.Parallel()
-	txHash := test.RandomBytes(32)
+	txHash := testutils.RandomBytes(32)
 
 	t.Run("valid request is built", func(t *testing.T) {
 		cli := &EvmClient{

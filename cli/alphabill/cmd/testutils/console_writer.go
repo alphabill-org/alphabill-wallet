@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 )
 
 type TestConsoleWriter struct {
@@ -42,7 +40,7 @@ func VerifyStdoutNotExists(t *testing.T, consoleWriter *TestConsoleWriter, expec
 }
 
 func VerifyStdoutEventually(t *testing.T, exec func() *TestConsoleWriter, expectedLines ...string) {
-	VerifyStdoutEventuallyWithTimeout(t, exec, test.WaitDuration, test.WaitTick, expectedLines...)
+	VerifyStdoutEventuallyWithTimeout(t, exec, WaitDuration, WaitTick, expectedLines...)
 }
 
 func VerifyStdoutEventuallyWithTimeout(t *testing.T, exec func() *TestConsoleWriter, waitFor time.Duration, tick time.Duration, expectedLines ...string) {

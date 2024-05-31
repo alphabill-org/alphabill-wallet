@@ -462,7 +462,7 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 		return nil, err
 	}
 	err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, w.confirmTx)
-	return newSingleResult(sub, accountNumber), nil
+	return newSingleResult(sub, accountNumber), err
 }
 
 // SendFungibleByID sends fungible tokens by given unit ID, if amount matches, does the transfer, otherwise splits the token

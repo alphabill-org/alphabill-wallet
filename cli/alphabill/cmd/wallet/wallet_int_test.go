@@ -1,19 +1,22 @@
+//go:build !nodocker
 package wallet
 
 import (
 	"fmt"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/orchestration"
+	baseutil "github.com/alphabill-org/alphabill-go-base/util"
+
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
-	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils/partition"
 	"github.com/alphabill-org/alphabill-wallet/util"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 )
 
 /*
@@ -25,144 +28,232 @@ Test scenario 2.1: wallet-1 account 2 sends one transaction to wallet-1 account 
 Test scenario 3: wallet-1 sends tx without confirming
 */
 func TestSendingMoneyUsingWallets_integration(t *testing.T) {
-	// create 2 wallets
-	am1, homedir1 := testutils.CreateNewWallet(t)
-	w1AccKey, err := am1.GetAccountKey(0)
-	require.NoError(t, err)
-	am1.Close()
+	wallets, abNet := testutils.SetupNetworkWithWallets(t, false, false)
 
-	am2, homedir2 := testutils.CreateNewWallet(t)
-	w2PubKey, err := am2.GetPublicKey(0)
-	require.NoError(t, err)
-	am2.Close()
-
-	genesisConfig := &testutil.MoneyGenesisConfig{
-		InitialBillID:      testutils.DefaultInitialBillID,
-		InitialBillValue:   1e18,
-		InitialBillOwner:   templates.NewP2pkh256BytesFromKey(w1AccKey.PubKey),
-		DCMoneySupplyValue: 10000,
-	}
-	moneyPartition := testutils.CreateMoneyPartition(t, genesisConfig, 1)
-	_ = testutils.StartAlphabill(t, []*testpartition.NodePartition{moneyPartition})
-
-	testutils.StartRpcServers(t, moneyPartition)
-	rpcUrl := moneyPartition.Nodes[0].AddrRPC
+	walletCmd := newWalletCmdExecutor("--rpc-url", abNet.MoneyRpcUrl).WithHome(wallets[0].Homedir)
 
 	// create fee credit for wallet-1
 	feeAmountAlpha := uint64(1)
-	stdout, err := execCommand(homedir1, fmt.Sprintf("fees add --amount %d --rpc-url %s", feeAmountAlpha, rpcUrl))
-	require.NoError(t, err)
-	testutils.VerifyStdout(t, stdout, fmt.Sprintf("Successfully created %d fee credits on money partition.", feeAmountAlpha))
+	addFeeCredit(t, wallets[0].Homedir, feeAmountAlpha, "money", abNet.MoneyRpcUrl, abNet.MoneyRpcUrl)
 
 	// verify fee credit received
-	w1BalanceBilly := genesisConfig.InitialBillValue - feeAmountAlpha*1e8
-	waitForFeeCreditCLI(t, homedir1, rpcUrl, feeAmountAlpha*1e8-2, 0)
+	w1BalanceBilly := 1e18 - feeAmountAlpha*1e8
+	waitForFeeCreditCLI(t, walletCmd, feeAmountAlpha*1e8-2, 0)
 
 	// TS1:
 	// send two transactions to wallet-2
-	stdout, err = execCommand(homedir1, fmt.Sprintf("send --amount 50 --address 0x%x --rpc-url %s", w2PubKey, rpcUrl))
-	require.NoError(t, err)
+	stdout := walletCmd.Exec(t, "send", "--amount", "50", "--address", fmt.Sprintf("0x%x", wallets[1].PubKeys[0]))
 	testutils.VerifyStdout(t, stdout,
 		"Successfully confirmed transaction(s)",
 		"Paid 0.000'000'01 fees for transaction(s)")
 
 	// verify wallet-1 balance is decreased
 	w1BalanceBilly -= 50 * 1e8
-	testutils.VerifyStdoutEventually(t, func() *testutils.TestConsoleWriter {
-		consoleWriter, err := execCommand(homedir1, fmt.Sprintf("get-balance --rpc-url %s", rpcUrl))
-		require.NoError(t, err)
-		return consoleWriter
-	}, fmt.Sprintf("#%d %s", 1, util.AmountToString(w1BalanceBilly, 8)))
+	testutils.VerifyStdoutEventually(t, walletCmd.ExecFunc(t, "get-balance"),
+		fmt.Sprintf("#%d %s", 1, util.AmountToString(w1BalanceBilly, 8)))
 
 	// verify wallet-2 received said bills
 	w2BalanceBilly := uint64(50 * 1e8)
-	testutils.VerifyStdoutEventually(t, func() *testutils.TestConsoleWriter {
-		consoleWriter, err := execCommand(homedir2, fmt.Sprintf("get-balance --rpc-url %s", rpcUrl))
-		require.NoError(t, err)
-		return consoleWriter
-	}, fmt.Sprintf("#%d %s", 1, util.AmountToString(w2BalanceBilly, 8)))
+	testutils.VerifyStdoutEventually(t, walletCmd.WithHome(wallets[1].Homedir).ExecFunc(t, "get-balance"),
+		fmt.Sprintf("#%d %s", 1, util.AmountToString(w2BalanceBilly, 8)))
 
 	// TS1.2: send bills back to wallet-1
 	// create fee credit for wallet-2
-	stdout, err = execCommand(homedir2, fmt.Sprintf("fees add --amount %d --rpc-url %s", feeAmountAlpha, rpcUrl))
-	require.NoError(t, err)
-	testutils.VerifyStdout(t, stdout, fmt.Sprintf("Successfully created %d fee credits on money partition.", feeAmountAlpha))
+	addFeeCredit(t, wallets[1].Homedir, feeAmountAlpha, "money", abNet.MoneyRpcUrl, abNet.MoneyRpcUrl)
 
 	// verify fee credit received for wallet-2
 	w2BalanceBilly = w2BalanceBilly - feeAmountAlpha*1e8
-	waitForFeeCreditCLI(t, homedir2, rpcUrl, feeAmountAlpha*1e8-2, 0)
+	waitForFeeCreditCLI(t, walletCmd.WithHome(wallets[1].Homedir), feeAmountAlpha*1e8-2, 0)
 
 	// send wallet-2 bills back to wallet-1
-	stdout, err = execCommand(homedir2, fmt.Sprintf("send --amount %s --address %s --rpc-url %s", util.AmountToString(w2BalanceBilly, 8), hexutil.Encode(w1AccKey.PubKey), rpcUrl))
-	require.NoError(t, err)
+	stdout = walletCmd.WithHome(wallets[1].Homedir).Exec(t,
+		"send",
+		"--amount", util.AmountToString(w2BalanceBilly, 8),
+		"--address", hexutil.Encode(wallets[0].PubKeys[0]))
 	testutils.VerifyStdout(t, stdout, "Successfully confirmed transaction(s)")
 
 	// verify wallet-2 balance is reduced
-	waitForBalanceCLI(t, homedir2, rpcUrl, 0, 0)
+	waitForBalanceCLI(t, walletCmd.WithHome(wallets[1].Homedir), 0, 0)
 
 	// verify wallet-1 balance is increased
 	w1BalanceBilly += w2BalanceBilly
-	waitForBalanceCLI(t, homedir1, rpcUrl, w1BalanceBilly, 0)
+	waitForBalanceCLI(t, walletCmd, w1BalanceBilly, 0)
 
 	// TS2:
-	// add additional accounts to wallet 1
-	pubKey2Hex := addAccount(t, homedir1)
-	pubKey3Hex := addAccount(t, homedir1)
+	// create w1k3
+	pubKey3Hex := addAccount(t, wallets[0].Homedir)
 
-	// send two bills to wallet account 2
-	stdout, err = execCommand(homedir1, fmt.Sprintf("send -k 1 --amount 50,150 --address %s,%s --rpc-url %s", pubKey2Hex, pubKey2Hex, rpcUrl))
-	require.NoError(t, err)
+	// send two bills to w1k2
+	stdout = walletCmd.Exec(t,
+		"send",
+		"--key", "1",
+		"--amount", "50,150",
+		"--address", fmt.Sprintf("0x%X,0x%X", wallets[0].PubKeys[1], wallets[0].PubKeys[1]))
 	testutils.VerifyStdout(t, stdout, "Successfully confirmed transaction(s)")
 
-	// verify wallet-1 account-1 balance is decreased
+	// verify w1k1 balance is decreased
 	w1BalanceBilly -= 200 * 1e8
-	testutils.VerifyStdoutEventually(t, func() *testutils.TestConsoleWriter {
-		consoleWriter, err := execCommand(homedir1, fmt.Sprintf("get-balance -k 1 --rpc-url %s", rpcUrl))
-		require.NoError(t, err)
-		return consoleWriter
-	}, fmt.Sprintf("#%d %s", 1, util.AmountToString(w1BalanceBilly, 8)))
+	testutils.VerifyStdoutEventually(t, walletCmd.ExecFunc(t, "get-balance", "--key", "1"),
+		fmt.Sprintf("#%d %s", 1, util.AmountToString(w1BalanceBilly, 8)))
 
-	// verify wallet-1 account-2 received said bills
+	// verify w1k2 received said bills
 	acc2BalanceBilly := uint64(200 * 1e8)
-	testutils.VerifyStdoutEventually(t, func() *testutils.TestConsoleWriter {
-		consoleWriter, err := execCommand(homedir1, fmt.Sprintf("get-balance -k 2 --rpc-url %s", rpcUrl))
-		require.NoError(t, err)
-		return consoleWriter
-	}, fmt.Sprintf("#%d %s", 2, util.AmountToString(acc2BalanceBilly, 8)))
+	testutils.VerifyStdoutEventually(t, walletCmd.ExecFunc(t, "get-balance", "--key", "2"),
+		fmt.Sprintf("#%d %s", 2, util.AmountToString(acc2BalanceBilly, 8)))
 
 	// TS2.1:
 	// create fee credit for account 2
-	stdout, err = execCommand(homedir1, fmt.Sprintf("fees add --amount %d -k 2 -r %s", feeAmountAlpha, rpcUrl))
-	require.NoError(t, err)
+	stdout = walletCmd.Exec(t, "fees", "add", "--amount", strconv.FormatUint(feeAmountAlpha, 10), "--key", "2")
+
 	testutils.VerifyStdout(t, stdout, fmt.Sprintf("Successfully created %d fee credits on money partition.", feeAmountAlpha))
 
 	// verify fee credit received
-	waitForFeeCreditCLI(t, homedir1, rpcUrl, feeAmountAlpha*1e8-2, 1)
+	waitForFeeCreditCLI(t, walletCmd, feeAmountAlpha*1e8-2, 1)
 
 	// send tx from account-2 to account-3
-	stdout, err = execCommand(homedir1, fmt.Sprintf("send --amount 100 --key 2 --address %s -r %s", pubKey3Hex, rpcUrl))
-	require.NoError(t, err)
+	stdout = walletCmd.Exec(t, "send", "--amount", "100", "--key", "2", "--address", pubKey3Hex)
 	testutils.VerifyStdout(t, stdout, "Successfully confirmed transaction(s)")
-	waitForBalanceCLI(t, homedir1, rpcUrl, 100*1e8, 2)
+	waitForBalanceCLI(t, walletCmd, 100*1e8, 2)
 
 	// verify account-2 fcb balance is reduced after send
-	stdout, err = execCommand(homedir1, fmt.Sprintf("fees list -k 2 -r %s", rpcUrl))
-	require.NoError(t, err)
+	stdout = walletCmd.Exec(t, "fees", "list", "--key", "2")
 	acc2FeeCredit := feeAmountAlpha*1e8 - 3 // minus one for tx and minus one for creating fee credit
 	acc2FeeCreditString := util.AmountToString(acc2FeeCredit, 8)
 	testutils.VerifyStdout(t, stdout, fmt.Sprintf("Account #2 %s", acc2FeeCreditString))
 
 	// TS3:
 	// verify transaction is broadcast immediately without confirmation
-	stdout, err = execCommand(homedir1, fmt.Sprintf("send -w false --amount 2 --address %s --rpc-url %s", pubKey2Hex, rpcUrl))
-	require.NoError(t, err)
+	stdout = walletCmd.Exec(t, "send", "-w", "false", "--amount", "2", "--address", fmt.Sprintf("0x%X", wallets[1].PubKeys[1]))
 	testutils.VerifyStdout(t, stdout, "Successfully sent transaction(s)")
 }
 
-func waitForBalanceCLI(t *testing.T, homedir string, url string, expectedBalance uint64, accountIndex uint64) {
+/*
+Test scenario:
+   w1k1 sends two bills to w1k2 and w1k3
+   w1 runs dust collection
+   w1k2 and w1k3 should have only single bill
+*/
+func TestCollectDustInMultiAccountWallet(t *testing.T) {
+	wallets, abNet := testutils.SetupNetworkWithWallets(t, false, false)
+	walletCmd := newWalletCmdExecutor("--rpc-url", abNet.MoneyRpcUrl).WithHome(wallets[0].Homedir)
+
+	// add fee credit for w1k1
+	walletCmd.Exec(t, "fees", "add",
+		"--amount", "1",
+		"--partition-rpc-url", abNet.MoneyRpcUrl)
+
+	pubKey2Hex := hexutil.Encode(wallets[0].PubKeys[1])
+	pubKey3Hex := addAccount(t, wallets[0].Homedir)
+
+	// send two bills to both w1k2 and w1k3
+	stdout := walletCmd.Exec(t, "send",
+		"--amount", "10,10,10,10",
+		"--address", fmt.Sprintf("%s,%s,%s,%s", pubKey2Hex, pubKey2Hex, pubKey3Hex, pubKey3Hex))
+	testutils.VerifyStdout(t, stdout,
+		"Successfully confirmed transaction(s)",
+		"Paid 0.000'000'01 fees for transaction(s)")
+
+	walletCmd.Exec(t, "fees", "add",
+		"--key", "2",
+		"--amount", "1",
+		"--partition-rpc-url", abNet.MoneyRpcUrl)
+
+	walletCmd.Exec(t, "fees", "add",
+		"--key", "3",
+		"--amount", "1",
+		"--partition-rpc-url", abNet.MoneyRpcUrl)
+
+	walletCmd.Exec(t, "collect-dust", "--key", "0")
+
+	// Verify that w1k2 has a single bill with value 19
+	testutils.VerifyStdout(t, walletCmd.Exec(t, "bills", "list", "--key", "2"),
+		util.AmountToString(19*1e8, 8))
+
+	// Verify that w1k3 has a single bill with value 19
+	testutils.VerifyStdout(t, walletCmd.Exec(t, "bills", "list", "--key", "3"),
+		util.AmountToString(19*1e8, 8))
+}
+
+func TestWalletBillsLockUnlockCmd_Ok(t *testing.T) {
+	// setup network
+	wallets, abNet := testutils.SetupNetworkWithWallets(t, false, false)
+
+	walletCmd := newWalletCmdExecutor("--rpc-url", abNet.MoneyRpcUrl).WithHome(wallets[0].Homedir)
+
+	// add fee credit
+	stdout := walletCmd.Exec(t, "fees", "add", "--amount=1")
+	require.Equal(t, "Successfully created 1 fee credits on money partition.", stdout.Lines[0])
+
+	// lock bill
+	stdout = walletCmd.Exec(t, "bills", "lock", "--bill-id", money.NewBillID(nil, []byte{1}).String())
+	testutils.VerifyStdout(t, stdout, "Bill locked successfully.")
+
+	// verify bill locked
+	stdout = walletCmd.Exec(t, "bills", "list")
+	testutils.VerifyStdout(t, stdout, "#1 0x000000000000000000000000000000000000000000000000000000000000000100 9'999'999'999.000'000'00 (manually locked by user)")
+
+	// unlock bill
+	stdout = walletCmd.Exec(t, "bills", "unlock", "--bill-id", money.NewBillID(nil, []byte{1}).String())
+	testutils.VerifyStdout(t, stdout, "Bill unlocked successfully.")
+
+	// verify bill unlocked
+	stdout = walletCmd.Exec(t, "bills", "list")
+	testutils.VerifyStdout(t, stdout, "#1 0x000000000000000000000000000000000000000000000000000000000000000100 9'999'999'999.000'000'00")
+}
+
+func TestOrchestration_AddVarOK(t *testing.T) {
+	wallets, net := testutils.SetupNetworkWithWallets(t, false, true)
+
+	varData := orchestration.ValidatorAssignmentRecord{
+		EpochNumber:            0,
+		EpochSwitchRoundNumber: 10000,
+		ValidatorAssignment: orchestration.ValidatorAssignment{
+			Validators: []orchestration.ValidatorInfo{
+				{
+					ValidatorID: []byte{1},
+					Stake:       100,
+				},
+				{
+					ValidatorID: []byte{2},
+					Stake:       100,
+				},
+				{
+					ValidatorID: []byte{3},
+					Stake:       100,
+				},
+			},
+			QuorumSize: 150,
+		},
+	}
+	varFile := writeVarFile(t, wallets[0].Homedir, varData)
+
+	orcCmd := newWalletCmdExecutor("orchestration", "--rpc-url", net.OrchestrationRpcUrl).WithHome(wallets[0].Homedir)
+
+	testutils.VerifyStdout(t, orcCmd.Exec(t, "add-var", "--partition-id", "1", "--var-file", varFile),
+		"Validator Assignment Record added successfully.")
+
+	// TODO: verify with some kind of list-var command?
+	// require.Eventually(t, testutils.BlockchainContains(orchestrationPartition, func(tx *types.TransactionOrder) bool {
+	// 	if tx.PayloadType() == orchestration.PayloadTypeAddVAR {
+	// 		var attrs *orchestration.AddVarAttributes
+	// 		require.NoError(t, tx.UnmarshalAttributes(&attrs))
+	// 		require.Equal(t, varData, attrs.Var)
+	// 		return true
+	// 	}
+	// 	return false
+	// }), testutils.WaitDuration, testutils.WaitTick)
+}
+
+func writeVarFile(t *testing.T, homedir string, varData orchestration.ValidatorAssignmentRecord) string {
+	varFilePath := filepath.Join(homedir, "var-file.json")
+	err := baseutil.WriteJsonFile(varFilePath, &varData)
+	require.NoError(t, err)
+	return varFilePath
+}
+
+func waitForBalanceCLI(t *testing.T, walletCmd *testutils.CmdExecutor, expectedBalance uint64, accountIndex uint64) {
 	require.Eventually(t, func() bool {
-		stdout, err := execCommand(homedir, "get-balance --rpc-url "+url)
-		require.NoError(t, err)
+		stdout := walletCmd.Exec(t, "get-balance")
 		for _, line := range stdout.Lines {
 			expectedBalanceStr := util.AmountToString(expectedBalance, 8)
 			if line == fmt.Sprintf("#%d %s", accountIndex+1, expectedBalanceStr) {
@@ -170,13 +261,12 @@ func waitForBalanceCLI(t *testing.T, homedir string, url string, expectedBalance
 			}
 		}
 		return false
-	}, test.WaitDuration, test.WaitTick)
+	}, testutils.WaitDuration, testutils.WaitTick)
 }
 
-func waitForFeeCreditCLI(t *testing.T, homedir string, url string, expectedBalance uint64, accountIndex uint64) {
+func waitForFeeCreditCLI(t *testing.T, walletCmd *testutils.CmdExecutor, expectedBalance uint64, accountIndex uint64) {
 	require.Eventually(t, func() bool {
-		stdout, err := execCommand(homedir, "fees list --rpc-url "+url)
-		require.NoError(t, err)
+		stdout := walletCmd.Exec(t, "fees", "list")
 		for _, line := range stdout.Lines {
 			expectedBalanceStr := util.AmountToString(expectedBalance, 8)
 			if line == fmt.Sprintf("Account #%d %s", accountIndex+1, expectedBalanceStr) {
@@ -184,13 +274,12 @@ func waitForFeeCreditCLI(t *testing.T, homedir string, url string, expectedBalan
 			}
 		}
 		return false
-	}, test.WaitDuration, test.WaitTick)
+	}, testutils.WaitDuration, testutils.WaitTick)
 }
 
 // addAccount calls "add-key" cli function on given wallet and returns the added pubkey hex
-func addAccount(t *testing.T, homedir string) string {
-	stdout, err := execCommand(homedir, "add-key")
-	require.NoError(t, err)
+func addAccount(t *testing.T, home string) string {
+	stdout := newWalletCmdExecutor().WithHome(home).Exec(t, "add-key")
 	for _, line := range stdout.Lines {
 		if strings.HasPrefix(line, "Added key #") {
 			return line[13:]
