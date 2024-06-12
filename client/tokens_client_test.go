@@ -10,8 +10,8 @@ import (
 	tokentxs "github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/client/rpc/mocksrv"
+	"github.com/alphabill-org/alphabill-wallet/client/types"
 )
 
 func TestTokensRpcClient(t *testing.T) {
@@ -255,7 +255,7 @@ func TestTokensRpcClient(t *testing.T) {
 	})
 }
 
-func startServerAndTokensClient(t *testing.T, service *mocksrv.StateServiceMock) *tokensPartitionClient {
+func startServerAndTokensClient(t *testing.T, service *mocksrv.StateServiceMock) types.TokensPartitionClient {
 	srv := mocksrv.StartStateApiServer(t, service)
 
 	tokensClient, err := NewTokensPartitionClient(context.Background(), "http://" + srv)

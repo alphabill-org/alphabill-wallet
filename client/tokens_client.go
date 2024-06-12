@@ -21,7 +21,7 @@ type (
 )
 
 // NewTokensPartitionClient creates a tokens partition client for the given RPC URL.
-func NewTokensPartitionClient(ctx context.Context, rpcUrl string) (*tokensPartitionClient, error) {
+func NewTokensPartitionClient(ctx context.Context, rpcUrl string) (sdktypes.TokensPartitionClient, error) {
 	adminApiClient, err := rpc.NewAdminAPIClient(ctx, rpcUrl)
 	if err != nil {
 		return nil, err
@@ -83,7 +83,7 @@ func (c *tokensPartitionClient) GetTypeHierarchy(ctx context.Context, typeID sdk
 	return tokenTypes, nil
 }
 
-// GetFeeCreditRecord finds the first fee credit record in tokens partition for the given owner ID,
+// GetFeeCreditRecordByOwnerID finds the first fee credit record in tokens partition for the given owner ID,
 // returns nil if fee credit record does not exist.
 func (c *tokensPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (*sdktypes.FeeCreditRecord, error) {
 	return c.StateAPIClient.GetFeeCreditRecordByOwnerID(ctx, ownerID, tokens.FeeCreditRecordUnitType)

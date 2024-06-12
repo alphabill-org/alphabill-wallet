@@ -495,6 +495,17 @@ func (w *Wallet) GetRoundNumber(ctx context.Context) (uint64, error) {
 	return w.tokensClient.GetRoundNumber(ctx)
 }
 
+// GetFeeCredit returns fee credit record for the given account,
+// can return nil if fee credit record has not been created yet.
+// Deprecated: faucet still uses, will be removed
+func (w *Wallet) GetFeeCredit(ctx context.Context, cmd fees.GetFeeCreditCmd) (*sdktypes.FeeCreditRecord, error) {
+	ac, err := w.am.GetAccountKey(cmd.AccountIndex)
+	if err != nil {
+		return nil, err
+	}
+	return w.tokensClient.GetFeeCreditRecordByOwnerID(ctx, ac.PubKeyHash.Sha256)
+}
+
 func (w *Wallet) AddFeeCredit(ctx context.Context, cmd fees.AddFeeCmd) (*fees.AddFeeCmdResponse, error) {
 	return w.feeManager.AddFeeCredit(ctx, cmd)
 }

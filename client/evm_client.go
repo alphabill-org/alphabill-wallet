@@ -34,7 +34,7 @@ func NewEvmPartitionClient(ctx context.Context, rpcUrl string) (sdktypes.Partiti
 	}, nil
 }
 
-// GetFeeCreditRecord finds the first fee credit record in evm partition for the given owner ID,
+// GetFeeCreditRecordByOwnerID finds the first fee credit record in evm partition for the given owner ID,
 // returns nil if fee credit record does not exist.
 func (c *evmPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (*sdktypes.FeeCreditRecord, error) {
 	return nil, nil
