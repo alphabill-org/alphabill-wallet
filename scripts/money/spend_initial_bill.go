@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
+	"crypto"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/alphabill-org/alphabill-go-base/hash"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
@@ -12,9 +15,10 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-go-base/util"
+
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
-	"github.com/alphabill-org/alphabill-wallet/client/rpc"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
+	"github.com/alphabill-org/alphabill-wallet/client"
+	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/fxamacker/cbor/v2"
 )
@@ -60,26 +64,26 @@ func main() {
 
 	// create rpc client
 	ctx := context.Background()
-	rpcClient, err := rpc.DialContext(ctx, args.BuildRpcUrl(*rpcServerAddr))
+	moneyClient, err := client.NewMoneyPartitionClient(ctx, args.BuildRpcUrl(*rpcServerAddr))
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer rpcClient.Close()
+	defer moneyClient.Close()
 
 	// calculate fee credit record id
-	roundNumber, err := rpcClient.GetRoundNumber(ctx)
+	roundNumber, err := moneyClient.GetRoundNumber(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
 	latestAdditionTime := roundNumber + *timeout
 	fcrID := money.NewFeeCreditRecordIDFromOwnerPredicate(nil, templates.AlwaysTrueBytes(), latestAdditionTime)
 
-	if err = execInitialBill(ctx, rpcClient, billID, fcrID, *billValue, latestAdditionTime, pubKey, *counter); err != nil {
+	if err = execInitialBill(ctx, moneyClient, billID, fcrID, *billValue, latestAdditionTime, pubKey, *counter); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func execInitialBill(ctx context.Context, rpcClient api.RpcClient, billID, fcrID types.UnitID, billValue, latestAdditionTime uint64, pubKey []byte, counter uint64) error {
+func execInitialBill(ctx context.Context, moneyClient sdktypes.PartitionClient, billID, fcrID types.UnitID, billValue, latestAdditionTime uint64, pubKey []byte, counter uint64) error {
 	txFee := uint64(1)
 	feeAmount := uint64(2)
 
@@ -88,14 +92,15 @@ func execInitialBill(ctx context.Context, rpcClient api.RpcClient, billID, fcrID
 	if err != nil {
 		return fmt.Errorf("creating transfer FC transaction: %w", err)
 	}
+
 	// send transferFC
 	log.Println("sending transferFC transaction")
-	_, err = rpcClient.SendTransaction(ctx, transferFC)
+	_, err = moneyClient.SendTransaction(ctx, transferFC)
 	if err != nil {
 		return fmt.Errorf("processing transfer FC transaction: %w", err)
 	}
 	// wait for transferFC proof
-	transferFCProof, err := api.WaitForConf(ctx, rpcClient, transferFC)
+	transferFCProof, err := waitForConf(ctx, moneyClient, transferFC)
 	if err != nil {
 		return fmt.Errorf("failed to confirm transferFC transaction %v", err)
 	} else {
@@ -109,12 +114,12 @@ func execInitialBill(ctx context.Context, rpcClient api.RpcClient, billID, fcrID
 	}
 	// send addFC
 	log.Println("sending addFC transaction")
-	_, err = rpcClient.SendTransaction(ctx, addFC)
+	_, err = moneyClient.SendTransaction(ctx, addFC)
 	if err != nil {
 		return fmt.Errorf("processing add FC transaction: %w", err)
 	}
 	// wait for addFC confirmation
-	_, err = api.WaitForConf(ctx, rpcClient, addFC)
+	_, err = waitForConf(ctx, moneyClient, addFC)
 	if err != nil {
 		return fmt.Errorf("failed to confirm addFC transaction %v", err)
 	} else {
@@ -128,12 +133,12 @@ func execInitialBill(ctx context.Context, rpcClient api.RpcClient, billID, fcrID
 	}
 	// send transfer tx
 	log.Println("sending initial bill transfer transaction")
-	_, err = rpcClient.SendTransaction(ctx, transferTx)
+	_, err = moneyClient.SendTransaction(ctx, transferTx)
 	if err != nil {
 		return fmt.Errorf("processing transfer transaction: %w", err)
 	}
 	// wait for transfer tx confirmation
-	_, err = api.WaitForConf(ctx, rpcClient, transferTx)
+	_, err = waitForConf(ctx, moneyClient, transferTx)
 	if err != nil {
 		return fmt.Errorf("failed to confirm transfer transaction %v", err)
 	} else {
@@ -216,4 +221,31 @@ func createTransferTx(pubKey []byte, unitID []byte, billValue uint64, fcrID []by
 		},
 		OwnerProof: nil,
 	}, nil
+}
+
+func waitForConf(ctx context.Context, c sdktypes.PartitionClient, tx *types.TransactionOrder) (*sdktypes.Proof, error) {
+       txHash := tx.Hash(crypto.SHA256)
+       for {
+               // fetch round number before proof to ensure that we cannot miss the proof
+               roundNumber, err := c.GetRoundNumber(ctx)
+               if err != nil {
+                       return nil, fmt.Errorf("failed to fetch target partition round number: %w", err)
+               }
+               proof, err := c.GetTransactionProof(ctx, txHash)
+	       if err != nil {
+		       return nil, err
+	       }
+               if proof != nil {
+		       return proof, nil
+               }
+               if roundNumber >= tx.Timeout() {
+                       break
+               }
+               select {
+               case <-time.After(time.Second):
+               case <-ctx.Done():
+                       return nil, errors.New("context canceled")
+               }
+       }
+       return nil, nil
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
-	"github.com/alphabill-org/alphabill-wallet/wallet/tokens"
+	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 )
 
 func TestListTokensCommandInputs(t *testing.T) {
@@ -18,7 +18,7 @@ func TestListTokensCommandInputs(t *testing.T) {
 		name          string
 		args          []string
 		accountNumber uint64
-		expectedKind  tokens.Kind
+		expectedKind  sdktypes.Kind
 		expectedPass  string
 		expectedFlags []string
 	}{
@@ -26,82 +26,82 @@ func TestListTokensCommandInputs(t *testing.T) {
 			name:          "list all tokens",
 			args:          []string{},
 			accountNumber: 0, // all tokens
-			expectedKind:  tokens.Any,
+			expectedKind:  sdktypes.Any,
 		},
 		{
 			name:          "list all tokens with flags",
 			args:          []string{"--with-all", "--with-type-name", "--with-token-uri", "--with-token-data"},
-			expectedKind:  tokens.Any,
+			expectedKind:  sdktypes.Any,
 			expectedFlags: []string{cmdFlagWithAll, cmdFlagWithTypeName, cmdFlagWithTokenURI, cmdFlagWithTokenData},
 		},
 		{
 			name:          "list all tokens, encrypted wallet",
 			args:          []string{"--pn", "some pass phrase"},
 			accountNumber: 0, // all tokens
-			expectedKind:  tokens.Any,
+			expectedKind:  sdktypes.Any,
 			expectedPass:  "some pass phrase",
 		},
 		{
 			name:          "list account tokens",
 			args:          []string{"--key", "3"},
 			accountNumber: 3,
-			expectedKind:  tokens.Any,
+			expectedKind:  sdktypes.Any,
 		},
 		{
 			name:          "list all fungible tokens",
 			args:          []string{"fungible"},
 			accountNumber: 0,
-			expectedKind:  tokens.Fungible,
+			expectedKind:  sdktypes.Fungible,
 		},
 		{
 			name:          "list account fungible tokens",
 			args:          []string{"fungible", "--key", "4"},
 			accountNumber: 4,
-			expectedKind:  tokens.Fungible,
+			expectedKind:  sdktypes.Fungible,
 		},
 		{
 			name:          "list account fungible tokens, encrypted wallet",
 			args:          []string{"fungible", "--key", "4", "--pn", "some pass phrase"},
 			accountNumber: 4,
-			expectedKind:  tokens.Fungible,
+			expectedKind:  sdktypes.Fungible,
 			expectedPass:  "some pass phrase",
 		},
 		{
 			name:          "list all fungible tokens with flags",
 			args:          []string{"fungible", "--with-all", "--with-type-name"},
-			expectedKind:  tokens.Fungible,
+			expectedKind:  sdktypes.Fungible,
 			expectedFlags: []string{cmdFlagWithAll, cmdFlagWithTypeName},
 		},
 		{
 			name:          "list all non-fungible tokens",
 			args:          []string{"non-fungible"},
 			accountNumber: 0,
-			expectedKind:  tokens.NonFungible,
+			expectedKind:  sdktypes.NonFungible,
 		},
 		{
 			name:          "list all non-fungible tokens with flags",
 			args:          []string{"non-fungible", "--with-all", "--with-type-name", "--with-token-uri", "--with-token-data"},
-			expectedKind:  tokens.NonFungible,
+			expectedKind:  sdktypes.NonFungible,
 			expectedFlags: []string{cmdFlagWithAll, cmdFlagWithTypeName, cmdFlagWithTokenURI, cmdFlagWithTokenData},
 		},
 		{
 			name:          "list account non-fungible tokens",
 			args:          []string{"non-fungible", "--key", "5"},
 			accountNumber: 5,
-			expectedKind:  tokens.NonFungible,
+			expectedKind:  sdktypes.NonFungible,
 		},
 		{
 			name:          "list account non-fungible tokens, encrypted wallet",
 			args:          []string{"non-fungible", "--key", "5", "--pn", "some pass phrase"},
 			accountNumber: 5,
-			expectedKind:  tokens.NonFungible,
+			expectedKind:  sdktypes.NonFungible,
 			expectedPass:  "some pass phrase",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			exec := false
-			cmd := tokenCmdList(&types.WalletConfig{}, func(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind tokens.Kind) error {
+			cmd := tokenCmdList(&types.WalletConfig{}, func(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind sdktypes.Kind) error {
 				require.Equal(t, tt.accountNumber, *accountNumber)
 				require.Equal(t, tt.expectedKind, kind)
 				if len(tt.expectedPass) > 0 {
@@ -132,43 +132,43 @@ func TestListTokensTypesCommandInputs(t *testing.T) {
 		name          string
 		args          []string
 		expectedAccNr uint64
-		expectedKind  tokens.Kind
+		expectedKind  sdktypes.Kind
 		expectedPass  string
 	}{
 		{
 			name:         "list all tokens",
 			args:         []string{},
-			expectedKind: tokens.Any,
+			expectedKind: sdktypes.Any,
 		},
 		{
 			name:         "list all tokens, encrypted wallet",
 			args:         []string{"--pn", "test pass phrase"},
-			expectedKind: tokens.Any,
+			expectedKind: sdktypes.Any,
 			expectedPass: "test pass phrase",
 		},
 		{
 			name:          "list all fungible tokens",
 			args:          []string{"fungible", "-k", "0"},
-			expectedKind:  tokens.Fungible,
+			expectedKind:  sdktypes.Fungible,
 			expectedAccNr: 0,
 		},
 		{
 			name:          "list all fungible tokens, encrypted wallet",
 			args:          []string{"fungible", "--pn", "test pass phrase"},
-			expectedKind:  tokens.Fungible,
+			expectedKind:  sdktypes.Fungible,
 			expectedPass:  "test pass phrase",
 			expectedAccNr: 0,
 		},
 		{
 			name:          "list all non-fungible tokens",
 			args:          []string{"non-fungible", "--key", "1"},
-			expectedKind:  tokens.NonFungible,
+			expectedKind:  sdktypes.NonFungible,
 			expectedAccNr: 1,
 		},
 		{
 			name:          "list all non-fungible tokens, encrypted wallet",
 			args:          []string{"non-fungible", "--pn", "test pass phrase", "-k", "2"},
-			expectedKind:  tokens.NonFungible,
+			expectedKind:  sdktypes.NonFungible,
 			expectedPass:  "test pass phrase",
 			expectedAccNr: 2,
 		},
@@ -176,7 +176,7 @@ func TestListTokensTypesCommandInputs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			exec := false
-			cmd := tokenCmdListTypes(&types.WalletConfig{}, func(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind tokens.Kind) error {
+			cmd := tokenCmdListTypes(&types.WalletConfig{}, func(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind sdktypes.Kind) error {
 				require.Equal(t, tt.expectedAccNr, *accountNumber)
 				require.Equal(t, tt.expectedKind, kind)
 				if len(tt.expectedPass) != 0 {

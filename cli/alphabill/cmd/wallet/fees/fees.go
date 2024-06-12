@@ -7,19 +7,19 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/spf13/cobra"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
-	"github.com/alphabill-org/alphabill-wallet/client/rpc"
+	"github.com/alphabill-org/alphabill-wallet/client"
+	"github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	evmwallet "github.com/alphabill-org/alphabill-wallet/wallet/evm"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
-	"github.com/spf13/cobra"
 )
 
 // NewFeesCmd creates a new cobra command for the wallet fees component.
@@ -279,11 +279,11 @@ func unlockFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
 }
 
 type FeeCreditManager interface {
-	GetFeeCredit(ctx context.Context, cmd fees.GetFeeCreditCmd) (*api.FeeCreditBill, error)
+	GetFeeCredit(ctx context.Context, cmd fees.GetFeeCreditCmd) (*types.FeeCreditRecord, error)
 	AddFeeCredit(ctx context.Context, cmd fees.AddFeeCmd) (*fees.AddFeeCmdResponse, error)
 	ReclaimFeeCredit(ctx context.Context, cmd fees.ReclaimFeeCmd) (*fees.ReclaimFeeCmdResponse, error)
-	LockFeeCredit(ctx context.Context, cmd fees.LockFeeCreditCmd) (*wallet.Proof, error)
-	UnlockFeeCredit(ctx context.Context, cmd fees.UnlockFeeCreditCmd) (*wallet.Proof, error)
+	LockFeeCredit(ctx context.Context, cmd fees.LockFeeCreditCmd) (*types.Proof, error)
+	UnlockFeeCredit(ctx context.Context, cmd fees.UnlockFeeCreditCmd) (*types.Proof, error)
 	Close()
 }
 
@@ -399,12 +399,11 @@ func (c *feesConfig) getTargetPartitionUrl() string {
 // Creates a fees.FeeManager that needs to be closed with the Close() method.
 // Does not close the account.Manager passed as an argument.
 func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager, feeManagerDB fees.FeeManagerDB, logger *slog.Logger) (*fees.FeeManager, error) {
-	moneyClient, err := rpc.DialContext(ctx, c.getMoneyRpcUrl())
+	moneyClient, err := client.NewMoneyPartitionClient(ctx, c.getMoneyRpcUrl())
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial money rpc url: %w", err)
 	}
-	moneyAdminClient := rpc.NewAdminClient(moneyClient.Client())
-	moneyInfo, err := moneyAdminClient.GetNodeInfo(ctx)
+	moneyInfo, err := moneyClient.GetNodeInfo(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch money system info: %w", err)
 	}
@@ -421,21 +420,18 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 			moneyInfo.SystemID,
 			moneyClient,
 			money.NewFeeCreditRecordIDFromPublicKey,
-			money.FeeCreditRecordUnitType,
 			moneyInfo.SystemID,
 			moneyClient,
 			money.NewFeeCreditRecordIDFromPublicKey,
-			money.FeeCreditRecordUnitType,
 			logger,
 		), nil
 	case clitypes.TokensType:
 		tokensRpcUrl := c.getTargetPartitionRpcUrl()
-		tokensClient, err := rpc.DialContext(ctx, tokensRpcUrl)
+		tokensClient, err := client.NewTokensPartitionClient(ctx, tokensRpcUrl)
 		if err != nil {
 			return nil, fmt.Errorf("failed to dial tokens rpc url: %w", err)
 		}
-		tokensAdminClient := rpc.NewAdminClient(tokensClient.Client())
-		tokenInfo, err := tokensAdminClient.GetNodeInfo(ctx)
+		tokenInfo, err := tokensClient.GetNodeInfo(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch tokens system info: %w", err)
 		}
@@ -449,21 +445,18 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 			moneyInfo.SystemID,
 			moneyClient,
 			money.NewFeeCreditRecordIDFromPublicKey,
-			money.FeeCreditRecordUnitType,
 			tokenInfo.SystemID,
 			tokensClient,
 			tokens.NewFeeCreditRecordIDFromPublicKey,
-			tokens.FeeCreditRecordUnitType,
 			logger,
 		), nil
 	case clitypes.EvmType:
 		evmRpcUrl := c.getTargetPartitionRpcUrl()
-		evmClient, err := rpc.DialContext(ctx, evmRpcUrl)
+		evmClient, err := client.NewEvmPartitionClient(ctx, evmRpcUrl)
 		if err != nil {
 			return nil, fmt.Errorf("failed to dial evm rpc url: %w", err)
 		}
-		evmAdminClient := rpc.NewAdminClient(evmClient.Client())
-		evmInfo, err := evmAdminClient.GetNodeInfo(ctx)
+		evmInfo, err := evmClient.GetNodeInfo(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch evm system info: %w", err)
 		}
@@ -477,11 +470,9 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 			moneyInfo.SystemID,
 			moneyClient,
 			money.NewFeeCreditRecordIDFromPublicKey,
-			money.FeeCreditRecordUnitType,
 			evmInfo.SystemID,
 			evmClient,
 			evmwallet.NewFeeCreditRecordIDFromPublicKey,
-			nil,
 			logger,
 		), nil
 	default:
@@ -489,9 +480,9 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 	}
 }
 
-func getLockedReasonString(fcb *api.FeeCreditBill) string {
+func getLockedReasonString(fcb *types.FeeCreditRecord) string {
 	if fcb.IsLocked() {
-		return fmt.Sprintf(" (%s)", wallet.LockReason(fcb.FeeCreditRecord.Locked).String())
+		return fmt.Sprintf(" (%s)", wallet.LockReason(fcb.Data.Locked).String())
 	}
 	return ""
 }

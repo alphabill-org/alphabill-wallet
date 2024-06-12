@@ -8,10 +8,11 @@ import (
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
+
+	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 )
@@ -21,26 +22,17 @@ type (
 		systemID      types.SystemID
 		maxBillsPerDC int
 		txTimeout     uint64
-		moneyClient   RpcClient
+		moneyClient   sdktypes.MoneyPartitionClient
 		log           *slog.Logger
 	}
 
 	DustCollectionResult struct {
-		SwapProof *wallet.Proof
-		LockProof *wallet.Proof
-	}
-
-	RpcClient interface {
-		GetRoundNumber(ctx context.Context) (uint64, error)
-		GetBill(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.Bill, error)
-		GetFeeCreditRecord(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error)
-		GetUnitsByOwnerID(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error)
-		SendTransaction(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
-		GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TransactionRecord, *types.TxProof, error)
+		SwapProof *sdktypes.Proof
+		LockProof *sdktypes.Proof
 	}
 )
 
-func NewDustCollector(systemID types.SystemID, maxBillsPerDC int, txTimeout uint64, moneyClient RpcClient, log *slog.Logger) *DustCollector {
+func NewDustCollector(systemID types.SystemID, maxBillsPerDC int, txTimeout uint64, moneyClient sdktypes.MoneyPartitionClient, log *slog.Logger) *DustCollector {
 	return &DustCollector{
 		systemID:      systemID,
 		maxBillsPerDC: maxBillsPerDC,
@@ -59,13 +51,13 @@ func (w *DustCollector) CollectDust(ctx context.Context, accountKey *account.Acc
 // runDustCollection executes dust collection process.
 func (w *DustCollector) runDustCollection(ctx context.Context, accountKey *account.AccountKey) (*DustCollectionResult, error) {
 	// fetch non-dc bills
-	bills, err := api.FetchBills(ctx, w.moneyClient, accountKey.PubKeyHash.Sha256)
+	bills, err := w.moneyClient.GetBills(ctx, accountKey.PubKeyHash.Sha256)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch bills: %w", err)
 	}
 
 	// filter any locked bills
-	bills, _ = util.FilterSlice(bills, func(b *api.Bill) (bool, error) {
+	bills, _ = util.FilterSlice(bills, func(b *sdktypes.Bill) (bool, error) {
 		return !b.IsLocked(), nil
 	})
 
@@ -81,7 +73,7 @@ func (w *DustCollector) runDustCollection(ctx context.Context, accountKey *accou
 	}
 
 	// fetch fee credit bill
-	fcb, err := api.FetchFeeCreditBillByOwnerID(ctx, w.moneyClient, accountKey.PubKeyHash.Sha256, money.FeeCreditRecordUnitType)
+	fcb, err := w.moneyClient.GetFeeCreditRecordByOwnerID(ctx, accountKey.PubKeyHash.Sha256)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch fee credit bill: %w", err)
 	}
@@ -109,7 +101,7 @@ func (w *DustCollector) runDustCollection(ctx context.Context, accountKey *accou
 }
 
 // submitDCBatch creates dust transfers from given bills and locked target bill.
-func (w *DustCollector) submitDCBatch(ctx context.Context, k *account.AccountKey, fcrID []byte, lockTxSub *txsubmitter.TxSubmission, counter uint64, billsToSwap []*api.Bill) (*DustCollectionResult, error) {
+func (w *DustCollector) submitDCBatch(ctx context.Context, k *account.AccountKey, fcrID []byte, lockTxSub *txsubmitter.TxSubmission, counter uint64, billsToSwap []*sdktypes.Bill) (*DustCollectionResult, error) {
 	// create dc batch
 	timeout, err := w.getTxTimeout(ctx)
 	if err != nil {
@@ -144,7 +136,7 @@ func (w *DustCollector) submitDCBatch(ctx context.Context, k *account.AccountKey
 
 // swapDCBills creates swap transfer from given dcProofs and target bill, joining the dcBills into the target bill,
 // the target bill is expected to be locked on server side.
-func (w *DustCollector) swapDCBills(ctx context.Context, k *account.AccountKey, dcProofs []*wallet.Proof, unitID types.UnitID, fcrID []byte) (*wallet.Proof, error) {
+func (w *DustCollector) swapDCBills(ctx context.Context, k *account.AccountKey, dcProofs []*sdktypes.Proof, unitID types.UnitID, fcrID []byte) (*sdktypes.Proof, error) {
 	timeout, err := w.getTxTimeout(ctx)
 	if err != nil {
 		return nil, err
@@ -169,7 +161,7 @@ func (w *DustCollector) swapDCBills(ctx context.Context, k *account.AccountKey, 
 	return sub.Proof, nil
 }
 
-func (w *DustCollector) lockTargetBill(ctx context.Context, k *account.AccountKey, targetBill *api.Bill, fcrID types.UnitID) (*txsubmitter.TxSubmission, error) {
+func (w *DustCollector) lockTargetBill(ctx context.Context, k *account.AccountKey, targetBill *sdktypes.Bill, fcrID types.UnitID) (*txsubmitter.TxSubmission, error) {
 	// create lock tx
 	timeout, err := w.getTxTimeout(ctx)
 	if err != nil {
@@ -189,8 +181,8 @@ func (w *DustCollector) lockTargetBill(ctx context.Context, k *account.AccountKe
 	return lockTxBatch.Submissions()[0], nil
 }
 
-func (w *DustCollector) extractProofsFromBatch(dcBatch *txsubmitter.TxSubmissionBatch) ([]*wallet.Proof, error) {
-	var proofs []*wallet.Proof
+func (w *DustCollector) extractProofsFromBatch(dcBatch *txsubmitter.TxSubmissionBatch) ([]*sdktypes.Proof, error) {
+	var proofs []*sdktypes.Proof
 	for _, sub := range dcBatch.Submissions() {
 		proofs = append(proofs, sub.Proof)
 	}
