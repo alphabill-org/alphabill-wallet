@@ -10,8 +10,7 @@ import (
 
 	"github.com/alphabill-org/alphabill-go-base/types"
 
-	"github.com/alphabill-org/alphabill-wallet/wallet"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
+	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 )
 
 type (
@@ -19,20 +18,14 @@ type (
 		UnitID      types.UnitID
 		TxHash      types.Bytes
 		Transaction *types.TransactionOrder
-		Proof       *wallet.Proof
+		Proof       *sdktypes.Proof
 	}
 
 	TxSubmissionBatch struct {
-		submissions []*TxSubmission
-		maxTimeout  uint64
-		rpcClient   RpcClient
-		log         *slog.Logger
-	}
-
-	RpcClient interface {
-		GetRoundNumber(ctx context.Context) (uint64, error)
-		SendTransaction(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
-		GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TransactionRecord, *types.TxProof, error)
+		submissions     []*TxSubmission
+		maxTimeout      uint64
+		partitionClient sdktypes.PartitionClient
+		log             *slog.Logger
 	}
 )
 
@@ -44,12 +37,12 @@ func New(tx *types.TransactionOrder) *TxSubmission {
 	}
 }
 
-func (s *TxSubmission) ToBatch(rpcClient RpcClient, log *slog.Logger) *TxSubmissionBatch {
+func (s *TxSubmission) ToBatch(partitionClient sdktypes.PartitionClient, log *slog.Logger) *TxSubmissionBatch {
 	return &TxSubmissionBatch{
-		rpcClient:   rpcClient,
-		submissions: []*TxSubmission{s},
-		maxTimeout:  s.Transaction.Timeout(),
-		log:         log,
+		partitionClient:   partitionClient,
+		submissions:       []*TxSubmission{s},
+		maxTimeout:        s.Transaction.Timeout(),
+		log:               log,
 	}
 }
 
@@ -57,10 +50,10 @@ func (s *TxSubmission) Confirmed() bool {
 	return s.Proof != nil
 }
 
-func NewBatch(rpcClient RpcClient, log *slog.Logger) *TxSubmissionBatch {
+func NewBatch(partitionClient sdktypes.PartitionClient, log *slog.Logger) *TxSubmissionBatch {
 	return &TxSubmissionBatch{
-		rpcClient: rpcClient,
-		log:       log,
+		partitionClient: partitionClient,
+		log:             log,
 	}
 }
 
@@ -80,7 +73,7 @@ func (t *TxSubmissionBatch) SendTx(ctx context.Context, confirmTx bool) error {
 		return errors.New("no transactions to send")
 	}
 	for _, txSubmission := range t.submissions {
-		_, err := t.rpcClient.SendTransaction(ctx, txSubmission.Transaction)
+		_, err := t.partitionClient.SendTransaction(ctx, txSubmission.Transaction)
 		if err != nil {
 			return err
 		}
@@ -99,7 +92,7 @@ func (t *TxSubmissionBatch) confirmUnitsTx(ctx context.Context) error {
 			return fmt.Errorf("confirming transactions interrupted: %w", err)
 		}
 
-		roundNumber, err := t.rpcClient.GetRoundNumber(ctx)
+		roundNumber, err := t.partitionClient.GetRoundNumber(ctx)
 		if err != nil {
 			return err
 		}
@@ -109,13 +102,13 @@ func (t *TxSubmissionBatch) confirmUnitsTx(ctx context.Context) error {
 				continue
 			}
 			if roundNumber <= sub.Transaction.Timeout() {
-				txRecord, txProof, err := t.rpcClient.GetTransactionProof(ctx, sub.TxHash)
-				if err != nil && !errors.Is(err, api.ErrNotFound) {
+				proof, err := t.partitionClient.GetTransactionProof(ctx, sub.TxHash)
+				if err != nil {
 					return err
 				}
-				if txRecord != nil && txProof != nil {
+				if proof != nil {
 					t.log.DebugContext(ctx, fmt.Sprintf("Tx confirmed: hash=%X, unitID=%X", sub.TxHash, sub.UnitID))
-					sub.Proof = &wallet.Proof{TxRecord: txRecord, TxProof: txProof}
+					sub.Proof = proof
 				}
 			}
 

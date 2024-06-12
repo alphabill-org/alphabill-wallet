@@ -1,22 +1,21 @@
 package mocksrv
 
 import (
-	abrpc "github.com/alphabill-org/alphabill/rpc"
-	"github.com/multiformats/go-multiaddr"
+	"github.com/alphabill-org/alphabill-wallet/client/types"
 )
 
 type (
 	AdminServiceMock struct {
-		InfoResponse *abrpc.NodeInfoResponse
+		InfoResponse *types.NodeInfoResponse
 	}
 )
 
 func NewAdminServiceMock(opts ...Option) *AdminServiceMock {
 	options := &Options{
-		InfoResponse: &abrpc.NodeInfoResponse{
+		InfoResponse: &types.NodeInfoResponse{
 			SystemID: 1,
 			Name:     "money node",
-			Self:     abrpc.PeerInfo{Identifier: "1337", Addresses: make([]multiaddr.Multiaddr, 0)},
+			Self:     types.PeerInfo{Identifier: "1337", Addresses: make([]string, 0)},
 		},
 	}
 	for _, option := range opts {
@@ -27,12 +26,12 @@ func NewAdminServiceMock(opts ...Option) *AdminServiceMock {
 	}
 }
 
-func WithInfoResponse(infoResponse *abrpc.NodeInfoResponse) Option {
+func WithInfoResponse(infoResponse *types.NodeInfoResponse) Option {
 	return func(o *Options) {
 		o.InfoResponse = infoResponse
 	}
 }
 
-func (s *AdminServiceMock) GetNodeInfo() (*abrpc.NodeInfoResponse, error) {
+func (s *AdminServiceMock) GetNodeInfo() (*types.NodeInfoResponse, error) {
 	return s.InfoResponse, nil
 }

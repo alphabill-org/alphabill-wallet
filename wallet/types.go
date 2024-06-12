@@ -1,10 +1,5 @@
 package wallet
 
-import (
-	"github.com/alphabill-org/alphabill-go-base/hash"
-	"github.com/alphabill-org/alphabill-go-base/types"
-)
-
 const (
 	LockReasonAddFees = 1 + iota
 	LockReasonReclaimFees
@@ -13,31 +8,8 @@ const (
 )
 
 type (
-	TxHash     []byte
-	Predicate  []byte
-	PubKey     []byte
-	PubKeyHash []byte
-
-	// Proof wrapper struct around TxRecord and TxProof
-	Proof struct {
-		_        struct{}                 `cbor:",toarray"`
-		TxRecord *types.TransactionRecord `json:"txRecord"`
-		TxProof  *types.TxProof           `json:"txProof"`
-	}
-
 	LockReason uint64
 )
-
-func (pk PubKey) Hash() PubKeyHash {
-	return hash.Sum256(pk)
-}
-
-func (p *Proof) GetActualFee() uint64 {
-	if p == nil {
-		return 0
-	}
-	return p.TxRecord.GetActualFee()
-}
 
 func (r LockReason) String() string {
 	switch r {

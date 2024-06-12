@@ -7,13 +7,11 @@ import (
 	"testing"
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
-	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
-	"github.com/alphabill-org/alphabill/rpc"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/client/rpc/mocksrv"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
+	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 )
 
 func TestRpcClient(t *testing.T) {
@@ -36,61 +34,24 @@ func TestRpcClient(t *testing.T) {
 		require.ErrorContains(t, err, "some error")
 	})
 
-	t.Run("GetBill_OK", func(t *testing.T) {
-		service.Reset()
-		bill := &api.Bill{
-			ID: []byte{1},
-			BillData: &money.BillData{
-				V:       192,
-				T:       168,
-				Counter: 123,
-			},
-		}
-		service.Units = map[string]*rpc.Unit[any]{
-			string(bill.ID): {
-				UnitID: bill.ID,
-				Data:   bill.BillData,
-			},
-		}
-
-		returnedBill, err := client.GetBill(context.Background(), bill.ID, false)
-		require.NoError(t, err)
-		require.Equal(t, bill, returnedBill)
-	})
-	t.Run("GetBill_NOK", func(t *testing.T) {
-		service.Reset()
-		service.Err = errors.New("some error")
-		unitID := []byte{1}
-
-		_, err := client.GetBill(context.Background(), unitID, false)
-		require.ErrorContains(t, err, "some error")
-	})
-	t.Run("GetBill_NotFound", func(t *testing.T) {
-		service.Reset()
-
-		b, err := client.GetBill(context.Background(), []byte{}, false)
-		require.ErrorIs(t, err, api.ErrNotFound)
-		require.Nil(t, b)
-	})
-
 	t.Run("GetFeeCreditRecord_OK", func(t *testing.T) {
 		service.Reset()
-		fcb := &api.FeeCreditBill{
+		fcb := &sdktypes.FeeCreditRecord{
 			ID: []byte{1},
-			FeeCreditRecord: &fc.FeeCreditRecord{
+			Data: &fc.FeeCreditRecord{
 				Balance: 192,
 				Timeout: 168,
 				Counter: 12345,
 			},
 		}
-		service.Units = map[string]*rpc.Unit[any]{
+		service.Units = map[string]*sdktypes.Unit[any]{
 			string(fcb.ID): {
 				UnitID: fcb.ID,
-				Data:   fcb.FeeCreditRecord,
+				Data:   fcb.Data,
 			},
 		}
 
-		returnedBill, err := client.GetFeeCreditRecord(context.Background(), fcb.ID, false)
+		returnedBill, err := client.getFeeCreditRecord(context.Background(), fcb.ID)
 		require.NoError(t, err)
 		require.Equal(t, fcb, returnedBill)
 	})
@@ -99,15 +60,15 @@ func TestRpcClient(t *testing.T) {
 		service.Err = errors.New("some error")
 		unitID := []byte{1}
 
-		fcr, err := client.GetFeeCreditRecord(context.Background(), unitID, false)
+		fcr, err := client.getFeeCreditRecord(context.Background(), unitID)
 		require.ErrorContains(t, err, "some error")
 		require.Nil(t, fcr)
 	})
 	t.Run("GetFeeCreditRecord_NotFound", func(t *testing.T) {
 		service.Reset()
 
-		fcr, err := client.GetFeeCreditRecord(context.Background(), []byte{1}, false)
-		require.ErrorIs(t, err, api.ErrNotFound)
+		fcr, err := client.getFeeCreditRecord(context.Background(), []byte{1})
+		require.Nil(t, err)
 		require.Nil(t, fcr)
 	})
 
@@ -164,32 +125,30 @@ func TestRpcClient(t *testing.T) {
 		require.NoError(t, err)
 		txProofCbor, err := encodeCbor(txProof)
 		require.NoError(t, err)
-		service.TxProofs = map[string]*rpc.TransactionRecordAndProof{
+		service.TxProofs = map[string]*sdktypes.TransactionRecordAndProof{
 			string(txHash): {TxRecord: txRecordCbor, TxProof: txProofCbor},
 		}
 
-		txRecordRes, txProofRes, err := client.GetTransactionProof(context.Background(), txHash)
+		proof, err := client.GetTransactionProof(context.Background(), txHash)
 		require.NoError(t, err)
-		require.Equal(t, txRecord, txRecordRes)
-		require.Equal(t, txProof, txProofRes)
+		require.Equal(t, txRecord, proof.TxRecord)
+		require.Equal(t, txProof, proof.TxProof)
 	})
 	t.Run("GetTransactionProof_NOK", func(t *testing.T) {
 		service.Reset()
 		service.Err = errors.New("some error")
 		txHash := []byte{1}
 
-		txr, txp, err := client.GetTransactionProof(context.Background(), txHash)
+		proof, err := client.GetTransactionProof(context.Background(), txHash)
 		require.ErrorContains(t, err, "some error")
-		require.Nil(t, txr)
-		require.Nil(t, txp)
+		require.Nil(t, proof)
 	})
 	t.Run("GetTransactionProof_NotFound", func(t *testing.T) {
 		service.Reset()
 
-		txr, txp, err := client.GetTransactionProof(context.Background(), []byte{1})
-		require.ErrorIs(t, err, api.ErrNotFound)
-		require.Nil(t, txr)
-		require.Nil(t, txp)
+		proof, err := client.GetTransactionProof(context.Background(), []byte{1})
+		require.Nil(t, err)
+		require.Nil(t, proof)
 	})
 
 	t.Run("GetBlock_OK", func(t *testing.T) {
@@ -217,15 +176,15 @@ func TestRpcClient(t *testing.T) {
 		service.Reset()
 
 		block, err := client.GetBlock(context.Background(), 1)
-		require.ErrorIs(t, err, api.ErrNotFound)
+		require.Nil(t, err)
 		require.Nil(t, block)
 	})
 }
 
-func startStateServer(t *testing.T, service *mocksrv.StateServiceMock) *Client {
+func startStateServer(t *testing.T, service *mocksrv.StateServiceMock) *StateAPIClient {
 	srv := mocksrv.StartServer(t, map[string]interface{}{"state": service})
 
-	client, err := DialContext(context.Background(), "http://"+srv)
+	client, err := NewStateAPIClient(context.Background(), "http://"+srv)
 	require.NoError(t, err)
 	t.Cleanup(client.Close)
 

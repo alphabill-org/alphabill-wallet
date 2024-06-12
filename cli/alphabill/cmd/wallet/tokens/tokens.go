@@ -10,11 +10,12 @@ import (
 	"strings"
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
-	sdktypes "github.com/alphabill-org/alphabill-go-base/types"
+	basetypes "github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
-	"github.com/alphabill-org/alphabill-wallet/client/rpc"
+	"github.com/alphabill-org/alphabill-wallet/client"
+	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
@@ -65,8 +66,8 @@ const (
 		"@filename - load argument from file, the file content will be used as-is.\n"
 )
 
-type runTokenListTypesCmd func(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind tokenswallet.Kind) error
-type runTokenListCmd func(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind tokenswallet.Kind) error
+type runTokenListTypesCmd func(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind sdktypes.Kind) error
+type runTokenListCmd func(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind sdktypes.Kind) error
 
 func NewTokenCmd(config *types.WalletConfig) *cobra.Command {
 	cmd := &cobra.Command{
@@ -176,7 +177,7 @@ func execTokenCmdNewTypeFungible(cmd *cobra.Command, config *types.WalletConfig)
 	if err != nil {
 		return err
 	}
-	defer tw.Shutdown()
+	defer tw.Close()
 	am := tw.GetAccountManager()
 	parentType, creationInputs, err := readParentTypeInfo(cmd, accountNumber, am)
 	if err != nil {
@@ -261,7 +262,7 @@ func execTokenCmdNewTypeNonFungible(cmd *cobra.Command, config *types.WalletConf
 	if err != nil {
 		return err
 	}
-	defer tw.Shutdown()
+	defer tw.Close()
 	am := tw.GetAccountManager()
 	parentType, creationInputs, err := readParentTypeInfo(cmd, accountNumber, am)
 	if err != nil {
@@ -350,7 +351,7 @@ func execTokenCmdNewTokenFungible(cmd *cobra.Command, config *types.WalletConfig
 		return err
 	}
 	am := tw.GetAccountManager()
-	defer tw.Shutdown()
+	defer tw.Close()
 
 	amountStr, err := cmd.Flags().GetString(cmdFlagAmount)
 	if err != nil {
@@ -442,7 +443,7 @@ func execTokenCmdNewTokenNonFungible(cmd *cobra.Command, config *types.WalletCon
 	if err != nil {
 		return err
 	}
-	defer tw.Shutdown()
+	defer tw.Close()
 	am := tw.GetAccountManager()
 	ci, err := readPredicateInput(cmd, cmdFlagMintClauseInput, accountNumber, am)
 	if err != nil {
@@ -544,7 +545,7 @@ func execTokenCmdSendFungible(cmd *cobra.Command, config *types.WalletConfig) er
 	if err != nil {
 		return err
 	}
-	defer tw.Shutdown()
+	defer tw.Close()
 
 	typeId, err := getHexFlag(cmd, cmdFlagType)
 	if err != nil {
@@ -623,7 +624,7 @@ func execTokenCmdSendNonFungible(cmd *cobra.Command, config *types.WalletConfig)
 	if err != nil {
 		return err
 	}
-	defer tw.Shutdown()
+	defer tw.Close()
 
 	tokenID, err := getHexFlag(cmd, cmdFlagTokenID)
 	if err != nil {
@@ -676,13 +677,13 @@ func execTokenCmdDC(cmd *cobra.Command, config *types.WalletConfig, accountNumbe
 	if err != nil {
 		return err
 	}
-	defer tw.Shutdown()
+	defer tw.Close()
 
 	typeIDStrs, err := cmd.Flags().GetStringSlice(cmdFlagType)
 	if err != nil {
 		return err
 	}
-	var typez []tokenswallet.TokenTypeID
+	var typez []sdktypes.TokenTypeID
 	for _, tokenType := range typeIDStrs {
 		typeBytes, err := tokenswallet.DecodeHexOrEmpty(tokenType)
 		if err != nil {
@@ -751,7 +752,7 @@ func execTokenCmdUpdateNFTData(cmd *cobra.Command, config *types.WalletConfig) e
 	if err != nil {
 		return err
 	}
-	defer tw.Shutdown()
+	defer tw.Close()
 
 	du, err := readPredicateInput(cmd, cmdFlagTokenDataUpdateClauseInput, accountNumber, tw.GetAccountManager())
 	if err != nil {
@@ -777,7 +778,7 @@ func tokenCmdList(config *types.WalletConfig, runner runTokenListCmd) *cobra.Com
 		Use:   "list",
 		Short: "lists all available tokens",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runner(cmd, config, &accountNumber, tokenswallet.Any)
+			return runner(cmd, config, &accountNumber, sdktypes.Any)
 		},
 	}
 	// add persistent password flags
@@ -801,7 +802,7 @@ func tokenCmdListFungible(config *types.WalletConfig, runner runTokenListCmd, ac
 		Use:   "fungible",
 		Short: "lists fungible tokens",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runner(cmd, config, accountNumber, tokenswallet.Fungible)
+			return runner(cmd, config, accountNumber, sdktypes.Fungible)
 		},
 	}
 
@@ -816,7 +817,7 @@ func tokenCmdListNonFungible(config *types.WalletConfig, runner runTokenListCmd,
 		Use:   "non-fungible",
 		Short: "lists non-fungible tokens",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runner(cmd, config, accountNumber, tokenswallet.NonFungible)
+			return runner(cmd, config, accountNumber, sdktypes.NonFungible)
 		},
 	}
 
@@ -828,12 +829,12 @@ func tokenCmdListNonFungible(config *types.WalletConfig, runner runTokenListCmd,
 	return cmd
 }
 
-func execTokenCmdList(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind tokenswallet.Kind) error {
+func execTokenCmdList(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind sdktypes.Kind) error {
 	tw, err := initTokensWallet(cmd, config)
 	if err != nil {
 		return err
 	}
-	defer tw.Shutdown()
+	defer tw.Close()
 
 	res, err := tw.ListTokens(cmd.Context(), kind, *accountNumber)
 	if err != nil {
@@ -851,7 +852,7 @@ func execTokenCmdList(cmd *cobra.Command, config *types.WalletConfig, accountNum
 		if err != nil {
 			return err
 		}
-		if kind == tokenswallet.Any || kind == tokenswallet.NonFungible {
+		if kind == sdktypes.Any || kind == sdktypes.NonFungible {
 			withTokenURI, err = cmd.Flags().GetBool(cmdFlagWithTokenURI)
 			if err != nil {
 				return err
@@ -899,7 +900,7 @@ func execTokenCmdList(cmd *cobra.Command, config *types.WalletConfig, accountNum
 			}
 			kind := fmt.Sprintf(" (%v)", tok.Kind)
 
-			if tok.Kind == tokenswallet.Fungible {
+			if tok.Kind == sdktypes.Fungible {
 				amount := util.AmountToString(tok.Amount, tok.Decimals)
 				config.Base.ConsoleWriter.Println(fmt.Sprintf("ID='%s', symbol='%s', amount='%v', token-type='%s', locked='%s'",
 					tok.ID, tok.Symbol, amount, tok.TypeID, wallet.LockReason(tok.Locked).String()) + typeName + kind)
@@ -921,7 +922,7 @@ func tokenCmdListTypes(config *types.WalletConfig, runner runTokenListTypesCmd) 
 		Use:   "list-types",
 		Short: "lists token types",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runner(cmd, config, &accountNumber, tokenswallet.Any)
+			return runner(cmd, config, &accountNumber, sdktypes.Any)
 		},
 	}
 	// add password flags as persistent
@@ -933,25 +934,25 @@ func tokenCmdListTypes(config *types.WalletConfig, runner runTokenListTypesCmd) 
 		Use:   "fungible",
 		Short: "lists fungible types",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runner(cmd, config, &accountNumber, tokenswallet.Fungible)
+			return runner(cmd, config, &accountNumber, sdktypes.Fungible)
 		},
 	})
 	cmd.AddCommand(&cobra.Command{
 		Use:   "non-fungible",
 		Short: "lists non-fungible types",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runner(cmd, config, &accountNumber, tokenswallet.NonFungible)
+			return runner(cmd, config, &accountNumber, sdktypes.NonFungible)
 		},
 	})
 	return cmd
 }
 
-func execTokenCmdListTypes(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind tokenswallet.Kind) error {
+func execTokenCmdListTypes(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind sdktypes.Kind) error {
 	tw, err := initTokensWallet(cmd, config)
 	if err != nil {
 		return err
 	}
-	defer tw.Shutdown()
+	defer tw.Close()
 
 	res, err := tw.ListTokenTypes(cmd.Context(), *accountNumber, kind)
 	if err != nil {
@@ -998,7 +999,7 @@ func execTokenCmdLock(cmd *cobra.Command, config *types.WalletConfig) error {
 	if err != nil {
 		return err
 	}
-	defer tw.Shutdown()
+	defer tw.Close()
 
 	ib, err := readPredicateInput(cmd, cmdFlagInheritBearerClauseInput, accountNumber, tw.GetAccountManager())
 	if err != nil {
@@ -1048,7 +1049,7 @@ func execTokenCmdUnlock(cmd *cobra.Command, config *types.WalletConfig) error {
 	if err != nil {
 		return err
 	}
-	defer tw.Shutdown()
+	defer tw.Close()
 
 	ib, err := readPredicateInput(cmd, cmdFlagInheritBearerClauseInput, accountNumber, tw.GetAccountManager())
 	if err != nil {
@@ -1081,13 +1082,12 @@ func initTokensWallet(cmd *cobra.Command, config *types.WalletConfig) (*tokenswa
 	if err != nil {
 		return nil, err
 	}
-	rpcClient, err := rpc.DialContext(cmd.Context(), args.BuildRpcUrl(rpcUrl))
+	tokensClient, err := client.NewTokensPartitionClient(cmd.Context(), args.BuildRpcUrl(rpcUrl))
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial rpc client: %w", err)
 	}
-	tokensClient := rpc.NewTokensClient(rpcClient)
-	adminClient := rpc.NewAdminClient(rpcClient.Client())
-	infoResponse, err := adminClient.GetNodeInfo(cmd.Context())
+
+	infoResponse, err := tokensClient.GetNodeInfo(cmd.Context())
 	if err != nil {
 		return nil, err
 	}
@@ -1098,7 +1098,7 @@ func initTokensWallet(cmd *cobra.Command, config *types.WalletConfig) (*tokenswa
 	return tokenswallet.New(infoResponse.SystemID, tokensClient, am, confirmTx, nil, config.Base.Logger)
 }
 
-func readParentTypeInfo(cmd *cobra.Command, keyNr uint64, am account.Manager) (tokenswallet.TokenTypeID, []*tokenswallet.PredicateInput, error) {
+func readParentTypeInfo(cmd *cobra.Command, keyNr uint64, am account.Manager) (sdktypes.TokenTypeID, []*tokenswallet.PredicateInput, error) {
 	parentType, err := getHexFlag(cmd, cmdFlagParentType)
 	if err != nil {
 		return nil, nil, err
@@ -1238,7 +1238,7 @@ func getFileSize(filepath string) (int64, error) {
 /*
 saveTxProofs saves the tx proofs into file when the cmd has appropriate flag set.
 */
-func saveTxProofs(cmd *cobra.Command, proofs []*wallet.Proof, out types.ConsoleWrapper) error {
+func saveTxProofs(cmd *cobra.Command, proofs []*sdktypes.Proof, out types.ConsoleWrapper) error {
 	_, proofFile, err := args.WaitForProofArg(cmd)
 	if err != nil {
 		return err
@@ -1251,7 +1251,7 @@ func saveTxProofs(cmd *cobra.Command, proofs []*wallet.Proof, out types.ConsoleW
 	if err != nil {
 		return fmt.Errorf("creating file for transaction proofs: %w", err)
 	}
-	if err := sdktypes.Cbor.Encode(w, proofs); err != nil {
+	if err := basetypes.Cbor.Encode(w, proofs); err != nil {
 		return fmt.Errorf("encoding transaction proofs as CBOR: %w", err)
 	}
 	out.Println("Transaction proof(s) saved to file:" + proofFile)

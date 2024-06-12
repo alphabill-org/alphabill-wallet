@@ -23,7 +23,7 @@ import (
 	clifees "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/orchestration"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/tokens"
-	"github.com/alphabill-org/alphabill-wallet/client/rpc"
+	"github.com/alphabill-org/alphabill-wallet/client"
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
@@ -153,11 +153,11 @@ func ExecSendCmd(ctx context.Context, cmd *cobra.Command, config *types.WalletCo
 	if err != nil {
 		return err
 	}
-	rpcClient, err := rpc.DialContext(ctx, args.BuildRpcUrl(rpcUrl))
+	moneyClient, err := client.NewMoneyPartitionClient(ctx, args.BuildRpcUrl(rpcUrl))
 	if err != nil {
 		return fmt.Errorf("failed to dial rpc url: %w", err)
 	}
-	defer rpcClient.Close()
+	defer moneyClient.Close()
 
 	am, err := cliaccount.LoadExistingAccountManager(config)
 	if err != nil {
@@ -169,7 +169,7 @@ func ExecSendCmd(ctx context.Context, cmd *cobra.Command, config *types.WalletCo
 	}
 	defer feeManagerDB.Close()
 
-	w, err := money.NewWallet(am, feeManagerDB, rpcClient, config.Base.Logger)
+	w, err := money.NewWallet(am, feeManagerDB, moneyClient, config.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -255,11 +255,11 @@ func ExecGetBalanceCmd(cmd *cobra.Command, config *types.WalletConfig) error {
 	if err != nil {
 		return err
 	}
-	rpcClient, err := rpc.DialContext(cmd.Context(), args.BuildRpcUrl(rpcUrl))
+	moneyClient, err := client.NewMoneyPartitionClient(cmd.Context(), args.BuildRpcUrl(rpcUrl))
 	if err != nil {
 		return fmt.Errorf("failed to dial rpc url: %w", err)
 	}
-	defer rpcClient.Close()
+	defer moneyClient.Close()
 
 	am, err := cliaccount.LoadExistingAccountManager(config)
 	if err != nil {
@@ -273,7 +273,7 @@ func ExecGetBalanceCmd(cmd *cobra.Command, config *types.WalletConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	w, err := money.NewWallet(am, feeManagerDB, rpcClient, config.Base.Logger)
+	w, err := money.NewWallet(am, feeManagerDB, moneyClient, config.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -386,11 +386,11 @@ func ExecCollectDust(cmd *cobra.Command, config *types.WalletConfig) error {
 	if err != nil {
 		return err
 	}
-	rpcClient, err := rpc.DialContext(cmd.Context(), args.BuildRpcUrl(rpcUrl))
+	moneyClient, err := client.NewMoneyPartitionClient(cmd.Context(), args.BuildRpcUrl(rpcUrl))
 	if err != nil {
 		return fmt.Errorf("failed to dial rpc url: %w", err)
 	}
-	defer rpcClient.Close()
+	defer moneyClient.Close()
 
 	am, err := cliaccount.LoadExistingAccountManager(config)
 	if err != nil {
@@ -404,7 +404,7 @@ func ExecCollectDust(cmd *cobra.Command, config *types.WalletConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	w, err := money.NewWallet(am, feeManagerDB, rpcClient, config.Base.Logger)
+	w, err := money.NewWallet(am, feeManagerDB, moneyClient, config.Base.Logger)
 	if err != nil {
 		return err
 	}

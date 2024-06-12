@@ -8,6 +8,7 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/stretchr/testify/require"
 
+	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
@@ -37,9 +38,9 @@ func TestConfirmUnitsTx_ok(t *testing.T) {
 			getRoundNumberCalled = true
 			return 100, nil
 		},
-		getTransactionProof: func(ctx context.Context, txHash types.Bytes) (*types.TransactionRecord, *types.TxProof, error) {
+		getTransactionProof: func(ctx context.Context, txHash types.Bytes) (*sdktypes.Proof, error) {
 			getTxProofCalled = true
-			return &types.TransactionRecord{}, &types.TxProof{}, nil
+			return &sdktypes.Proof{}, nil
 		},
 	}
 	batch := txsubmitter.NewBatch(rpcClient, logger.New(t))
@@ -65,12 +66,12 @@ func TestConfirmUnitsTx_timeout(t *testing.T) {
 			}
 			return 103, nil
 		},
-		getTransactionProof: func(ctx context.Context, txHash types.Bytes) (*types.TransactionRecord, *types.TxProof, error) {
+		getTransactionProof: func(ctx context.Context, txHash types.Bytes) (*sdktypes.Proof, error) {
 			getTxProofCalled++
 			if bytes.Equal(txHash, randomTxHash1) {
-				return &types.TransactionRecord{}, &types.TxProof{}, nil
+				return &sdktypes.Proof{}, nil
 			}
-			return nil, nil, nil
+			return nil, nil
 		},
 	}
 	batch := txsubmitter.NewBatch(rpcClient, logger.New(t))

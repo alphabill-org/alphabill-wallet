@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/alphabill-org/alphabill-go-base/types"
-	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/client/rpc/mocksrv"
@@ -25,11 +24,11 @@ func TestAdminClient(t *testing.T) {
 	})
 }
 
-func startAdminServer(t *testing.T, service *mocksrv.AdminServiceMock) *AdminClient {
+func startAdminServer(t *testing.T, service *mocksrv.AdminServiceMock) *AdminAPIClient {
 	srv := mocksrv.StartAdminApiServer(t, service)
 
-	c, err := ethrpc.DialContext(context.Background(), "http://"+srv)
+	c, err := NewAdminAPIClient(context.Background(), "http://"+srv)
 	require.NoError(t, err)
 
-	return NewAdminClient(c)
+	return c
 }

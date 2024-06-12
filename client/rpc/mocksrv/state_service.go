@@ -5,15 +5,16 @@ import (
 	"crypto"
 
 	"github.com/alphabill-org/alphabill-go-base/types"
-	abrpc "github.com/alphabill-org/alphabill/rpc"
+
+	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 )
 
 type (
 	StateServiceMock struct {
 		RoundNumber  uint64
-		Units        map[string]*abrpc.Unit[any]
+		Units        map[string]*sdktypes.Unit[any]
 		OwnerUnitIDs map[string][]types.UnitID
-		TxProofs     map[string]*abrpc.TransactionRecordAndProof
+		TxProofs     map[string]*sdktypes.TransactionRecordAndProof
 		Block        types.Bytes
 		SentTxs      map[string]*types.TransactionOrder
 		Err          error
@@ -22,10 +23,10 @@ type (
 	Options struct {
 		Err          error
 		RoundNumber  uint64
-		TxProofs     map[string]*abrpc.TransactionRecordAndProof
-		Units        map[string]*abrpc.Unit[any]
+		TxProofs     map[string]*sdktypes.TransactionRecordAndProof
+		Units        map[string]*sdktypes.Unit[any]
 		OwnerUnits   map[string][]types.UnitID
-		InfoResponse *abrpc.NodeInfoResponse
+		InfoResponse *sdktypes.NodeInfoResponse
 	}
 
 	Option func(*Options)
@@ -33,8 +34,8 @@ type (
 
 func NewStateServiceMock(opts ...Option) *StateServiceMock {
 	options := &Options{
-		TxProofs:   map[string]*abrpc.TransactionRecordAndProof{},
-		Units:      map[string]*abrpc.Unit[any]{},
+		TxProofs:   map[string]*sdktypes.TransactionRecordAndProof{},
+		Units:      map[string]*sdktypes.Unit[any]{},
 		OwnerUnits: map[string][]types.UnitID{},
 	}
 	for _, option := range opts {
@@ -50,20 +51,20 @@ func NewStateServiceMock(opts ...Option) *StateServiceMock {
 	}
 }
 
-func WithOwnerUnit(unit *abrpc.Unit[any]) Option {
+func WithOwnerUnit(unit *sdktypes.Unit[any]) Option {
 	return func(o *Options) {
 		o.Units[string(unit.UnitID)] = unit
 		o.OwnerUnits[string(unit.OwnerPredicate)] = append(o.OwnerUnits[string(unit.OwnerPredicate)], unit.UnitID)
 	}
 }
 
-func WithUnit(unit *abrpc.Unit[any]) Option {
+func WithUnit(unit *sdktypes.Unit[any]) Option {
 	return func(o *Options) {
 		o.Units[string(unit.UnitID)] = unit
 	}
 }
 
-func WithUnits(units ...*abrpc.Unit[any]) Option {
+func WithUnits(units ...*sdktypes.Unit[any]) Option {
 	return func(o *Options) {
 		for _, unit := range units {
 			o.Units[string(unit.UnitID)] = unit
@@ -71,7 +72,7 @@ func WithUnits(units ...*abrpc.Unit[any]) Option {
 	}
 }
 
-func WithTxProof(txHash []byte, txProof *abrpc.TransactionRecordAndProof) Option {
+func WithTxProof(txHash []byte, txProof *sdktypes.TransactionRecordAndProof) Option {
 	return func(o *Options) {
 		o.TxProofs[string(txHash)] = txProof
 	}
@@ -96,7 +97,7 @@ func (s *StateServiceMock) GetRoundNumber(ctx context.Context) (types.Uint64, er
 	return types.Uint64(s.RoundNumber), nil
 }
 
-func (s *StateServiceMock) GetUnit(unitID types.UnitID, includeStateProof bool) (*abrpc.Unit[any], error) {
+func (s *StateServiceMock) GetUnit(unitID types.UnitID, includeStateProof bool) (*sdktypes.Unit[any], error) {
 	if s.Err != nil {
 		return nil, s.Err
 	}
@@ -127,7 +128,7 @@ func (s *StateServiceMock) SendTransaction(ctx context.Context, tx types.Bytes) 
 	return txHash, nil
 }
 
-func (s *StateServiceMock) GetTransactionProof(ctx context.Context, txHash types.Bytes) (*abrpc.TransactionRecordAndProof, error) {
+func (s *StateServiceMock) GetTransactionProof(ctx context.Context, txHash types.Bytes) (*sdktypes.TransactionRecordAndProof, error) {
 	if s.Err != nil {
 		return nil, s.Err
 	}
@@ -147,7 +148,7 @@ func (s *StateServiceMock) GetTransactionProof(ctx context.Context, txHash types
 		if err != nil {
 			return nil, err
 		}
-		return &abrpc.TransactionRecordAndProof{
+		return &sdktypes.TransactionRecordAndProof{
 			TxRecord: txrBytes,
 			TxProof:  txProofBytes,
 		}, nil
