@@ -254,6 +254,17 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*sdktypes.Proof, erro
 	return proofs, nil
 }
 
+// GetFeeCredit returns fee credit record for the given account,
+// can return nil if fee credit record has not been created yet.
+// Deprecated: faucet still uses, will be removed
+func (w *Wallet) GetFeeCredit(ctx context.Context, cmd fees.GetFeeCreditCmd) (*sdktypes.FeeCreditRecord, error) {
+	ac, err := w.am.GetAccountKey(cmd.AccountIndex)
+	if err != nil {
+		return nil, err
+	}
+	return w.moneyClient.GetFeeCreditRecordByOwnerID(ctx, ac.PubKeyHash.Sha256)
+}
+
 // AddFeeCredit creates fee credit for the given amount.
 // Wallet must have a bill large enough for the required amount plus fees.
 // Returns transferFC and addFC transaction proofs.
