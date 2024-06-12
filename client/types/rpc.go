@@ -12,7 +12,6 @@ type (
 		StateProof     *types.UnitStateProof `json:"stateProof,omitempty"`
 	}
 
-	// TODO: somehow merge with above
 	TransactionRecordAndProof struct {
 		TxRecord types.Bytes `json:"txRecord"`
 		TxProof  types.Bytes `json:"txProof"`
