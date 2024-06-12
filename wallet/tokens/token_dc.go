@@ -9,6 +9,7 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-go-base/util"
 
+	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
@@ -16,7 +17,7 @@ import (
 
 const maxBurnBatchSize = 100
 
-func (w *Wallet) CollectDust(ctx context.Context, accountNumber uint64, allowedTokenTypes []TokenTypeID, invariantPredicateArgs []*PredicateInput) (map[uint64][]*SubmissionResult, error) {
+func (w *Wallet) CollectDust(ctx context.Context, accountNumber uint64, allowedTokenTypes []sdktypes.TokenTypeID, invariantPredicateArgs []*PredicateInput) (map[uint64][]*SubmissionResult, error) {
 	keys, err := w.getAccounts(accountNumber)
 	if err != nil {
 		return nil, err
@@ -43,7 +44,7 @@ func (w *Wallet) CollectDust(ctx context.Context, accountNumber uint64, allowedT
 	return results, nil
 }
 
-func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, typedTokens []*TokenUnit, invariantPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, typedTokens []*sdktypes.TokenUnit, invariantPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
 	batchCount := ((len(typedTokens) - 1) / maxBurnBatchSize) + 1
 	txCount := len(typedTokens) + batchCount*2 // +lock fee and join fee for every batch
 	fcrID, err := w.ensureFeeCredit(ctx, acc.AccountKey, txCount)
@@ -106,7 +107,7 @@ func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, typedTokens [
 	return &SubmissionResult{FeeSum: totalFees}, nil
 }
 
-func (w *Wallet) joinTokenForDC(ctx context.Context, acc *account.AccountKey, burnProofs []*wallet.Proof, targetTokenCounter uint64, targetTokenID, fcrID types.UnitID, invariantPredicateArgs []*PredicateInput) (uint64, error) {
+func (w *Wallet) joinTokenForDC(ctx context.Context, acc *account.AccountKey, burnProofs []*sdktypes.Proof, targetTokenCounter uint64, targetTokenID, fcrID types.UnitID, invariantPredicateArgs []*PredicateInput) (uint64, error) {
 	// explicitly sort proofs by unit ids in increasing order
 	sort.Slice(burnProofs, func(i, j int) bool {
 		a := burnProofs[i].TxRecord.TransactionOrder.UnitID()
@@ -139,14 +140,14 @@ func (w *Wallet) joinTokenForDC(ctx context.Context, acc *account.AccountKey, bu
 	if err != nil {
 		return 0, err
 	}
-	if err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, true); err != nil {
+	if err = sub.ToBatch(w.tokensClient, w.log).SendTx(ctx, true); err != nil {
 		return 0, err
 	}
 	return sub.Proof.TxRecord.ServerMetadata.ActualFee, nil
 }
 
-func (w *Wallet) burnTokensForDC(ctx context.Context, acc *account.AccountKey, tokensToBurn []*TokenUnit, targetTokenCounter uint64, targetTokenID, fcrID types.UnitID, invariantPredicateArgs []*PredicateInput) (uint64, uint64, []*wallet.Proof, error) {
-	burnBatch := txsubmitter.NewBatch(w.rpcClient, w.log)
+func (w *Wallet) burnTokensForDC(ctx context.Context, acc *account.AccountKey, tokensToBurn []*sdktypes.TokenUnit, targetTokenCounter uint64, targetTokenID, fcrID types.UnitID, invariantPredicateArgs []*PredicateInput) (uint64, uint64, []*sdktypes.Proof, error) {
+	burnBatch := txsubmitter.NewBatch(w.tokensClient, w.log)
 	rnFetcher := &cachingRoundNumberFetcher{delegate: w.GetRoundNumber}
 	burnBatchAmount := uint64(0)
 
@@ -172,7 +173,7 @@ func (w *Wallet) burnTokensForDC(ctx context.Context, acc *account.AccountKey, t
 		return 0, 0, nil, fmt.Errorf("failed to send burn tx: %w", err)
 	}
 
-	proofs := make([]*wallet.Proof, 0, len(burnBatch.Submissions()))
+	proofs := make([]*sdktypes.Proof, 0, len(burnBatch.Submissions()))
 	feeSum := uint64(0)
 	for _, sub := range burnBatch.Submissions() {
 		proofs = append(proofs, sub.Proof)
@@ -181,16 +182,16 @@ func (w *Wallet) burnTokensForDC(ctx context.Context, acc *account.AccountKey, t
 	return burnBatchAmount, feeSum, proofs, nil
 }
 
-func (w *Wallet) getTokensForDC(ctx context.Context, key wallet.PubKey, allowedTokenTypes []TokenTypeID) (map[string][]*TokenUnit, error) {
+func (w *Wallet) getTokensForDC(ctx context.Context, key sdktypes.PubKey, allowedTokenTypes []sdktypes.TokenTypeID) (map[string][]*sdktypes.TokenUnit, error) {
 	// find tokens to join
-	allTokens, err := w.getTokens(ctx, Fungible, key.Hash())
+	allTokens, err := w.getTokens(ctx, sdktypes.Fungible, key.Hash())
 	if err != nil {
 		return nil, err
 	}
 	// group tokens by type
-	var tokensByTypes = make(map[string][]*TokenUnit, len(allowedTokenTypes))
+	var tokensByTypes = make(map[string][]*sdktypes.TokenUnit, len(allowedTokenTypes))
 	for _, tokenType := range allowedTokenTypes {
-		tokensByTypes[string(tokenType)] = make([]*TokenUnit, 0)
+		tokensByTypes[string(tokenType)] = make([]*sdktypes.TokenUnit, 0)
 	}
 	for _, tok := range allTokens {
 		typeID := string(tok.TypeID)
@@ -231,7 +232,7 @@ func (w *Wallet) lockTokenForDC(ctx context.Context, acc *account.AccountKey, fc
 		return 0, err
 	}
 
-	if err = sub.ToBatch(w.rpcClient, w.log).SendTx(ctx, true); err != nil {
+	if err = sub.ToBatch(w.tokensClient, w.log).SendTx(ctx, true); err != nil {
 		return 0, err
 	}
 	return sub.Proof.TxRecord.ServerMetadata.ActualFee, nil

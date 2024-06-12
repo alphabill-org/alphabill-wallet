@@ -10,9 +10,9 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
 
+	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
-	mtypes "github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 )
 
 const testMnemonic = "dinosaur simple verify deliver bless ridge monkey design venue six problem lucky"
@@ -26,9 +26,9 @@ func TestSplitTransactionAmount(t *testing.T) {
 	receiverPubKeyHash := hash.Sum256(receiverPubKey)
 	keys, _ := account.NewKeys(testMnemonic)
 	billID := money.NewBillID(nil, nil)
-	b := &mtypes.Bill{
+	b := &sdktypes.Bill{
 		ID: billID,
-		BillData: &money.BillData{
+		Data: &money.BillData{
 			V:       500,
 			Counter: 1234,
 		},
@@ -62,7 +62,7 @@ func TestSplitTransactionAmount(t *testing.T) {
 func TestCreateTransactions(t *testing.T) {
 	tests := []struct {
 		name        string
-		bills       []*mtypes.Bill
+		bills       []*sdktypes.Bill
 		amount      uint64
 		refNo       []byte
 		txCount     int
@@ -71,7 +71,7 @@ func TestCreateTransactions(t *testing.T) {
 	}{
 		{
 			name:   "have more bills than target amount",
-			bills:  []*mtypes.Bill{createBill(5), createBill(3), createBill(1)},
+			bills:  []*sdktypes.Bill{createBill(5), createBill(3), createBill(1)},
 			amount: uint64(7),
 			refNo:  []byte("invoice 1"),
 			verify: func(t *testing.T, systemID types.SystemID, txs []*types.TransactionOrder) {
@@ -99,7 +99,7 @@ func TestCreateTransactions(t *testing.T) {
 		},
 		{
 			name:   "have less bills than target amount",
-			bills:  []*mtypes.Bill{createBill(5), createBill(1)},
+			bills:  []*sdktypes.Bill{createBill(5), createBill(1)},
 			amount: uint64(7),
 			verify: func(t *testing.T, systemID types.SystemID, txs []*types.TransactionOrder) {
 				require.Empty(t, txs)
@@ -108,7 +108,7 @@ func TestCreateTransactions(t *testing.T) {
 		},
 		{
 			name:   "have exact amount of bills than target amount",
-			bills:  []*mtypes.Bill{createBill(5), createBill(5)},
+			bills:  []*sdktypes.Bill{createBill(5), createBill(5)},
 			amount: uint64(10),
 			verify: func(t *testing.T, systemID types.SystemID, txs []*types.TransactionOrder) {
 				// verify tx count
@@ -126,7 +126,7 @@ func TestCreateTransactions(t *testing.T) {
 		},
 		{
 			name:   "have exactly one bill with equal target amount",
-			bills:  []*mtypes.Bill{createBill(5)},
+			bills:  []*sdktypes.Bill{createBill(5)},
 			amount: uint64(5),
 			refNo:  []byte{7, 7, 7},
 			verify: func(t *testing.T, systemID types.SystemID, txs []*types.TransactionOrder) {
@@ -159,10 +159,10 @@ func TestCreateTransactions(t *testing.T) {
 	}
 }
 
-func createBill(value uint64) *mtypes.Bill {
-	return &mtypes.Bill{
+func createBill(value uint64) *sdktypes.Bill {
+	return &sdktypes.Bill{
 		ID: util.Uint64ToBytes32(0),
-		BillData: &money.BillData{
+		Data: &money.BillData{
 			V:       value,
 			Counter: 0,
 		},

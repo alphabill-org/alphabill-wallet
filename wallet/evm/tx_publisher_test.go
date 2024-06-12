@@ -5,18 +5,18 @@ import (
 	"testing"
 
 	"github.com/alphabill-org/alphabill-go-base/types"
-	"github.com/alphabill-org/alphabill-wallet/wallet/evm/client"
 	testtransaction "github.com/alphabill-org/alphabill/txsystem/testutils/transaction"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alphabill-org/alphabill-wallet/wallet"
+	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
+	"github.com/alphabill-org/alphabill-wallet/wallet/evm/client"
 )
 
 type MockClient struct {
 	RoundNr      uint64
 	RoundNrError error
 	PostError    error
-	Proof        *wallet.Proof
+	Proof        *sdktypes.Proof
 	ProofError   error
 }
 
@@ -32,7 +32,7 @@ func createTxOrder(t *testing.T) *types.TransactionOrder {
 	return transaction
 }
 
-func NewClientMock(round uint64, proof *wallet.Proof) Client {
+func NewClientMock(round uint64, proof *sdktypes.Proof) Client {
 	return &MockClient{
 		RoundNr: round,
 		Proof:   proof,
@@ -51,12 +51,12 @@ func (m *MockClient) PostTransaction(ctx context.Context, tx *types.TransactionO
 	return m.PostError
 }
 
-func (m *MockClient) GetTxProof(ctx context.Context, unitID types.UnitID, txHash wallet.TxHash) (*wallet.Proof, error) {
+func (m *MockClient) GetTxProof(ctx context.Context, unitID types.UnitID, txHash sdktypes.TxHash) (*sdktypes.Proof, error) {
 	return m.Proof, m.ProofError
 }
 
 func TestTxPublisher_SendTx_Cancel(t *testing.T) {
-	client := NewClientMock(1, &wallet.Proof{})
+	client := NewClientMock(1, &sdktypes.Proof{})
 	txPublisher := NewTxPublisher(client)
 	require.NotNil(t, txPublisher)
 	ctx, cancel := context.WithCancel(context.Background())

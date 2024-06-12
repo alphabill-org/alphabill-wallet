@@ -5,19 +5,18 @@ import (
 	"fmt"
 	"strings"
 
-	moneysdk "github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	"github.com/spf13/cobra"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
+
 	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
-	"github.com/alphabill-org/alphabill-wallet/client/rpc"
+	"github.com/alphabill-org/alphabill-wallet/client"
+	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
-	moneywallet "github.com/alphabill-org/alphabill-wallet/wallet/money"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
-	"github.com/alphabill-org/alphabill-wallet/wallet/txpublisher"
-	"github.com/spf13/cobra"
 )
 
 // NewBillsCmd creates a new cobra command for the wallet bills component.
@@ -49,7 +48,7 @@ func listCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 }
 
 func execListCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
-	moneyClient, err := rpc.DialContext(cmd.Context(), config.GetRpcUrl())
+	moneyClient, err := client.NewMoneyPartitionClient(cmd.Context(), config.GetRpcUrl())
 	if err != nil {
 		return fmt.Errorf("failed to dial money rpc: %w", err)
 	}
@@ -67,7 +66,7 @@ func execListCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	type accountBillGroup struct {
 		accountIndex uint64
 		pubKey       []byte
-		bills        []*api.Bill
+		bills        []*sdktypes.Bill
 	}
 	var accountBillGroups []*accountBillGroup
 	if accountNumber == 0 {
@@ -77,7 +76,7 @@ func execListCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 		}
 		for accountIndex, accountKey := range accountKeys {
 			pubKey := accountKey.PubKey
-			bills, err := api.FetchBills(cmd.Context(), moneyClient, accountKey.PubKeyHash.Sha256)
+			bills, err := moneyClient.GetBills(cmd.Context(), accountKey.PubKeyHash.Sha256)
 			if err != nil {
 				return fmt.Errorf("failed to fetch bills: %w", err)
 			}
@@ -89,7 +88,7 @@ func execListCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 		if err != nil {
 			return fmt.Errorf("failed to load account key: %w", err)
 		}
-		accountBills, err := api.FetchBills(cmd.Context(), moneyClient, accountKey.PubKeyHash.Sha256)
+		accountBills, err := moneyClient.GetBills(cmd.Context(), accountKey.PubKeyHash.Sha256)
 		if err != nil {
 			return fmt.Errorf("failed to fetch bills: %w", err)
 		}
@@ -122,7 +121,7 @@ func lockCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 	cmd.Flags().StringVarP(&config.RpcUrl, args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "rpc node url")
 	cmd.Flags().Uint64VarP(&config.Key, args.KeyCmdName, "k", 1, "account number of the bill to lock")
 	cmd.Flags().Var(&config.BillID, args.BillIdCmdName, "id of the bill to lock")
-	cmd.Flags().Uint32Var(&config.SystemID, args.SystemIdentifierCmdName, uint32(moneysdk.DefaultSystemID), "system identifier")
+	cmd.Flags().Uint32Var(&config.SystemID, args.SystemIdentifierCmdName, uint32(money.DefaultSystemID), "system identifier")
 	return cmd
 }
 
@@ -138,13 +137,12 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 		return fmt.Errorf("failed to load account key: %w", err)
 	}
 
-	moneyClient, err := rpc.DialContext(cmd.Context(), config.GetRpcUrl())
+	moneyClient, err := client.NewMoneyPartitionClient(cmd.Context(), config.GetRpcUrl())
 	if err != nil {
 		return fmt.Errorf("failed to dial money rpc: %w", err)
 	}
 
-	adminClient := rpc.NewAdminClient(moneyClient.Client())
-	infoResponse, err := adminClient.GetNodeInfo(cmd.Context())
+	infoResponse, err := moneyClient.GetNodeInfo(cmd.Context())
 	if err != nil {
 		return fmt.Errorf("failed to fetch node info rpc: %w", err)
 	}
@@ -152,14 +150,14 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if !strings.HasPrefix(infoResponse.Name, moneyTypeVar.String()) {
 		return errors.New("invalid rpc url provided for money partition")
 	}
-	fcb, err := moneywallet.FetchFeeCreditBill(cmd.Context(), moneyClient, accountKey)
+	fcb, err := moneyClient.GetFeeCreditRecordByOwnerID(cmd.Context(), accountKey.PubKeyHash.Sha256)
 	if err != nil {
 		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
 	}
 	if fcb.Balance() < txbuilder.MaxFee {
 		return errors.New("not enough fee credit in wallet")
 	}
-	bill, err := moneyClient.GetBill(cmd.Context(), types.UnitID(config.BillID), false)
+	bill, err := moneyClient.GetBill(cmd.Context(), types.UnitID(config.BillID))
 	if err != nil {
 		return fmt.Errorf("failed to fetch bill: %w", err)
 	}
@@ -174,11 +172,12 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to create lock tx: %w", err)
 	}
-	moneyTxPublisher := txpublisher.NewTxPublisher(moneyClient, config.WalletConfig.Base.Logger)
-	_, err = moneyTxPublisher.SendTx(cmd.Context(), tx)
+
+	_, err = moneyClient.ConfirmTransaction(cmd.Context(), tx, config.WalletConfig.Base.Logger)
 	if err != nil {
 		return fmt.Errorf("failed to send lock tx: %w", err)
 	}
+
 	config.WalletConfig.Base.ConsoleWriter.Println("Bill locked successfully.")
 	return nil
 }
@@ -195,7 +194,7 @@ func unlockCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 	cmd.Flags().StringVarP(&config.RpcUrl, args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "rpc node url")
 	cmd.Flags().Uint64VarP(&config.Key, args.KeyCmdName, "k", 1, "account number of the bill to unlock")
 	cmd.Flags().Var(&config.BillID, args.BillIdCmdName, "id of the bill to unlock")
-	cmd.Flags().Uint32Var(&config.SystemID, args.SystemIdentifierCmdName, uint32(moneysdk.DefaultSystemID), "system identifier")
+	cmd.Flags().Uint32Var(&config.SystemID, args.SystemIdentifierCmdName, uint32(money.DefaultSystemID), "system identifier")
 	return cmd
 }
 
@@ -211,13 +210,12 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 		return fmt.Errorf("failed to load account key: %w", err)
 	}
 
-	moneyClient, err := rpc.DialContext(cmd.Context(), config.GetRpcUrl())
+	moneyClient, err := client.NewMoneyPartitionClient(cmd.Context(), config.GetRpcUrl())
 	if err != nil {
 		return fmt.Errorf("failed to dial money rpc: %w", err)
 	}
 
-	adminClient := rpc.NewAdminClient(moneyClient.Client())
-	infoResponse, err := adminClient.GetNodeInfo(cmd.Context())
+	infoResponse, err := moneyClient.GetNodeInfo(cmd.Context())
 	if err != nil {
 		return fmt.Errorf("failed to fetch node info rpc: %w", err)
 	}
@@ -226,7 +224,7 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 		return errors.New("invalid rpc url provided for money partition")
 	}
 
-	fcb, err := moneywallet.FetchFeeCreditBill(cmd.Context(), moneyClient, accountKey)
+	fcb, err := moneyClient.GetFeeCreditRecordByOwnerID(cmd.Context(), accountKey.PubKeyHash.Sha256)
 	if err != nil {
 		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
 	}
@@ -234,7 +232,7 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 		return errors.New("not enough fee credit in wallet")
 	}
 
-	bill, err := moneyClient.GetBill(cmd.Context(), types.UnitID(config.BillID), false)
+	bill, err := moneyClient.GetBill(cmd.Context(), types.UnitID(config.BillID))
 	if err != nil {
 		return fmt.Errorf("failed to fetch bill: %w", err)
 	}
@@ -250,18 +248,19 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to create unlock tx: %w", err)
 	}
-	moneyTxPublisher := txpublisher.NewTxPublisher(moneyClient, config.WalletConfig.Base.Logger)
-	_, err = moneyTxPublisher.SendTx(cmd.Context(), tx)
+
+	_, err = moneyClient.ConfirmTransaction(cmd.Context(), tx, config.WalletConfig.Base.Logger)
 	if err != nil {
 		return fmt.Errorf("failed to send unlock tx: %w", err)
 	}
+
 	config.WalletConfig.Base.ConsoleWriter.Println("Bill unlocked successfully.")
 	return nil
 }
 
-func getLockedReasonString(bill *api.Bill) string {
+func getLockedReasonString(bill *sdktypes.Bill) string {
 	if bill.IsLocked() {
-		return fmt.Sprintf(" (%s)", wallet.LockReason(bill.BillData.Locked).String())
+		return fmt.Sprintf(" (%s)", wallet.LockReason(bill.Data.Locked).String())
 	}
 	return ""
 }

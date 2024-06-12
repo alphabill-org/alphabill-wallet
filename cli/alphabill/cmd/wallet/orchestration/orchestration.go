@@ -14,9 +14,8 @@ import (
 	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
-	"github.com/alphabill-org/alphabill-wallet/client/rpc"
+	"github.com/alphabill-org/alphabill-wallet/client"
 	"github.com/alphabill-org/alphabill-wallet/wallet/orchestration/txbuilder"
-	"github.com/alphabill-org/alphabill-wallet/wallet/txpublisher"
 )
 
 const (
@@ -73,7 +72,7 @@ func execAddVarCmd(cmd *cobra.Command, config *clitypes.AddVarCmdConfig) error {
 
 	// create rpc client
 	rpcUrl := args.BuildRpcUrl(config.OrchestrationConfig.RpcUrl)
-	rpcClient, err := rpc.DialContext(cmd.Context(), rpcUrl)
+	orcClient, err := client.NewOrchestrationPartitionClient(cmd.Context(), rpcUrl)
 	if err != nil {
 		return fmt.Errorf("failed to create rpc client: %w", err)
 	}
@@ -87,7 +86,7 @@ func execAddVarCmd(cmd *cobra.Command, config *clitypes.AddVarCmdConfig) error {
 	// create 'addVar' tx
 	unitPart := hash.Sum(crypto.SHA256, util.Uint32ToBytes(config.PartitionID), config.ShardID)
 	unitID := orchestration.NewVarID(config.ShardID, unitPart)
-	roundNumber, err := rpcClient.GetRoundNumber(cmd.Context())
+	roundNumber, err := orcClient.GetRoundNumber(cmd.Context())
 	if err != nil {
 		return fmt.Errorf("failed to fetch round number: %w", err)
 	}
@@ -98,12 +97,11 @@ func execAddVarCmd(cmd *cobra.Command, config *clitypes.AddVarCmdConfig) error {
 	}
 
 	// send 'addVar' tx
-	slog := config.OrchestrationConfig.WalletConfig.Base.Logger
-	txPublisher := txpublisher.NewTxPublisher(rpcClient, slog)
-	_, err = txPublisher.SendTx(cmd.Context(), txo)
+	_, err = orcClient.ConfirmTransaction(cmd.Context(), txo, config.OrchestrationConfig.WalletConfig.Base.Logger)
 	if err != nil {
 		return fmt.Errorf("failed to send tx: %w", err)
 	}
+
 	config.OrchestrationConfig.WalletConfig.Base.ConsoleWriter.Println("Validator Assignment Record added successfully.")
 	return nil
 }

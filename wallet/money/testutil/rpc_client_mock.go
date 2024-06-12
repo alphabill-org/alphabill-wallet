@@ -4,35 +4,38 @@ import (
 	"bytes"
 	"context"
 	"crypto"
+	"log/slog"
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
-	"github.com/alphabill-org/alphabill-wallet/wallet"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
+
+	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 )
 
 const transferFCLatestAdditionTime = 65536 // relative timeout after which transferFC unit becomes unusable
 
 type (
 	RpcClientMock struct {
-		Err            error
-		Bills          map[string]*api.Bill
-		FeeCreditBills map[string]*api.FeeCreditBill
-		OwnerUnits     []types.UnitID
-		RoundNumber    uint64
-		TxProofs       map[string]*wallet.Proof
+		Err                   error
+		Bills                 map[string]*sdktypes.Bill
+		OwnerBills            []*sdktypes.Bill
+		FeeCreditRecords      map[string]*sdktypes.FeeCreditRecord
+		OwnerFeeCreditRecords []*sdktypes.FeeCreditRecord
+		RoundNumber           uint64
+		TxProofs              map[string]*sdktypes.Proof
 
-		RecordedTxs []*types.TransactionOrder
+		RecordedTxs           []*types.TransactionOrder
 	}
 
 	Options struct {
-		Err            error
-		RoundNumber    uint64
-		TxProofs       map[string]*wallet.Proof
-		Bills          map[string]*api.Bill
-		FeeCreditBills map[string]*api.FeeCreditBill
-		OwnerUnits     []types.UnitID
+		Err                   error
+		RoundNumber           uint64
+		TxProofs              map[string]*sdktypes.Proof
+		Bills                 map[string]*sdktypes.Bill
+		OwnerBills            []*sdktypes.Bill
+		FeeCreditRecords      map[string]*sdktypes.FeeCreditRecord
+		OwnerFeeCreditRecords []*sdktypes.FeeCreditRecord
 	}
 
 	Option func(*Options)
@@ -40,38 +43,39 @@ type (
 
 func NewRpcClientMock(opts ...Option) *RpcClientMock {
 	options := &Options{
-		Bills:          map[string]*api.Bill{},
-		FeeCreditBills: map[string]*api.FeeCreditBill{},
-		TxProofs:       map[string]*wallet.Proof{},
+		Bills:            map[string]*sdktypes.Bill{},
+		FeeCreditRecords: map[string]*sdktypes.FeeCreditRecord{},
+		TxProofs:         map[string]*sdktypes.Proof{},
 	}
 	for _, option := range opts {
 		option(options)
 	}
 	return &RpcClientMock{
-		Err:            options.Err,
-		RoundNumber:    options.RoundNumber,
-		Bills:          options.Bills,
-		FeeCreditBills: options.FeeCreditBills,
-		OwnerUnits:     options.OwnerUnits,
-		TxProofs:       options.TxProofs,
+		Err:                   options.Err,
+		RoundNumber:           options.RoundNumber,
+		Bills:                 options.Bills,
+		OwnerBills:            options.OwnerBills,
+		FeeCreditRecords:      options.FeeCreditRecords,
+		OwnerFeeCreditRecords: options.OwnerFeeCreditRecords,
+		TxProofs:              options.TxProofs,
 	}
 }
 
-func WithOwnerBill(bill *api.Bill) Option {
+func WithOwnerBill(bill *sdktypes.Bill) Option {
 	return func(o *Options) {
 		o.Bills[string(bill.ID)] = bill
-		o.OwnerUnits = append(o.OwnerUnits, bill.ID)
+		o.OwnerBills = append(o.OwnerBills, bill)
 	}
 }
 
-func WithOwnerFeeCreditBill(fcb *api.FeeCreditBill) Option {
+func WithOwnerFeeCreditRecord(fcb *sdktypes.FeeCreditRecord) Option {
 	return func(o *Options) {
-		o.FeeCreditBills[string(fcb.ID)] = fcb
-		o.OwnerUnits = append(o.OwnerUnits, fcb.ID)
+		o.FeeCreditRecords[string(fcb.ID)] = fcb
+		o.OwnerFeeCreditRecords = append(o.OwnerFeeCreditRecords, fcb)
 	}
 }
 
-func WithTxProof(txHash []byte, txProof *wallet.Proof) Option {
+func WithTxProof(txHash []byte, txProof *sdktypes.Proof) Option {
 	return func(o *Options) {
 		o.TxProofs[string(txHash)] = txProof
 	}
@@ -89,6 +93,13 @@ func WithError(err error) Option {
 	}
 }
 
+func (c *RpcClientMock) GetNodeInfo(ctx context.Context) (*sdktypes.NodeInfoResponse, error) {
+	return &sdktypes.NodeInfoResponse{
+		SystemID: 0,
+		Name: "mock",
+	}, nil
+}
+
 func (c *RpcClientMock) GetRoundNumber(ctx context.Context) (uint64, error) {
 	if c.Err != nil {
 		return 0, c.Err
@@ -96,7 +107,7 @@ func (c *RpcClientMock) GetRoundNumber(ctx context.Context) (uint64, error) {
 	return c.RoundNumber, nil
 }
 
-func (c *RpcClientMock) GetBill(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.Bill, error) {
+func (c *RpcClientMock) GetBill(ctx context.Context, unitID types.UnitID) (*sdktypes.Bill, error) {
 	if c.Err != nil {
 		return nil, c.Err
 	}
@@ -104,27 +115,27 @@ func (c *RpcClientMock) GetBill(ctx context.Context, unitID types.UnitID, includ
 	if ok {
 		return bill, nil
 	}
-	return nil, api.ErrNotFound
+	return nil, nil
 }
 
-func (c *RpcClientMock) GetFeeCreditRecord(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error) {
+func (c *RpcClientMock) GetBills(ctx context.Context, ownerID []byte) ([]*sdktypes.Bill, error) {
 	if c.Err != nil {
 		return nil, c.Err
 	}
-	fcb, ok := c.FeeCreditBills[string(unitID)]
-	if ok {
-		return fcb, nil
+	if c.OwnerBills != nil {
+		return c.OwnerBills, nil
 	}
-	return nil, api.ErrNotFound
+	return nil, nil
 }
 
-func (c *RpcClientMock) GetUnitsByOwnerID(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
+func (c *RpcClientMock) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (*sdktypes.FeeCreditRecord, error) {
 	if c.Err != nil {
 		return nil, c.Err
 	}
-	if c.OwnerUnits != nil {
-		return c.OwnerUnits, nil
+	if len(c.OwnerFeeCreditRecords) > 0 {
+		return c.OwnerFeeCreditRecords[0], nil
 	}
+
 	return nil, nil
 }
 
@@ -136,13 +147,24 @@ func (c *RpcClientMock) SendTransaction(ctx context.Context, tx *types.Transacti
 	return tx.Hash(crypto.SHA256), nil
 }
 
-func (c *RpcClientMock) GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TransactionRecord, *types.TxProof, error) {
+func (c *RpcClientMock) ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*sdktypes.Proof, error) {
 	if c.Err != nil {
-		return nil, nil, c.Err
+		return nil, c.Err
+	}
+	c.RecordedTxs = append(c.RecordedTxs, tx)
+	return c.GetTransactionProof(ctx, tx.Hash(crypto.SHA256))
+}
+
+func (c *RpcClientMock) GetTransactionProof(ctx context.Context, txHash types.Bytes) (*sdktypes.Proof, error) {
+	if c.Err != nil {
+		return nil, c.Err
 	}
 	txProofs, ok := c.TxProofs[string(txHash)]
 	if ok {
-		return txProofs.TxRecord, txProofs.TxProof, nil
+		return &sdktypes.Proof{
+			TxRecord: txProofs.TxRecord,
+			TxProof: txProofs.TxProof,
+		}, nil
 	}
 	// return proof for sent tx if one exists
 	if len(c.RecordedTxs) > 0 {
@@ -152,11 +174,14 @@ func (c *RpcClientMock) GetTransactionProof(ctx context.Context, txHash types.By
 					TransactionOrder: tx,
 					ServerMetadata:   &types.ServerMetadata{ActualFee: 1},
 				}
-				return txr, &types.TxProof{}, nil
+				return &sdktypes.Proof{
+					TxRecord: txr,
+					TxProof: &types.TxProof{},
+				}, nil
 			}
 		}
 	}
-	return nil, nil, api.ErrNotFound
+	return nil, nil
 }
 
 func (c *RpcClientMock) GetBlock(ctx context.Context, blockNumber uint64) (*types.Block, error) {
@@ -166,18 +191,22 @@ func (c *RpcClientMock) GetBlock(ctx context.Context, blockNumber uint64) (*type
 	return &types.Block{}, nil
 }
 
-func NewMoneyBill(unitIDPart []byte, billData *money.BillData) *api.Bill {
+func (c *RpcClientMock) Close() {
+	// Nothing to close
+}
+
+func NewMoneyBill(unitIDPart []byte, billData *money.BillData) *sdktypes.Bill {
 	billID := money.NewBillID(nil, unitIDPart)
-	return &api.Bill{
-		ID:       billID,
-		BillData: billData,
+	return &sdktypes.Bill{
+		ID:   billID,
+		Data: billData,
 	}
 }
 
-func NewMoneyFCR(pubKeyHash []byte, fcrData *fc.FeeCreditRecord) *api.FeeCreditBill {
+func NewMoneyFCR(pubKeyHash []byte, fcrData *fc.FeeCreditRecord) *sdktypes.FeeCreditRecord {
 	fcrID := money.NewFeeCreditRecordIDFromPublicKeyHash(nil, pubKeyHash, 1000+transferFCLatestAdditionTime)
-	return &api.FeeCreditBill{
-		ID:              fcrID,
-		FeeCreditRecord: fcrData,
+	return &sdktypes.FeeCreditRecord{
+		ID:   fcrID,
+		Data: fcrData,
 	}
 }

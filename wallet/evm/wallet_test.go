@@ -10,8 +10,8 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/stretchr/testify/require"
 
+	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
-	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	evmclient "github.com/alphabill-org/alphabill-wallet/wallet/evm/client"
 )
@@ -51,7 +51,7 @@ func (e *evmClientMock) PostTransaction(ctx context.Context, tx *types.Transacti
 	return nil
 }
 
-func (e *evmClientMock) GetTxProof(ctx context.Context, unitID types.UnitID, txHash wallet.TxHash) (*wallet.Proof, error) {
+func (e *evmClientMock) GetTxProof(ctx context.Context, unitID types.UnitID, txHash sdktypes.TxHash) (*sdktypes.Proof, error) {
 	if e.SimulateErr != nil {
 		return nil, e.SimulateErr
 	}
@@ -59,7 +59,7 @@ func (e *evmClientMock) GetTxProof(ctx context.Context, unitID types.UnitID, txH
 		ErrorDetails: "some error string",
 	}
 	encoded, _ := types.Cbor.Marshal(details)
-	return &wallet.Proof{
+	return &sdktypes.Proof{
 		TxRecord: &types.TransactionRecord{
 			TransactionOrder: &types.TransactionOrder{},
 			ServerMetadata: &types.ServerMetadata{

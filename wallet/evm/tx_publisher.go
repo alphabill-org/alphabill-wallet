@@ -1,4 +1,4 @@
-package evm
+ package evm
 
 import (
 	"context"
@@ -7,17 +7,18 @@ import (
 	"time"
 
 	"github.com/alphabill-org/alphabill-go-base/types"
-	"github.com/alphabill-org/alphabill-wallet/wallet/evm/client"
 
-	"github.com/alphabill-org/alphabill-wallet/wallet"
+	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
+	"github.com/alphabill-org/alphabill-wallet/wallet/evm/client"
 )
 
 type (
 	Client interface {
 		GetRoundNumber(ctx context.Context) (*client.RoundNumber, error)
 		PostTransaction(ctx context.Context, tx *types.TransactionOrder) error
-		GetTxProof(ctx context.Context, unitID types.UnitID, txHash wallet.TxHash) (*wallet.Proof, error)
+		GetTxProof(ctx context.Context, unitID types.UnitID, txHash sdktypes.TxHash) (*sdktypes.Proof, error)
 	}
+
 	TxPublisher struct {
 		cli Client
 	}
@@ -30,7 +31,7 @@ func NewTxPublisher(restClient Client) *TxPublisher {
 }
 
 // SendTx sends a tx and waits for confirmation, returns tx proof
-func (w *TxPublisher) SendTx(ctx context.Context, tx *types.TransactionOrder, _ []byte) (*wallet.Proof, error) {
+func (w *TxPublisher) SendTx(ctx context.Context, tx *types.TransactionOrder, _ []byte) (*sdktypes.Proof, error) {
 	txHash := tx.Hash(crypto.SHA256)
 	if err := w.cli.PostTransaction(ctx, tx); err != nil {
 		return nil, fmt.Errorf("evm post tx failed: %w", err)

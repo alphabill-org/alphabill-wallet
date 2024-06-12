@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
 
+	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
@@ -94,7 +95,7 @@ func TestWallet_GetBalances(t *testing.T) {
 	require.EqualValues(t, 20, sum)
 }
 
-func createTestWallet(t *testing.T, rpcClient RpcClient) *Wallet {
+func createTestWallet(t *testing.T, moneyClient sdktypes.MoneyPartitionClient) *Wallet {
 	dir := t.TempDir()
 	am, err := account.NewManager(dir, "", true)
 	require.NoError(t, err)
@@ -105,7 +106,7 @@ func createTestWallet(t *testing.T, rpcClient RpcClient) *Wallet {
 	feeManagerDB, err := fees.NewFeeManagerDB(dir)
 	require.NoError(t, err)
 
-	w, err := NewWallet(am, feeManagerDB, rpcClient, logger.New(t))
+	w, err := NewWallet(am, feeManagerDB, moneyClient, logger.New(t))
 	require.NoError(t, err)
 
 	return w

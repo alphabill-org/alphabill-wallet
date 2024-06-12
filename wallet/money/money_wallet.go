@@ -12,14 +12,13 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
+
+	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/util"
-	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/api"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/dc"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
-	"github.com/alphabill-org/alphabill-wallet/wallet/txpublisher"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 )
 
@@ -31,21 +30,10 @@ const (
 type (
 	Wallet struct {
 		am            account.Manager
-		rpcClient     RpcClient
+		moneyClient   sdktypes.MoneyPartitionClient
 		feeManager    *fees.FeeManager
-		txPublisher   *txpublisher.TxPublisher
 		dustCollector *dc.DustCollector
 		log           *slog.Logger
-	}
-
-	RpcClient interface {
-		GetRoundNumber(ctx context.Context) (uint64, error)
-		GetBill(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.Bill, error)
-		GetFeeCreditRecord(ctx context.Context, unitID types.UnitID, includeStateProof bool) (*api.FeeCreditBill, error)
-		GetUnitsByOwnerID(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error)
-		SendTransaction(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
-		GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TransactionRecord, *types.TxProof, error)
-		GetBlock(ctx context.Context, roundNumber uint64) (*types.Block, error)
 	}
 
 	SendCmd struct {
@@ -82,15 +70,16 @@ func GenerateKeys(am account.Manager, mnemonic string) error {
 }
 
 // NewWallet creates a new money wallet from specified parameters. The account manager must contain pre-generated keys.
-func NewWallet(am account.Manager, feeManagerDB fees.FeeManagerDB, rpcClient RpcClient, log *slog.Logger) (*Wallet, error) {
+func NewWallet(am account.Manager, feeManagerDB fees.FeeManagerDB, moneyClient sdktypes.MoneyPartitionClient, log *slog.Logger) (*Wallet, error) {
 	moneySystemID := money.DefaultSystemID
-	moneyTxPublisher := txpublisher.NewTxPublisher(rpcClient, log)
-	feeManager := fees.NewFeeManager(am, feeManagerDB, moneySystemID, rpcClient, money.NewFeeCreditRecordIDFromPublicKey, money.FeeCreditRecordUnitType, moneySystemID, rpcClient, money.NewFeeCreditRecordIDFromPublicKey, money.FeeCreditRecordUnitType, log)
-	dustCollector := dc.NewDustCollector(moneySystemID, maxBillsForDustCollection, txTimeoutBlockCount, rpcClient, log)
+	feeManager := fees.NewFeeManager(am, feeManagerDB,
+		moneySystemID, moneyClient, money.NewFeeCreditRecordIDFromPublicKey,
+		moneySystemID, moneyClient, money.NewFeeCreditRecordIDFromPublicKey,
+		log)
+	dustCollector := dc.NewDustCollector(moneySystemID, maxBillsForDustCollection, txTimeoutBlockCount, moneyClient, log)
 	return &Wallet{
 		am:            am,
-		rpcClient:     rpcClient,
-		txPublisher:   moneyTxPublisher,
+		moneyClient:   moneyClient,
 		feeManager:    feeManager,
 		dustCollector: dustCollector,
 		log:           log,
@@ -112,6 +101,7 @@ func (w *Wallet) Close() {
 	w.am.Close()
 	w.feeManager.Close()
 	_ = w.dustCollector.Close()
+	w.moneyClient.Close()
 }
 
 // GetBalance returns the total value of all bills currently held in the wallet, for the given account,
@@ -122,7 +112,7 @@ func (w *Wallet) GetBalance(ctx context.Context, cmd GetBalanceCmd) (uint64, err
 		return 0, fmt.Errorf("failed to load account key: %w", err)
 	}
 	ownerID := accountKey.PubKeyHash.Sha256
-	bills, err := api.FetchBills(ctx, w.rpcClient, ownerID)
+	bills, err := w.moneyClient.GetBills(ctx, ownerID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to fetch bills: %w", err)
 	}
@@ -155,7 +145,7 @@ func (w *Wallet) GetBalances(ctx context.Context, cmd GetBalanceCmd) ([]uint64, 
 
 // GetRoundNumber returns the latest round number in node.
 func (w *Wallet) GetRoundNumber(ctx context.Context) (uint64, error) {
-	return w.rpcClient.GetRoundNumber(ctx)
+	return w.moneyClient.GetRoundNumber(ctx)
 }
 
 // Send creates, signs and broadcasts transactions, in total for the given amount,
@@ -163,7 +153,7 @@ func (w *Wallet) GetRoundNumber(ctx context.Context) (uint64, error) {
 // Sends one transaction per bill, prioritizing larger bills.
 // Waits for initial response from the node, returns error if any transaction was not accepted to the mempool.
 // Returns list of tx proofs, if waitForConfirmation=true, otherwise nil.
-func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*wallet.Proof, error) {
+func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*sdktypes.Proof, error) {
 	if err := cmd.isValid(); err != nil {
 		return nil, err
 	}
@@ -173,7 +163,7 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*wallet.Proof, error)
 		return nil, fmt.Errorf("failed to load public key: %w", err)
 	}
 
-	roundNumber, err := w.rpcClient.GetRoundNumber(ctx)
+	roundNumber, err := w.moneyClient.GetRoundNumber(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +173,7 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*wallet.Proof, error)
 		return nil, err
 	}
 
-	fcb, err := w.GetFeeCredit(ctx, fees.GetFeeCreditCmd{AccountIndex: cmd.AccountIndex})
+	fcb, err := w.moneyClient.GetFeeCreditRecordByOwnerID(ctx, k.PubKeyHash.Sha256)
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +194,7 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*wallet.Proof, error)
 		return nil, errors.New("insufficient balance for transaction")
 	}
 	timeout := roundNumber + txTimeoutBlockCount
-	batch := txsubmitter.NewBatch(w.rpcClient, w.log)
+	batch := txsubmitter.NewBatch(w.moneyClient, w.log)
 
 	var txs []*types.TransactionOrder
 	if len(cmd.Receivers) > 1 {
@@ -257,16 +247,11 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*wallet.Proof, error)
 		return nil, err
 	}
 
-	var proofs []*wallet.Proof
+	var proofs []*sdktypes.Proof
 	for _, txSub := range batch.Submissions() {
 		proofs = append(proofs, txSub.Proof)
 	}
 	return proofs, nil
-}
-
-// SendTx sends tx and waits for confirmation, returns tx proof
-func (w *Wallet) SendTx(ctx context.Context, tx *types.TransactionOrder) (*wallet.Proof, error) {
-	return w.txPublisher.SendTx(ctx, tx)
 }
 
 // AddFeeCredit creates fee credit for the given amount.
@@ -281,35 +266,6 @@ func (w *Wallet) AddFeeCredit(ctx context.Context, cmd fees.AddFeeCmd) (*fees.Ad
 // Returns closeFC and reclaimFC transaction proofs.
 func (w *Wallet) ReclaimFeeCredit(ctx context.Context, cmd fees.ReclaimFeeCmd) (*fees.ReclaimFeeCmdResponse, error) {
 	return w.feeManager.ReclaimFeeCredit(ctx, cmd)
-}
-
-// GetFeeCredit returns fee credit bill for given account,
-// can return nil if fee credit bill has not been created yet.
-func (w *Wallet) GetFeeCredit(ctx context.Context, cmd fees.GetFeeCreditCmd) (*api.FeeCreditBill, error) {
-	accountKey, err := w.am.GetAccountKey(cmd.AccountIndex)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load account key: %w", err)
-	}
-	unitIDs, err := w.rpcClient.GetUnitsByOwnerID(ctx, accountKey.PubKeyHash.Sha256)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch units: %w", err)
-	}
-	for _, unitID := range unitIDs {
-		if unitID.HasType(money.FeeCreditRecordUnitType) {
-			fcb, err := w.GetFeeCreditBill(ctx, unitID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to fetch fee credit bill: %w", err)
-			}
-			return fcb, nil
-		}
-	}
-	return nil, nil
-}
-
-// GetFeeCreditBill returns fee credit bill for given unitID,
-// returns nil if fee credit bill has not been created yet.
-func (w *Wallet) GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*api.FeeCreditBill, error) {
-	return api.FetchFeeCreditBillByUnitID(ctx, w.rpcClient, unitID)
 }
 
 // CollectDust starts the dust collector process for the requested accounts in the wallet.
@@ -347,9 +303,9 @@ func (w *Wallet) CollectDust(ctx context.Context, accountNumber uint64) ([]*Dust
 	return res, nil
 }
 
-func (w *Wallet) getUnlockedBills(ctx context.Context, ownerID []byte) ([]*api.Bill, error) {
-	var unlockedBills []*api.Bill
-	bills, err := api.FetchBills(ctx, w.rpcClient, ownerID)
+func (w *Wallet) getUnlockedBills(ctx context.Context, ownerID []byte) ([]*sdktypes.Bill, error) {
+	var unlockedBills []*sdktypes.Bill
+	bills, err := w.moneyClient.GetBills(ctx, ownerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch bills: %w", err)
 	}
@@ -412,10 +368,4 @@ func createMoneyWallet(mnemonic string, am account.Manager) error {
 		}
 	}
 	return nil
-}
-
-// FetchFeeCreditBill finds the first fee credit record in money partition for the given account key,
-// returns nil if fee credit record does not exist.
-func FetchFeeCreditBill(ctx context.Context, c RpcClient, accountKey *account.AccountKey) (*api.FeeCreditBill, error) {
-	return api.FetchFeeCreditBillByOwnerID(ctx, c, accountKey.PubKeyHash.Sha256, money.FeeCreditRecordUnitType)
 }
