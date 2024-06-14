@@ -316,7 +316,7 @@ func TestMintFungibleToken(t *testing.T) {
 		},
 		getFeeCreditRecordByOwnerID: func(ctx context.Context, ownerID []byte) (*sdktypes.FeeCreditRecord, error) {
 			return &sdktypes.FeeCreditRecord{
-				ID:              []byte{1},
+				ID:   []byte{1},
 				Data: &fc.FeeCreditRecord{Balance: 100000, Counter: 2},
 			}, nil
 		},
@@ -695,6 +695,8 @@ func TestTransferNFT(t *testing.T) {
 		},
 	}
 	tw := initTestWallet(t, rpcClient)
+	pk, err := tw.am.GetPublicKey(0)
+	require.NoError(t, err)
 
 	first := func(s sdktypes.PubKey, e error) sdktypes.PubKey {
 		require.NoError(t, e)
@@ -709,7 +711,7 @@ func TestTransferNFT(t *testing.T) {
 	}{
 		{
 			name:  "to 'always true' predicate",
-			token: &sdktypes.TokenUnit{ID: test.RandomBytes(32), Kind: sdktypes.NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32)},
+			token: &sdktypes.TokenUnit{ID: test.RandomBytes(32), Kind: sdktypes.NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32), Owner: templates.NewP2pkh256BytesFromKey(pk)},
 			key:   nil,
 			validateOwner: func(t *testing.T, accountNumber uint64, key sdktypes.PubKey, tok *tokens.TransferNonFungibleTokenAttributes) {
 				require.EqualValues(t, templates.AlwaysTrueBytes(), tok.NewBearer)
@@ -717,7 +719,7 @@ func TestTransferNFT(t *testing.T) {
 		},
 		{
 			name:  "to public key hash predicate",
-			token: &sdktypes.TokenUnit{ID: test.RandomBytes(32), Kind: sdktypes.NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32)},
+			token: &sdktypes.TokenUnit{ID: test.RandomBytes(32), Kind: sdktypes.NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32), Owner: templates.NewP2pkh256BytesFromKey(pk)},
 			key:   first(hexutil.Decode("0x0290a43bc454babf1ea8b0b76fcbb01a8f27a989047cf6d6d76397cc4756321e64")),
 			validateOwner: func(t *testing.T, accountNumber uint64, key sdktypes.PubKey, tok *tokens.TransferNonFungibleTokenAttributes) {
 				require.EqualValues(t, templates.NewP2pkh256BytesFromKeyHash(hash.Sum256(key)), tok.NewBearer)
@@ -725,7 +727,7 @@ func TestTransferNFT(t *testing.T) {
 		},
 		{
 			name:    "locked token is not sent",
-			token:   &sdktypes.TokenUnit{ID: test.RandomBytes(32), Kind: sdktypes.NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32), Locked: 1},
+			token:   &sdktypes.TokenUnit{ID: test.RandomBytes(32), Kind: sdktypes.NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32), Locked: 1, Owner: templates.NewP2pkh256BytesFromKey(pk)},
 			wantErr: "token is locked",
 		},
 	}
@@ -844,15 +846,17 @@ func TestLockToken(t *testing.T) {
 		},
 	}
 	tw := initTestWallet(t, rpcClient)
+	pk, err := tw.am.GetPublicKey(0)
+	require.NoError(t, err)
 
 	// test token is already locked
-	token = &sdktypes.TokenUnit{ID: test.RandomBytes(32), Kind: sdktypes.NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32), Locked: wallet.LockReasonManual}
+	token = &sdktypes.TokenUnit{ID: test.RandomBytes(32), Kind: sdktypes.NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32), Locked: wallet.LockReasonManual, Owner: templates.NewP2pkh256BytesFromKey(pk)}
 	result, err := tw.LockToken(context.Background(), 1, token.ID, []*PredicateInput{{Argument: nil}})
 	require.ErrorContains(t, err, "token is already locked")
 	require.Nil(t, result)
 
 	// test lock token ok
-	token = &sdktypes.TokenUnit{ID: test.RandomBytes(32), Kind: sdktypes.NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32)}
+	token = &sdktypes.TokenUnit{ID: test.RandomBytes(32), Kind: sdktypes.NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32), Owner: templates.NewP2pkh256BytesFromKey(pk)}
 	result, err = tw.LockToken(context.Background(), 1, token.ID, []*PredicateInput{{Argument: nil}})
 	require.NoError(t, err)
 	require.NotNil(t, result)
@@ -889,15 +893,17 @@ func TestUnlockToken(t *testing.T) {
 		},
 	}
 	tw := initTestWallet(t, rpcClient)
+	pk, err := tw.am.GetPublicKey(0)
+	require.NoError(t, err)
 
 	// test token is already unlocked
-	token = &sdktypes.TokenUnit{ID: test.RandomBytes(32), Kind: sdktypes.NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32)}
+	token = &sdktypes.TokenUnit{ID: test.RandomBytes(32), Kind: sdktypes.NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32), Owner: templates.NewP2pkh256BytesFromKey(pk)}
 	result, err := tw.UnlockToken(context.Background(), 1, token.ID, []*PredicateInput{{Argument: nil}})
 	require.ErrorContains(t, err, "token is already unlocked")
 	require.Nil(t, result)
 
 	// test unlock token ok
-	token = &sdktypes.TokenUnit{ID: test.RandomBytes(32), Kind: sdktypes.NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32), Locked: wallet.LockReasonManual}
+	token = &sdktypes.TokenUnit{ID: test.RandomBytes(32), Kind: sdktypes.NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32), Locked: wallet.LockReasonManual, Owner: templates.NewP2pkh256BytesFromKey(pk)}
 	result, err = tw.UnlockToken(context.Background(), 1, token.ID, []*PredicateInput{{Argument: nil}})
 	require.NoError(t, err)
 	require.NotNil(t, result)
@@ -947,26 +953,29 @@ func TestSendFungibleByID(t *testing.T) {
 	}
 
 	// Initialize the wallet
-	wallet := initTestWallet(t, be)
+	w := initTestWallet(t, be)
+	pk, err := w.am.GetPublicKey(0)
+	require.NoError(t, err)
+	token.Owner = templates.NewP2pkh256BytesFromKey(pk)
 
 	// Test sending fungible token by ID
-	sub, err := wallet.SendFungibleByID(context.Background(), 1, token.ID, 50, nil, nil)
+	sub, err := w.SendFungibleByID(context.Background(), 1, token.ID, 50, nil, nil)
 	require.NoError(t, err)
 	// ensure it's a split
 	require.Equal(t, tokens.PayloadTypeSplitFungibleToken, sub.Submissions[0].Transaction.PayloadType())
 
-	sub, err = wallet.SendFungibleByID(context.Background(), 1, token.ID, 100, nil, nil)
+	sub, err = w.SendFungibleByID(context.Background(), 1, token.ID, 100, nil, nil)
 	require.NoError(t, err)
 	// ensure it's a transfer
 	require.Equal(t, tokens.PayloadTypeTransferFungibleToken, sub.Submissions[0].Transaction.PayloadType())
 
 	// Test sending fungible token by ID with insufficient balance
-	_, err = wallet.SendFungibleByID(context.Background(), 1, token.ID, 200, nil, nil)
+	_, err = w.SendFungibleByID(context.Background(), 1, token.ID, 200, nil, nil)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "insufficient FT value")
 
 	// Test sending fungible token by ID with invalid account number
-	_, err = wallet.SendFungibleByID(context.Background(), 0, token.ID, 50, nil, nil)
+	_, err = w.SendFungibleByID(context.Background(), 0, token.ID, 50, nil, nil)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "invalid account number")
 }
@@ -989,23 +998,23 @@ func initAccountManager(t *testing.T) account.Manager {
 }
 
 type mockTokensRpcClient struct {
-	getToken            func(ctx context.Context, id sdktypes.TokenID) (*sdktypes.TokenUnit, error)
-	getTokens           func(ctx context.Context, kind sdktypes.Kind, ownerID []byte) ([]*sdktypes.TokenUnit, error)
-	getTokenTypes       func(ctx context.Context, kind sdktypes.Kind, creator sdktypes.PubKey) ([]*sdktypes.TokenTypeUnit, error)
-	getTypeHierarchy    func(ctx context.Context, id sdktypes.TokenTypeID) ([]*sdktypes.TokenTypeUnit, error)
-	getRoundNumber      func(ctx context.Context) (uint64, error)
-	sendTransaction     func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
-	confirmTransaction  func(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*sdktypes.Proof, error)
-	getTransactionProof func(ctx context.Context, txHash types.Bytes) (*sdktypes.Proof, error)
+	getToken                    func(ctx context.Context, id sdktypes.TokenID) (*sdktypes.TokenUnit, error)
+	getTokens                   func(ctx context.Context, kind sdktypes.Kind, ownerID []byte) ([]*sdktypes.TokenUnit, error)
+	getTokenTypes               func(ctx context.Context, kind sdktypes.Kind, creator sdktypes.PubKey) ([]*sdktypes.TokenTypeUnit, error)
+	getTypeHierarchy            func(ctx context.Context, id sdktypes.TokenTypeID) ([]*sdktypes.TokenTypeUnit, error)
+	getRoundNumber              func(ctx context.Context) (uint64, error)
+	sendTransaction             func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
+	confirmTransaction          func(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*sdktypes.Proof, error)
+	getTransactionProof         func(ctx context.Context, txHash types.Bytes) (*sdktypes.Proof, error)
 	getFeeCreditRecordByOwnerID func(ctx context.Context, ownerID []byte) (*sdktypes.FeeCreditRecord, error)
-	getBlock            func(ctx context.Context, roundNumber uint64) (*types.Block, error)
-	getUnitsByOwnerID   func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error)
+	getBlock                    func(ctx context.Context, roundNumber uint64) (*types.Block, error)
+	getUnitsByOwnerID           func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error)
 }
 
 func (m *mockTokensRpcClient) GetNodeInfo(ctx context.Context) (*sdktypes.NodeInfoResponse, error) {
 	return &sdktypes.NodeInfoResponse{
 		SystemID: 2,
-		Name: "tokens node",
+		Name:     "tokens node",
 	}, nil
 }
 
