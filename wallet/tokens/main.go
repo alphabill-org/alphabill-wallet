@@ -313,7 +313,7 @@ func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID 
 	if err != nil {
 		return nil, err
 	}
-	if err = w.ensureTokenOwnership(accountNumber, token); err != nil {
+	if err = ensureTokenOwnership(accountNumber, key.PubKey, token); err != nil {
 		return nil, err
 	}
 	if token.IsLocked() {
@@ -469,7 +469,7 @@ func (w *Wallet) SendFungibleByID(ctx context.Context, accountNumber uint64, tok
 	if err != nil {
 		return nil, fmt.Errorf("failed to get token %X: %w", tokenID, err)
 	}
-	if err = w.ensureTokenOwnership(accountNumber, token); err != nil {
+	if err = ensureTokenOwnership(accountNumber, acc.PubKey, token); err != nil {
 		return nil, err
 	}
 	if targetAmount > token.Amount {
@@ -550,7 +550,7 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID []
 	if err != nil {
 		return nil, err
 	}
-	if err = w.ensureTokenOwnership(accountNumber, token); err != nil {
+	if err = ensureTokenOwnership(accountNumber, key.PubKey, token); err != nil {
 		return nil, err
 	}
 	if token.IsLocked() {
@@ -586,7 +586,7 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	if err != nil {
 		return nil, err
 	}
-	if err = w.ensureTokenOwnership(accountNumber, token); err != nil {
+	if err = ensureTokenOwnership(accountNumber, key.PubKey, token); err != nil {
 		return nil, err
 	}
 	if !token.IsLocked() {
@@ -609,14 +609,7 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	return newSingleResult(sub, accountNumber), err
 }
 
-func (w *Wallet) ensureTokenOwnership(accountNumber uint64, unit *sdktypes.TokenUnit) error {
-	if accountNumber < 1 {
-		return fmt.Errorf("invalid account number: %d", accountNumber)
-	}
-	pk, err := w.am.GetPublicKey(accountNumber - 1)
-	if err != nil {
-		return err
-	}
+func ensureTokenOwnership(accountNumber uint64, pk sdktypes.PubKey, unit *sdktypes.TokenUnit) error {
 	if !bytes.Equal(unit.Owner, templates.NewP2pkh256BytesFromKey(pk)) {
 		return fmt.Errorf("token '%s' does not belong to account #%d", unit.ID, accountNumber)
 	}
