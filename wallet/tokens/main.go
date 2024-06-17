@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"math"
 
+	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-go-base/util"
@@ -312,6 +313,9 @@ func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID 
 	if err != nil {
 		return nil, err
 	}
+	if err = ensureTokenOwnership(accountNumber, key.PubKey, token); err != nil {
+		return nil, err
+	}
 	if token.IsLocked() {
 		return nil, errors.New("token is locked")
 	}
@@ -465,6 +469,9 @@ func (w *Wallet) SendFungibleByID(ctx context.Context, accountNumber uint64, tok
 	if err != nil {
 		return nil, fmt.Errorf("failed to get token %X: %w", tokenID, err)
 	}
+	if err = ensureTokenOwnership(accountNumber, acc.PubKey, token); err != nil {
+		return nil, err
+	}
 	if targetAmount > token.Amount {
 		return nil, fmt.Errorf("insufficient FT value: got %v, need %v", token.Amount, targetAmount)
 	}
@@ -543,6 +550,9 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID []
 	if err != nil {
 		return nil, err
 	}
+	if err = ensureTokenOwnership(accountNumber, key.PubKey, token); err != nil {
+		return nil, err
+	}
 	if token.IsLocked() {
 		return nil, errors.New("token is already locked")
 	}
@@ -576,6 +586,9 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	if err != nil {
 		return nil, err
 	}
+	if err = ensureTokenOwnership(accountNumber, key.PubKey, token); err != nil {
+		return nil, err
+	}
 	if !token.IsLocked() {
 		return nil, errors.New("token is already unlocked")
 	}
@@ -594,4 +607,11 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	}
 	err = sub.ToBatch(w.tokensClient, w.log).SendTx(ctx, w.confirmTx)
 	return newSingleResult(sub, accountNumber), err
+}
+
+func ensureTokenOwnership(accountNumber uint64, pk sdktypes.PubKey, unit *sdktypes.TokenUnit) error {
+	if !bytes.Equal(unit.Owner, templates.NewP2pkh256BytesFromKey(pk)) {
+		return fmt.Errorf("token '%s' does not belong to account #%d", unit.ID, accountNumber)
+	}
+	return nil
 }
