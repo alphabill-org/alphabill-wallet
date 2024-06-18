@@ -1,4 +1,5 @@
 //go:build !nodocker
+
 package wallet
 
 import (
@@ -15,7 +16,7 @@ import (
 
 func TestWalletFeesCmds_MoneyPartition(t *testing.T) {
 	// start money partition
-	wallets, abNet := testutils.SetupNetworkWithWallets(t, false, false)
+	wallets, abNet := testutils.SetupNetworkWithWallets(t)
 
 	feesCmd := newWalletCmdExecutor("fees", "--rpc-url", abNet.MoneyRpcUrl).WithHome(wallets[0].Homedir)
 
@@ -67,7 +68,7 @@ func TestWalletFeesCmds_MoneyPartition(t *testing.T) {
 
 func TestWalletFeesCmds_TokenPartition(t *testing.T) {
 	// start money and tokens partition
-	wallets, abNet := testutils.SetupNetworkWithWallets(t, true, false)
+	wallets, abNet := testutils.SetupNetworkWithWallets(t, testutils.WithTokensNode(t))
 
 	feesCmd := newWalletCmdExecutor("fees",
 		"--rpc-url", abNet.MoneyRpcUrl,
@@ -162,9 +163,9 @@ func TestWalletFeesCmds_MinimumFeeAmount(t *testing.T) {
 }
 
 func TestWalletFeesLockCmds_Ok(t *testing.T) {
-	wallets, abNet := testutils.SetupNetworkWithWallets(t, false, false)
+	wallets, abNet := testutils.SetupNetworkWithWallets(t)
 
-	feesCmd := newWalletCmdExecutor("fees",	"--rpc-url", abNet.MoneyRpcUrl).WithHome(wallets[0].Homedir)
+	feesCmd := newWalletCmdExecutor("fees", "--rpc-url", abNet.MoneyRpcUrl).WithHome(wallets[0].Homedir)
 
 	// create fee credit bill by adding fee credit
 	stdout := feesCmd.Exec(t, "add", "--amount", "1")
