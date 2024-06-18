@@ -123,8 +123,65 @@ func TestWalletFeesCmds_TokenPartition(t *testing.T) {
 	require.Equal(t, fmt.Sprintf("Account #1 %s", util.AmountToString(expectedFees, 8)), stdout.Lines[1])
 }
 
+func TestWalletFeesCmds_EvmPartition(t *testing.T) {
+	// start money and tokens partition
+	wallets, abNet := testutils.SetupNetworkWithWallets(t, testutils.WithEvmNode(t))
+
+	feesCmd := newWalletCmdExecutor("fees",
+		"--rpc-url", abNet.MoneyRpcUrl,
+		"--partition", "evm",
+		"--partition-rpc-url", abNet.EvmRpcUrl).WithHome(wallets[0].Homedir)
+
+	// list fees on token partition
+	stdout := feesCmd.Exec(t, "list")
+
+	require.Equal(t, "Partition: evm", stdout.Lines[0])
+	require.Equal(t, "Account #1 0.000'000'00", stdout.Lines[1])
+
+	// add fee credits
+	amount := uint64(150)
+	stdout = feesCmd.Exec(t, "add", "--amount", strconv.FormatUint(amount, 10))
+	require.Equal(t, fmt.Sprintf("Successfully created %d fee credits on evm partition.", amount), stdout.Lines[0])
+
+	// verify fee credits
+	expectedFees := amount*1e8 - 2
+	stdout = feesCmd.Exec(t, "list")
+	require.Equal(t, "Partition: evm", stdout.Lines[0])
+	require.Equal(t, fmt.Sprintf("Account #1 %s", util.AmountToString(expectedFees, 8)), stdout.Lines[1])
+
+	// add more fee credits to token partition
+	stdout = feesCmd.Exec(t, "add", "--amount", strconv.FormatUint(amount, 10))
+	require.Equal(t, fmt.Sprintf("Successfully created %d fee credits on evm partition.", amount), stdout.Lines[0])
+
+	// verify fee credits to token partition
+	expectedFees = amount*2*1e8 - 5
+	stdout = feesCmd.Exec(t, "list")
+	require.Equal(t, "Partition: evm", stdout.Lines[0])
+	require.Equal(t, fmt.Sprintf("Account #1 %s", util.AmountToString(expectedFees, 8)), stdout.Lines[1])
+
+	// reclaim fees
+	// invalid transaction: fee credit record unit is nil
+	stdout = feesCmd.Exec(t, "reclaim")
+	require.Equal(t, "Successfully reclaimed fee credits on evm partition.", stdout.Lines[0])
+
+	// list fees
+	stdout = feesCmd.Exec(t, "list")
+	require.Equal(t, "Partition: evm", stdout.Lines[0])
+	require.Equal(t, "Account #1 0.000'000'00", stdout.Lines[1])
+
+	// add more fees after reclaiming
+	stdout = feesCmd.Exec(t, "add", "--amount", strconv.FormatUint(amount, 10))
+	require.Equal(t, fmt.Sprintf("Successfully created %d fee credits on evm partition.", amount), stdout.Lines[0])
+
+	// verify list fees
+	expectedFees = amount*1e8 - 2
+	stdout = feesCmd.Exec(t, "list")
+	require.Equal(t, "Partition: evm", stdout.Lines[0])
+	require.Equal(t, fmt.Sprintf("Account #1 %s", util.AmountToString(expectedFees, 8)), stdout.Lines[1])
+}
+
 func TestWalletFeesCmds_MinimumFeeAmount(t *testing.T) {
-	wallets, abNet := testutils.SetupNetworkWithWallets(t, false, false)
+	wallets, abNet := testutils.SetupNetworkWithWallets(t)
 
 	feesCmd := newWalletCmdExecutor("fees",
 		"--rpc-url", abNet.MoneyRpcUrl).WithHome(wallets[0].Homedir)
