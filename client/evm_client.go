@@ -60,7 +60,6 @@ func (c *evmPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ow
 		Counter: stateObj.AlphaBill.Counter,
 		Timeout: stateObj.AlphaBill.Timeout,
 	}
-	fmt.Printf("!!!Balance in wei: %s, balance in Tema: %d\n", stateObj.Account.Balance.String(), fcr.Balance)
 	return &sdktypes.FeeCreditRecord{
 		ID:   u.UnitID,
 		Data: fcr,
