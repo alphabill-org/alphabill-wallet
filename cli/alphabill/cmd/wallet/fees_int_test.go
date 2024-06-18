@@ -124,7 +124,7 @@ func TestWalletFeesCmds_TokenPartition(t *testing.T) {
 }
 
 func TestWalletFeesCmds_EvmPartition(t *testing.T) {
-	// start money and tokens partition
+	// start money and EVM partition
 	wallets, abNet := testutils.SetupNetworkWithWallets(t, testutils.WithEvmNode(t))
 
 	feesCmd := newWalletCmdExecutor("fees",
@@ -132,7 +132,7 @@ func TestWalletFeesCmds_EvmPartition(t *testing.T) {
 		"--partition", "evm",
 		"--partition-rpc-url", abNet.EvmRpcUrl).WithHome(wallets[0].Homedir)
 
-	// list fees on token partition
+	// list fees on EVM partition
 	stdout := feesCmd.Exec(t, "list")
 
 	require.Equal(t, "Partition: evm", stdout.Lines[0])
@@ -149,12 +149,12 @@ func TestWalletFeesCmds_EvmPartition(t *testing.T) {
 	require.Equal(t, "Partition: evm", stdout.Lines[0])
 	require.Equal(t, fmt.Sprintf("Account #1 %s", util.AmountToString(expectedFees, 8)), stdout.Lines[1])
 
-	// add more fee credits to token partition
+	// add more fee credits to EVM partition
 	stdout = feesCmd.Exec(t, "add", "--amount", strconv.FormatUint(amount, 10))
 	require.Equal(t, fmt.Sprintf("Successfully created %d fee credits on evm partition.", amount), stdout.Lines[0])
 
-	// verify fee credits to token partition
-	expectedFees = amount*2*1e8 - 5
+	// verify fee credits to EVM partition
+	expectedFees = amount*2*1e8 - 4
 	stdout = feesCmd.Exec(t, "list")
 	require.Equal(t, "Partition: evm", stdout.Lines[0])
 	require.Equal(t, fmt.Sprintf("Account #1 %s", util.AmountToString(expectedFees, 8)), stdout.Lines[1])
