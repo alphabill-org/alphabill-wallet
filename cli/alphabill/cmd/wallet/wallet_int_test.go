@@ -1,4 +1,5 @@
 //go:build !nodocker
+
 package wallet
 
 import (
@@ -28,7 +29,7 @@ Test scenario 2.1: wallet-1 account 2 sends one transaction to wallet-1 account 
 Test scenario 3: wallet-1 sends tx without confirming
 */
 func TestSendingMoneyUsingWallets_integration(t *testing.T) {
-	wallets, abNet := testutils.SetupNetworkWithWallets(t, false, false)
+	wallets, abNet := testutils.SetupNetworkWithWallets(t)
 
 	walletCmd := newWalletCmdExecutor("--rpc-url", abNet.MoneyRpcUrl).WithHome(wallets[0].Homedir)
 
@@ -129,12 +130,13 @@ func TestSendingMoneyUsingWallets_integration(t *testing.T) {
 
 /*
 Test scenario:
-   w1k1 sends two bills to w1k2 and w1k3
-   w1 runs dust collection
-   w1k2 and w1k3 should have only single bill
+
+	w1k1 sends two bills to w1k2 and w1k3
+	w1 runs dust collection
+	w1k2 and w1k3 should have only single bill
 */
 func TestCollectDustInMultiAccountWallet(t *testing.T) {
-	wallets, abNet := testutils.SetupNetworkWithWallets(t, false, false)
+	wallets, abNet := testutils.SetupNetworkWithWallets(t)
 	walletCmd := newWalletCmdExecutor("--rpc-url", abNet.MoneyRpcUrl).WithHome(wallets[0].Homedir)
 
 	// add fee credit for w1k1
@@ -176,7 +178,7 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 
 func TestWalletBillsLockUnlockCmd_Ok(t *testing.T) {
 	// setup network
-	wallets, abNet := testutils.SetupNetworkWithWallets(t, false, false)
+	wallets, abNet := testutils.SetupNetworkWithWallets(t)
 
 	walletCmd := newWalletCmdExecutor("--rpc-url", abNet.MoneyRpcUrl).WithHome(wallets[0].Homedir)
 
@@ -202,7 +204,7 @@ func TestWalletBillsLockUnlockCmd_Ok(t *testing.T) {
 }
 
 func TestOrchestration_AddVarOK(t *testing.T) {
-	wallets, net := testutils.SetupNetworkWithWallets(t, false, true)
+	wallets, net := testutils.SetupNetworkWithWallets(t, testutils.WithOrchestrationNode(t))
 
 	varData := orchestration.ValidatorAssignmentRecord{
 		EpochNumber:            0,

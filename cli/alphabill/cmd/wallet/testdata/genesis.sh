@@ -10,6 +10,10 @@
                --home /home/nonroot/genesis/tokens1 \
                --gen-keys
 
+/app/alphabill evm-genesis \
+               --home /home/nonroot/genesis/evm1 \
+               --gen-keys
+
 /app/alphabill orchestration-genesis \
                --home /home/nonroot/genesis/orchestration1 \
                --gen-keys \
@@ -23,6 +27,7 @@
                --total-nodes "1" \
                -p /home/nonroot/genesis/money1/money/node-genesis.json \
                -p /home/nonroot/genesis/tokens1/tokens/node-genesis.json \
+               -p /home/nonroot/genesis/evm1/evm/node-genesis.json \
                -p /home/nonroot/genesis/orchestration1/orchestration/node-genesis.json
 
 /app/alphabill root-genesis combine \

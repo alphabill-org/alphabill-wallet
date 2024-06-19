@@ -1,4 +1,5 @@
 //go:build !nodocker
+
 package wallet
 
 import (
@@ -22,7 +23,7 @@ const (
 )
 
 func TestFungibleToken_Subtyping_Integration(t *testing.T) {
-	wallets, abNet := testutils.SetupNetworkWithWallets(t, true, false)
+	wallets, abNet := testutils.SetupNetworkWithWallets(t, testutils.WithTokensNode(t))
 
 	symbol1 := "AB"
 	// test subtyping
@@ -94,7 +95,7 @@ func TestFungibleToken_Subtyping_Integration(t *testing.T) {
 }
 
 func TestFungibleToken_InvariantPredicate_Integration(t *testing.T) {
-	wallets, abNet := testutils.SetupNetworkWithWallets(t, true, false)
+	wallets, abNet := testutils.SetupNetworkWithWallets(t, testutils.WithTokensNode(t))
 
 	symbol1 := "AB"
 	typeID11 := randomFungibleTokenTypeID(t)
@@ -128,7 +129,7 @@ func TestFungibleToken_InvariantPredicate_Integration(t *testing.T) {
 		"new", "fungible",
 		"--type", typeID12.String(),
 		"--amount", "1000",
-		"--mint-input", predicatePtpkh + "," + predicatePtpkh)
+		"--mint-input", predicatePtpkh+","+predicatePtpkh)
 	testutils.VerifyStdoutEventually(t, tokenCmd.ExecFunc(t, "list", "fungible"), "amount='1'000'")
 
 	// send to w2
@@ -138,12 +139,12 @@ func TestFungibleToken_InvariantPredicate_Integration(t *testing.T) {
 		"--amount", "100",
 		"--address", fmt.Sprintf("0x%X", wallets[1].PubKeys[0]),
 		"--key", "1",
-		"--inherit-bearer-input", predicateTrue + "," + predicatePtpkh)
+		"--inherit-bearer-input", predicateTrue+","+predicatePtpkh)
 	testutils.VerifyStdoutEventually(t, tokenCmd.WithHome(wallets[1].Homedir).ExecFunc(t, "list", "fungible"), "amount='100'")
 }
 
 func TestFungibleTokens_Sending_Integration(t *testing.T) {
-	wallets, abNet := testutils.SetupNetworkWithWallets(t, true, false)
+	wallets, abNet := testutils.SetupNetworkWithWallets(t, testutils.WithTokensNode(t))
 
 	typeID1 := randomFungibleTokenTypeID(t)
 	// fungible token types
@@ -218,7 +219,7 @@ func TestFungibleTokens_Sending_Integration(t *testing.T) {
 
 func TestWalletCreateFungibleTokenTypeAndTokenAndSendCmd_IntegrationTest(t *testing.T) {
 	// mint tokens
-	wallets, abNet := testutils.SetupNetworkWithWallets(t, true, false)
+	wallets, abNet := testutils.SetupNetworkWithWallets(t, testutils.WithTokensNode(t))
 
 	addFeeCredit(t, wallets[0].Homedir, 100, "money", abNet.MoneyRpcUrl, abNet.MoneyRpcUrl)
 	addFeeCredit(t, wallets[0].Homedir, 100, "tokens", abNet.TokensRpcUrl, abNet.MoneyRpcUrl)
@@ -286,7 +287,7 @@ func TestWalletCreateFungibleTokenTypeAndTokenAndSendCmd_IntegrationTest(t *test
 }
 
 func TestFungibleTokens_CollectDust_Integration(t *testing.T) {
-	wallets, abNet := testutils.SetupNetworkWithWallets(t, true, false)
+	wallets, abNet := testutils.SetupNetworkWithWallets(t, testutils.WithTokensNode(t))
 
 	addFeeCredit(t, wallets[0].Homedir, 100, "money", abNet.MoneyRpcUrl, abNet.MoneyRpcUrl)
 	addFeeCredit(t, wallets[0].Homedir, 100, "tokens", abNet.TokensRpcUrl, abNet.MoneyRpcUrl)
@@ -325,7 +326,7 @@ func TestFungibleTokens_CollectDust_Integration(t *testing.T) {
 }
 
 func TestFungibleTokens_LockUnlock_Integration(t *testing.T) {
-	wallets, abNet := testutils.SetupNetworkWithWallets(t, true, false)
+	wallets, abNet := testutils.SetupNetworkWithWallets(t, testutils.WithTokensNode(t))
 
 	addFeeCredit(t, wallets[0].Homedir, 100, "money", abNet.MoneyRpcUrl, abNet.MoneyRpcUrl)
 	addFeeCredit(t, wallets[0].Homedir, 100, "tokens", abNet.TokensRpcUrl, abNet.MoneyRpcUrl)
@@ -373,7 +374,7 @@ func addFeeCredit(t *testing.T, home string, amount uint64, partition, partition
 		"--partition-rpc-url", partitionRpcUrl).WithHome(home)
 
 	stdout := feesCmd.Exec(t, "fees", "add", "--amount", amountStr)
-	require.Equal(t, "Successfully created " + amountStr + " fee credits on " + partition + " partition.", stdout.Lines[0])
+	require.Equal(t, "Successfully created "+amountStr+" fee credits on "+partition+" partition.", stdout.Lines[0])
 }
 
 func extractID(input string) string {
