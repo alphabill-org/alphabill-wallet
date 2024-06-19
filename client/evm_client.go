@@ -2,13 +2,16 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
+	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/types"
-
 	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
+	"github.com/alphabill-org/alphabill/txsystem/evm/statedb"
+	"github.com/holiman/uint256"
 )
 
 type (
@@ -37,7 +40,40 @@ func NewEvmPartitionClient(ctx context.Context, rpcUrl string) (sdktypes.Partiti
 // GetFeeCreditRecordByOwnerID finds the first fee credit record in evm partition for the given owner ID,
 // returns nil if fee credit record does not exist.
 func (c *evmPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (*sdktypes.FeeCreditRecord, error) {
-	return nil, nil
+	unitIDs, err := c.GetUnitsByOwnerID(ctx, ownerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch units: %w", err)
+	}
+	if len(unitIDs) == 0 {
+		return nil, nil
+	}
+	var u *sdktypes.Unit[statedb.StateObject]
+	if err := c.RpcClient.CallContext(ctx, &u, "state_getUnit", unitIDs[0], false); err != nil {
+		return nil, err
+	}
+	if u == nil {
+		return nil, nil
+	}
+	stateObj := u.Data
+	fcr := &fc.FeeCreditRecord{
+		Balance: weiToAlpha(stateObj.Account.Balance),
+		Counter: stateObj.AlphaBill.Counter,
+		Timeout: stateObj.AlphaBill.Timeout,
+	}
+	return &sdktypes.FeeCreditRecord{
+		ID:   u.UnitID,
+		Data: fcr,
+	}, nil
+}
+
+// TODO: copied from AB repo, move to go-base?
+var alpha2Wei = new(uint256.Int).Exp(uint256.NewInt(10), uint256.NewInt(10))
+var alpha2WeiRoundCorrector = new(uint256.Int).Div(alpha2Wei, uint256.NewInt(2))
+
+// weiToAlpha - converts from wei to alpha, rounding half up.
+// 1 wei = wei * 10^10 / 10^18
+func weiToAlpha(wei *uint256.Int) uint64 {
+	return new(uint256.Int).Div(new(uint256.Int).Add(wei, alpha2WeiRoundCorrector), alpha2Wei).Uint64()
 }
 
 func (c *evmPartitionClient) ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*sdktypes.Proof, error) {

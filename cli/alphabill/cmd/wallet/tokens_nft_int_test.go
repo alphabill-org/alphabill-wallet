@@ -1,4 +1,5 @@
 //go:build !nodocker
+
 package wallet
 
 import (
@@ -18,7 +19,7 @@ import (
 )
 
 func TestNFTs_Integration(t *testing.T) {
-	wallets, abNet := testutils.SetupNetworkWithWallets(t, true, false)
+	wallets, abNet := testutils.SetupNetworkWithWallets(t, testutils.WithTokensNode(t))
 
 	addFeeCredit(t, wallets[0].Homedir, 100, "money", abNet.MoneyRpcUrl, abNet.MoneyRpcUrl)
 	addFeeCredit(t, wallets[0].Homedir, 100, "tokens", abNet.TokensRpcUrl, abNet.MoneyRpcUrl)
@@ -46,7 +47,7 @@ func TestNFTs_Integration(t *testing.T) {
 	symbol := "ABNFT"
 
 	tokensCmd := walletCmd.WithPrefixArgs("token", "--rpc-url", abNet.TokensRpcUrl)
-	tokensCmd.ExecWithError(t, "required flag(s) \"symbol\" not set", "new-type", "non-fungible", )
+	tokensCmd.ExecWithError(t, "required flag(s) \"symbol\" not set", "new-type", "non-fungible")
 	tokensCmd.Exec(t, "new-type", "non-fungible", "--key", "2", "--symbol", symbol, "--type", typeID.String(), "--subtype-clause", "ptpkh")
 	tokensCmd.Exec(t, "new-type", "non-fungible",
 		"--key", "2",
@@ -115,7 +116,7 @@ func TestNFTs_Integration(t *testing.T) {
 }
 
 func TestNFTDataUpdateCmd_Integration(t *testing.T) {
-	wallets, abNet := testutils.SetupNetworkWithWallets(t, true, false)
+	wallets, abNet := testutils.SetupNetworkWithWallets(t, testutils.WithTokensNode(t))
 
 	typeID := randomNonFungibleTokenTypeID(t)
 	symbol := "ABNFT"
@@ -165,7 +166,7 @@ func TestNFTDataUpdateCmd_Integration(t *testing.T) {
 	nftID2 := extractTokenID(t, stdout.Lines[0])
 
 	testutils.VerifyStdoutEventually(t, tokensCmd.ExecFunc(t, "list", "non-fungible", "--with-token-data"),
-		fmt.Sprintf("ID='%s'", nftID2),	"data='01'")
+		fmt.Sprintf("ID='%s'", nftID2), "data='01'")
 
 	// try to update and Observe failure
 	// TODO: a very slow way (10s) to verify that transaction failed, can we do better without inspecting node internals?
@@ -175,7 +176,7 @@ func TestNFTDataUpdateCmd_Integration(t *testing.T) {
 }
 
 func TestNFT_InvariantPredicate_Integration(t *testing.T) {
-	wallets, abNet := testutils.SetupNetworkWithWallets(t, true, false)
+	wallets, abNet := testutils.SetupNetworkWithWallets(t, testutils.WithTokensNode(t))
 
 	symbol1 := "ABNFT"
 	typeID11 := randomNonFungibleTokenTypeID(t)
@@ -203,7 +204,7 @@ func TestNFT_InvariantPredicate_Integration(t *testing.T) {
 	// mint
 	stdout := tokensCmd.Exec(t, "new", "non-fungible",
 		"--type", typeID12.String(),
-		"--mint-input", predicatePtpkh + "," + predicatePtpkh)
+		"--mint-input", predicatePtpkh+","+predicatePtpkh)
 	id := extractTokenID(t, stdout.Lines[0])
 	testutils.VerifyStdoutEventually(t, tokensCmd.ExecFunc(t, "list", "non-fungible"), fmt.Sprintf("ID='%s'", id))
 
@@ -212,13 +213,13 @@ func TestNFT_InvariantPredicate_Integration(t *testing.T) {
 		"--token-identifier", id.String(),
 		"--address", fmt.Sprintf("0x%X", wallets[1].PubKeys[0]),
 		"--key", "1",
-		"--inherit-bearer-input", predicateTrue + "," + predicatePtpkh)
+		"--inherit-bearer-input", predicateTrue+","+predicatePtpkh)
 	testutils.VerifyStdoutEventually(t, tokensCmd.WithHome(wallets[1].Homedir).ExecFunc(t, "list", "non-fungible"),
 		fmt.Sprintf("ID='%s'", id))
 }
 
 func TestNFT_LockUnlock_Integration(t *testing.T) {
-	wallets, abNet := testutils.SetupNetworkWithWallets(t, true, false)
+	wallets, abNet := testutils.SetupNetworkWithWallets(t, testutils.WithTokensNode(t))
 
 	typeID := randomNonFungibleTokenTypeID(t)
 	symbol := "ABNFT"

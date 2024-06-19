@@ -29,13 +29,16 @@ type (
 	AlphabillNetwork struct {
 		MoneyRpcUrl         string
 		TokensRpcUrl        string
+		EvmRpcUrl           string
 		OrchestrationRpcUrl string
 
-		ctx                 context.Context
-		genesis             []byte
-		dockerNetwork       string
-		bootstrapNode       string
+		ctx           context.Context
+		genesis       []byte
+		dockerNetwork string
+		bootstrapNode string
 	}
+
+	AlphabillNetworkOption func(*AlphabillNetwork)
 
 	Wallet struct {
 		Homedir string
@@ -46,7 +49,7 @@ type (
 )
 
 func (lc *StdoutLogConsumer) Accept(l tc.Log) {
-    fmt.Print(string(l.Content))
+	fmt.Print(string(l.Content))
 }
 
 func dockerImage() string {
@@ -57,11 +60,29 @@ func dockerImage() string {
 	return image
 }
 
+func WithTokensNode(t *testing.T) AlphabillNetworkOption {
+	return func(n *AlphabillNetwork) {
+		n.startTokensNode(t)
+	}
+}
+
+func WithOrchestrationNode(t *testing.T) AlphabillNetworkOption {
+	return func(n *AlphabillNetwork) {
+		n.startOrchestrationNode(t)
+	}
+}
+
+func WithEvmNode(t *testing.T) AlphabillNetworkOption {
+	return func(n *AlphabillNetwork) {
+		n.startEvmNode(t)
+	}
+}
+
 // SetupNetworkWithWallets sets up the Alphabill network and creates two wallets with two keys in both of them.
-// Starts money partition, and optionally tokens and orchestration partitions, with rpc servers up and running.
+// Starts money partition, and with given options, tokens, evm and/or orchestration partitions, with rpc servers up and running.
 // The owner of the initial bill is set to the first key of the first wallet.
 // Returns the created wallets and a reference to the Alphabill network.
-func SetupNetworkWithWallets(t *testing.T, withTokensNode, withOrchestrationNode bool) ([]*Wallet, *AlphabillNetwork) {
+func SetupNetworkWithWallets(t *testing.T, opts ...AlphabillNetworkOption) ([]*Wallet, *AlphabillNetwork) {
 	ctx := context.Background()
 	dockerNetwork, err := network.New(ctx, network.WithCheckDuplicate())
 	require.NoError(t, err)
@@ -81,17 +102,14 @@ func SetupNetworkWithWallets(t *testing.T, withTokensNode, withOrchestrationNode
 	abNet.startRootNode(t)
 	abNet.startMoneyNode(t)
 
-	if withTokensNode {
-		abNet.startTokensNode(t)
-	}
-	if withOrchestrationNode {
-		abNet.startOrchestrationNode(t)
+	for _, opt := range opts {
+		opt(abNet)
 	}
 
 	return wallets, abNet
 }
 
-func setupWallets(t *testing.T, walletCount, keyCount int) []*Wallet{
+func setupWallets(t *testing.T, walletCount, keyCount int) []*Wallet {
 	var wallets []*Wallet
 	for i := 0; i < walletCount; i++ {
 		am, home := CreateNewWallet(t)
@@ -114,8 +132,8 @@ func setupWallets(t *testing.T, walletCount, keyCount int) []*Wallet{
 
 func (n *AlphabillNetwork) createGenesis(t *testing.T, ownerPredicate []byte) {
 	cr := tc.ContainerRequest{
-		Image: dockerImage(),
-		WaitingFor: wait.ForExit().WithExitTimeout(10*time.Second),
+		Image:      dockerImage(),
+		WaitingFor: wait.ForExit().WithExitTimeout(10 * time.Second),
 		LogConsumerCfg: &tc.LogConsumerConfig{
 			Consumers: []tc.LogConsumer{&StdoutLogConsumer{}},
 		},
@@ -151,7 +169,7 @@ func (n *AlphabillNetwork) startRootNode(t *testing.T) {
 	container := n.startNode(t,
 		"root",
 		"--home", "/home/nonroot/root1",
-		"--address", "/ip4/0.0.0.0/tcp/" + containerP2pPort,
+		"--address", "/ip4/0.0.0.0/tcp/"+containerP2pPort,
 		"--log-file", "stdout",
 		"--log-level", "info",
 		"--log-format", "text",
@@ -164,16 +182,16 @@ func (n *AlphabillNetwork) startMoneyNode(t *testing.T) {
 	container := n.startNode(t,
 		"money",
 		"--home", "/home/nonroot/money1",
-		"--address", "/ip4/0.0.0.0/tcp/" + containerP2pPort,
-		"--rpc-server-address", "0.0.0.0:" + containerRpcPort,
+		"--address", "/ip4/0.0.0.0/tcp/"+containerP2pPort,
+		"--rpc-server-address", "0.0.0.0:"+containerRpcPort,
 		"--log-file", "stdout",
 		"--log-level", "info",
 		"--log-format", "text",
-		"--genesis",  "/home/nonroot/root1/rootchain/partition-genesis-1.json",
+		"--genesis", "/home/nonroot/root1/rootchain/partition-genesis-1.json",
 		"--key-file", "/home/nonroot/money1/money/keys.json",
-		"--state",    "/home/nonroot/money1/money/node-genesis-state.cbor",
-		"--db",       "/home/nonroot/money1/money/blocks.db",
-		"--tx-db",    "/home/nonroot/money1/money/tx.db",
+		"--state", "/home/nonroot/money1/money/node-genesis-state.cbor",
+		"--db", "/home/nonroot/money1/money/blocks.db",
+		"--tx-db", "/home/nonroot/money1/money/tx.db",
 		"--bootnodes", n.bootstrapNode,
 		"--trust-base-file", "/home/nonroot/root-trust-base.json")
 	n.MoneyRpcUrl = rpcUrl(t, n.ctx, container)
@@ -183,59 +201,78 @@ func (n *AlphabillNetwork) startTokensNode(t *testing.T) {
 	container := n.startNode(t,
 		"tokens",
 		"--home", "/home/nonroot/tokens1",
-		"--address", "/ip4/0.0.0.0/tcp/" + containerP2pPort,
-		"--rpc-server-address", "0.0.0.0:" + containerRpcPort,
+		"--address", "/ip4/0.0.0.0/tcp/"+containerP2pPort,
+		"--rpc-server-address", "0.0.0.0:"+containerRpcPort,
 		"--log-file", "stdout",
 		"--log-level", "info",
 		"--log-format", "text",
-		"--genesis",  "/home/nonroot/root1/rootchain/partition-genesis-2.json",
+		"--genesis", "/home/nonroot/root1/rootchain/partition-genesis-2.json",
 		"--key-file", "/home/nonroot/tokens1/tokens/keys.json",
-		"--state",    "/home/nonroot/tokens1/tokens/node-genesis-state.cbor",
-		"--db",       "/home/nonroot/tokens1/tokens/blocks.db",
-		"--tx-db",    "/home/nonroot/tokens1/tokens/tx.db",
+		"--state", "/home/nonroot/tokens1/tokens/node-genesis-state.cbor",
+		"--db", "/home/nonroot/tokens1/tokens/blocks.db",
+		"--tx-db", "/home/nonroot/tokens1/tokens/tx.db",
 		"--bootnodes", n.bootstrapNode,
 		"--trust-base-file", "/home/nonroot/root-trust-base.json")
 	n.TokensRpcUrl = rpcUrl(t, n.ctx, container)
+}
+
+func (n *AlphabillNetwork) startEvmNode(t *testing.T) {
+	container := n.startNode(t,
+		"evm",
+		"--home", "/home/nonroot/evm1",
+		"--address", "/ip4/0.0.0.0/tcp/"+containerP2pPort,
+		"--rpc-server-address", "0.0.0.0:"+containerRpcPort,
+		"--log-file", "stdout",
+		"--log-level", "info",
+		"--log-format", "text",
+		"--genesis", "/home/nonroot/root1/rootchain/partition-genesis-3.json",
+		"--key-file", "/home/nonroot/evm1/evm/keys.json",
+		"--state", "/home/nonroot/evm1/evm/node-genesis-state.cbor",
+		"--db", "/home/nonroot/evm1/evm/blocks.db",
+		"--tx-db", "/home/nonroot/evm1/evm/tx.db",
+		"--bootnodes", n.bootstrapNode,
+		"--trust-base-file", "/home/nonroot/root-trust-base.json")
+	n.EvmRpcUrl = rpcUrl(t, n.ctx, container)
 }
 
 func (n *AlphabillNetwork) startOrchestrationNode(t *testing.T) {
 	container := n.startNode(t,
 		"orchestration",
 		"--home", "/home/nonroot/orchestration1",
-		"--address", "/ip4/0.0.0.0/tcp/" + containerP2pPort,
-		"--rpc-server-address", "0.0.0.0:" + containerRpcPort,
+		"--address", "/ip4/0.0.0.0/tcp/"+containerP2pPort,
+		"--rpc-server-address", "0.0.0.0:"+containerRpcPort,
 		"--log-file", "stdout",
 		"--log-level", "info",
 		"--log-format", "text",
-		"--genesis",  "/home/nonroot/root1/rootchain/partition-genesis-4.json",
+		"--genesis", "/home/nonroot/root1/rootchain/partition-genesis-4.json",
 		"--key-file", "/home/nonroot/orchestration1/orchestration/keys.json",
-		"--state",    "/home/nonroot/orchestration1/orchestration/node-genesis-state.cbor",
-		"--db",       "/home/nonroot/orchestration1/orchestration/blocks.db",
-		"--tx-db",    "/home/nonroot/orchestration1/orchestration/tx.db",
+		"--state", "/home/nonroot/orchestration1/orchestration/node-genesis-state.cbor",
+		"--db", "/home/nonroot/orchestration1/orchestration/blocks.db",
+		"--tx-db", "/home/nonroot/orchestration1/orchestration/tx.db",
 		"--bootnodes", n.bootstrapNode,
-		 "--trust-base-file", "/home/nonroot/root-trust-base.json")
+		"--trust-base-file", "/home/nonroot/root-trust-base.json")
 	n.OrchestrationRpcUrl = rpcUrl(t, n.ctx, container)
 }
 
 func (n *AlphabillNetwork) startNode(t *testing.T, args ...string) tc.Container {
 	cr := tc.ContainerRequest{
-		Image: dockerImage(),
-		WaitingFor: wait.ForLog("BuildInfo=").WithStartupTimeout(5*time.Second),
+		Image:      dockerImage(),
+		WaitingFor: wait.ForLog("BuildInfo=").WithStartupTimeout(5 * time.Second),
 		LogConsumerCfg: &tc.LogConsumerConfig{
 			Consumers: []tc.LogConsumer{&StdoutLogConsumer{}},
 		},
 		Entrypoint: []string{"/home/nonroot/alphabill.sh"},
 		Files: []tc.ContainerFile{{
-			HostFilePath: "./testdata/alphabill.sh",
+			HostFilePath:      "./testdata/alphabill.sh",
 			ContainerFilePath: "/home/nonroot/alphabill.sh",
-			FileMode: 0o755,
+			FileMode:          0o755,
 		}, {
-			Reader: bytes.NewReader(n.genesis),
+			Reader:            bytes.NewReader(n.genesis),
 			ContainerFilePath: containerGenesisPath,
-			FileMode: 0o755,
+			FileMode:          0o755,
 		}},
-		Cmd: args,
-		Networks: []string{n.dockerNetwork},
+		Cmd:          args,
+		Networks:     []string{n.dockerNetwork},
 		ExposedPorts: []string{containerRpcPort},
 	}
 
