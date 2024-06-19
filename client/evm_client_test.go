@@ -92,8 +92,8 @@ func startServerAndEvmClient(t *testing.T, service *mocksrv.StateServiceMock) sd
 	srv := mocksrv.StartStateApiServer(t, service)
 
 	evmClient, err := NewEvmPartitionClient(context.Background(), "http://"+srv)
-	t.Cleanup(evmClient.Close)
 	require.NoError(t, err)
+	t.Cleanup(evmClient.Close)
 
 	return evmClient
 }

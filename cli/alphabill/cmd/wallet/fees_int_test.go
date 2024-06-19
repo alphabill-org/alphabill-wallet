@@ -103,7 +103,6 @@ func TestWalletFeesCmds_TokenPartition(t *testing.T) {
 	require.Equal(t, fmt.Sprintf("Account #1 %s", util.AmountToString(expectedFees, 8)), stdout.Lines[1])
 
 	// reclaim fees
-	// invalid transaction: fee credit record unit is nil
 	stdout = feesCmd.Exec(t, "reclaim")
 	require.Equal(t, "Successfully reclaimed fee credits on tokens partition.", stdout.Lines[0])
 
@@ -160,7 +159,6 @@ func TestWalletFeesCmds_EvmPartition(t *testing.T) {
 	require.Equal(t, fmt.Sprintf("Account #1 %s", util.AmountToString(expectedFees, 8)), stdout.Lines[1])
 
 	// reclaim fees
-	// invalid transaction: fee credit record unit is nil
 	stdout = feesCmd.Exec(t, "reclaim")
 	require.Equal(t, "Successfully reclaimed fee credits on evm partition.", stdout.Lines[0])
 

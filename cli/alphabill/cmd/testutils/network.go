@@ -79,7 +79,7 @@ func WithEvmNode(t *testing.T) AlphabillNetworkOption {
 }
 
 // SetupNetworkWithWallets sets up the Alphabill network and creates two wallets with two keys in both of them.
-// Starts money partition, and optionally tokens and orchestration partitions, with rpc servers up and running.
+// Starts money partition, and with given options, tokens, evm and/or orchestration partitions, with rpc servers up and running.
 // The owner of the initial bill is set to the first key of the first wallet.
 // Returns the created wallets and a reference to the Alphabill network.
 func SetupNetworkWithWallets(t *testing.T, opts ...AlphabillNetworkOption) ([]*Wallet, *AlphabillNetwork) {
