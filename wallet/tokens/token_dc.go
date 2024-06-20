@@ -11,13 +11,12 @@ import (
 
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
-	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 )
 
 const maxBurnBatchSize = 100
 
-func (w *Wallet) CollectDust(ctx context.Context, accountNumber uint64, allowedTokenTypes []sdktypes.TokenTypeID, invariantPredicateArgs []*PredicateInput) (map[uint64][]*SubmissionResult, error) {
+func (w *Wallet) CollectDust(ctx context.Context, accountNumber uint64, allowedTokenTypes []sdktypes.TokenTypeID, invariantPredicateArgs []*PredicateInput, ownerProof *PredicateInput) (map[uint64][]*SubmissionResult, error) {
 	keys, err := w.getAccounts(accountNumber)
 	if err != nil {
 		return nil, err
@@ -82,20 +81,20 @@ func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, typedTokens [
 		}
 
 		var lockFee uint64
-		lockFee, err = w.lockTokenForDC(ctx, acc.AccountKey, fcrID, targetTokenID, targetTokenCounter, invariantPredicateArgs)
+		lockFee, err = w.lockTokenForDC(ctx, acc, fcrID, targetTokenID, targetTokenCounter, invariantPredicateArgs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to lock target token: %w", err)
 		}
 
 		targetTokenCounter += 1
-		burnBatchAmount, burnFee, proofs, err := w.burnTokensForDC(ctx, acc.AccountKey, burnBatch, targetTokenCounter, targetTokenID, fcrID, invariantPredicateArgs)
+		burnBatchAmount, burnFee, proofs, err := w.burnTokensForDC(ctx, acc, burnBatch, targetTokenCounter, targetTokenID, fcrID, invariantPredicateArgs)
 		if err != nil {
 			return nil, err
 		}
 
 		// if there's more to burn, update counter to continue
 		var joinFee uint64
-		joinFee, err = w.joinTokenForDC(ctx, acc.AccountKey, proofs, targetTokenCounter, targetTokenID, fcrID, invariantPredicateArgs)
+		joinFee, err = w.joinTokenForDC(ctx, acc, proofs, targetTokenCounter, targetTokenID, fcrID, invariantPredicateArgs)
 		if err != nil {
 			return nil, err
 		}
@@ -107,7 +106,7 @@ func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, typedTokens [
 	return &SubmissionResult{FeeSum: totalFees}, nil
 }
 
-func (w *Wallet) joinTokenForDC(ctx context.Context, acc *account.AccountKey, burnProofs []*sdktypes.Proof, targetTokenCounter uint64, targetTokenID, fcrID types.UnitID, invariantPredicateArgs []*PredicateInput) (uint64, error) {
+func (w *Wallet) joinTokenForDC(ctx context.Context, acc *accountKey, burnProofs []*sdktypes.Proof, targetTokenCounter uint64, targetTokenID, fcrID types.UnitID, invariantPredicateArgs []*PredicateInput) (uint64, error) {
 	// explicitly sort proofs by unit ids in increasing order
 	sort.Slice(burnProofs, func(i, j int) bool {
 		a := burnProofs[i].TxRecord.TransactionOrder.UnitID()
@@ -128,7 +127,7 @@ func (w *Wallet) joinTokenForDC(ctx context.Context, acc *account.AccountKey, bu
 		InvariantPredicateSignatures: nil,
 	}
 
-	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeJoinFungibleToken, joinAttrs, targetTokenID, fcrID, acc, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
+	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeJoinFungibleToken, joinAttrs, targetTokenID, fcrID, w.GetRoundNumber, defaultOwnerProof(acc.AccountNumber()), func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.GetAccountManager(), invariantPredicateArgs, tx, joinAttrs)
 		if err != nil {
 			return err
@@ -146,7 +145,7 @@ func (w *Wallet) joinTokenForDC(ctx context.Context, acc *account.AccountKey, bu
 	return sub.Proof.TxRecord.ServerMetadata.ActualFee, nil
 }
 
-func (w *Wallet) burnTokensForDC(ctx context.Context, acc *account.AccountKey, tokensToBurn []*sdktypes.TokenUnit, targetTokenCounter uint64, targetTokenID, fcrID types.UnitID, invariantPredicateArgs []*PredicateInput) (uint64, uint64, []*sdktypes.Proof, error) {
+func (w *Wallet) burnTokensForDC(ctx context.Context, acc *accountKey, tokensToBurn []*sdktypes.TokenUnit, targetTokenCounter uint64, targetTokenID, fcrID types.UnitID, invariantPredicateArgs []*PredicateInput) (uint64, uint64, []*sdktypes.Proof, error) {
 	burnBatch := txsubmitter.NewBatch(w.tokensClient, w.log)
 	rnFetcher := &cachingRoundNumberFetcher{delegate: w.GetRoundNumber}
 	burnBatchAmount := uint64(0)
@@ -154,7 +153,7 @@ func (w *Wallet) burnTokensForDC(ctx context.Context, acc *account.AccountKey, t
 	for _, token := range tokensToBurn {
 		burnBatchAmount += token.Amount
 		attrs := newBurnTxAttrs(token, targetTokenCounter, targetTokenID)
-		sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeBurnFungibleToken, attrs, token.ID, fcrID, acc, rnFetcher.getRoundNumber, func(tx *types.TransactionOrder) error {
+		sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeBurnFungibleToken, attrs, token.ID, fcrID, rnFetcher.getRoundNumber, defaultOwnerProof(acc.AccountNumber()), func(tx *types.TransactionOrder) error {
 			signatures, err := preparePredicateSignatures(w.GetAccountManager(), invariantPredicateArgs, tx, attrs)
 			if err != nil {
 				return err
@@ -213,13 +212,13 @@ func (w *Wallet) getTokensForDC(ctx context.Context, key sdktypes.PubKey, allowe
 	return tokensByTypes, nil
 }
 
-func (w *Wallet) lockTokenForDC(ctx context.Context, acc *account.AccountKey, fcrID types.UnitID, targetTokenID types.UnitID, targetTokenCounter uint64, invariantPredicateArgs []*PredicateInput) (uint64, error) {
+func (w *Wallet) lockTokenForDC(ctx context.Context, acc *accountKey, fcrID types.UnitID, targetTokenID types.UnitID, targetTokenCounter uint64, invariantPredicateArgs []*PredicateInput) (uint64, error) {
 	attr := &tokens.LockTokenAttributes{
 		LockStatus: wallet.LockReasonCollectDust,
 		Counter:    targetTokenCounter,
 	}
 
-	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeLockToken, attr, targetTokenID, fcrID, acc, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
+	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeLockToken, attr, targetTokenID, fcrID, w.GetRoundNumber, defaultOwnerProof(acc.AccountNumber()), func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.GetAccountManager(), invariantPredicateArgs, tx, attr)
 		if err != nil {
 			return err
