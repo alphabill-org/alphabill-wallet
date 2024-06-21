@@ -33,6 +33,7 @@ const (
 	cmdFlagSybTypeClauseInput         = "subtype-input"
 	cmdFlagMintClause                 = "mint-clause"
 	cmdFlagBearerClause               = "bearer-clause"
+	cmdFlagBearerClauseInput          = "bearer-clause-input"
 	cmdFlagMintClauseInput            = "mint-input"
 	cmdFlagInheritBearerClause        = "inherit-bearer-clause"
 	cmdFlagInheritBearerClauseInput   = "inherit-bearer-input"
@@ -60,10 +61,10 @@ const (
 	maxDecimalPlaces   = 8
 
 	helpPredicateValues = `Valid values are either one of the predicate template name [ true | false | ptpkh | ptpkh:n | ptpkh:0x<hex-string> ] ` +
-		`or @filename to load predicate from given file.`
+		`or @<filename> to load predicate from given file.`
 	helpPredicateArgument = "Valid values are:\n[ true | false | empty ] - these will esentially mean \"no argument\"\n" +
 		"[ ptpkh | ptpkh:n ] - creates argument for the ptpkh predicate template using either default account key or account n key respectively\n" +
-		"@filename - load argument from file, the file content will be used as-is.\n"
+		"@<filename> - load argument from file, the file content will be used as-is.\n"
 )
 
 type runTokenListTypesCmd func(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind sdktypes.Kind) error
@@ -361,7 +362,7 @@ func execTokenCmdNewTokenFungible(cmd *cobra.Command, config *types.WalletConfig
 	if err != nil {
 		return err
 	}
-	ci, err := readPredicateInput(cmd, cmdFlagMintClauseInput, accountNumber, am)
+	ci, err := readPredicateInputs(cmd, cmdFlagMintClauseInput, accountNumber, am)
 	if err != nil {
 		return err
 	}
@@ -445,7 +446,7 @@ func execTokenCmdNewTokenNonFungible(cmd *cobra.Command, config *types.WalletCon
 	}
 	defer tw.Close()
 	am := tw.GetAccountManager()
-	ci, err := readPredicateInput(cmd, cmdFlagMintClauseInput, accountNumber, am)
+	ci, err := readPredicateInputs(cmd, cmdFlagMintClauseInput, accountNumber, am)
 	if err != nil {
 		return err
 	}
@@ -499,6 +500,7 @@ func tokenCmdSendFungible(config *types.WalletConfig) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringSlice(cmdFlagInheritBearerClauseInput, []string{predicateTrue}, "input to satisfy the type's invariant clause. "+helpPredicateArgument)
+	cmd.Flags().String(cmdFlagBearerClauseInput, predicatePtpkh, "input to satisfy the bearer clause. "+helpPredicateArgument)
 	cmd.Flags().String(cmdFlagAmount, "", "amount, must be bigger than 0 and is interpreted according to token type precision (decimals)")
 	err := cmd.MarkFlagRequired(cmdFlagAmount)
 	if err != nil {
@@ -562,7 +564,12 @@ func execTokenCmdSendFungible(cmd *cobra.Command, config *types.WalletConfig) er
 		return err
 	}
 
-	ib, err := readPredicateInput(cmd, cmdFlagInheritBearerClauseInput, accountNumber, tw.GetAccountManager())
+	ib, err := readPredicateInputs(cmd, cmdFlagInheritBearerClauseInput, accountNumber, tw.GetAccountManager())
+	if err != nil {
+		return err
+	}
+
+	bearerProof, err := readSinglePredicateInput(cmd, cmdFlagBearerClauseInput, accountNumber, tw.GetAccountManager())
 	if err != nil {
 		return err
 	}
@@ -580,7 +587,7 @@ func execTokenCmdSendFungible(cmd *cobra.Command, config *types.WalletConfig) er
 	if targetValue == 0 {
 		return fmt.Errorf("invalid parameter \"%s\" for \"--amount\": 0 is not valid amount", amountStr)
 	}
-	result, err := tw.SendFungible(cmd.Context(), accountNumber, typeId, targetValue, pubKey, ib)
+	result, err := tw.SendFungible(cmd.Context(), accountNumber, typeId, targetValue, pubKey, ib, bearerProof)
 	if err != nil {
 		return err
 	}
@@ -602,6 +609,7 @@ func tokenCmdSendNonFungible(config *types.WalletConfig) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringSlice(cmdFlagInheritBearerClauseInput, []string{predicateTrue}, "input to satisfy the type's invariant clause. "+helpPredicateArgument)
+	cmd.Flags().String(cmdFlagBearerClauseInput, predicatePtpkh, "input to satisfy the bearer clause. "+helpPredicateArgument)
 	setHexFlag(cmd, cmdFlagTokenID, nil, "token identifier")
 	err := cmd.MarkFlagRequired(cmdFlagTokenID)
 	if err != nil {
@@ -636,12 +644,17 @@ func execTokenCmdSendNonFungible(cmd *cobra.Command, config *types.WalletConfig)
 		return err
 	}
 
-	ib, err := readPredicateInput(cmd, cmdFlagInheritBearerClauseInput, accountNumber, tw.GetAccountManager())
+	ib, err := readPredicateInputs(cmd, cmdFlagInheritBearerClauseInput, accountNumber, tw.GetAccountManager())
 	if err != nil {
 		return err
 	}
 
-	result, err := tw.TransferNFT(cmd.Context(), accountNumber, tokenID, pubKey, ib)
+	bearerProof, err := readSinglePredicateInput(cmd, cmdFlagBearerClauseInput, accountNumber, tw.GetAccountManager())
+	if err != nil {
+		return err
+	}
+
+	result, err := tw.TransferNFT(cmd.Context(), accountNumber, tokenID, pubKey, ib, bearerProof)
 	if err != nil {
 		return err
 	}
@@ -668,6 +681,7 @@ func tokenCmdDC(config *types.WalletConfig) *cobra.Command {
 	cmd.Flags().Uint64VarP(&accountNumber, args.KeyCmdName, "k", 0, "which key to use for dust collection, 0 for all tokens from all accounts")
 	cmd.Flags().StringSlice(cmdFlagType, nil, "type unit identifier (hex)")
 	cmd.Flags().StringSlice(cmdFlagInheritBearerClauseInput, []string{predicateTrue}, "input to satisfy the type's invariant clause. "+helpPredicateArgument)
+	//cmd.Flags().String(cmdFlagBearerClauseInput, predicatePtpkh, "input to satisfy the bearer clause. "+helpPredicateArgument)
 
 	return cmd
 }
@@ -693,12 +707,20 @@ func execTokenCmdDC(cmd *cobra.Command, config *types.WalletConfig, accountNumbe
 			typez = append(typez, typeBytes)
 		}
 	}
-	ib, err := readPredicateInput(cmd, cmdFlagInheritBearerClauseInput, *accountNumber, tw.GetAccountManager())
+
+	// TODO: check the case with an inherit predicate other than "always true" and accNr = 0, might fail
+	ib, err := readPredicateInputs(cmd, cmdFlagInheritBearerClauseInput, *accountNumber, tw.GetAccountManager())
 	if err != nil {
 		return err
 	}
 
-	results, err := tw.CollectDust(cmd.Context(), *accountNumber, typez, ib)
+	// TODO: solve for "All accounts" case
+	//bearerProof, err := readSinglePredicateInput(cmd, cmdFlagBearerClauseInput, *accountNumber, tw.GetAccountManager())
+	//if err != nil {
+	//	return err
+	//}
+
+	results, err := tw.CollectDust(cmd.Context(), *accountNumber, typez, ib, nil)
 	if err != nil {
 		return err
 	}
@@ -754,7 +776,7 @@ func execTokenCmdUpdateNFTData(cmd *cobra.Command, config *types.WalletConfig) e
 	}
 	defer tw.Close()
 
-	du, err := readPredicateInput(cmd, cmdFlagTokenDataUpdateClauseInput, accountNumber, tw.GetAccountManager())
+	du, err := readPredicateInputs(cmd, cmdFlagTokenDataUpdateClauseInput, accountNumber, tw.GetAccountManager())
 	if err != nil {
 		return err
 	}
@@ -982,6 +1004,7 @@ func tokenCmdLock(config *types.WalletConfig) *cobra.Command {
 		panic(err)
 	}
 	cmd.Flags().StringSlice(cmdFlagInheritBearerClauseInput, []string{predicateTrue}, "input to satisfy the type's invariant clause. "+helpPredicateArgument)
+	cmd.Flags().String(cmdFlagBearerClauseInput, predicatePtpkh, "input to satisfy the bearer clause. "+helpPredicateArgument)
 	return addCommonAccountFlags(cmd)
 }
 
@@ -1001,12 +1024,17 @@ func execTokenCmdLock(cmd *cobra.Command, config *types.WalletConfig) error {
 	}
 	defer tw.Close()
 
-	ib, err := readPredicateInput(cmd, cmdFlagInheritBearerClauseInput, accountNumber, tw.GetAccountManager())
+	ib, err := readPredicateInputs(cmd, cmdFlagInheritBearerClauseInput, accountNumber, tw.GetAccountManager())
 	if err != nil {
 		return err
 	}
 
-	result, err := tw.LockToken(cmd.Context(), accountNumber, tokenID, ib)
+	bearerProof, err := readSinglePredicateInput(cmd, cmdFlagBearerClauseInput, accountNumber, tw.GetAccountManager())
+	if err != nil {
+		return err
+	}
+
+	result, err := tw.LockToken(cmd.Context(), accountNumber, tokenID, ib, bearerProof)
 	if err != nil {
 		return err
 	}
@@ -1032,6 +1060,7 @@ func tokenCmdUnlock(config *types.WalletConfig) *cobra.Command {
 		panic(err)
 	}
 	cmd.Flags().StringSlice(cmdFlagInheritBearerClauseInput, []string{predicateTrue}, "input to satisfy the type's invariant clause. "+helpPredicateArgument)
+	cmd.Flags().String(cmdFlagBearerClauseInput, predicatePtpkh, "input to satisfy the bearer clause. "+helpPredicateArgument)
 	return addCommonAccountFlags(cmd)
 }
 
@@ -1051,12 +1080,17 @@ func execTokenCmdUnlock(cmd *cobra.Command, config *types.WalletConfig) error {
 	}
 	defer tw.Close()
 
-	ib, err := readPredicateInput(cmd, cmdFlagInheritBearerClauseInput, accountNumber, tw.GetAccountManager())
+	ib, err := readPredicateInputs(cmd, cmdFlagInheritBearerClauseInput, accountNumber, tw.GetAccountManager())
 	if err != nil {
 		return err
 	}
 
-	result, err := tw.UnlockToken(cmd.Context(), accountNumber, tokenID, ib)
+	bearerProof, err := readSinglePredicateInput(cmd, cmdFlagBearerClauseInput, accountNumber, tw.GetAccountManager())
+	if err != nil {
+		return err
+	}
+
+	result, err := tw.UnlockToken(cmd.Context(), accountNumber, tokenID, ib, bearerProof)
 	if err != nil {
 		return err
 	}
@@ -1108,7 +1142,7 @@ func readParentTypeInfo(cmd *cobra.Command, keyNr uint64, am account.Manager) (s
 		return nil, []*tokenswallet.PredicateInput{}, nil
 	}
 
-	creationInputs, err := readPredicateInput(cmd, cmdFlagSybTypeClauseInput, keyNr, am)
+	creationInputs, err := readPredicateInputs(cmd, cmdFlagSybTypeClauseInput, keyNr, am)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1116,19 +1150,39 @@ func readParentTypeInfo(cmd *cobra.Command, keyNr uint64, am account.Manager) (s
 	return parentType, creationInputs, nil
 }
 
-func readPredicateInput(cmd *cobra.Command, flag string, keyNr uint64, am account.Manager) ([]*tokenswallet.PredicateInput, error) {
+/*
+readPredicateInputs reads the flag value and converts it to predicate inputs. Returns a single input with nil argument if the flag is empty.
+*/
+func readPredicateInputs(cmd *cobra.Command, flag string, keyNr uint64, am account.Manager) ([]*tokenswallet.PredicateInput, error) {
 	creationInputStrs, err := cmd.Flags().GetStringSlice(flag)
 	if err != nil {
 		return nil, err
 	}
 	if len(creationInputStrs) == 0 {
-		return []*tokenswallet.PredicateInput{{Argument: nil}}, nil
+		return []*tokenswallet.PredicateInput{{Argument: nil, AccountNumber: keyNr}}, nil
 	}
-	creationInputs, err := tokenswallet.ParsePredicateArguments(creationInputStrs, keyNr, am)
+	return tokenswallet.ParsePredicateArguments(creationInputStrs, keyNr, am)
+}
+
+/*
+readSinglePredicateInput reads the flag value and converts it to predicate input. Returns nil if the flag is empty.
+*/
+func readSinglePredicateInput(cmd *cobra.Command, flag string, keyNr uint64, am account.Manager) (*tokenswallet.PredicateInput, error) {
+	arg, err := cmd.Flags().GetString(flag)
 	if err != nil {
 		return nil, err
 	}
-	return creationInputs, nil
+	if arg == "" {
+		return nil, nil
+	}
+	args, err := tokenswallet.ParsePredicateArguments([]string{arg}, keyNr, am)
+	if err != nil {
+		return nil, err
+	}
+	if len(args) != 1 {
+		return nil, fmt.Errorf("expected exactly one argument, got %d", len(args))
+	}
+	return args[0], nil
 }
 
 /*
