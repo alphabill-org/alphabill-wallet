@@ -12,13 +12,13 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-go-base/util"
-
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
+	"github.com/alphabill-org/alphabill/predicates"
 )
 
 const (
@@ -269,13 +269,28 @@ type accountKey struct {
 	idx uint64
 }
 
+func (a *accountKey) AccountNumber() uint64 {
+	return a.idx + 1
+}
+
+func (w *Wallet) getAccount(accountNumber uint64) (*accountKey, error) {
+	if accountNumber < 1 {
+		return nil, fmt.Errorf("invalid account number: %d", accountNumber)
+	}
+	key, err := w.am.GetAccountKey(accountNumber - 1)
+	if err != nil {
+		return nil, err
+	}
+	return &accountKey{AccountKey: key, idx: accountNumber - 1}, nil
+}
+
 func (w *Wallet) getAccounts(accountNumber uint64) ([]*accountKey, error) {
 	if accountNumber > AllAccounts {
-		key, err := w.am.GetAccountKey(accountNumber - 1)
+		key, err := w.getAccount(accountNumber)
 		if err != nil {
 			return nil, err
 		}
-		return []*accountKey{{AccountKey: key, idx: accountNumber - 1}}, nil
+		return []*accountKey{key}, nil
 	}
 	keys, err := w.am.GetAccountKeys()
 	if err != nil {
@@ -300,12 +315,12 @@ func (w *Wallet) GetToken(ctx context.Context, tokenID sdktypes.TokenID) (*sdkty
 	return token, nil
 }
 
-func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID sdktypes.TokenID, receiverPubKey sdktypes.PubKey, invariantPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
-	key, err := w.am.GetAccountKey(accountNumber - 1)
+func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID sdktypes.TokenID, receiverPubKey sdktypes.PubKey, invariantPredicateArgs []*PredicateInput, ownerProof *PredicateInput) (*SubmissionResult, error) {
+	key, err := w.getAccount(accountNumber)
 	if err != nil {
 		return nil, err
 	}
-	fcrID, err := w.ensureFeeCredit(ctx, key, 1)
+	fcrID, err := w.ensureFeeCredit(ctx, key.AccountKey, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -313,14 +328,14 @@ func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID 
 	if err != nil {
 		return nil, err
 	}
-	if err = ensureTokenOwnership(accountNumber, key.PubKey, token); err != nil {
+	if err = ensureTokenOwnership(key, token, ownerProof); err != nil {
 		return nil, err
 	}
 	if token.IsLocked() {
 		return nil, errors.New("token is locked")
 	}
 	attrs := newNonFungibleTransferTxAttrs(token, receiverPubKey)
-	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeTransferNFT, attrs, tokenID, fcrID, key, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
+	sub, err := w.prepareTxSubmission(ctx, key, tokens.PayloadTypeTransferNFT, attrs, tokenID, fcrID, w.GetRoundNumber, ownerProof, func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.am, invariantPredicateArgs, tx, attrs)
 		if err != nil {
 			return err
@@ -336,18 +351,17 @@ func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID 
 	return newSingleResult(sub, accountNumber), err
 }
 
-func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId sdktypes.TokenTypeID, targetAmount uint64, receiverPubKey []byte, invariantPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId sdktypes.TokenTypeID, targetAmount uint64, receiverPubKey []byte, invariantPredicateArgs []*PredicateInput, ownerProof *PredicateInput) (*SubmissionResult, error) {
 	if targetAmount == 0 {
 		return nil, fmt.Errorf("invalid amount: 0")
 	}
 	if accountNumber < 1 {
 		return nil, fmt.Errorf("invalid account number: %d", accountNumber)
 	}
-	accs, err := w.getAccounts(accountNumber)
+	acc, err := w.getAccount(accountNumber)
 	if err != nil {
 		return nil, err
 	}
-	acc := accs[0]
 	fcrID, err := w.ensureFeeCredit(ctx, acc.AccountKey, 1)
 	if err != nil {
 		return nil, err
@@ -396,26 +410,23 @@ func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId 
 	}
 	// optimization: first try to make a single operation instead of iterating through all tokens in doSendMultiple
 	if closestMatch.Amount >= targetAmount {
-		sub, err := w.prepareSplitOrTransferTx(ctx, acc.AccountKey, targetAmount, closestMatch, fcrID, receiverPubKey, invariantPredicateArgs, w.GetRoundNumber)
+		sub, err := w.prepareSplitOrTransferTx(ctx, acc, targetAmount, closestMatch, fcrID, receiverPubKey, invariantPredicateArgs, w.GetRoundNumber, ownerProof)
 		if err != nil {
 			return nil, err
 		}
 		err = sub.ToBatch(w.tokensClient, w.log).SendTx(ctx, w.confirmTx)
 		return newSingleResult(sub, accountNumber), err
 	} else {
-		return w.doSendMultiple(ctx, targetAmount, matchingTokens, acc, fcrID, receiverPubKey, invariantPredicateArgs)
+		return w.doSendMultiple(ctx, targetAmount, matchingTokens, acc, fcrID, receiverPubKey, invariantPredicateArgs, ownerProof)
 	}
 }
 
 func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenID sdktypes.TokenID, data []byte, updatePredicateArgs []*PredicateInput) (*SubmissionResult, error) {
-	if accountNumber < 1 {
-		return nil, fmt.Errorf("invalid account number: %d", accountNumber)
-	}
-	acc, err := w.am.GetAccountKey(accountNumber - 1)
+	acc, err := w.getAccount(accountNumber)
 	if err != nil {
 		return nil, err
 	}
-	fcrID, err := w.ensureFeeCredit(ctx, acc, 1)
+	fcrID, err := w.ensureFeeCredit(ctx, acc.AccountKey, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -436,7 +447,7 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 		DataUpdateSignatures: nil,
 	}
 
-	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeUpdateNFT, attrs, tokenID, fcrID, acc, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
+	sub, err := w.prepareTxSubmission(ctx, acc, tokens.PayloadTypeUpdateNFT, attrs, tokenID, fcrID, w.GetRoundNumber, defaultOwnerProof(accountNumber), func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.am, updatePredicateArgs, tx, attrs)
 		if err != nil {
 			return err
@@ -454,14 +465,11 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 
 // SendFungibleByID sends fungible tokens by given unit ID, if amount matches, does the transfer, otherwise splits the token
 func (w *Wallet) SendFungibleByID(ctx context.Context, accountNumber uint64, tokenID sdktypes.TokenID, targetAmount uint64, receiverPubKey []byte, invariantPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
-	if accountNumber < 1 {
-		return nil, fmt.Errorf("invalid account number: %d", accountNumber)
-	}
-	acc, err := w.am.GetAccountKey(accountNumber - 1)
+	acc, err := w.getAccount(accountNumber)
 	if err != nil {
 		return nil, err
 	}
-	fcrID, err := w.ensureFeeCredit(ctx, acc, 1)
+	fcrID, err := w.ensureFeeCredit(ctx, acc.AccountKey, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -469,13 +477,13 @@ func (w *Wallet) SendFungibleByID(ctx context.Context, accountNumber uint64, tok
 	if err != nil {
 		return nil, fmt.Errorf("failed to get token %X: %w", tokenID, err)
 	}
-	if err = ensureTokenOwnership(accountNumber, acc.PubKey, token); err != nil {
+	if err = ensureTokenOwnership(acc, token, defaultOwnerProof(accountNumber)); err != nil {
 		return nil, err
 	}
 	if targetAmount > token.Amount {
 		return nil, fmt.Errorf("insufficient FT value: got %v, need %v", token.Amount, targetAmount)
 	}
-	sub, err := w.prepareSplitOrTransferTx(ctx, acc, targetAmount, token, fcrID, receiverPubKey, invariantPredicateArgs, w.GetRoundNumber)
+	sub, err := w.prepareSplitOrTransferTx(ctx, acc, targetAmount, token, fcrID, receiverPubKey, invariantPredicateArgs, w.GetRoundNumber, defaultOwnerProof(accountNumber))
 	if err != nil {
 		return nil, err
 	}
@@ -484,14 +492,11 @@ func (w *Wallet) SendFungibleByID(ctx context.Context, accountNumber uint64, tok
 }
 
 func (w *Wallet) BurnTokens(ctx context.Context, accountNumber uint64, tokensToBurn []*sdktypes.TokenUnit, invariantPredicateArgs []*PredicateInput) (uint64, uint64, []*sdktypes.Proof, error) {
-	if accountNumber < 1 {
-		return 0, 0, nil, fmt.Errorf("invalid account number: %d", accountNumber)
-	}
-	acc, err := w.am.GetAccountKey(accountNumber - 1)
+	acc, err := w.getAccount(accountNumber)
 	if err != nil {
 		return 0, 0, nil, err
 	}
-	fcrID, err := w.ensureFeeCredit(ctx, acc, 1)
+	fcrID, err := w.ensureFeeCredit(ctx, acc.AccountKey, 1)
 	if err != nil {
 		return 0, 0, nil, err
 	}
@@ -536,12 +541,12 @@ func (w *Wallet) ensureFeeCredit(ctx context.Context, accountKey *account.Accoun
 	return fcb.ID, nil
 }
 
-func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID []byte, ib []*PredicateInput) (*SubmissionResult, error) {
-	key, err := w.am.GetAccountKey(accountNumber - 1)
+func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID []byte, ib []*PredicateInput, ownerProof *PredicateInput) (*SubmissionResult, error) {
+	key, err := w.getAccount(accountNumber)
 	if err != nil {
 		return nil, err
 	}
-	fcrID, err := w.ensureFeeCredit(ctx, key, 1)
+	fcrID, err := w.ensureFeeCredit(ctx, key.AccountKey, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -550,14 +555,14 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID []
 	if err != nil {
 		return nil, err
 	}
-	if err = ensureTokenOwnership(accountNumber, key.PubKey, token); err != nil {
+	if err = ensureTokenOwnership(key, token, ownerProof); err != nil {
 		return nil, err
 	}
 	if token.IsLocked() {
 		return nil, errors.New("token is already locked")
 	}
 	attrs := newLockTxAttrs(token.Counter, wallet.LockReasonManual)
-	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeLockToken, attrs, tokenID, fcrID, key, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
+	sub, err := w.prepareTxSubmission(ctx, key, tokens.PayloadTypeLockToken, attrs, tokenID, fcrID, w.GetRoundNumber, ownerProof, func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.am, ib, tx, attrs)
 		if err != nil {
 			return err
@@ -573,12 +578,12 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID []
 	return newSingleResult(sub, accountNumber), err
 }
 
-func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID []byte, ib []*PredicateInput) (*SubmissionResult, error) {
-	key, err := w.am.GetAccountKey(accountNumber - 1)
+func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID []byte, ib []*PredicateInput, ownerProof *PredicateInput) (*SubmissionResult, error) {
+	key, err := w.getAccount(accountNumber)
 	if err != nil {
 		return nil, err
 	}
-	fcrID, err := w.ensureFeeCredit(ctx, key, 1)
+	fcrID, err := w.ensureFeeCredit(ctx, key.AccountKey, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -586,14 +591,14 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	if err != nil {
 		return nil, err
 	}
-	if err = ensureTokenOwnership(accountNumber, key.PubKey, token); err != nil {
+	if err = ensureTokenOwnership(key, token, ownerProof); err != nil {
 		return nil, err
 	}
 	if !token.IsLocked() {
 		return nil, errors.New("token is already unlocked")
 	}
 	attrs := newUnlockTxAttrs(token.Counter)
-	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeUnlockToken, attrs, tokenID, fcrID, key, w.GetRoundNumber, func(tx *types.TransactionOrder) error {
+	sub, err := w.prepareTxSubmission(ctx, key, tokens.PayloadTypeUnlockToken, attrs, tokenID, fcrID, w.GetRoundNumber, ownerProof, func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.am, ib, tx, attrs)
 		if err != nil {
 			return err
@@ -609,9 +614,21 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	return newSingleResult(sub, accountNumber), err
 }
 
-func ensureTokenOwnership(accountNumber uint64, pk sdktypes.PubKey, unit *sdktypes.TokenUnit) error {
-	if !bytes.Equal(unit.Owner, templates.NewP2pkh256BytesFromKey(pk)) {
-		return fmt.Errorf("token '%s' does not belong to account #%d", unit.ID, accountNumber)
+func ensureTokenOwnership(acc *accountKey, unit *sdktypes.TokenUnit, ownerProof *PredicateInput) error {
+	if bytes.Equal(unit.Owner, templates.NewP2pkh256BytesFromKey(acc.PubKey)) {
+		return nil
 	}
-	return nil
+	predicate, err := predicates.ExtractPredicate(unit.Owner)
+	if err != nil {
+		return err
+	}
+	if !templates.IsP2pkhTemplate(predicate) && ownerProof != nil && ownerProof.AccountNumber == 0 && ownerProof.Argument != nil {
+		// this must be a "custom predicate" with provided owner proof
+		return nil
+	}
+	return fmt.Errorf("token '%s' does not belong to account #%d", unit.ID, acc.AccountNumber())
+}
+
+func defaultOwnerProof(accNr uint64) *PredicateInput {
+	return &PredicateInput{AccountNumber: accNr}
 }
