@@ -4,6 +4,7 @@ package wallet
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -11,8 +12,10 @@ import (
 	"testing"
 
 	"github.com/alphabill-org/alphabill-go-base/hash"
+	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill-go-base/types"
+	"github.com/alphabill-org/alphabill-wallet/client"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
@@ -113,6 +116,67 @@ func TestNFTs_Integration(t *testing.T) {
 		"--bearer-clause", fmt.Sprintf("ptpkh:0x%X", hash.Sum256(wallets[1].PubKeys[0])))
 	nftID2 := extractTokenID(t, stdout.Lines[0])
 	testutils.VerifyStdout(t, tokensCmd.WithHome(wallets[1].Homedir).Exec(t, "list", "non-fungible"), fmt.Sprintf("ID='%s'", nftID2))
+}
+
+func TestNFTs_CustomBearer_Integration(t *testing.T) {
+	wallets, abNet := testutils.SetupNetworkWithWallets(t, testutils.WithTokensNode(t))
+
+	addFeeCredit(t, wallets[0].Homedir, 100, "money", abNet.MoneyRpcUrl, abNet.MoneyRpcUrl)
+	addFeeCredit(t, wallets[0].Homedir, 100, "tokens", abNet.TokensRpcUrl, abNet.MoneyRpcUrl)
+
+	walletCmd := newWalletCmdExecutor().WithHome(wallets[0].Homedir)
+
+	// send money to w1k2 to create fee credits
+	walletCmd.Exec(t, "send",
+		"--rpc-url", abNet.MoneyRpcUrl,
+		"--amount", "100",
+		"--address", fmt.Sprintf("0x%X", wallets[0].PubKeys[1]))
+
+	// create fee credit for w1k2
+	stdout := walletCmd.Exec(t, "fees", "add",
+		"--rpc-url", abNet.MoneyRpcUrl,
+		"--partition", "tokens",
+		"--partition-rpc-url", abNet.TokensRpcUrl,
+		"--key", "2",
+		"--amount", "50")
+	require.Equal(t, "Successfully created 50 fee credits on tokens partition.", stdout.Lines[0])
+
+	// non-fungible token types
+	typeID := randomNonFungibleTokenTypeID(t)
+	symbol := "ABNFT"
+
+	tokensCmd := walletCmd.WithPrefixArgs("token", "--rpc-url", abNet.TokensRpcUrl)
+	tokensCmd.Exec(t, "new-type", "non-fungible", "--key", "1", "--symbol", symbol, "--type", typeID.String(), "--subtype-clause", "false")
+
+	// mint NFT and set bearer to "always true"
+	stdout = tokensCmd.Exec(t, "new", "non-fungible", "--key", "1", "--type", typeID.String(), "--bearer-clause", "true")
+	nftID := extractTokenID(t, stdout.Lines[0])
+
+	// check token exists via RPC because "always true" does not belong to any wallet
+	ctx := context.Background()
+	client, err := client.NewTokensPartitionClient(ctx, abNet.TokensRpcUrl)
+	require.NoError(t, err)
+	t.Cleanup(client.Close)
+	nft, err := client.GetToken(ctx, nftID)
+	require.NoError(t, err)
+	require.NotNil(t, nft)
+	require.Equal(t, nftID, nft.ID)
+	require.Equal(t, typeID, nft.TypeID)
+	require.Equal(t, templates.AlwaysTrueBytes(), nft.Owner)
+
+	// create temp file and write 'CBOR NULL' byte into it:
+	tmpfile, err := os.CreateTemp(t.TempDir(), "test")
+	require.NoError(t, err)
+	_, err = tmpfile.Write([]byte{0xf6})
+	require.NoError(t, err)
+
+	// transfer NFT to w1k2 using custom --bearer-clause-input flag with a proof to "always true" predicate
+	tokensCmd.Exec(t, "send", "non-fungible", "--key", "1", "--token-identifier", nftID.String(), "--address", fmt.Sprintf("0x%X", wallets[0].PubKeys[1]),
+		"--bearer-clause-input", "@"+tmpfile.Name())
+
+	//check that w1k2 has the nft
+	testutils.VerifyStdoutEventually(t, tokensCmd.WithHome(wallets[0].Homedir).ExecFunc(t, "list", "non-fungible", "--key", "2"),
+		fmt.Sprintf("ID='%s'", nftID))
 }
 
 func TestNFTDataUpdateCmd_Integration(t *testing.T) {
