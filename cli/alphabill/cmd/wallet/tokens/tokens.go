@@ -61,10 +61,10 @@ const (
 	maxDecimalPlaces   = 8
 
 	helpPredicateValues = `Valid values are either one of the predicate template name [ true | false | ptpkh | ptpkh:n | ptpkh:0x<hex-string> ] ` +
-		`or @filename to load predicate from given file.`
+		`or @<filename> to load predicate from given file.`
 	helpPredicateArgument = "Valid values are:\n[ true | false | empty ] - these will esentially mean \"no argument\"\n" +
 		"[ ptpkh | ptpkh:n ] - creates argument for the ptpkh predicate template using either default account key or account n key respectively\n" +
-		"@filename - load argument from file, the file content will be used as-is.\n"
+		"@<filename> - load argument from file, the file content will be used as-is.\n"
 )
 
 type runTokenListTypesCmd func(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind sdktypes.Kind) error
