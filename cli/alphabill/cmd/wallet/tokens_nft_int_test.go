@@ -126,21 +126,6 @@ func TestNFTs_CustomBearer_Integration(t *testing.T) {
 
 	walletCmd := newWalletCmdExecutor().WithHome(wallets[0].Homedir)
 
-	// send money to w1k2 to create fee credits
-	walletCmd.Exec(t, "send",
-		"--rpc-url", abNet.MoneyRpcUrl,
-		"--amount", "100",
-		"--address", fmt.Sprintf("0x%X", wallets[0].PubKeys[1]))
-
-	// create fee credit for w1k2
-	stdout := walletCmd.Exec(t, "fees", "add",
-		"--rpc-url", abNet.MoneyRpcUrl,
-		"--partition", "tokens",
-		"--partition-rpc-url", abNet.TokensRpcUrl,
-		"--key", "2",
-		"--amount", "50")
-	require.Equal(t, "Successfully created 50 fee credits on tokens partition.", stdout.Lines[0])
-
 	// non-fungible token types
 	typeID := randomNonFungibleTokenTypeID(t)
 	symbol := "ABNFT"
@@ -149,7 +134,7 @@ func TestNFTs_CustomBearer_Integration(t *testing.T) {
 	tokensCmd.Exec(t, "new-type", "non-fungible", "--key", "1", "--symbol", symbol, "--type", typeID.String(), "--subtype-clause", "false")
 
 	// mint NFT and set bearer to "always true"
-	stdout = tokensCmd.Exec(t, "new", "non-fungible", "--key", "1", "--type", typeID.String(), "--bearer-clause", "true")
+	stdout := tokensCmd.Exec(t, "new", "non-fungible", "--key", "1", "--type", typeID.String(), "--bearer-clause", "true")
 	nftID := extractTokenID(t, stdout.Lines[0])
 
 	// check token exists via RPC because "always true" does not belong to any wallet
