@@ -12,13 +12,13 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-go-base/util"
-
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
+	"github.com/alphabill-org/alphabill/predicates"
 )
 
 const (
@@ -316,11 +316,11 @@ func (w *Wallet) GetToken(ctx context.Context, tokenID sdktypes.TokenID) (*sdkty
 }
 
 func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID sdktypes.TokenID, receiverPubKey sdktypes.PubKey, invariantPredicateArgs []*PredicateInput, ownerProof *PredicateInput) (*SubmissionResult, error) {
-	key, err := w.am.GetAccountKey(accountNumber - 1)
+	key, err := w.getAccount(accountNumber)
 	if err != nil {
 		return nil, err
 	}
-	fcrID, err := w.ensureFeeCredit(ctx, key, 1)
+	fcrID, err := w.ensureFeeCredit(ctx, key.AccountKey, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -328,7 +328,7 @@ func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID 
 	if err != nil {
 		return nil, err
 	}
-	if err = ensureTokenOwnership(accountNumber, key.PubKey, token); err != nil {
+	if err = ensureTokenOwnership(key, token, ownerProof); err != nil {
 		return nil, err
 	}
 	if token.IsLocked() {
@@ -478,7 +478,7 @@ func (w *Wallet) SendFungibleByID(ctx context.Context, accountNumber uint64, tok
 	if err != nil {
 		return nil, fmt.Errorf("failed to get token %X: %w", tokenID, err)
 	}
-	if err = ensureTokenOwnership(accountNumber, acc.PubKey, token); err != nil {
+	if err = ensureTokenOwnership(acc, token, defaultOwnerProof(accountNumber)); err != nil {
 		return nil, err
 	}
 	if targetAmount > token.Amount {
@@ -543,11 +543,11 @@ func (w *Wallet) ensureFeeCredit(ctx context.Context, accountKey *account.Accoun
 }
 
 func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID []byte, ib []*PredicateInput, ownerProof *PredicateInput) (*SubmissionResult, error) {
-	key, err := w.am.GetAccountKey(accountNumber - 1)
+	key, err := w.getAccount(accountNumber)
 	if err != nil {
 		return nil, err
 	}
-	fcrID, err := w.ensureFeeCredit(ctx, key, 1)
+	fcrID, err := w.ensureFeeCredit(ctx, key.AccountKey, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -556,7 +556,7 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID []
 	if err != nil {
 		return nil, err
 	}
-	if err = ensureTokenOwnership(accountNumber, key.PubKey, token); err != nil {
+	if err = ensureTokenOwnership(key, token, ownerProof); err != nil {
 		return nil, err
 	}
 	if token.IsLocked() {
@@ -580,11 +580,11 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID []
 }
 
 func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID []byte, ib []*PredicateInput, ownerProof *PredicateInput) (*SubmissionResult, error) {
-	key, err := w.am.GetAccountKey(accountNumber - 1)
+	key, err := w.getAccount(accountNumber)
 	if err != nil {
 		return nil, err
 	}
-	fcrID, err := w.ensureFeeCredit(ctx, key, 1)
+	fcrID, err := w.ensureFeeCredit(ctx, key.AccountKey, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -592,7 +592,7 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	if err != nil {
 		return nil, err
 	}
-	if err = ensureTokenOwnership(accountNumber, key.PubKey, token); err != nil {
+	if err = ensureTokenOwnership(key, token, ownerProof); err != nil {
 		return nil, err
 	}
 	if !token.IsLocked() {
@@ -615,11 +615,19 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	return newSingleResult(sub, accountNumber), err
 }
 
-func ensureTokenOwnership(accountNumber uint64, pk sdktypes.PubKey, unit *sdktypes.TokenUnit) error {
-	if !bytes.Equal(unit.Owner, templates.NewP2pkh256BytesFromKey(pk)) {
-		return fmt.Errorf("token '%s' does not belong to account #%d", unit.ID, accountNumber)
+func ensureTokenOwnership(acc *accountKey, unit *sdktypes.TokenUnit, ownerProof *PredicateInput) error {
+	if bytes.Equal(unit.Owner, templates.NewP2pkh256BytesFromKey(acc.PubKey)) {
+		return nil
 	}
-	return nil
+	predicate, err := predicates.ExtractPredicate(unit.Owner)
+	if err != nil {
+		return err
+	}
+	if !templates.IsP2pkhTemplate(predicate) && ownerProof != nil && ownerProof.AccountNumber == 0 && ownerProof.Argument != nil {
+		// this must be a "custom predicate" with provided owner proof
+		return nil
+	}
+	return fmt.Errorf("token '%s' does not belong to account #%d", unit.ID, acc.AccountNumber())
 }
 
 func defaultOwnerProof(accNr uint64) *PredicateInput {
