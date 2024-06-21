@@ -681,7 +681,7 @@ func tokenCmdDC(config *types.WalletConfig) *cobra.Command {
 	cmd.Flags().Uint64VarP(&accountNumber, args.KeyCmdName, "k", 0, "which key to use for dust collection, 0 for all tokens from all accounts")
 	cmd.Flags().StringSlice(cmdFlagType, nil, "type unit identifier (hex)")
 	cmd.Flags().StringSlice(cmdFlagInheritBearerClauseInput, []string{predicateTrue}, "input to satisfy the type's invariant clause. "+helpPredicateArgument)
-	cmd.Flags().String(cmdFlagBearerClauseInput, predicatePtpkh, "input to satisfy the bearer clause. "+helpPredicateArgument)
+	//cmd.Flags().String(cmdFlagBearerClauseInput, predicatePtpkh, "input to satisfy the bearer clause. "+helpPredicateArgument)
 
 	return cmd
 }
