@@ -335,7 +335,7 @@ func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID 
 		return nil, errors.New("token is locked")
 	}
 	attrs := newNonFungibleTransferTxAttrs(token, receiverPubKey)
-	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeTransferNFT, attrs, tokenID, fcrID, w.GetRoundNumber, ownerProof, func(tx *types.TransactionOrder) error {
+	sub, err := w.prepareTxSubmission(ctx, key, tokens.PayloadTypeTransferNFT, attrs, tokenID, fcrID, w.GetRoundNumber, ownerProof, func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.am, invariantPredicateArgs, tx, attrs)
 		if err != nil {
 			return err
@@ -358,11 +358,10 @@ func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId 
 	if accountNumber < 1 {
 		return nil, fmt.Errorf("invalid account number: %d", accountNumber)
 	}
-	accs, err := w.getAccounts(accountNumber)
+	acc, err := w.getAccount(accountNumber)
 	if err != nil {
 		return nil, err
 	}
-	acc := accs[0]
 	fcrID, err := w.ensureFeeCredit(ctx, acc.AccountKey, 1)
 	if err != nil {
 		return nil, err
@@ -411,7 +410,7 @@ func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId 
 	}
 	// optimization: first try to make a single operation instead of iterating through all tokens in doSendMultiple
 	if closestMatch.Amount >= targetAmount {
-		sub, err := w.prepareSplitOrTransferTx(ctx, targetAmount, closestMatch, fcrID, receiverPubKey, invariantPredicateArgs, w.GetRoundNumber, ownerProof)
+		sub, err := w.prepareSplitOrTransferTx(ctx, acc, targetAmount, closestMatch, fcrID, receiverPubKey, invariantPredicateArgs, w.GetRoundNumber, ownerProof)
 		if err != nil {
 			return nil, err
 		}
@@ -448,7 +447,7 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 		DataUpdateSignatures: nil,
 	}
 
-	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeUpdateNFT, attrs, tokenID, fcrID, w.GetRoundNumber, defaultOwnerProof(accountNumber), func(tx *types.TransactionOrder) error {
+	sub, err := w.prepareTxSubmission(ctx, acc, tokens.PayloadTypeUpdateNFT, attrs, tokenID, fcrID, w.GetRoundNumber, defaultOwnerProof(accountNumber), func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.am, updatePredicateArgs, tx, attrs)
 		if err != nil {
 			return err
@@ -484,7 +483,7 @@ func (w *Wallet) SendFungibleByID(ctx context.Context, accountNumber uint64, tok
 	if targetAmount > token.Amount {
 		return nil, fmt.Errorf("insufficient FT value: got %v, need %v", token.Amount, targetAmount)
 	}
-	sub, err := w.prepareSplitOrTransferTx(ctx, targetAmount, token, fcrID, receiverPubKey, invariantPredicateArgs, w.GetRoundNumber, defaultOwnerProof(accountNumber))
+	sub, err := w.prepareSplitOrTransferTx(ctx, acc, targetAmount, token, fcrID, receiverPubKey, invariantPredicateArgs, w.GetRoundNumber, defaultOwnerProof(accountNumber))
 	if err != nil {
 		return nil, err
 	}
@@ -563,7 +562,7 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID []
 		return nil, errors.New("token is already locked")
 	}
 	attrs := newLockTxAttrs(token.Counter, wallet.LockReasonManual)
-	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeLockToken, attrs, tokenID, fcrID, w.GetRoundNumber, ownerProof, func(tx *types.TransactionOrder) error {
+	sub, err := w.prepareTxSubmission(ctx, key, tokens.PayloadTypeLockToken, attrs, tokenID, fcrID, w.GetRoundNumber, ownerProof, func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.am, ib, tx, attrs)
 		if err != nil {
 			return err
@@ -599,7 +598,7 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 		return nil, errors.New("token is already unlocked")
 	}
 	attrs := newUnlockTxAttrs(token.Counter)
-	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeUnlockToken, attrs, tokenID, fcrID, w.GetRoundNumber, ownerProof, func(tx *types.TransactionOrder) error {
+	sub, err := w.prepareTxSubmission(ctx, key, tokens.PayloadTypeUnlockToken, attrs, tokenID, fcrID, w.GetRoundNumber, ownerProof, func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.am, ib, tx, attrs)
 		if err != nil {
 			return err

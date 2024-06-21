@@ -53,7 +53,7 @@ func (w *Wallet) newType(ctx context.Context, accountNumber uint64, payloadType 
 	if err != nil {
 		return nil, err
 	}
-	sub, err := w.prepareTxSubmission(ctx, payloadType, attrs, typeId, fcrID, w.GetRoundNumber, defaultOwnerProof(accountNumber), func(tx *types.TransactionOrder) error {
+	sub, err := w.prepareTxSubmission(ctx, acc, payloadType, attrs, typeId, fcrID, w.GetRoundNumber, defaultOwnerProof(accountNumber), func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.am, subtypePredicateArgs, tx, attrs)
 		if err != nil {
 			return err
@@ -114,7 +114,7 @@ func (w *Wallet) newToken(ctx context.Context, accountNumber uint64, payloadType
 	if err != nil {
 		return nil, err
 	}
-	sub, err := w.prepareTxSubmission(ctx, payloadType, attrs, nil, fcrID, w.GetRoundNumber, defaultOwnerProof(accountNumber), func(tx *types.TransactionOrder) error {
+	sub, err := w.prepareTxSubmission(ctx, key, payloadType, attrs, nil, fcrID, w.GetRoundNumber, defaultOwnerProof(accountNumber), func(tx *types.TransactionOrder) error {
 		// generate token identifier, needs to be generated before signatures
 		unitPart, err := tokens.HashForNewTokenID(attrs, tx.Payload.ClientMetadata, crypto.SHA256)
 		if err != nil {
@@ -139,7 +139,7 @@ func (w *Wallet) newToken(ctx context.Context, accountNumber uint64, payloadType
 	return sub, nil
 }
 
-func (w *Wallet) prepareTxSubmission(ctx context.Context, payloadType string, attrs types.SigBytesProvider, unitID types.UnitID, fcrID types.UnitID, rn roundNumberFetcher, ownerProof *PredicateInput, txps txPreprocessor) (*txsubmitter.TxSubmission, error) {
+func (w *Wallet) prepareTxSubmission(ctx context.Context, acc *accountKey, payloadType string, attrs types.SigBytesProvider, unitID types.UnitID, fcrID types.UnitID, rn roundNumberFetcher, ownerProof *PredicateInput, txps txPreprocessor) (*txsubmitter.TxSubmission, error) {
 	if unitID != nil {
 		w.log.InfoContext(ctx, fmt.Sprintf("Preparing to send token tx, UnitID=%s", unitID))
 	} else {
@@ -166,7 +166,7 @@ func (w *Wallet) prepareTxSubmission(ctx context.Context, payloadType string, at
 	}
 
 	// TODO: AB-1016 remove when fixed
-	tx.FeeProof, err = preparePredicateSignature(am, ownerProof, tx, nil)
+	tx.FeeProof, err = signTx(acc.AccountKey, tx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make tx fee proof: %w", err)
 	}
@@ -287,7 +287,7 @@ func (w *Wallet) doSendMultiple(ctx context.Context, amount uint64, tokens []*sd
 
 	for _, t := range tokens {
 		remainingAmount := amount - accumulatedSum
-		sub, err := w.prepareSplitOrTransferTx(ctx, remainingAmount, t, fcrID, receiverPubKey, invariantPredicateArgs, rnFetcher.getRoundNumber, ownerProof)
+		sub, err := w.prepareSplitOrTransferTx(ctx, acc, remainingAmount, t, fcrID, receiverPubKey, invariantPredicateArgs, rnFetcher.getRoundNumber, ownerProof)
 		if err != nil {
 			return nil, err
 		}
@@ -307,7 +307,7 @@ func (w *Wallet) doSendMultiple(ctx context.Context, amount uint64, tokens []*sd
 	return &SubmissionResult{Submissions: batch.Submissions(), FeeSum: feeSum, AccountNumber: acc.AccountNumber()}, err
 }
 
-func (w *Wallet) prepareSplitOrTransferTx(ctx context.Context, amount uint64, token *sdktypes.TokenUnit, fcrID, receiverPubKey []byte, invariantPredicateArgs []*PredicateInput, rn roundNumberFetcher, ownerProof *PredicateInput) (*txsubmitter.TxSubmission, error) {
+func (w *Wallet) prepareSplitOrTransferTx(ctx context.Context, acc *accountKey, amount uint64, token *sdktypes.TokenUnit, fcrID, receiverPubKey []byte, invariantPredicateArgs []*PredicateInput, rn roundNumberFetcher, ownerProof *PredicateInput) (*txsubmitter.TxSubmission, error) {
 	var attrs AttrWithInvariantPredicateInputs
 	var payloadType string
 	if amount >= token.Amount {
@@ -317,7 +317,7 @@ func (w *Wallet) prepareSplitOrTransferTx(ctx context.Context, amount uint64, to
 		attrs = newSplitTxAttrs(token, amount, receiverPubKey)
 		payloadType = tokens.PayloadTypeSplitFungibleToken
 	}
-	sub, err := w.prepareTxSubmission(ctx, payloadType, attrs, token.ID, fcrID, rn, ownerProof, func(tx *types.TransactionOrder) error {
+	sub, err := w.prepareTxSubmission(ctx, acc, payloadType, attrs, token.ID, fcrID, rn, ownerProof, func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.am, invariantPredicateArgs, tx, attrs)
 		if err != nil {
 			return err

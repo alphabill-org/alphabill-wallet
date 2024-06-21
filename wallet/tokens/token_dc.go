@@ -127,7 +127,7 @@ func (w *Wallet) joinTokenForDC(ctx context.Context, acc *accountKey, burnProofs
 		InvariantPredicateSignatures: nil,
 	}
 
-	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeJoinFungibleToken, joinAttrs, targetTokenID, fcrID, w.GetRoundNumber, defaultOwnerProof(acc.AccountNumber()), func(tx *types.TransactionOrder) error {
+	sub, err := w.prepareTxSubmission(ctx, acc, tokens.PayloadTypeJoinFungibleToken, joinAttrs, targetTokenID, fcrID, w.GetRoundNumber, defaultOwnerProof(acc.AccountNumber()), func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.GetAccountManager(), invariantPredicateArgs, tx, joinAttrs)
 		if err != nil {
 			return err
@@ -153,7 +153,7 @@ func (w *Wallet) burnTokensForDC(ctx context.Context, acc *accountKey, tokensToB
 	for _, token := range tokensToBurn {
 		burnBatchAmount += token.Amount
 		attrs := newBurnTxAttrs(token, targetTokenCounter, targetTokenID)
-		sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeBurnFungibleToken, attrs, token.ID, fcrID, rnFetcher.getRoundNumber, defaultOwnerProof(acc.AccountNumber()), func(tx *types.TransactionOrder) error {
+		sub, err := w.prepareTxSubmission(ctx, acc, tokens.PayloadTypeBurnFungibleToken, attrs, token.ID, fcrID, rnFetcher.getRoundNumber, defaultOwnerProof(acc.AccountNumber()), func(tx *types.TransactionOrder) error {
 			signatures, err := preparePredicateSignatures(w.GetAccountManager(), invariantPredicateArgs, tx, attrs)
 			if err != nil {
 				return err
@@ -218,7 +218,7 @@ func (w *Wallet) lockTokenForDC(ctx context.Context, acc *accountKey, fcrID type
 		Counter:    targetTokenCounter,
 	}
 
-	sub, err := w.prepareTxSubmission(ctx, tokens.PayloadTypeLockToken, attr, targetTokenID, fcrID, w.GetRoundNumber, defaultOwnerProof(acc.AccountNumber()), func(tx *types.TransactionOrder) error {
+	sub, err := w.prepareTxSubmission(ctx, acc, tokens.PayloadTypeLockToken, attr, targetTokenID, fcrID, w.GetRoundNumber, defaultOwnerProof(acc.AccountNumber()), func(tx *types.TransactionOrder) error {
 		signatures, err := preparePredicateSignatures(w.GetAccountManager(), invariantPredicateArgs, tx, attr)
 		if err != nil {
 			return err
