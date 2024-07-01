@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"math"
 
+	"github.com/alphabill-org/alphabill-go-base/predicates"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill-go-base/types"
@@ -18,7 +19,6 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
-	"github.com/alphabill-org/alphabill/predicates"
 )
 
 const (
@@ -618,7 +618,7 @@ func ensureTokenOwnership(acc *accountKey, unit *sdktypes.TokenUnit, ownerProof 
 	if bytes.Equal(unit.Owner, templates.NewP2pkh256BytesFromKey(acc.PubKey)) {
 		return nil
 	}
-	predicate, err := predicates.ExtractPredicate(unit.Owner)
+	predicate, err := extractPredicate(unit.Owner)
 	if err != nil {
 		return err
 	}
@@ -631,4 +631,12 @@ func ensureTokenOwnership(acc *accountKey, unit *sdktypes.TokenUnit, ownerProof 
 
 func defaultOwnerProof(accNr uint64) *PredicateInput {
 	return &PredicateInput{AccountNumber: accNr}
+}
+
+func extractPredicate(predicateBytes []byte) (*predicates.Predicate, error) {
+	predicate := &predicates.Predicate{}
+	if err := types.Cbor.Unmarshal(predicateBytes, predicate); err != nil {
+		return nil, err
+	}
+	return predicate, nil
 }
