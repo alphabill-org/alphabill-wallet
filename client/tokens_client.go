@@ -38,72 +38,7 @@ func NewTokensPartitionClient(ctx context.Context, rpcUrl string) (sdktypes.Toke
 
 // GetToken returns token for the given token id.
 // Returns ErrNotFound if the token does not exist.
-func (c *tokensPartitionClient) GetToken(ctx context.Context, id sdktypes.TokenID) (*sdktypes.TokenUnit, error) {
-	return c.getTokenUnit(ctx, id)
-}
-
-// GetTokens returns tokens for the given owner id.
-func (c *tokensPartitionClient) GetTokens(ctx context.Context, kind sdktypes.Kind, ownerID []byte) ([]*sdktypes.TokenUnit, error) {
-	unitIds, err := c.GetUnitsByOwnerID(ctx, ownerID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch owner unit ids: %w", err)
-	}
-	var tokenz []*sdktypes.TokenUnit
-	for _, unitID := range unitIds {
-		// only fetch NFTs and FTs, ignoring fee credit units and token type units (type units are not indexed anyway)
-		if unitID.HasType(tokens.FungibleTokenUnitType) || unitID.HasType(tokens.NonFungibleTokenUnitType) {
-			tokenUnit, err := c.GetToken(ctx, unitID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to fetch token: %w", err)
-			}
-			if kind == sdktypes.Any || kind == tokenUnit.Kind {
-				tokenz = append(tokenz, tokenUnit)
-			}
-		}
-	}
-	return tokenz, nil
-}
-
-func (c *tokensPartitionClient) GetTokenTypes(ctx context.Context, kind sdktypes.Kind, creator sdktypes.PubKey) ([]*sdktypes.TokenTypeUnit, error) {
-	// TODO AB-1448
-	return nil, nil
-}
-
-// GetTypeHierarchy returns type hierarchy for given token type id where the root type is the last element (no parent).
-func (c *tokensPartitionClient) GetTypeHierarchy(ctx context.Context, typeID sdktypes.TokenTypeID) ([]*sdktypes.TokenTypeUnit, error) {
-	var tokenTypes []*sdktypes.TokenTypeUnit
-	for len(typeID) > 0 && !typeID.Eq(sdktypes.NoParent) {
-		tokenType, err := c.getTokenType(ctx, typeID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch token type: %w", err)
-		}
-		tokenTypes = append(tokenTypes, tokenType)
-		typeID = tokenType.ParentTypeID
-	}
-	return tokenTypes, nil
-}
-
-// GetFeeCreditRecordByOwnerID finds the first fee credit record in tokens partition for the given owner ID,
-// returns nil if fee credit record does not exist.
-func (c *tokensPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (*sdktypes.FeeCreditRecord, error) {
-	return c.StateAPIClient.GetFeeCreditRecordByOwnerID(ctx, ownerID, tokens.FeeCreditRecordUnitType)
-}
-
-func (c *tokensPartitionClient) ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*sdktypes.Proof, error) {
-	txBatch := txsubmitter.New(tx).ToBatch(c, log)
-	err := txBatch.SendTx(ctx, true)
-	if err != nil {
-		return nil, err
-	}
-	return txBatch.Submissions()[0].Proof, nil
-}
-
-func (c *tokensPartitionClient) Close() {
-	c.AdminAPIClient.Close()
-	c.StateAPIClient.Close()
-}
-
-func (c *tokensPartitionClient) getTokenUnit(ctx context.Context, tokenID sdktypes.TokenID) (*sdktypes.TokenUnit, error) {
+func (c *tokensPartitionClient) GetToken(ctx context.Context, tokenID sdktypes.TokenID) (*sdktypes.TokenUnit, error) {
 	if tokenID.HasType(tokens.FungibleTokenUnitType) {
 		var ft *sdktypes.Unit[tokens.FungibleTokenData]
 		if err := c.RpcClient.CallContext(ctx, &ft, "state_getUnit", tokenID, false); err != nil {
@@ -177,6 +112,67 @@ func (c *tokensPartitionClient) getTokenUnit(ctx context.Context, tokenID sdktyp
 	} else {
 		return nil, fmt.Errorf("invalid token id: %s", tokenID)
 	}
+}
+
+// GetTokens returns tokens for the given owner id.
+func (c *tokensPartitionClient) GetTokens(ctx context.Context, kind sdktypes.Kind, ownerID []byte) ([]*sdktypes.TokenUnit, error) {
+	unitIds, err := c.GetUnitsByOwnerID(ctx, ownerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch owner unit ids: %w", err)
+	}
+	var tokenz []*sdktypes.TokenUnit
+	for _, unitID := range unitIds {
+		// only fetch NFTs and FTs, ignoring fee credit units and token type units (type units are not indexed anyway)
+		if unitID.HasType(tokens.FungibleTokenUnitType) || unitID.HasType(tokens.NonFungibleTokenUnitType) {
+			tokenUnit, err := c.GetToken(ctx, unitID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to fetch token: %w", err)
+			}
+			if kind == sdktypes.Any || kind == tokenUnit.Kind {
+				tokenz = append(tokenz, tokenUnit)
+			}
+		}
+	}
+	return tokenz, nil
+}
+
+func (c *tokensPartitionClient) GetTokenTypes(ctx context.Context, kind sdktypes.Kind, creator sdktypes.PubKey) ([]*sdktypes.TokenTypeUnit, error) {
+	// TODO AB-1448
+	return nil, nil
+}
+
+// GetTypeHierarchy returns type hierarchy for given token type id where the root type is the last element (no parent).
+func (c *tokensPartitionClient) GetTypeHierarchy(ctx context.Context, typeID sdktypes.TokenTypeID) ([]*sdktypes.TokenTypeUnit, error) {
+	var tokenTypes []*sdktypes.TokenTypeUnit
+	for len(typeID) > 0 && !typeID.Eq(sdktypes.NoParent) {
+		tokenType, err := c.getTokenType(ctx, typeID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch token type: %w", err)
+		}
+		tokenTypes = append(tokenTypes, tokenType)
+		typeID = tokenType.ParentTypeID
+	}
+	return tokenTypes, nil
+}
+
+// GetFeeCreditRecordByOwnerID finds the first fee credit record in tokens partition for the given owner ID,
+// returns nil if fee credit record does not exist.
+func (c *tokensPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (*sdktypes.FeeCreditRecord, error) {
+	return c.StateAPIClient.GetFeeCreditRecordByOwnerID(ctx, ownerID, tokens.FeeCreditRecordUnitType)
+}
+
+func (c *tokensPartitionClient) ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*sdktypes.Proof, error) {
+	txBatch := txsubmitter.New(tx).ToBatch(c, log)
+	err := txBatch.SendTx(ctx, true)
+	if err != nil {
+		return nil, err
+	}
+	return txBatch.Submissions()[0].Proof, nil
+}
+
+func (c *tokensPartitionClient) Close() {
+	c.AdminAPIClient.Close()
+	c.StateAPIClient.Close()
 }
 
 func (c *tokensPartitionClient) getTokenType(ctx context.Context, typeID sdktypes.TokenTypeID) (*sdktypes.TokenTypeUnit, error) {
