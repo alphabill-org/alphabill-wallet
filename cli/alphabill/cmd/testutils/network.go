@@ -19,12 +19,16 @@ import (
 )
 
 const (
-	//defaultDockerImage   = "ghcr.io/alphabill-org/alphabill:WasmPredicates"
-	defaultDockerImage   = "ghcr.io/alphabill-org/alphabill:b1bc707de3ed4c93a38b85c87e5110be88dda7cb"
+	defaultDockerImage   = "ghcr.io/alphabill-org/alphabill:WasmPredicates" // TODO: change back to main before merging
 	containerGenesisPath = "/home/nonroot/genesis.tar"
 	containerP2pPort     = "8000"
 	containerRpcPort     = "8001"
 )
+
+var walletMnemonics = []string{
+	"ancient unhappy slush month cook fortune capital option sample buzz trip shed",
+	"burden resemble casino rebel spend banner lumber diamond word hollow true master",
+}
 
 type (
 	AlphabillNetwork struct {
@@ -96,7 +100,7 @@ func SetupNetworkWithWallets(t *testing.T, opts ...AlphabillNetworkOption) ([]*W
 		dockerNetwork: dockerNetwork.Name,
 	}
 
-	wallets := setupWallets(t, 2, 2)
+	wallets := SetupWallets(t, 2, 2)
 	ownerPredicate := templates.NewP2pkh256BytesFromKey(wallets[0].PubKeys[0])
 
 	abNet.createGenesis(t, ownerPredicate)
@@ -110,10 +114,10 @@ func SetupNetworkWithWallets(t *testing.T, opts ...AlphabillNetworkOption) ([]*W
 	return wallets, abNet
 }
 
-func setupWallets(t *testing.T, walletCount, keyCount int) []*Wallet {
+func SetupWallets(t *testing.T, walletCount, keyCount int) []*Wallet {
 	var wallets []*Wallet
 	for i := 0; i < walletCount; i++ {
-		am, home := CreateNewWallet(t)
+		am, home := CreateNewWallet(t, getMnemonic(i))
 		defer am.Close()
 
 		pubKey, err := am.GetPublicKey(0)
@@ -129,6 +133,13 @@ func setupWallets(t *testing.T, walletCount, keyCount int) []*Wallet {
 		wallets = append(wallets, &Wallet{home, keys})
 	}
 	return wallets
+}
+
+func getMnemonic(walletNumber int) string {
+	if walletNumber < len(walletMnemonics) {
+		return walletMnemonics[walletNumber]
+	}
+	return ""
 }
 
 func (n *AlphabillNetwork) createGenesis(t *testing.T, ownerPredicate []byte) {
