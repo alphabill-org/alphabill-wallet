@@ -1138,7 +1138,7 @@ func TestLockFeeCredit(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		// fcb exists
 		moneyClient := testutil.NewRpcClientMock(
-			testutil.WithOwnerFeeCreditRecord(newMoneyFCB(accountKey, &fc.FeeCreditRecord{Balance: 2, Counter: 100})),
+			testutil.WithOwnerFeeCreditRecord(newMoneyFCB(accountKey, &fc.FeeCreditRecord{Balance: 21, Counter: 100})),
 		)
 		feeManager := newMoneyPartitionFeeManager(am, feeManagerDB, moneyClient, logger.New(t))
 
@@ -1152,7 +1152,7 @@ func TestLockFeeCredit(t *testing.T) {
 	t.Run("fcb already locked", func(t *testing.T) {
 		// fcb already locked
 		moneyClient := testutil.NewRpcClientMock(
-			testutil.WithOwnerFeeCreditRecord(newMoneyFCB(accountKey, &fc.FeeCreditRecord{Balance: 2, Counter: 100, Locked: wallet.LockReasonManual})),
+			testutil.WithOwnerFeeCreditRecord(newMoneyFCB(accountKey, &fc.FeeCreditRecord{Balance: 21, Counter: 100, Locked: wallet.LockReasonManual})),
 		)
 		feeManager := newMoneyPartitionFeeManager(am, feeManagerDB, moneyClient, logger.New(t))
 
