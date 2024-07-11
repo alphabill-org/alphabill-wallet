@@ -46,7 +46,7 @@ func TestSendingMoneyUsingWallets_integration(t *testing.T) {
 	stdout := walletCmd.Exec(t, "send", "--amount", "50", "--address", fmt.Sprintf("0x%x", wallets[1].PubKeys[0]))
 	testutils.VerifyStdout(t, stdout,
 		"Successfully confirmed transaction(s)",
-		"Paid 0.000'000'01 fees for transaction(s)")
+		"Paid 0.000'000'02 fees for transaction(s)")
 
 	// verify wallet-1 balance is decreased
 	w1BalanceBilly -= 50 * 1e8
@@ -118,7 +118,7 @@ func TestSendingMoneyUsingWallets_integration(t *testing.T) {
 
 	// verify account-2 fcb balance is reduced after send
 	stdout = walletCmd.Exec(t, "fees", "list", "--key", "2")
-	acc2FeeCredit := feeAmountAlpha*1e8 - 3 // minus one for tx and minus one for creating fee credit
+	acc2FeeCredit := feeAmountAlpha*1e8 - 4 // minus one for tx and minus one for creating fee credit
 	acc2FeeCreditString := util.AmountToString(acc2FeeCredit, 8)
 	testutils.VerifyStdout(t, stdout, fmt.Sprintf("Account #2 %s", acc2FeeCreditString))
 
@@ -153,7 +153,7 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 		"--address", fmt.Sprintf("%s,%s,%s,%s", pubKey2Hex, pubKey2Hex, pubKey3Hex, pubKey3Hex))
 	testutils.VerifyStdout(t, stdout,
 		"Successfully confirmed transaction(s)",
-		"Paid 0.000'000'01 fees for transaction(s)")
+		"Paid 0.000'000'02 fees for transaction(s)")
 
 	walletCmd.Exec(t, "fees", "add",
 		"--key", "2",
