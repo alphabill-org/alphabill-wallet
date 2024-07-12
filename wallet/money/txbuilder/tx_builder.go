@@ -17,7 +17,7 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/txbuilder"
 )
 
-const MaxFee = uint64(1)
+const MaxFee = uint64(10)
 
 // CreateTransactions creates 1 to N P2PKH transactions from given bills until target amount is reached.
 // If there exists a bill with value equal to the given amount then transfer transaction is created using that bill,

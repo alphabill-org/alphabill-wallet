@@ -6,7 +6,7 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/types"
 )
 
-const MaxFee = uint64(1)
+const MaxFee = uint64(10)
 
 // NewTxPayload creates a new transaction payload.
 func NewTxPayload(systemID types.SystemID, txType string, unitID, fcrID types.UnitID, timeout uint64, refNo []byte, attr interface{}) (*types.Payload, error) {

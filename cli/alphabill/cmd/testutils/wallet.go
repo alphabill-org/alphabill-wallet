@@ -43,13 +43,13 @@ func CreateNewTestWallet(t *testing.T, opts ...Option) string {
 	return homeDir
 }
 
-func CreateNewWallet(t *testing.T) (account.Manager, string) {
+func CreateNewWallet(t *testing.T, mnemonic string) (account.Manager, string) {
 	homeDir := t.TempDir()
 	walletDir := filepath.Join(homeDir, WalletBaseDir)
 	am, err := account.NewManager(walletDir, "", true)
 	require.NoError(t, err)
 	t.Cleanup(am.Close)
-	err = am.CreateKeys("")
+	err = am.CreateKeys(mnemonic)
 	require.NoError(t, err)
 	return am, homeDir
 }
