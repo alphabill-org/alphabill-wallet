@@ -118,7 +118,7 @@ func TestSendingMoneyUsingWallets_integration(t *testing.T) {
 
 	// verify account-2 fcb balance is reduced after send
 	stdout = walletCmd.Exec(t, "fees", "list", "--key", "2")
-	acc2FeeCredit := feeAmountAlpha*1e8 - 4 // minus one for tx and minus one for creating fee credit
+	acc2FeeCredit := feeAmountAlpha*1e8 - 4 // minus two for tx and minus two for creating fee credit
 	acc2FeeCreditString := util.AmountToString(acc2FeeCredit, 8)
 	testutils.VerifyStdout(t, stdout, fmt.Sprintf("Account #2 %s", acc2FeeCreditString))
 
