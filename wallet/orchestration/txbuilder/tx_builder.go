@@ -10,7 +10,7 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/txbuilder"
 )
 
-const MaxFee = uint64(1)
+const MaxFee = uint64(10)
 
 // NewAddVarTx creates a 'addVar' transaction order.
 func NewAddVarTx(varData orchestration.ValidatorAssignmentRecord, systemID types.SystemID, unitID types.UnitID, timeout uint64, signingKey *account.AccountKey) (*types.TransactionOrder, error) {

@@ -39,10 +39,10 @@ func New(tx *types.TransactionOrder) *TxSubmission {
 
 func (s *TxSubmission) ToBatch(partitionClient sdktypes.PartitionClient, log *slog.Logger) *TxSubmissionBatch {
 	return &TxSubmissionBatch{
-		partitionClient:   partitionClient,
-		submissions:       []*TxSubmission{s},
-		maxTimeout:        s.Transaction.Timeout(),
-		log:               log,
+		partitionClient: partitionClient,
+		submissions:     []*TxSubmission{s},
+		maxTimeout:      s.Transaction.Timeout(),
+		log:             log,
 	}
 }
 
@@ -97,6 +97,7 @@ func (t *TxSubmissionBatch) confirmUnitsTx(ctx context.Context) error {
 			return err
 		}
 		unconfirmed := false
+		failed := false
 		for _, sub := range t.submissions {
 			if sub.Confirmed() {
 				continue
@@ -107,8 +108,22 @@ func (t *TxSubmissionBatch) confirmUnitsTx(ctx context.Context) error {
 					return err
 				}
 				if proof != nil {
-					t.log.DebugContext(ctx, fmt.Sprintf("Tx confirmed: hash=%X, unitID=%X", sub.TxHash, sub.UnitID))
 					sub.Proof = proof
+
+					var status types.TxStatus
+					if proof.TxRecord != nil && proof.TxRecord.ServerMetadata != nil {
+						status = proof.TxRecord.ServerMetadata.SuccessIndicator
+					}
+					switch status {
+					case types.TxStatusSuccessful:
+						t.log.DebugContext(ctx, fmt.Sprintf("Tx confirmed: hash=%X, unitID=%X", sub.TxHash, sub.UnitID))
+					case types.TxErrOutOfGas:
+						t.log.InfoContext(ctx, fmt.Sprintf("Tx failed: out of gas: hash=%X, unitID=%X", sub.TxHash, sub.UnitID))
+						failed = true
+					case types.TxStatusFailed:
+						t.log.InfoContext(ctx, fmt.Sprintf("Tx failed: hash=%X, unitID=%X", sub.TxHash, sub.UnitID))
+						failed = true
+					}
 				}
 			}
 
@@ -128,6 +143,8 @@ func (t *TxSubmissionBatch) confirmUnitsTx(ctx context.Context) error {
 			}
 
 			time.Sleep(500 * time.Millisecond)
+		} else if failed {
+			return errors.New("transaction(s) failed")
 		} else {
 			t.log.InfoContext(ctx, "All transactions confirmed")
 			return nil

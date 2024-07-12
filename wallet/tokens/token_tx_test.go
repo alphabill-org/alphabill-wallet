@@ -40,7 +40,7 @@ func TestConfirmUnitsTx_ok(t *testing.T) {
 		},
 		getTransactionProof: func(ctx context.Context, txHash types.Bytes) (*sdktypes.Proof, error) {
 			getTxProofCalled = true
-			return &sdktypes.Proof{}, nil
+			return &sdktypes.Proof{TxRecord: &types.TransactionRecord{ServerMetadata: &types.ServerMetadata{SuccessIndicator: types.TxStatusSuccessful}}}, nil
 		},
 	}
 	batch := txsubmitter.NewBatch(rpcClient, logger.New(t))
