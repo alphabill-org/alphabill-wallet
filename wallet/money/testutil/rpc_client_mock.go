@@ -25,7 +25,7 @@ type (
 		RoundNumber           uint64
 		TxProofs              map[string]*sdktypes.Proof
 
-		RecordedTxs           []*types.TransactionOrder
+		RecordedTxs []*types.TransactionOrder
 	}
 
 	Options struct {
@@ -96,7 +96,7 @@ func WithError(err error) Option {
 func (c *RpcClientMock) GetNodeInfo(ctx context.Context) (*sdktypes.NodeInfoResponse, error) {
 	return &sdktypes.NodeInfoResponse{
 		SystemID: 0,
-		Name: "mock",
+		Name:     "mock",
 	}, nil
 }
 
@@ -163,7 +163,7 @@ func (c *RpcClientMock) GetTransactionProof(ctx context.Context, txHash types.By
 	if ok {
 		return &sdktypes.Proof{
 			TxRecord: txProofs.TxRecord,
-			TxProof: txProofs.TxProof,
+			TxProof:  txProofs.TxProof,
 		}, nil
 	}
 	// return proof for sent tx if one exists
@@ -172,11 +172,11 @@ func (c *RpcClientMock) GetTransactionProof(ctx context.Context, txHash types.By
 			if bytes.Equal(txHash, tx.Hash(crypto.SHA256)) {
 				txr := &types.TransactionRecord{
 					TransactionOrder: tx,
-					ServerMetadata:   &types.ServerMetadata{ActualFee: 1},
+					ServerMetadata:   &types.ServerMetadata{ActualFee: 1, SuccessIndicator: types.TxStatusSuccessful},
 				}
 				return &sdktypes.Proof{
 					TxRecord: txr,
-					TxProof: &types.TxProof{},
+					TxProof:  &types.TxProof{},
 				}, nil
 			}
 		}

@@ -13,8 +13,8 @@ import (
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
-	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/client/rpc/mocksrv"
+	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	moneywallet "github.com/alphabill-org/alphabill-wallet/wallet/money"
 )
 
@@ -161,7 +161,7 @@ func TestWalletGetBalanceCmdQuietFlag(t *testing.T) {
 }
 
 func TestPubKeysCmd(t *testing.T) {
-	am, homedir := testutils.CreateNewWallet(t)
+	am, homedir := testutils.CreateNewWallet(t, "")
 	pk, err := am.GetPublicKey(0)
 	require.NoError(t, err)
 	am.Close()
@@ -189,7 +189,7 @@ func TestSendingFailsWithInsufficientBalance(t *testing.T) {
 
 	walletCmd := newWalletCmdExecutor("--rpc-url", rpcUrl).WithHome(homedir)
 	walletCmd.ExecWithError(t, "insufficient balance for transaction",
-		"send", "--amount", "10", "--address", "0x" + testutils.TestPubKey1Hex)
+		"send", "--amount", "10", "--address", "0x"+testutils.TestPubKey1Hex)
 }
 
 func Test_groupPubKeysAndAmounts(t *testing.T) {
@@ -280,6 +280,6 @@ func Test_parseRefNumbers(t *testing.T) {
 	})
 }
 
-func newWalletCmdExecutor(prefixArgs ...string) *testutils.CmdExecutor{
+func newWalletCmdExecutor(prefixArgs ...string) *testutils.CmdExecutor {
 	return testutils.NewCmdExecutor(NewWalletCmd, prefixArgs...)
 }

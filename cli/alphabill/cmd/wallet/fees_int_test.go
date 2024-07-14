@@ -189,11 +189,11 @@ func TestWalletFeesCmds_MinimumFeeAmount(t *testing.T) {
 	feesCmd.ExecWithError(t, err, "add", "--amount", "0.00000003")
 
 	// add minimum fee amount
-	stdout := feesCmd.Exec(t, "add", "--amount=0.00000004")
-	require.Equal(t, "Successfully created 0.00000004 fee credits on money partition.", stdout.Lines[0])
+	stdout := feesCmd.Exec(t, "add", "--amount=0.00000040")
+	require.Equal(t, "Successfully created 0.00000040 fee credits on money partition.", stdout.Lines[0])
 
 	// verify fee credit is below minimum
-	expectedFees := uint64(2)
+	expectedFees := uint64(38)
 	stdout = feesCmd.Exec(t, "list")
 	require.Equal(t, "Partition: money", stdout.Lines[0])
 	require.Equal(t, fmt.Sprintf("Account #1 %s", util.AmountToString(expectedFees, 8)), stdout.Lines[1])
@@ -203,11 +203,11 @@ func TestWalletFeesCmds_MinimumFeeAmount(t *testing.T) {
 	feesCmd.ExecWithError(t, err, "reclaim")
 
 	// add more fee credit
-	stdout = feesCmd.Exec(t, "add", "--amount=0.00000005")
-	require.Equal(t, "Successfully created 0.00000005 fee credits on money partition.", stdout.Lines[0])
+	stdout = feesCmd.Exec(t, "add", "--amount=0.00000045")
+	require.Equal(t, "Successfully created 0.00000045 fee credits on money partition.", stdout.Lines[0])
 
 	// verify fee credit is valid for reclaim
-	expectedFees = uint64(4)
+	expectedFees = uint64(80)
 	stdout = feesCmd.Exec(t, "list")
 	require.Equal(t, "Partition: money", stdout.Lines[0])
 	require.Equal(t, fmt.Sprintf("Account #1 %s", util.AmountToString(expectedFees, 8)), stdout.Lines[1])
