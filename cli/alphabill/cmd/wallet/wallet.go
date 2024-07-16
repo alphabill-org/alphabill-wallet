@@ -138,6 +138,7 @@ func SendCmd(config *types.WalletConfig) *cobra.Command {
 	cmd.Flags().StringP(args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "rpc node url")
 	cmd.Flags().Uint64P(args.KeyCmdName, "k", 1, "which key to use for sending the transaction")
 	args.AddWaitForProofFlags(cmd, cmd.Flags())
+	args.AddMaxFeeFlag(cmd, cmd.Flags())
 
 	if err := cmd.MarkFlagRequired(args.AddressCmdName); err != nil {
 		panic(err)
@@ -203,7 +204,11 @@ func ExecSendCmd(ctx context.Context, cmd *cobra.Command, config *types.WalletCo
 	if err != nil {
 		return err
 	}
-	proofs, err := w.Send(ctx, money.SendCmd{Receivers: receivers, WaitForConfirmation: waitForConf, AccountIndex: accountNumber - 1, ReferenceNumber: refNumber})
+	maxFee, err := args.ParseMaxFeeFlag(cmd)
+	if err != nil {
+		return err
+	}
+	proofs, err := w.Send(ctx, money.SendCmd{Receivers: receivers, WaitForConfirmation: waitForConf, AccountIndex: accountNumber - 1, ReferenceNumber: refNumber, MaxFee: maxFee})
 	if err != nil {
 		return err
 	}

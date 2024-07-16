@@ -6,10 +6,10 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/types"
 )
 
-const MaxFee = uint64(10)
+const _MaxFee = uint64(10)
 
 // NewTxPayload creates a new transaction payload.
-func NewTxPayload(systemID types.SystemID, txType string, unitID, fcrID types.UnitID, timeout uint64, refNo []byte, attr interface{}) (*types.Payload, error) {
+func NewTxPayload(systemID types.SystemID, txType string, unitID, fcrID types.UnitID, timeout uint64, refNo []byte, maxFee uint64, attr interface{}) (*types.Payload, error) {
 	attrBytes, err := types.Cbor.Marshal(attr)
 	if err != nil {
 		return nil, err
@@ -21,7 +21,7 @@ func NewTxPayload(systemID types.SystemID, txType string, unitID, fcrID types.Un
 		Attributes: attrBytes,
 		ClientMetadata: &types.ClientMetadata{
 			Timeout:           timeout,
-			MaxTransactionFee: MaxFee,
+			MaxTransactionFee: maxFee,
 			FeeCreditRecordID: fcrID,
 			ReferenceNumber:   refNo,
 		},

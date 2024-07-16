@@ -41,6 +41,7 @@ type (
 		WaitForConfirmation bool
 		AccountIndex        uint64
 		ReferenceNumber     []byte
+		MaxFee              uint64
 	}
 
 	ReceiverData struct {

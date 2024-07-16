@@ -38,7 +38,7 @@ func Test_GetRoundNumber_OK(t *testing.T) {
 			return 42, nil
 		},
 	}
-	w, err := New(tokens.DefaultSystemID, rpcClient, nil, false, nil, logger.New(t))
+	w, err := New(tokens.DefaultSystemID, rpcClient, nil, false, nil, 0, logger.New(t))
 	require.NoError(t, err)
 
 	roundNumber, err := w.GetRoundNumber(context.Background())

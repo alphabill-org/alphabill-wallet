@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	MinimumFeeAmount             = 4 * txbuilder.MaxFee
+	MinimumFeeAmountMultiplier   = 4
 	txTimeoutBlockCount          = 10
 	transferFCLatestAdditionTime = 65536 // relative timeout after which transferFC unit becomes unusable
 )
@@ -58,9 +58,11 @@ type (
 		moneyPartitionFcrUnitType []byte
 
 		// target partition fields
-		targetPartitionSystemID    types.SystemID
-		targetPartitionClient      sdktypes.PartitionClient
-		targetPartitionFcrIDFn     GenerateFcrID
+		targetPartitionSystemID types.SystemID
+		targetPartitionClient   sdktypes.PartitionClient
+		targetPartitionFcrIDFn  GenerateFcrID
+
+		maxFee uint64
 	}
 
 	GetFeeCreditCmd struct {
@@ -115,11 +117,11 @@ type (
 		LockingDisabled   bool                    `json:"lockingDisabled,omitempty"`   // user defined flag if we should lock fee credit record when adding fees
 		FeeCreditRecordID []byte                  `json:"feeCreditRecordId,omitempty"` // the fee credit record id used in current fee credit process
 		LockFCTx          *types.TransactionOrder `json:"lockFCTx,omitempty"`
-		LockFCProof       *sdktypes.Proof           `json:"lockFCProof,omitempty"`
+		LockFCProof       *sdktypes.Proof         `json:"lockFCProof,omitempty"`
 		TransferFCTx      *types.TransactionOrder `json:"transferFCTx,omitempty"`
-		TransferFCProof   *sdktypes.Proof           `json:"transferFCProof,omitempty"`
+		TransferFCProof   *sdktypes.Proof         `json:"transferFCProof,omitempty"`
 		AddFCTx           *types.TransactionOrder `json:"addFCTx,omitempty"`
-		AddFCProof        *sdktypes.Proof           `json:"addFCProof,omitempty"`
+		AddFCProof        *sdktypes.Proof         `json:"addFCProof,omitempty"`
 	}
 
 	ReclaimFeeCreditCtx struct {
@@ -128,11 +130,11 @@ type (
 		TargetBillCounter uint64                  `json:"targetBillCounter"` // closeFC target bill counter
 		LockingDisabled   bool                    `json:"lockingDisabled,omitempty"`
 		LockTx            *types.TransactionOrder `json:"lockTx,omitempty"`
-		LockTxProof       *sdktypes.Proof           `json:"lockTxProof,omitempty"`
+		LockTxProof       *sdktypes.Proof         `json:"lockTxProof,omitempty"`
 		CloseFCTx         *types.TransactionOrder `json:"closeFCTx,omitempty"`
-		CloseFCProof      *sdktypes.Proof           `json:"closeFCProof,omitempty"`
+		CloseFCProof      *sdktypes.Proof         `json:"closeFCProof,omitempty"`
 		ReclaimFCTx       *types.TransactionOrder `json:"reclaimFCTx,omitempty"`
-		ReclaimFCProof    *sdktypes.Proof           `json:"reclaimFCProof,omitempty"`
+		ReclaimFCProof    *sdktypes.Proof         `json:"reclaimFCProof,omitempty"`
 	}
 )
 
@@ -164,15 +166,15 @@ func NewFeeManager(
 	log *slog.Logger,
 ) *FeeManager {
 	return &FeeManager{
-		am:                         am,
-		db:                         db,
-		moneySystemID:              moneySystemID,
-		moneyClient:                moneyClient,
-		moneyPartitionFcrIDFn:      moneyPartitionFcrIDFn,
-		targetPartitionSystemID:    targetPartitionSystemID,
-		targetPartitionClient:      targetPartitionClient,
-		targetPartitionFcrIDFn:     targetPartitionFcrIDFn,
-		log:                        log,
+		am:                      am,
+		db:                      db,
+		moneySystemID:           moneySystemID,
+		moneyClient:             moneyClient,
+		moneyPartitionFcrIDFn:   moneyPartitionFcrIDFn,
+		targetPartitionSystemID: targetPartitionSystemID,
+		targetPartitionClient:   targetPartitionClient,
+		targetPartitionFcrIDFn:  targetPartitionFcrIDFn,
+		log:                     log,
 	}
 }
 
@@ -181,7 +183,7 @@ func NewFeeManager(
 // (the add process was previously left in an incomplete state) only the partial bill is added to fee credit.
 // Returns transaction proofs that were used to add credit.
 func (w *FeeManager) AddFeeCredit(ctx context.Context, cmd AddFeeCmd) (*AddFeeCmdResponse, error) {
-	if err := cmd.isValid(); err != nil {
+	if err := cmd.isValid(w.maxFee); err != nil {
 		return nil, err
 	}
 	accountKey, err := w.am.GetAccountKey(cmd.AccountIndex)
@@ -299,7 +301,7 @@ func (w *FeeManager) LockFeeCredit(ctx context.Context, cmd LockFeeCreditCmd) (*
 	if fcb == nil {
 		return nil, errors.New("fee credit bill does not exist")
 	}
-	if fcb.Balance() < 2*txbuilder.MaxFee {
+	if fcb.Balance() < 2*w.maxFee {
 		return nil, errors.New("not enough fee credit in wallet")
 	}
 	if fcb.IsLocked() {
@@ -309,7 +311,7 @@ func (w *FeeManager) LockFeeCredit(ctx context.Context, cmd LockFeeCreditCmd) (*
 	if err != nil {
 		return nil, err
 	}
-	tx, err := txbuilder.NewLockFCTx(accountKey, w.targetPartitionSystemID, fcb, cmd.LockStatus, timeout)
+	tx, err := txbuilder.NewLockFCTx(accountKey, w.targetPartitionSystemID, fcb, cmd.LockStatus, timeout, w.maxFee)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create lockFC transaction: %w", err)
 	}
@@ -341,7 +343,7 @@ func (w *FeeManager) UnlockFeeCredit(ctx context.Context, cmd UnlockFeeCreditCmd
 	if err != nil {
 		return nil, err
 	}
-	tx, err := txbuilder.NewUnlockFCTx(accountKey, w.targetPartitionSystemID, fcb, timeout)
+	tx, err := txbuilder.NewUnlockFCTx(accountKey, w.targetPartitionSystemID, fcb, timeout, w.maxFee)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create unlockFC transaction: %w", err)
 	}
@@ -387,7 +389,7 @@ func (w *FeeManager) addFees(ctx context.Context, accountKey *account.AccountKey
 
 	// filter bills of too small value
 	bills, _ = util.FilterSlice(bills, func(b *sdktypes.Bill) (bool, error) {
-		return b.Value() >= MinimumFeeAmount, nil
+		return b.Value() >= MinimumFeeAmountMultiplier*w.maxFee, nil
 	})
 
 	// sum bill values i.e. calculate effective balance
@@ -504,6 +506,7 @@ func (w *FeeManager) sendLockFCTx(ctx context.Context, accountKey *account.Accou
 		fcb,
 		wallet.LockReasonAddFees,
 		targetPartitionTimeout,
+		w.maxFee,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create lockFC transaction: %w", err)
@@ -611,6 +614,7 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 		feeCtx.TargetBillCounter,
 		moneyTimeout,
 		latestAdditionTime,
+		w.maxFee,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create transferFC transaction: %w", err)
@@ -688,7 +692,7 @@ func (w *FeeManager) sendAddFCTx(ctx context.Context, accountKey *account.Accoun
 	}
 
 	// need to use same FCR that was calculated form transferFC timeout, best to store it in WAL
-	addFCTx, err := txbuilder.NewAddFCTx(feeCtx.FeeCreditRecordID, feeCtx.TransferFCProof, accountKey, w.targetPartitionSystemID, timeout)
+	addFCTx, err := txbuilder.NewAddFCTx(feeCtx.FeeCreditRecordID, feeCtx.TransferFCProof, accountKey, w.targetPartitionSystemID, timeout, w.maxFee)
 	if err != nil {
 		return fmt.Errorf("failed to create addFC transaction: %w", err)
 	}
@@ -726,7 +730,7 @@ func (w *FeeManager) reclaimFees(ctx context.Context, accountKey *account.Accoun
 	if fcb.IsLocked() {
 		return nil, errors.New("fee credit bill is locked")
 	}
-	if fcb.Balance() < MinimumFeeAmount {
+	if fcb.Balance() < MinimumFeeAmountMultiplier*w.maxFee {
 		return nil, ErrMinimumFeeAmount
 	}
 
@@ -830,6 +834,7 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 		feeCtx.TargetBillCounter,
 		wallet.LockReasonReclaimFees,
 		timeout,
+		w.maxFee,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create lock transaction: %w", err)
@@ -892,7 +897,7 @@ func (w *FeeManager) sendCloseFCTx(ctx context.Context, accountKey *account.Acco
 	}
 
 	// create closeFC transaction
-	tx, err := txbuilder.NewCloseFCTx(w.targetPartitionSystemID, fcb, targetPartitionTimeout, feeCtx.TargetBillID, feeCtx.TargetBillCounter, accountKey)
+	tx, err := txbuilder.NewCloseFCTx(w.targetPartitionSystemID, fcb, targetPartitionTimeout, feeCtx.TargetBillID, feeCtx.TargetBillCounter, w.maxFee, accountKey)
 	if err != nil {
 		return fmt.Errorf("failed to create closeFC transaction: %w", err)
 	}
@@ -963,7 +968,7 @@ func (w *FeeManager) sendReclaimFCTx(ctx context.Context, accountKey *account.Ac
 		return err
 	}
 
-	reclaimFC, err := txbuilder.NewReclaimFCTx(w.moneySystemID, feeCtx.TargetBillID, moneyTimeout, feeCtx.CloseFCProof, feeCtx.TargetBillCounter, accountKey)
+	reclaimFC, err := txbuilder.NewReclaimFCTx(w.moneySystemID, feeCtx.TargetBillID, moneyTimeout, feeCtx.CloseFCProof, feeCtx.TargetBillCounter, w.maxFee, accountKey)
 	if err != nil {
 		return fmt.Errorf("failed to create reclaimFC transaction: %w", err)
 	}
@@ -1045,7 +1050,7 @@ func (w *FeeManager) unlockFeeCreditRecord(ctx context.Context, accountKey *acco
 	if err != nil {
 		return nil, err
 	}
-	tx, err := txbuilder.NewUnlockFCTx(accountKey, w.targetPartitionSystemID, fcb, timeout)
+	tx, err := txbuilder.NewUnlockFCTx(accountKey, w.targetPartitionSystemID, fcb, timeout, w.maxFee)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create unlockFC transaction: %w", err)
 	}
@@ -1075,7 +1080,7 @@ func (w *FeeManager) unlockBill(ctx context.Context, accountKey *account.Account
 				if fcb == nil {
 					return nil, fmt.Errorf("fee credit bill not found")
 				}
-				unlockTx, err := txbuilder.NewUnlockTx(accountKey, w.moneySystemID, b, fcb.ID, timeout)
+				unlockTx, err := txbuilder.NewUnlockTx(accountKey, w.moneySystemID, b, fcb.ID, timeout, w.maxFee)
 				if err != nil {
 					return nil, fmt.Errorf("failed to create unlock tx: %w", err)
 				}
@@ -1091,8 +1096,8 @@ func (w *FeeManager) unlockBill(ctx context.Context, accountKey *account.Account
 	return nil, nil
 }
 
-func (c AddFeeCmd) isValid() error {
-	if c.Amount < MinimumFeeAmount {
+func (c AddFeeCmd) isValid(maxFee uint64) error {
+	if c.Amount < MinimumFeeAmountMultiplier*maxFee {
 		return ErrMinimumFeeAmount
 	}
 	return nil
