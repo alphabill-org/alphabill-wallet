@@ -173,11 +173,11 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*sdktypes.Proof, erro
 		return nil, err
 	}
 
-	fcb, err := w.moneyClient.GetFeeCreditRecordByOwnerID(ctx, k.PubKeyHash.Sha256)
+	fcr, err := w.moneyClient.GetFeeCreditRecordByOwnerID(ctx, k.PubKeyHash.Sha256)
 	if err != nil {
 		return nil, err
 	}
-	if fcb == nil {
+	if fcr == nil {
 		return nil, errors.New("no fee credit in money wallet")
 	}
 
@@ -220,15 +220,18 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*sdktypes.Proof, erro
 				OwnerCondition: templates.NewP2pkh256BytesFromKeyHash(hash.Sum256(r.PubKey)),
 			})
 		}
-		remainingValue := largestBill.Value() - totalAmount
-		tx, err := txbuilder.NewSplitTx(targetUnits, remainingValue, k, w.SystemID(), largestBill, timeout, fcb.ID, cmd.ReferenceNumber)
+		tx, err := largestBill.Split(targetUnits,
+			sdktypes.WithTimeout(timeout),
+			sdktypes.WithFeeCreditRecordID(fcr.ID),
+			sdktypes.WithReferenceNumber(cmd.ReferenceNumber),
+			sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create N-way split tx: %w", err)
 		}
 		txs = append(txs, tx)
 	} else {
 		// if single receiver then perform up to N transfers (until target amount is reached)
-		txs, err = txbuilder.CreateTransactions(cmd.Receivers[0].PubKey, cmd.Receivers[0].Amount, w.SystemID(), bills, k, timeout, fcb.ID, cmd.ReferenceNumber)
+		txs, err = txbuilder.CreateTransactions(cmd.Receivers[0].PubKey, cmd.Receivers[0].Amount, w.SystemID(), bills, k, timeout, fcr.ID, cmd.ReferenceNumber)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create transactions: %w", err)
 		}
@@ -239,7 +242,7 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*sdktypes.Proof, erro
 	}
 
 	txsCost := txbuilder.MaxFee * uint64(len(batch.Submissions()))
-	if fcb.Balance() < txsCost {
+	if fcr.Balance() < txsCost {
 		return nil, errors.New("insufficient fee credit balance for transaction(s)")
 	}
 

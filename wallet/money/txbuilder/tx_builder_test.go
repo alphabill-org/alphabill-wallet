@@ -22,6 +22,7 @@ var (
 	accountKey, _     = account.NewKeys(testMnemonic)
 )
 
+// TODO: move under client/types where bill.Split() is
 func TestSplitTransactionAmount(t *testing.T) {
 	receiverPubKeyHash := hash.Sum256(receiverPubKey)
 	keys, _ := account.NewKeys(testMnemonic)

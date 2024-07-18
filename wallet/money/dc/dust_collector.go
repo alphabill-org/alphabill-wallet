@@ -95,13 +95,15 @@ func (w *DustCollector) runDustCollection(ctx context.Context, accountKey *accou
 	if err != nil {
 		return nil, fmt.Errorf("failed to lock target bill: %w", err)
 	}
+	// lock transaction confirmed, counter was increased
+	targetBill.Data.Counter += 1
 
 	// exec swap (increment counter for successful lock transaction)
-	return w.submitDCBatch(ctx, accountKey, fcb.ID, lockTxSub, targetBill.Counter()+1, billsToSwap)
+	return w.submitDCBatch(ctx, accountKey, fcb.ID, lockTxSub, targetBill, billsToSwap)
 }
 
 // submitDCBatch creates dust transfers from given bills and locked target bill.
-func (w *DustCollector) submitDCBatch(ctx context.Context, k *account.AccountKey, fcrID []byte, lockTxSub *txsubmitter.TxSubmission, counter uint64, billsToSwap []*sdktypes.Bill) (*DustCollectionResult, error) {
+func (w *DustCollector) submitDCBatch(ctx context.Context, k *account.AccountKey, fcrID []byte, lockTxSub *txsubmitter.TxSubmission, targetBill *sdktypes.Bill, billsToSwap []*sdktypes.Bill) (*DustCollectionResult, error) {
 	// create dc batch
 	timeout, err := w.getTxTimeout(ctx)
 	if err != nil {
@@ -109,7 +111,10 @@ func (w *DustCollector) submitDCBatch(ctx context.Context, k *account.AccountKey
 	}
 	dcBatch := txsubmitter.NewBatch(w.moneyClient, w.log)
 	for _, b := range billsToSwap {
-		tx, err := txbuilder.NewDustTx(k, w.systemID, fcrID, b, lockTxSub.UnitID, counter, timeout)
+		tx, err := b.TransferToDustCollector(targetBill,
+			sdktypes.WithTimeout(timeout),
+			sdktypes.WithFeeCreditRecordID(fcrID),
+			sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
 		if err != nil {
 			return nil, fmt.Errorf("failed to build dust transfer transaction: %w", err)
 		}
@@ -117,7 +122,7 @@ func (w *DustCollector) submitDCBatch(ctx context.Context, k *account.AccountKey
 	}
 
 	// send dc batch
-	w.log.InfoContext(ctx, fmt.Sprintf("submitting dc batch of %d dust transfers with target bill %x", len(dcBatch.Submissions()), lockTxSub.UnitID))
+	w.log.InfoContext(ctx, fmt.Sprintf("submitting dc batch of %d dust transfers with target bill %x", len(dcBatch.Submissions()), targetBill.ID))
 	if err := dcBatch.SendTx(ctx, true); err != nil {
 		return nil, fmt.Errorf("failed to send dust transfer transactions: %w", err)
 	}
@@ -127,7 +132,7 @@ func (w *DustCollector) submitDCBatch(ctx context.Context, k *account.AccountKey
 	}
 
 	// send swap tx, return swap proof
-	swapProof, err := w.swapDCBills(ctx, k, proofs, lockTxSub.UnitID, fcrID)
+	swapProof, err := w.swapDCBills(ctx, k, proofs, targetBill, fcrID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to swap dc bills: %w", err)
 	}
@@ -136,14 +141,17 @@ func (w *DustCollector) submitDCBatch(ctx context.Context, k *account.AccountKey
 
 // swapDCBills creates swap transfer from given dcProofs and target bill, joining the dcBills into the target bill,
 // the target bill is expected to be locked on server side.
-func (w *DustCollector) swapDCBills(ctx context.Context, k *account.AccountKey, dcProofs []*sdktypes.Proof, unitID types.UnitID, fcrID []byte) (*sdktypes.Proof, error) {
+func (w *DustCollector) swapDCBills(ctx context.Context, k *account.AccountKey, dcProofs []*sdktypes.Proof, targetBill *sdktypes.Bill, fcrID []byte) (*sdktypes.Proof, error) {
 	timeout, err := w.getTxTimeout(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// create swap tx
-	swapTx, err := txbuilder.NewSwapTx(k, w.systemID, fcrID, dcProofs, unitID, timeout)
+	swapTx, err  := targetBill.SwapWithDustCollector(dcProofs,
+		sdktypes.WithTimeout(timeout),
+		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to build swap tx: %w", err)
 	}
@@ -154,7 +162,7 @@ func (w *DustCollector) swapDCBills(ctx context.Context, k *account.AccountKey, 
 	dcBatch.Add(sub)
 
 	// send swap tx
-	w.log.InfoContext(ctx, fmt.Sprintf("sending swap tx with timeout=%d, unitID=%X", timeout, unitID))
+	w.log.InfoContext(ctx, fmt.Sprintf("sending swap tx with timeout=%d, unitID=%X", timeout, targetBill.ID))
 	if err := dcBatch.SendTx(ctx, true); err != nil {
 		return nil, fmt.Errorf("failed to send swap tx: %w", err)
 	}
@@ -167,10 +175,15 @@ func (w *DustCollector) lockTargetBill(ctx context.Context, k *account.AccountKe
 	if err != nil {
 		return nil, err
 	}
-	lockTx, err := txbuilder.NewLockTx(k, w.systemID, targetBill.ID, fcrID, targetBill.Counter(), wallet.LockReasonCollectDust, timeout)
+	lockTx, err := targetBill.Lock(
+		wallet.LockReasonCollectDust,
+		sdktypes.WithTimeout(timeout),
+		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
 	if err != nil {
 		return nil, err
 	}
+
 	// lock target bill server side
 	w.log.InfoContext(ctx, fmt.Sprintf("locking target bill in node %x", targetBill.ID))
 	lockTxBatch := txsubmitter.NewBatch(w.moneyClient, w.log)

@@ -28,10 +28,8 @@ const (
 
 type (
 	PredicateInput struct {
-		// first priority
-		Argument types.PredicateBytes
-		// if Argument empty, check AccountNumber
-		AccountNumber uint64
+		Argument   types.PredicateBytes
+		AccountKey *account.AccountKey
 	}
 
 	CreateFungibleTokenTypeAttributes struct {
@@ -122,10 +120,11 @@ func parsePredicateArgument(argument string, keyNr uint64, am account.Manager) (
 		if keyNr < 1 {
 			return nil, fmt.Errorf("invalid key number: %v in '%s'", keyNr, argument)
 		}
-		if _, err := am.GetAccountKey(keyNr - 1); err != nil {
+		key, err := am.GetAccountKey(keyNr - 1)
+		if err != nil {
 			return nil, err
 		}
-		return &PredicateInput{AccountNumber: keyNr}, nil
+		return &PredicateInput{AccountKey: key}, nil
 	case strings.HasPrefix(argument, hexPrefix):
 		decoded, err := DecodeHexOrEmpty(argument)
 		if err != nil {

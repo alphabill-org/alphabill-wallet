@@ -519,7 +519,7 @@ func TestSendFungible(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			recTxs = make([]*types.TransactionOrder, 0)
-			result, err := tw.SendFungible(context.Background(), 1, tt.tokenTypeID, tt.targetAmount, nil, nil, defaultOwnerProof(1))
+			result, err := tw.SendFungible(context.Background(), 1, tt.tokenTypeID, tt.targetAmount, nil, nil, defaultProof(1))
 			if tt.expectedErrorMsg != "" {
 				require.ErrorContains(t, err, tt.expectedErrorMsg)
 				return
@@ -734,7 +734,7 @@ func TestTransferNFT(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tokenz[string(tt.token.ID)] = tt.token
-			result, err := tw.TransferNFT(context.Background(), 1, tt.token.ID, tt.key, nil, defaultOwnerProof(1))
+			result, err := tw.TransferNFT(context.Background(), 1, tt.token.ID, tt.key, nil, defaultProof(1))
 			if tt.wantErr == "" {
 				require.NoError(t, err)
 				require.NotNil(t, result)
@@ -851,13 +851,13 @@ func TestLockToken(t *testing.T) {
 
 	// test token is already locked
 	token = &sdktypes.TokenUnit{ID: test.RandomBytes(32), Kind: sdktypes.NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32), Locked: wallet.LockReasonManual, Owner: templates.NewP2pkh256BytesFromKey(pk)}
-	result, err := tw.LockToken(context.Background(), 1, token.ID, []*PredicateInput{{Argument: nil}}, defaultOwnerProof(1))
+	result, err := tw.LockToken(context.Background(), 1, token.ID, []*PredicateInput{{Argument: nil}}, defaultProof(1))
 	require.ErrorContains(t, err, "token is already locked")
 	require.Nil(t, result)
 
 	// test lock token ok
 	token = &sdktypes.TokenUnit{ID: test.RandomBytes(32), Kind: sdktypes.NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32), Owner: templates.NewP2pkh256BytesFromKey(pk)}
-	result, err = tw.LockToken(context.Background(), 1, token.ID, []*PredicateInput{{Argument: nil}}, defaultOwnerProof(1))
+	result, err = tw.LockToken(context.Background(), 1, token.ID, []*PredicateInput{{Argument: nil}}, defaultProof(1))
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	tx, found := recTxs[string(token.ID)]
@@ -898,13 +898,13 @@ func TestUnlockToken(t *testing.T) {
 
 	// test token is already unlocked
 	token = &sdktypes.TokenUnit{ID: test.RandomBytes(32), Kind: sdktypes.NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32), Owner: templates.NewP2pkh256BytesFromKey(pk)}
-	result, err := tw.UnlockToken(context.Background(), 1, token.ID, []*PredicateInput{{Argument: nil}}, defaultOwnerProof(1))
+	result, err := tw.UnlockToken(context.Background(), 1, token.ID, []*PredicateInput{{Argument: nil}}, defaultProof(1))
 	require.ErrorContains(t, err, "token is already unlocked")
 	require.Nil(t, result)
 
 	// test unlock token ok
 	token = &sdktypes.TokenUnit{ID: test.RandomBytes(32), Kind: sdktypes.NonFungible, Symbol: "AB", TypeID: test.RandomBytes(32), Locked: wallet.LockReasonManual, Owner: templates.NewP2pkh256BytesFromKey(pk)}
-	result, err = tw.UnlockToken(context.Background(), 1, token.ID, []*PredicateInput{{Argument: nil}}, defaultOwnerProof(1))
+	result, err = tw.UnlockToken(context.Background(), 1, token.ID, []*PredicateInput{{Argument: nil}}, defaultProof(1))
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	tx, found := recTxs[string(token.ID)]

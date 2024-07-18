@@ -6,8 +6,8 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/txsystem/orchestration"
 	"github.com/alphabill-org/alphabill-go-base/types"
 
+	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
-	"github.com/alphabill-org/alphabill-wallet/wallet/txbuilder"
 )
 
 const MaxFee = uint64(10)
@@ -17,16 +17,22 @@ func NewAddVarTx(varData orchestration.ValidatorAssignmentRecord, systemID types
 	attr := &orchestration.AddVarAttributes{
 		Var: varData,
 	}
-	txPayload, err := txbuilder.NewTxPayload(systemID, orchestration.PayloadTypeAddVAR, unitID, nil, timeout, nil, attr)
+
+	opts := &sdktypes.TxOptions{}
+	sdktypes.WithTimeout(timeout)(opts)
+	sdktypes.WithMaxFee(MaxFee)(opts)
+
+	txPayload, err := sdktypes.NewPayload(systemID, unitID, orchestration.PayloadTypeAddVAR, attr, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tx: %w", err)
 	}
+
+	tx := &types.TransactionOrder{Payload: txPayload}
 	if signingKey != nil {
-		payloadSig, err := txbuilder.SignPayload(txPayload, signingKey.PrivKey)
-		if err != nil {
+		ownerProof := sdktypes.NewP2pkhProofGenerator(signingKey.PrivKey, signingKey.PubKey)
+		if err := tx.SetOwnerProof(ownerProof); err != nil {
 			return nil, fmt.Errorf("failed to sign tx: %w", err)
 		}
-		return txbuilder.NewTransactionOrderP2PKH(txPayload, payloadSig, signingKey.PubKey), nil
 	}
-	return &types.TransactionOrder{Payload: txPayload}, nil
+	return tx, nil
 }

@@ -9,73 +9,128 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/types"
 )
 
-const (
-	Any Kind = 1 << iota
-	Fungible
-	NonFungible
-)
-
 var NoParent = TokenTypeID(make([]byte, crypto.SHA256.Size()))
 
 type (
 	TokensPartitionClient interface {
 		PartitionClient
 
-		GetToken(ctx context.Context, id TokenID) (*TokenUnit, error)
-		GetTokens(ctx context.Context, kind Kind, ownerID []byte) ([]*TokenUnit, error)
-		GetTokenTypes(ctx context.Context, kind Kind, creator PubKey) ([]*TokenTypeUnit, error)
-		GetTypeHierarchy(ctx context.Context, typeID TokenTypeID) ([]*TokenTypeUnit, error)
+		GetFungibleToken(ctx context.Context, id TokenID) (FungibleToken, error)
+		GetFungibleTokens(ctx context.Context, ownerID []byte) ([]FungibleToken, error)
+		GetFungibleTokenTypes(ctx context.Context, creator PubKey) ([]FungibleTokenType, error)
+		GetFungibleTokenTypeHierarchy(ctx context.Context, typeID TokenTypeID) ([]FungibleTokenType, error)
+
+		GetNonFungibleToken(ctx context.Context, id TokenID) (NonFungibleToken, error)
+		GetNonFungibleTokens(ctx context.Context, ownerID []byte) ([]NonFungibleToken, error)
+		GetNonFungibleTokenTypes(ctx context.Context, creator PubKey) ([]NonFungibleTokenType, error)
 	}
 
-	TokenUnit struct {
-		// common
-		ID       TokenID     `json:"id"`
-		Symbol   string      `json:"symbol"`
-		TypeID   TokenTypeID `json:"typeId"`
-		TypeName string      `json:"typeName"`
-		Owner    types.Bytes `json:"owner"`
-		Nonce    types.Bytes `json:"nonce,omitempty"`
-		Counter  uint64      `json:"counter"`
-		Locked   uint64      `json:"locked"`
-
-		// fungible only
-		Amount   uint64 `json:"amount,omitempty,string"`
-		Decimals uint32 `json:"decimals,omitempty"`
-		Burned   bool   `json:"burned,omitempty"`
-
-		// nft only
-		NftName                string    `json:"nftName,omitempty"`
-		NftURI                 string    `json:"nftUri,omitempty"`
-		NftData                []byte    `json:"nftData,omitempty"`
-		NftDataUpdatePredicate Predicate `json:"nftDataUpdatePredicate,omitempty"`
-
-		// meta
-		Kind Kind `json:"kind"`
+	TokenType interface {
+		SystemID() types.SystemID
+		ID() TokenTypeID
+		ParentTypeID() TokenTypeID
+		Symbol() string
+		Name() string
+		Icon() *tokens.Icon
+		SubTypeCreationPredicate() Predicate
+		TokenCreationPredicate() Predicate
+		InvariantPredicate() Predicate
 	}
 
-	TokenTypeUnit struct {
-		// common
-		ID                       TokenTypeID      `json:"id"`
-		ParentTypeID             TokenTypeID      `json:"parentTypeId"`
-		Symbol                   string           `json:"symbol"`
-		Name                     string           `json:"name,omitempty"`
-		Icon                     *tokens.Icon     `json:"icon,omitempty"`
-		SubTypeCreationPredicate Predicate `json:"subTypeCreationPredicate,omitempty"`
-		TokenCreationPredicate   Predicate `json:"tokenCreationPredicate,omitempty"`
-		InvariantPredicate       Predicate `json:"invariantPredicate,omitempty"`
-
-		// fungible only
-		DecimalPlaces uint32 `json:"decimalPlaces,omitempty"`
-
-		// nft only
-		NftDataUpdatePredicate Predicate `json:"nftDataUpdatePredicate,omitempty"`
-
-		// meta
-		Kind   Kind   `json:"kind"`
-		TxHash TxHash `json:"txHash"`
+	FungibleTokenType interface {
+		TokenType
+		DecimalPlaces() uint32
+		Create(txOptions ...TxOption) (*types.TransactionOrder, error)
 	}
 
-	Kind          byte
+	NonFungibleTokenType interface {
+		TokenType
+		DataUpdatePredicate() Predicate
+		Create(txOptions ...TxOption) (*types.TransactionOrder, error)
+	}
+
+	FungibleTokenTypeParams struct {
+		SystemID                 types.SystemID
+		ID                       TokenTypeID
+		ParentTypeID             TokenTypeID
+		Symbol                   string
+		Name                     string
+		Icon                     *tokens.Icon
+		SubTypeCreationPredicate Predicate
+		TokenCreationPredicate   Predicate
+		InvariantPredicate       Predicate
+		DecimalPlaces            uint32
+	}
+
+	NonFungibleTokenTypeParams struct {
+		SystemID                 types.SystemID
+		ID                       TokenTypeID
+		ParentTypeID             TokenTypeID
+		Symbol                   string
+		Name                     string
+		Icon                     *tokens.Icon
+		SubTypeCreationPredicate Predicate
+		TokenCreationPredicate   Predicate
+		InvariantPredicate       Predicate
+		DataUpdatePredicate      Predicate
+	}
+
+	Token interface {
+		SystemID() types.SystemID
+		ID() TokenID
+		TypeID() TokenTypeID
+		TypeName() string
+		Symbol() string
+		OwnerPredicate() []byte
+		Nonce() []byte
+		LockStatus() uint64
+		Counter() uint64
+		IncreaseCounter()
+
+		Create(txOptions ...TxOption) (*types.TransactionOrder, error)
+		Transfer(ownerPredicate []byte, txOptions ...TxOption) (*types.TransactionOrder, error)
+		Lock(lockStatus uint64, txOptions ...TxOption) (*types.TransactionOrder, error)
+		Unlock(txOptions ...TxOption) (*types.TransactionOrder, error)
+	}
+
+	FungibleToken interface {
+		Token
+		Amount() uint64
+		DecimalPlaces() uint32
+		Burned() bool
+
+		Split(amount uint64, ownerPredicate []byte, txOptions ...TxOption) (*types.TransactionOrder, error)
+		Burn(targetTokenID types.UnitID, targetTokenCounter uint64, txOptions ...TxOption) (*types.TransactionOrder, error)
+		Join(burnTxs []*types.TransactionRecord, burnProofs []*types.TxProof, txOptions ...TxOption) (*types.TransactionOrder, error)
+	}
+
+	NonFungibleToken interface {
+		Token
+		Name() string
+		URI() string
+		Data() []byte
+		DataUpdatePredicate() Predicate
+
+		Update(data []byte, txOptions ...TxOption) (*types.TransactionOrder, error)
+	}
+
+	FungibleTokenParams struct {
+		SystemID       types.SystemID
+		TypeID         TokenTypeID
+		OwnerPredicate Predicate
+		Amount         uint64
+	}
+
+	NonFungibleTokenParams struct {
+		SystemID            types.SystemID
+		TypeID              TokenTypeID
+		OwnerPredicate      Predicate
+		Name                string
+		URI                 string
+		Data                []byte
+		DataUpdatePredicate Predicate
+	}
+
 	TokenID     = types.UnitID
 	TokenTypeID = types.UnitID
 	
@@ -84,25 +139,6 @@ type (
 	PubKey     []byte
 	PubKeyHash []byte
 )
-
-func (tu *TokenUnit) IsLocked() bool {
-	if tu != nil {
-		return tu.Locked > 0
-	}
-	return false
-}
-
-func (kind Kind) String() string {
-	switch kind {
-	case Any:
-		return "all"
-	case Fungible:
-		return "fungible"
-	case NonFungible:
-		return "nft"
-	}
-	return "unknown"
-}
 
 func (pk PubKey) Hash() PubKeyHash {
 	return hash.Sum256(pk)

@@ -36,121 +36,149 @@ func NewTokensPartitionClient(ctx context.Context, rpcUrl string) (sdktypes.Toke
 	}, nil
 }
 
-// GetToken returns token for the given token id.
-// Returns ErrNotFound if the token does not exist.
-func (c *tokensPartitionClient) GetToken(ctx context.Context, tokenID sdktypes.TokenID) (*sdktypes.TokenUnit, error) {
-	if tokenID.HasType(tokens.FungibleTokenUnitType) {
-		var ft *sdktypes.Unit[tokens.FungibleTokenData]
-		if err := c.RpcClient.CallContext(ctx, &ft, "state_getUnit", tokenID, false); err != nil {
-			return nil, err
-		}
-		if ft == nil {
-			return nil, nil
-		}
-
-		var ftType *sdktypes.Unit[tokens.FungibleTokenTypeData]
-		if err := c.RpcClient.CallContext(ctx, &ftType, "state_getUnit", ft.Data.TokenType, false); err != nil {
-			return nil, err
-		}
-		if ftType == nil {
-			return nil, nil
-		}
-
-		return &sdktypes.TokenUnit{
-			// common
-			ID:       ft.UnitID,
-			Symbol:   ftType.Data.Symbol,
-			TypeID:   ft.Data.TokenType,
-			TypeName: ftType.Data.Name,
-			Owner:    ft.OwnerPredicate,
-			Counter:  ft.Data.Counter,
-			Locked:   ft.Data.Locked,
-
-			// fungible only
-			Amount:   ft.Data.Value,
-			Decimals: ftType.Data.DecimalPlaces,
-
-			// meta
-			Kind: sdktypes.Fungible,
-		}, nil
-	} else if tokenID.HasType(tokens.NonFungibleTokenUnitType) {
-		var nft *sdktypes.Unit[tokens.NonFungibleTokenData]
-		if err := c.RpcClient.CallContext(ctx, &nft, "state_getUnit", tokenID, false); err != nil {
-			return nil, err
-		}
-		if nft == nil {
-			return nil, nil
-		}
-
-		var nftType *sdktypes.Unit[tokens.NonFungibleTokenTypeData]
-		if err := c.RpcClient.CallContext(ctx, &nftType, "state_getUnit", nft.Data.TypeID, false); err != nil {
-			return nil, err
-		}
-		if nftType == nil {
-			return nil, nil
-		}
-
-		return &sdktypes.TokenUnit{
-			// common
-			ID:       nft.UnitID,
-			Symbol:   nftType.Data.Symbol,
-			TypeID:   nft.Data.TypeID,
-			TypeName: nftType.Data.Name,
-			Owner:    nft.OwnerPredicate,
-			Counter:  nft.Data.Counter,
-			Locked:   nft.Data.Locked,
-
-			// nft only
-			NftName:                nft.Data.Name,
-			NftURI:                 nft.Data.URI,
-			NftData:                nft.Data.Data,
-			NftDataUpdatePredicate: nft.Data.DataUpdatePredicate,
-
-			// meta
-			Kind: sdktypes.NonFungible,
-		}, nil
-	} else {
-		return nil, fmt.Errorf("invalid token id: %s", tokenID)
+// GetFungibleToken returns fungible token for the given token id.
+// Returns nil,nil if the token does not exist.
+func (c *tokensPartitionClient) GetFungibleToken(ctx context.Context, tokenID sdktypes.TokenID) (sdktypes.FungibleToken, error) {
+	if !tokenID.HasType(tokens.FungibleTokenUnitType) {
+		return nil, fmt.Errorf("invalid fungible token id: %s", tokenID)
 	}
+
+	var ft *sdktypes.Unit[tokens.FungibleTokenData]
+	if err := c.RpcClient.CallContext(ctx, &ft, "state_getUnit", tokenID, false); err != nil {
+		return nil, err
+	}
+	if ft == nil {
+		return nil, nil
+	}
+
+	var ftType *sdktypes.Unit[tokens.FungibleTokenTypeData]
+	if err := c.RpcClient.CallContext(ctx, &ftType, "state_getUnit", ft.Data.TokenType, false); err != nil {
+		return nil, err
+	}
+	if ftType == nil {
+		return nil, nil
+	}
+
+	return &fungibleToken{
+		token: token{
+			systemID:       0, // TODO
+			id:             ft.UnitID,
+			symbol:         ftType.Data.Symbol,
+			typeID:         ft.Data.TokenType,
+			typeName:       ftType.Data.Name,
+			ownerPredicate: ft.OwnerPredicate,
+			counter:        ft.Data.Counter,
+			lockStatus:     ft.Data.Locked,
+		},
+		amount:        ft.Data.Value,
+		decimalPlaces: ftType.Data.DecimalPlaces,
+	}, nil
 }
 
-// GetTokens returns tokens for the given owner id.
-func (c *tokensPartitionClient) GetTokens(ctx context.Context, kind sdktypes.Kind, ownerID []byte) ([]*sdktypes.TokenUnit, error) {
+// GetNonFungibleToken returns non-fungible token for the given token id.
+// Returns nil,nil if the token does not exist.
+func (c *tokensPartitionClient) GetNonFungibleToken(ctx context.Context, tokenID sdktypes.TokenID) (sdktypes.NonFungibleToken, error) {
+	if !tokenID.HasType(tokens.NonFungibleTokenUnitType) {
+		return nil, fmt.Errorf("invalid non-fungible token id: %s", tokenID)
+	}
+
+	var nft *sdktypes.Unit[tokens.NonFungibleTokenData]
+	if err := c.RpcClient.CallContext(ctx, &nft, "state_getUnit", tokenID, false); err != nil {
+		return nil, err
+	}
+	if nft == nil {
+		return nil, nil
+	}
+
+	var nftType *sdktypes.Unit[tokens.NonFungibleTokenTypeData]
+	if err := c.RpcClient.CallContext(ctx, &nftType, "state_getUnit", nft.Data.TypeID, false); err != nil {
+		return nil, err
+	}
+	if nftType == nil {
+		return nil, nil
+	}
+
+	return &nonFungibleToken{
+		token: token{
+			id:             nft.UnitID,
+			symbol:         nftType.Data.Symbol,
+			typeID:         nft.Data.TypeID,
+			typeName:       nftType.Data.Name,
+			ownerPredicate: nft.OwnerPredicate,
+			counter:        nft.Data.Counter,
+			lockStatus:     nft.Data.Locked,
+		},
+		name:                nft.Data.Name,
+		uri:                 nft.Data.URI,
+		data:                nft.Data.Data,
+		dataUpdatePredicate: nft.Data.DataUpdatePredicate,
+	}, nil
+}
+
+// GetFungibleTokens returns fungible tokens for the given owner id.
+func (c *tokensPartitionClient) GetFungibleTokens(ctx context.Context, ownerID []byte) ([]sdktypes.FungibleToken, error) {
 	unitIds, err := c.GetUnitsByOwnerID(ctx, ownerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch owner unit ids: %w", err)
 	}
-	var tokenz []*sdktypes.TokenUnit
+
+	var fungibleTokens []sdktypes.FungibleToken
 	for _, unitID := range unitIds {
-		// only fetch NFTs and FTs, ignoring fee credit units and token type units (type units are not indexed anyway)
-		if unitID.HasType(tokens.FungibleTokenUnitType) || unitID.HasType(tokens.NonFungibleTokenUnitType) {
-			tokenUnit, err := c.GetToken(ctx, unitID)
-			if err != nil {
-				return nil, fmt.Errorf("failed to fetch token: %w", err)
-			}
-			if kind == sdktypes.Any || kind == tokenUnit.Kind {
-				tokenz = append(tokenz, tokenUnit)
-			}
+		if !unitID.HasType(tokens.FungibleTokenUnitType) {
+			continue
 		}
+		fungibleToken, err := c.GetFungibleToken(ctx, unitID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch token: %w", err)
+		}
+		fungibleTokens = append(fungibleTokens, fungibleToken)
 	}
-	return tokenz, nil
+
+	return fungibleTokens, nil
 }
 
-func (c *tokensPartitionClient) GetTokenTypes(ctx context.Context, kind sdktypes.Kind, creator sdktypes.PubKey) ([]*sdktypes.TokenTypeUnit, error) {
+// GetNonFungibleTokens returns non-fungible tokens for the given owner id.
+func (c *tokensPartitionClient) GetNonFungibleTokens(ctx context.Context, ownerID []byte) ([]sdktypes.NonFungibleToken, error) {
+	unitIds, err := c.GetUnitsByOwnerID(ctx, ownerID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch owner unit ids: %w", err)
+	}
+
+	var nonFungibleTokens []sdktypes.NonFungibleToken
+	for _, unitID := range unitIds {
+		if !unitID.HasType(tokens.NonFungibleTokenUnitType) {
+			continue
+		}
+		nonFungibleToken, err := c.GetNonFungibleToken(ctx, unitID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch token: %w", err)
+		}
+		nonFungibleTokens = append(nonFungibleTokens, nonFungibleToken)
+	}
+
+	return nonFungibleTokens, nil
+}
+
+func (c *tokensPartitionClient) GetFungibleTokenTypes(ctx context.Context, creator sdktypes.PubKey) ([]sdktypes.FungibleTokenType, error) {
+	// TODO AB-1448
+	return nil, nil
+}
+
+func (c *tokensPartitionClient) GetNonFungibleTokenTypes(ctx context.Context, creator sdktypes.PubKey) ([]sdktypes.NonFungibleTokenType, error) {
 	// TODO AB-1448
 	return nil, nil
 }
 
 // GetTypeHierarchy returns type hierarchy for given token type id where the root type is the last element (no parent).
-func (c *tokensPartitionClient) GetTypeHierarchy(ctx context.Context, typeID sdktypes.TokenTypeID) ([]*sdktypes.TokenTypeUnit, error) {
-	var tokenTypes []*sdktypes.TokenTypeUnit
+func (c *tokensPartitionClient) GetFungibleTokenTypeHierarchy(ctx context.Context, typeID sdktypes.TokenTypeID) ([]sdktypes.FungibleTokenType, error) {
+	var tokenTypes []sdktypes.FungibleTokenType
 	for len(typeID) > 0 && !typeID.Eq(sdktypes.NoParent) {
-		tokenType, err := c.getTokenType(ctx, typeID)
+		tokenType, err := c.getFungibleTokenType(ctx, typeID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch token type: %w", err)
 		}
 		tokenTypes = append(tokenTypes, tokenType)
-		typeID = tokenType.ParentTypeID
+		typeID = tokenType.ParentTypeID()
 	}
 	return tokenTypes, nil
 }
@@ -175,48 +203,56 @@ func (c *tokensPartitionClient) Close() {
 	c.StateAPIClient.Close()
 }
 
-func (c *tokensPartitionClient) getTokenType(ctx context.Context, typeID sdktypes.TokenTypeID) (*sdktypes.TokenTypeUnit, error) {
-	if typeID.HasType(tokens.FungibleTokenTypeUnitType) {
-		var ftType *sdktypes.Unit[tokens.FungibleTokenTypeData]
-		if err := c.RpcClient.CallContext(ctx, &ftType, "state_getUnit", typeID, false); err != nil {
-			return nil, err
-		}
-		if ftType == nil {
-			return nil, nil
-		}
-		return &sdktypes.TokenTypeUnit{
-			ID:                       ftType.UnitID,
-			ParentTypeID:             ftType.Data.ParentTypeID,
-			Symbol:                   ftType.Data.Symbol,
-			Name:                     ftType.Data.Name,
-			Icon:                     ftType.Data.Icon,
-			SubTypeCreationPredicate: ftType.Data.SubTypeCreationPredicate,
-			TokenCreationPredicate:   ftType.Data.TokenCreationPredicate,
-			InvariantPredicate:       ftType.Data.InvariantPredicate,
-			DecimalPlaces:            ftType.Data.DecimalPlaces,
-			Kind:                     sdktypes.Fungible,
-		}, nil
-	} else if typeID.HasType(tokens.NonFungibleTokenTypeUnitType) {
-		var nftType *sdktypes.Unit[tokens.NonFungibleTokenTypeData]
-		if err := c.RpcClient.CallContext(ctx, &nftType, "state_getUnit", typeID, false); err != nil {
-			return nil, err
-		}
-		if nftType == nil {
-			return nil, nil
-		}
-		return &sdktypes.TokenTypeUnit{
-			ID:                       nftType.UnitID,
-			ParentTypeID:             nftType.Data.ParentTypeID,
-			Symbol:                   nftType.Data.Symbol,
-			Name:                     nftType.Data.Name,
-			Icon:                     nftType.Data.Icon,
-			SubTypeCreationPredicate: nftType.Data.SubTypeCreationPredicate,
-			TokenCreationPredicate:   nftType.Data.TokenCreationPredicate,
-			InvariantPredicate:       nftType.Data.InvariantPredicate,
-			NftDataUpdatePredicate:   nftType.Data.DataUpdatePredicate,
-			Kind:                     sdktypes.NonFungible,
-		}, nil
-	} else {
-		return nil, fmt.Errorf("invalid token type id: %s", typeID)
+func (c *tokensPartitionClient) getFungibleTokenType(ctx context.Context, typeID sdktypes.TokenTypeID) (sdktypes.FungibleTokenType, error) {
+	if !typeID.HasType(tokens.FungibleTokenTypeUnitType) {
+		return nil, fmt.Errorf("invalid fungible token type id: %s", typeID)
 	}
+	var ftType *sdktypes.Unit[tokens.FungibleTokenTypeData]
+	if err := c.RpcClient.CallContext(ctx, &ftType, "state_getUnit", typeID, false); err != nil {
+		return nil, err
+	}
+	if ftType == nil {
+		return nil, nil
+	}
+	return &fungibleTokenType{
+		tokenType: tokenType{
+			systemID:                 1, // TODO
+			id:                       ftType.UnitID,
+			parentTypeID:             ftType.Data.ParentTypeID,
+			symbol:                   ftType.Data.Symbol,
+			name:                     ftType.Data.Name,
+			icon:                     ftType.Data.Icon,
+			subTypeCreationPredicate: ftType.Data.SubTypeCreationPredicate,
+			tokenCreationPredicate:   ftType.Data.TokenCreationPredicate,
+			invariantPredicate:       ftType.Data.InvariantPredicate,
+		},
+		decimalPlaces: ftType.Data.DecimalPlaces,
+	}, nil
+}
+
+func (c *tokensPartitionClient) getNonFungibleTokenType(ctx context.Context, typeID sdktypes.TokenTypeID) (sdktypes.NonFungibleTokenType, error) {
+	if !typeID.HasType(tokens.NonFungibleTokenTypeUnitType) {
+		return nil, fmt.Errorf("invalid non-fungible token type id: %s", typeID)
+	}
+	var nftType *sdktypes.Unit[tokens.NonFungibleTokenTypeData]
+	if err := c.RpcClient.CallContext(ctx, &nftType, "state_getUnit", typeID, false); err != nil {
+		return nil, err
+	}
+	if nftType == nil {
+		return nil, nil
+	}
+	return &nonFungibleTokenType{
+		tokenType: tokenType{
+			systemID:                 1, // TODO
+			id:                       nftType.UnitID,
+			parentTypeID:             nftType.Data.ParentTypeID,
+			symbol:                   nftType.Data.Symbol,
+			name:                     nftType.Data.Name,
+			icon:                     nftType.Data.Icon,
+			subTypeCreationPredicate: nftType.Data.SubTypeCreationPredicate,
+			tokenCreationPredicate:   nftType.Data.TokenCreationPredicate,
+			invariantPredicate:       nftType.Data.InvariantPredicate,
+		},
+		dataUpdatePredicate: nftType.Data.DataUpdatePredicate,
+	}, nil
 }
