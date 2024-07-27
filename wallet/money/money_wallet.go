@@ -317,8 +317,8 @@ func (w *Wallet) CollectDust(ctx context.Context, accountNumber uint64) ([]*Dust
 	return res, nil
 }
 
-func (w *Wallet) getUnlockedBills(ctx context.Context, ownerID []byte) ([]*sdktypes.Bill, error) {
-	var unlockedBills []*sdktypes.Bill
+func (w *Wallet) getUnlockedBills(ctx context.Context, ownerID []byte) ([]sdktypes.Bill, error) {
+	var unlockedBills []sdktypes.Bill
 	bills, err := w.moneyClient.GetBills(ctx, ownerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch bills: %w", err)
@@ -329,7 +329,7 @@ func (w *Wallet) getUnlockedBills(ctx context.Context, ownerID []byte) ([]*sdkty
 	})
 	// filter locked bills
 	for _, b := range bills {
-		if !b.IsLocked() {
+		if b.LockStatus() == 0 {
 			unlockedBills = append(unlockedBills, b)
 		}
 	}

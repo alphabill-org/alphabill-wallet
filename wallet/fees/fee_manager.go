@@ -108,27 +108,21 @@ type (
 	}
 
 	AddFeeCreditCtx struct {
-		// TargetPartitionID types.SystemID          `json:"targetPartitionId"`           // target partition id where the fee is being added to
-		TargetBill        *sdktypes.Bill          `json:"targetBill"`                  // transferFC target bill id
-		// TargetBillID      []byte                  `json:"targetBillId"`                // transferFC target bill id
-		// TargetBillCounter uint64                  `json:"targetBillCounter"`           // transferFC target bill counter
-		TargetAmount      uint64                  `json:"targetAmount"`                // the amount to add to the fee credit bill
-		LockingDisabled   bool                    `json:"lockingDisabled,omitempty"`   // user defined flag if we should lock fee credit record when adding fees
-		// FeeCreditRecordID []byte                  `json:"feeCreditRecordId,omitempty"` // the fee credit record id used in current fee credit process
+		TargetBill        sdktypes.Bill             `json:"targetBill"`                  // transferFC target bill id
+		TargetAmount      uint64                    `json:"targetAmount"`                // the amount to add to the fee credit bill
+		LockingDisabled   bool                      `json:"lockingDisabled,omitempty"`   // user defined flag if we should lock fee credit record when adding fees
 		FeeCreditRecord   *sdktypes.FeeCreditRecord `json:"feeCreditRecord,omitempty"` // the fee credit record used in current fee credit process
-		LockFCTx          *types.TransactionOrder `json:"lockFCTx,omitempty"`
-		LockFCProof       *sdktypes.Proof         `json:"lockFCProof,omitempty"`
-		TransferFCTx      *types.TransactionOrder `json:"transferFCTx,omitempty"`
-		TransferFCProof   *sdktypes.Proof         `json:"transferFCProof,omitempty"`
-		AddFCTx           *types.TransactionOrder `json:"addFCTx,omitempty"`
-		AddFCProof        *sdktypes.Proof         `json:"addFCProof,omitempty"`
+		LockFCTx          *types.TransactionOrder   `json:"lockFCTx,omitempty"`
+		LockFCProof       *sdktypes.Proof           `json:"lockFCProof,omitempty"`
+		TransferFCTx      *types.TransactionOrder   `json:"transferFCTx,omitempty"`
+		TransferFCProof   *sdktypes.Proof           `json:"transferFCProof,omitempty"`
+		AddFCTx           *types.TransactionOrder   `json:"addFCTx,omitempty"`
+		AddFCProof        *sdktypes.Proof           `json:"addFCProof,omitempty"`
 	}
 
 	ReclaimFeeCreditCtx struct {
 		TargetPartitionID types.SystemID          `json:"targetPartitionId"` // target partition id where the fee credit is being reclaimed from
-		TargetBill        *sdktypes.Bill          `json:"targetBill"`        // closeFC target bill
-		// TargetBillID      []byte                  `json:"targetBillId"`      // closeFC target bill id
-		// TargetBillCounter uint64                  `json:"targetBillCounter"` // closeFC target bill counter
+		TargetBill        sdktypes.Bill           `json:"targetBill"`        // closeFC target bill
 		LockingDisabled   bool                    `json:"lockingDisabled,omitempty"`
 		LockTx            *types.TransactionOrder `json:"lockTx,omitempty"`
 		LockTxProof       *sdktypes.Proof         `json:"lockTxProof,omitempty"`
@@ -207,7 +201,7 @@ func (w *FeeManager) AddFeeCredit(ctx context.Context, cmd AddFeeCmd) (*AddFeeCm
 	}
 	if addFeeCtx != nil {
 		// verify fee ctx exists for current partition
-		if addFeeCtx.TargetBill.SystemID != w.targetPartitionSystemID {
+		if addFeeCtx.TargetBill.SystemID() != w.targetPartitionSystemID {
 			return nil, fmt.Errorf("%w: pendingProcessSystemID=%s, providedSystemID=%s",
 				ErrInvalidPartition, addFeeCtx.TargetBill.SystemID, w.targetPartitionSystemID)
 		}
@@ -389,12 +383,12 @@ func (w *FeeManager) addFees(ctx context.Context, accountKey *account.AccountKey
 	}
 
 	// filter locked bills
-	bills, _ = util.FilterSlice(bills, func(b *sdktypes.Bill) (bool, error) {
-		return !b.IsLocked(), nil
+	bills, _ = util.FilterSlice(bills, func(b sdktypes.Bill) (bool, error) {
+		return b.LockStatus() == 0, nil
 	})
 
 	// filter bills of too small value
-	bills, _ = util.FilterSlice(bills, func(b *sdktypes.Bill) (bool, error) {
+	bills, _ = util.FilterSlice(bills, func(b sdktypes.Bill) (bool, error) {
 		return b.Value() >= MinimumFeeAmount, nil
 	})
 
@@ -554,7 +548,7 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 
 		// if transferFC failed then verify the source bill is still valid,
 		// if not valid then return error to user and delete fee context and remote lock
-		sourceBill, err := w.moneyClient.GetBill(ctx, feeCtx.TargetBill.ID)
+		sourceBill, err := w.moneyClient.GetBill(ctx, feeCtx.TargetBill.ID())
 		if err != nil {
 			return fmt.Errorf("failed to fetch bill: %w", err)
 		}
@@ -726,8 +720,8 @@ func (w *FeeManager) reclaimFees(ctx context.Context, accountKey *account.Accoun
 	if err != nil {
 		return nil, err
 	}
-	bills, _ = util.FilterSlice(bills, func(b *sdktypes.Bill) (bool, error) {
-		return !b.IsLocked(), nil
+	bills, _ = util.FilterSlice(bills, func(b sdktypes.Bill) (bool, error) {
+		return b.LockStatus() == 0, nil
 	})
 	if len(bills) == 0 {
 		return nil, errors.New("wallet must have a source bill to which to add reclaimed fee credits")
@@ -789,7 +783,7 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 		if proof != nil {
 			w.log.InfoContext(ctx, fmt.Sprintf("lock tx '%x' confirmed", feeCtx.LockTx.Hash(crypto.SHA256)))
 			feeCtx.LockTxProof = proof
-			feeCtx.TargetBill.Data.Counter += 1
+			feeCtx.TargetBill.IncreaseCounter()
 			if err := w.db.SetReclaimFeeContext(accountKey.PubKey, feeCtx); err != nil {
 				return fmt.Errorf("failed to store lock tx proof: %w", err)
 			}
@@ -835,7 +829,7 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 
 	// store lock transaction proof in fee context
 	feeCtx.LockTxProof = proof
-	feeCtx.TargetBill.Data.Counter += 1
+	feeCtx.TargetBill.IncreaseCounter()
 	if err = w.db.SetReclaimFeeContext(accountKey.PubKey, feeCtx); err != nil {
 		return fmt.Errorf("failed to store lock transaction fee context: %w", err)
 	}
@@ -928,12 +922,12 @@ func (w *FeeManager) sendReclaimFCTx(ctx context.Context, accountKey *account.Ac
 			}
 			return nil
 		}
-		actualTargetBill, err := w.moneyClient.GetBill(ctx, feeCtx.TargetBill.ID)
+		actualTargetBill, err := w.moneyClient.GetBill(ctx, feeCtx.TargetBill.ID())
 		if err != nil {
 			return fmt.Errorf("failed to fetch bill: %w", err)
 		}
 		if actualTargetBill == nil || actualTargetBill.Counter() != feeCtx.TargetBill.Counter() {
-			_, err := w.unlockBill(ctx, accountKey, feeCtx.TargetBill.ID)
+			_, err := w.unlockBill(ctx, accountKey, feeCtx.TargetBill.ID())
 			if err != nil {
 				return fmt.Errorf("failed to unlock target bill: %w", err)
 			}
@@ -950,7 +944,7 @@ func (w *FeeManager) sendReclaimFCTx(ctx context.Context, accountKey *account.Ac
 		return err
 	}
 
-	reclaimFC, err := feeCtx.TargetBill.ReclaimFeeCredit(feeCtx.CloseFCProof,
+	reclaimFC, err := feeCtx.TargetBill.ReclaimFromFeeCredit(feeCtx.CloseFCProof,
 		sdktypes.WithTimeout(moneyTimeout),
 		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
@@ -995,7 +989,7 @@ func (w *FeeManager) getTargetPartitionTimeout(ctx context.Context) (uint64, err
 }
 
 // fetchBills fetches bills from money rpc node and sorts them by value (descending, largest first)
-func (w *FeeManager) fetchBills(ctx context.Context, k *account.AccountKey) ([]*sdktypes.Bill, error) {
+func (w *FeeManager) fetchBills(ctx context.Context, k *account.AccountKey) ([]sdktypes.Bill, error) {
 	bills, err := w.moneyClient.GetBills(ctx, k.PubKeyHash.Sha256)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch bills: %w", err)
@@ -1006,7 +1000,7 @@ func (w *FeeManager) fetchBills(ctx context.Context, k *account.AccountKey) ([]*
 	return bills, nil
 }
 
-func (w *FeeManager) sumValues(bills []*sdktypes.Bill) uint64 {
+func (w *FeeManager) sumValues(bills []sdktypes.Bill) uint64 {
 	var sum uint64
 	for _, b := range bills {
 		sum += b.Value()
@@ -1055,7 +1049,7 @@ func (w *FeeManager) unlockBill(ctx context.Context, accountKey *account.Account
 	if bill == nil {
 		return nil, nil
 	}
-	if bill.IsLocked() {
+	if bill.LockStatus() != 0 {
 		timeout, err := w.getMoneyPartitionTimeout(ctx)
 		if err != nil {
 			return nil, err

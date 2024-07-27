@@ -39,8 +39,8 @@ func NewMoneyPartitionClient(ctx context.Context, rpcUrl string) (sdktypes.Money
 }
 
 // GetBill returns bill for the given bill id.
-// Returns api.ErrNotFound if the bill does not exist.
-func (c *moneyPartitionClient) GetBill(ctx context.Context, unitID types.UnitID) (*sdktypes.Bill, error) {
+// Returns nil,nil if the bill does not exist.
+func (c *moneyPartitionClient) GetBill(ctx context.Context, unitID types.UnitID) (sdktypes.Bill, error) {
 	var u *sdktypes.Unit[money.BillData]
 	if err := c.RpcClient.CallContext(ctx, &u, "state_getUnit", unitID, false); err != nil {
 		return nil, err
@@ -49,18 +49,21 @@ func (c *moneyPartitionClient) GetBill(ctx context.Context, unitID types.UnitID)
 		return nil, nil
 	}
 
-	return &sdktypes.Bill{
-		ID:   u.UnitID,
-		Data: &u.Data,
+	return &bill{
+		systemID: money.DefaultSystemID, // TODO: should come from server
+		id:       u.UnitID,
+		value:    u.Data.V,
+		counter:    u.Data.Counter,
+		lockStatus: u.Data.Locked,
 	}, nil
 }
 
-func (c *moneyPartitionClient) GetBills(ctx context.Context, ownerID []byte) ([]*sdktypes.Bill, error) {
+func (c *moneyPartitionClient) GetBills(ctx context.Context, ownerID []byte) ([]sdktypes.Bill, error) {
 	unitIDs, err := c.GetUnitsByOwnerID(ctx, ownerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch owner units: %w", err)
 	}
-	var bills []*sdktypes.Bill
+	var bills []sdktypes.Bill
 	for _, unitID := range unitIDs {
 		if !unitID.HasType(money.BillUnitType) {
 			continue
@@ -75,7 +78,7 @@ func (c *moneyPartitionClient) GetBills(ctx context.Context, ownerID []byte) ([]
 }
 
 // GetFeeCreditRecordByOwnerID finds the first fee credit record in money partition for the given owner ID,
-// returns nil if fee credit record does not exist.
+// returns nil,nil if fee credit record does not exist.
 func (c *moneyPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (*sdktypes.FeeCreditRecord, error) {
 	return c.StateAPIClient.GetFeeCreditRecordByOwnerID(ctx, ownerID, money.FeeCreditRecordUnitType)
 }

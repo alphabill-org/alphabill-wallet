@@ -71,11 +71,11 @@ func (f *FeeCreditRecord) AddFreeCredit(ownerPredicate []byte, transFCProof *Pro
 	return tx, nil
 }
 
-func (f *FeeCreditRecord) CloseFreeCredit(targetBill *Bill, txOptions ...TxOption) (*types.TransactionOrder, error) {
+func (f *FeeCreditRecord) CloseFreeCredit(targetBill Bill, txOptions ...TxOption) (*types.TransactionOrder, error) {
 	opts := TxOptionsWithDefaults(txOptions)
 	attr := &fc.CloseFeeCreditAttributes{
 		Amount:            f.Balance(),
-		TargetUnitID:      targetBill.ID,
+		TargetUnitID:      targetBill.ID(),
 		TargetUnitCounter: targetBill.Counter(),
 		Counter:           f.Counter(),
 	}

@@ -17,8 +17,8 @@ const MaxFee = uint64(10)
 // CreateTransactions creates 1 to N P2PKH transactions from given bills until target amount is reached.
 // If there exists a bill with value equal to the given amount then transfer transaction is created using that bill,
 // otherwise bills are selected in the given order.
-func CreateTransactions(pubKey []byte, amount uint64, systemID types.SystemID, bills []*sdktypes.Bill, k *account.AccountKey, timeout uint64, fcrID, refNo []byte) ([]*types.TransactionOrder, error) {
-	billIndex := slices.IndexFunc(bills, func(b *sdktypes.Bill) bool { return b.Value() == amount })
+func CreateTransactions(pubKey []byte, amount uint64, systemID types.SystemID, bills []sdktypes.Bill, k *account.AccountKey, timeout uint64, fcrID, refNo []byte) ([]*types.TransactionOrder, error) {
+	billIndex := slices.IndexFunc(bills, func(b sdktypes.Bill) bool { return b.Value() == amount })
 	if billIndex >= 0 {
 		ownerPredicate := templates.NewP2pkh256BytesFromKey(pubKey)
 		tx, err := bills[billIndex].Transfer(ownerPredicate,
@@ -49,7 +49,7 @@ func CreateTransactions(pubKey []byte, amount uint64, systemID types.SystemID, b
 }
 
 // createTransaction creates a P2PKH transfer or split transaction using the given bill.
-func createTransaction(receiverPubKey []byte, k *account.AccountKey, amount uint64, bill *sdktypes.Bill, timeout uint64, fcrID, refNo []byte) (*types.TransactionOrder, error) {
+func createTransaction(receiverPubKey []byte, k *account.AccountKey, amount uint64, bill sdktypes.Bill, timeout uint64, fcrID, refNo []byte) (*types.TransactionOrder, error) {
 	if bill.Value() <= amount {
 		ownerPredicate := templates.NewP2pkh256BytesFromKey(receiverPubKey)
 		return bill.Transfer(ownerPredicate,

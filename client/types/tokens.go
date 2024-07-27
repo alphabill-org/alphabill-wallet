@@ -35,18 +35,18 @@ type (
 		SubTypeCreationPredicate() Predicate
 		TokenCreationPredicate() Predicate
 		InvariantPredicate() Predicate
+
+		Create(txOptions ...TxOption) (*types.TransactionOrder, error)
 	}
 
 	FungibleTokenType interface {
 		TokenType
 		DecimalPlaces() uint32
-		Create(txOptions ...TxOption) (*types.TransactionOrder, error)
 	}
 
 	NonFungibleTokenType interface {
 		TokenType
 		DataUpdatePredicate() Predicate
-		Create(txOptions ...TxOption) (*types.TransactionOrder, error)
 	}
 
 	FungibleTokenTypeParams struct {
