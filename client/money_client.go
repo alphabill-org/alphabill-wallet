@@ -8,33 +8,25 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
 
-	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 )
 
 type (
 	moneyPartitionClient struct {
-		*rpc.AdminAPIClient
-		*rpc.StateAPIClient
+		*partitionClient
 	}
 )
 
 // NewMoneyPartitionClient creates a money partition client for the given RPC URL.
 func NewMoneyPartitionClient(ctx context.Context, rpcUrl string) (sdktypes.MoneyPartitionClient, error) {
-	// TODO: duplicate underlying rpc clients, could use one?
-	stateApiClient, err := rpc.NewStateAPIClient(ctx, rpcUrl)
-	if err != nil {
-		return nil, err
-	}
-	adminApiClient, err := rpc.NewAdminAPIClient(ctx, rpcUrl)
+	partitionClient, err := newPartitionClient(ctx, rpcUrl)
 	if err != nil {
 		return nil, err
 	}
 
 	return &moneyPartitionClient{
-		AdminAPIClient: adminApiClient,
-		StateAPIClient: stateApiClient,
+		partitionClient: partitionClient,
 	}, nil
 }
 
@@ -50,9 +42,9 @@ func (c *moneyPartitionClient) GetBill(ctx context.Context, unitID types.UnitID)
 	}
 
 	return &bill{
-		systemID: money.DefaultSystemID, // TODO: should come from server
-		id:       u.UnitID,
-		value:    u.Data.V,
+		systemID:   money.DefaultSystemID, // TODO: should come from server
+		id:         u.UnitID,
+		value:      u.Data.V,
 		counter:    u.Data.Counter,
 		lockStatus: u.Data.Locked,
 	}, nil
@@ -79,8 +71,8 @@ func (c *moneyPartitionClient) GetBills(ctx context.Context, ownerID []byte) ([]
 
 // GetFeeCreditRecordByOwnerID finds the first fee credit record in money partition for the given owner ID,
 // returns nil,nil if fee credit record does not exist.
-func (c *moneyPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (*sdktypes.FeeCreditRecord, error) {
-	return c.StateAPIClient.GetFeeCreditRecordByOwnerID(ctx, ownerID, money.FeeCreditRecordUnitType)
+func (c *moneyPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (sdktypes.FeeCreditRecord, error) {
+	return c.getFeeCreditRecordByOwnerID(ctx, ownerID, money.FeeCreditRecordUnitType)
 }
 
 func (c *moneyPartitionClient) ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*sdktypes.Proof, error) {
@@ -90,9 +82,4 @@ func (c *moneyPartitionClient) ConfirmTransaction(ctx context.Context, tx *types
 		return nil, err
 	}
 	return txBatch.Submissions()[0].Proof, nil
-}
-
-func (c *moneyPartitionClient) Close() {
-	c.AdminAPIClient.Close()
-	c.StateAPIClient.Close()
 }

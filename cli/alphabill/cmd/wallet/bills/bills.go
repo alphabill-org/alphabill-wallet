@@ -150,11 +150,11 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if !strings.HasPrefix(infoResponse.Name, moneyTypeVar.String()) {
 		return errors.New("invalid rpc url provided for money partition")
 	}
-	fcb, err := moneyClient.GetFeeCreditRecordByOwnerID(cmd.Context(), accountKey.PubKeyHash.Sha256)
+	fcr, err := moneyClient.GetFeeCreditRecordByOwnerID(cmd.Context(), accountKey.PubKeyHash.Sha256)
 	if err != nil {
 		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
 	}
-	if fcb.Balance() < txbuilder.MaxFee {
+	if fcr.Balance() < txbuilder.MaxFee {
 		return errors.New("not enough fee credit in wallet")
 	}
 	bill, err := moneyClient.GetBill(cmd.Context(), types.UnitID(config.BillID))
@@ -170,7 +170,7 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	}
 	tx, err := bill.Lock(wallet.LockReasonManual,
 		sdktypes.WithTimeout(roundNumber+10),
-		sdktypes.WithFeeCreditRecordID(fcb.ID),
+		sdktypes.WithFeeCreditRecordID(fcr.ID()),
 		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return fmt.Errorf("failed to create lock tx: %w", err)
@@ -227,11 +227,11 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 		return errors.New("invalid rpc url provided for money partition")
 	}
 
-	fcb, err := moneyClient.GetFeeCreditRecordByOwnerID(cmd.Context(), accountKey.PubKeyHash.Sha256)
+	fcr, err := moneyClient.GetFeeCreditRecordByOwnerID(cmd.Context(), accountKey.PubKeyHash.Sha256)
 	if err != nil {
 		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
 	}
-	if fcb.Balance() < txbuilder.MaxFee {
+	if fcr.Balance() < txbuilder.MaxFee {
 		return errors.New("not enough fee credit in wallet")
 	}
 
@@ -249,7 +249,7 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	}
 	tx, err := bill.Unlock(
 		sdktypes.WithTimeout(roundNumber+10),
-		sdktypes.WithFeeCreditRecordID(fcb.ID),
+		sdktypes.WithFeeCreditRecordID(fcr.ID()),
 		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return fmt.Errorf("failed to create unlock tx: %w", err)

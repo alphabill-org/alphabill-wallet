@@ -222,7 +222,7 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*sdktypes.Proof, erro
 		}
 		tx, err := largestBill.Split(targetUnits,
 			sdktypes.WithTimeout(timeout),
-			sdktypes.WithFeeCreditRecordID(fcr.ID),
+			sdktypes.WithFeeCreditRecordID(fcr.ID()),
 			sdktypes.WithReferenceNumber(cmd.ReferenceNumber),
 			sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
 		if err != nil {
@@ -231,7 +231,7 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*sdktypes.Proof, erro
 		txs = append(txs, tx)
 	} else {
 		// if single receiver then perform up to N transfers (until target amount is reached)
-		txs, err = txbuilder.CreateTransactions(cmd.Receivers[0].PubKey, cmd.Receivers[0].Amount, w.SystemID(), bills, k, timeout, fcr.ID, cmd.ReferenceNumber)
+		txs, err = txbuilder.CreateTransactions(cmd.Receivers[0].PubKey, cmd.Receivers[0].Amount, w.SystemID(), bills, k, timeout, fcr.ID(), cmd.ReferenceNumber)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create transactions: %w", err)
 		}
@@ -260,7 +260,7 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*sdktypes.Proof, erro
 // GetFeeCredit returns fee credit record for the given account,
 // can return nil if fee credit record has not been created yet.
 // Deprecated: faucet still uses, will be removed
-func (w *Wallet) GetFeeCredit(ctx context.Context, cmd fees.GetFeeCreditCmd) (*sdktypes.FeeCreditRecord, error) {
+func (w *Wallet) GetFeeCredit(ctx context.Context, cmd fees.GetFeeCreditCmd) (sdktypes.FeeCreditRecord, error) {
 	ac, err := w.am.GetAccountKey(cmd.AccountIndex)
 	if err != nil {
 		return nil, err

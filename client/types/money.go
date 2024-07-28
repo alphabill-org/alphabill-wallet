@@ -27,7 +27,7 @@ type (
 		Split(targetUnits []*money.TargetUnit, txOptions ...TxOption) (*types.TransactionOrder, error)
 		TransferToDustCollector(targetBill Bill, txOptions ...TxOption) (*types.TransactionOrder, error)
 		SwapWithDustCollector(transDCProofs []*Proof, txOptions ...TxOption) (*types.TransactionOrder, error)
-		TransferToFeeCredit(fcr *FeeCreditRecord, amount uint64, latestAdditionTime uint64, txOptions ...TxOption) (*types.TransactionOrder, error)
+		TransferToFeeCredit(fcr FeeCreditRecord, amount uint64, latestAdditionTime uint64, txOptions ...TxOption) (*types.TransactionOrder, error)
 		ReclaimFromFeeCredit(closeFCProof *Proof, txOptions ...TxOption) (*types.TransactionOrder, error)
 		Lock(lockStatus uint64, txOptions ...TxOption) (*types.TransactionOrder, error)
 		Unlock(txOptions ...TxOption) (*types.TransactionOrder, error)

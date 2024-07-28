@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/types"
 )
 
@@ -15,8 +14,23 @@ type (
 		SendTransaction(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
 		ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*Proof, error)
 		GetTransactionProof(ctx context.Context, txHash types.Bytes) (*Proof, error)
-		GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (*FeeCreditRecord, error)
+		GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (FeeCreditRecord, error)
 		Close()
+	}
+
+	FeeCreditRecord interface {
+		SystemID() types.SystemID
+		ID() types.UnitID
+		Balance() uint64
+		Counter() *uint64
+		IncreaseCounter()
+		Timeout() uint64
+		LockStatus() uint64
+
+		AddFreeCredit(ownerPredicate []byte, transFCProof *Proof, txOptions ...TxOption) (*types.TransactionOrder, error)
+		CloseFreeCredit(targetBill Bill, txOptions ...TxOption) (*types.TransactionOrder, error)
+		Lock(lockStatus uint64, txOptions ...TxOption) (*types.TransactionOrder, error)
+		Unlock(txOptions ...TxOption) (*types.TransactionOrder, error)
 	}
 
 	NodeInfoResponse struct {
@@ -34,12 +48,6 @@ type (
 		Addresses  []string `json:"addresses"`
 	}
 
-	FeeCreditRecord struct {
-		SystemID types.SystemID
-		ID       types.UnitID
-		Data     *fc.FeeCreditRecord
-	}
-
 	// Proof wrapper struct around TxRecord and TxProof
 	Proof struct {
 		_        struct{}                 `cbor:",toarray"`
@@ -47,99 +55,6 @@ type (
 		TxProof  *types.TxProof           `json:"txProof"`
 	}
 )
-
-func NewFeeCreditRecord(systemID types.SystemID, id types.UnitID) *FeeCreditRecord {
-	return &FeeCreditRecord{
-		SystemID: systemID,
-		ID:       id,
-	}
-}
-
-func (f *FeeCreditRecord) AddFreeCredit(ownerPredicate []byte, transFCProof *Proof, txOptions ...TxOption) (*types.TransactionOrder, error) {
-	opts := TxOptionsWithDefaults(txOptions)
-	attr := &fc.AddFeeCreditAttributes{
-		FeeCreditOwnerCondition: ownerPredicate,
-		FeeCreditTransfer:       transFCProof.TxRecord,
-		FeeCreditTransferProof:  transFCProof.TxProof,
-	}
-	txPayload, err := NewPayload(f.SystemID, f.ID, fc.PayloadTypeAddFeeCredit, attr, opts)
-	if err != nil {
-		return nil, err
-	}
-	tx := NewTransactionOrder(txPayload)
-	GenerateAndSetProofs(tx, nil, nil, opts)
-	return tx, nil
-}
-
-func (f *FeeCreditRecord) CloseFreeCredit(targetBill Bill, txOptions ...TxOption) (*types.TransactionOrder, error) {
-	opts := TxOptionsWithDefaults(txOptions)
-	attr := &fc.CloseFeeCreditAttributes{
-		Amount:            f.Balance(),
-		TargetUnitID:      targetBill.ID(),
-		TargetUnitCounter: targetBill.Counter(),
-		Counter:           f.Counter(),
-	}
-	txPayload, err := NewPayload(f.SystemID, f.ID, fc.PayloadTypeCloseFeeCredit, attr, opts)
-	if err != nil {
-		return nil, err
-	}
-	tx := NewTransactionOrder(txPayload)
-	GenerateAndSetProofs(tx, nil, nil, opts)
-	return tx, nil
-}
-
-func (f *FeeCreditRecord) Lock(lockStatus uint64, txOptions ...TxOption) (*types.TransactionOrder, error) {
-	opts := TxOptionsWithDefaults(txOptions)
-	attr := &fc.LockFeeCreditAttributes{
-		LockStatus: lockStatus,
-		Counter:    f.Counter(),
-	}
-	txPayload, err := NewPayload(f.SystemID, f.ID, fc.PayloadTypeLockFeeCredit, attr, opts)
-	if err != nil {
-		return nil, err
-	}
-	tx := NewTransactionOrder(txPayload)
-	GenerateAndSetProofs(tx, nil, nil, opts)
-	return tx, nil
-}
-
-func (f *FeeCreditRecord) Unlock(txOptions ...TxOption) (*types.TransactionOrder, error) {
-	opts := TxOptionsWithDefaults(txOptions)
-	attr := &fc.UnlockFeeCreditAttributes{
-		Counter: f.Counter(),
-	}
-	txPayload, err := NewPayload(f.SystemID, f.ID, fc.PayloadTypeUnlockFeeCredit, attr, opts)
-	if err != nil {
-		return nil, err
-	}
-	tx := NewTransactionOrder(txPayload)
-	GenerateAndSetProofs(tx, nil, nil, opts)
-	return tx, nil
-}
-
-func (b *FeeCreditRecord) IsLocked() bool {
-	if b == nil {
-		return false
-	}
-	return b.Data.IsLocked()
-}
-
-func (b *FeeCreditRecord) Counter() uint64 {
-	if b == nil {
-		return 0
-	}
-	return b.Data.GetCounter()
-}
-
-func (b *FeeCreditRecord) Balance() uint64 {
-	if b == nil {
-		return 0
-	}
-	if b.Data == nil {
-		return 0
-	}
-	return b.Data.Balance
-}
 
 func (p *Proof) GetActualFee() uint64 {
 	if p == nil {

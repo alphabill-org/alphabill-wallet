@@ -8,31 +8,25 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill-go-base/types"
 
-	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 )
 
 type (
 	tokensPartitionClient struct {
-		*rpc.AdminAPIClient
-		*rpc.StateAPIClient
+		*partitionClient
 	}
 )
 
 // NewTokensPartitionClient creates a tokens partition client for the given RPC URL.
 func NewTokensPartitionClient(ctx context.Context, rpcUrl string) (sdktypes.TokensPartitionClient, error) {
-	adminApiClient, err := rpc.NewAdminAPIClient(ctx, rpcUrl)
+	partitionClient, err := newPartitionClient(ctx, rpcUrl)
 	if err != nil {
 		return nil, err
 	}
-	stateApiClient, err := rpc.NewStateAPIClient(ctx, rpcUrl)
-	if err != nil {
-		return nil, err
-	}
+
 	return &tokensPartitionClient{
-		AdminAPIClient: adminApiClient,
-		StateAPIClient: stateApiClient,
+		partitionClient: partitionClient,
 	}, nil
 }
 
@@ -185,8 +179,8 @@ func (c *tokensPartitionClient) GetFungibleTokenTypeHierarchy(ctx context.Contex
 
 // GetFeeCreditRecordByOwnerID finds the first fee credit record in tokens partition for the given owner ID,
 // returns nil if fee credit record does not exist.
-func (c *tokensPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (*sdktypes.FeeCreditRecord, error) {
-	return c.StateAPIClient.GetFeeCreditRecordByOwnerID(ctx, ownerID, tokens.FeeCreditRecordUnitType)
+func (c *tokensPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (sdktypes.FeeCreditRecord, error) {
+	return c.getFeeCreditRecordByOwnerID(ctx, ownerID, tokens.FeeCreditRecordUnitType)
 }
 
 func (c *tokensPartitionClient) ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*sdktypes.Proof, error) {

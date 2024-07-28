@@ -7,7 +7,6 @@ import (
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/types"
-	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 	"github.com/alphabill-org/alphabill/txsystem/evm/statedb"
@@ -16,30 +15,25 @@ import (
 
 type (
 	evmPartitionClient struct {
-		*rpc.AdminAPIClient
-		*rpc.StateAPIClient
+		*partitionClient
 	}
 )
 
 // NewEvmPartitionClient creates an evm partition client for the given RPC URL.
 func NewEvmPartitionClient(ctx context.Context, rpcUrl string) (sdktypes.PartitionClient, error) {
-	adminApiClient, err := rpc.NewAdminAPIClient(ctx, rpcUrl)
+	partitionClient, err := newPartitionClient(ctx, rpcUrl)
 	if err != nil {
 		return nil, err
 	}
-	stateApiClient, err := rpc.NewStateAPIClient(ctx, rpcUrl)
-	if err != nil {
-		return nil, err
-	}
+
 	return &evmPartitionClient{
-		AdminAPIClient: adminApiClient,
-		StateAPIClient: stateApiClient,
+		partitionClient: partitionClient,
 	}, nil
 }
 
 // GetFeeCreditRecordByOwnerID finds the first fee credit record in evm partition for the given owner ID,
 // returns nil if fee credit record does not exist.
-func (c *evmPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (*sdktypes.FeeCreditRecord, error) {
+func (c *evmPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (sdktypes.FeeCreditRecord, error) {
 	unitIDs, err := c.GetUnitsByOwnerID(ctx, ownerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch units: %w", err)
@@ -60,9 +54,14 @@ func (c *evmPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ow
 		Counter: stateObj.AlphaBill.Counter,
 		Timeout: stateObj.AlphaBill.Timeout,
 	}
-	return &sdktypes.FeeCreditRecord{
-		ID:   u.UnitID,
-		Data: fcr,
+	counterCopy := fcr.Counter
+	return &feeCreditRecord{
+		systemID:   0, // TODO:
+		id:         u.UnitID,
+		balance:    fcr.Balance,
+		counter:    &counterCopy,
+		timeout:    fcr.Timeout,
+		lockStatus: 0,
 	}, nil
 }
 
