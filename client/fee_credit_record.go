@@ -104,10 +104,6 @@ func (f *feeCreditRecord) Counter() *uint64 {
 	return f.counter
 }
 
-func (f *feeCreditRecord) IncreaseCounter() {
-	*f.counter += 1
-}
-
 func (f *feeCreditRecord) Timeout() uint64 {
 	return f.timeout
 }

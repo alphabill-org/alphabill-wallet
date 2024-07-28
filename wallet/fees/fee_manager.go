@@ -204,7 +204,7 @@ func (w *FeeManager) AddFeeCredit(ctx context.Context, cmd AddFeeCmd) (*AddFeeCm
 		// verify fee ctx exists for current partition
 		if addFeeCtx.TargetBill.SystemID() != w.targetPartitionSystemID {
 			return nil, fmt.Errorf("%w: pendingProcessSystemID=%s, providedSystemID=%s",
-				ErrInvalidPartition, addFeeCtx.TargetBill.SystemID, w.targetPartitionSystemID)
+				ErrInvalidPartition, addFeeCtx.TargetBill.SystemID(), w.targetPartitionSystemID)
 		}
 		// handle the pending fee credit process
 		feeTxProofs, err := w.addFeeCredit(ctx, accountKey, addFeeCtx)

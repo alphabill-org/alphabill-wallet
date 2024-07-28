@@ -23,7 +23,6 @@ type (
 		ID() types.UnitID
 		Balance() uint64
 		Counter() *uint64
-		IncreaseCounter()
 		Timeout() uint64
 		LockStatus() uint64
 
