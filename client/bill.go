@@ -13,15 +13,13 @@ import (
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 )
 
-type (
-	bill struct {
-		systemID   types.SystemID
-		id         types.UnitID
-		value      uint64
-		counter    uint64
-		lockStatus uint64
-	}
-)
+type bill struct {
+	systemID   types.SystemID
+	id         types.UnitID
+	value      uint64
+	counter    uint64
+	lockStatus uint64
+}
 
 func (b *bill) SystemID() types.SystemID {
 	return b.systemID
@@ -36,7 +34,6 @@ func (b *bill) Value() uint64 {
 }
 
 func (b *bill) Counter() uint64 {
-	// TODO: need to return 0 if b == nil?
 	return b.counter
 }
 

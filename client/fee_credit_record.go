@@ -7,16 +7,14 @@ import (
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 )
 
-type (
-	feeCreditRecord struct {
-		systemID   types.SystemID
-		id         types.UnitID
-		balance    uint64
-		counter    *uint64
-		timeout    uint64
-		lockStatus uint64
-	}
-)
+type feeCreditRecord struct {
+	systemID   types.SystemID
+	id         types.UnitID
+	balance    uint64
+	counter    *uint64
+	timeout    uint64
+	lockStatus uint64
+}
 
 func NewFeeCreditRecord(systemID types.SystemID, id types.UnitID) sdktypes.FeeCreditRecord {
 	return &feeCreditRecord{
