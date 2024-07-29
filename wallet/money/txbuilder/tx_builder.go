@@ -8,6 +8,7 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
 
+	"github.com/alphabill-org/alphabill-wallet/client/tx"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 )
@@ -22,10 +23,10 @@ func CreateTransactions(pubKey []byte, amount uint64, systemID types.SystemID, b
 	if billIndex >= 0 {
 		ownerPredicate := templates.NewP2pkh256BytesFromKey(pubKey)
 		tx, err := bills[billIndex].Transfer(ownerPredicate,
-			sdktypes.WithTimeout(timeout),
-			sdktypes.WithFeeCreditRecordID(fcrID),
-			sdktypes.WithReferenceNumber(refNo),
-			sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
+			tx.WithTimeout(timeout),
+			tx.WithFeeCreditRecordID(fcrID),
+			tx.WithReferenceNumber(refNo),
+			tx.WithOwnerProof(tx.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
 		if err != nil {
 			return nil, err
 		}
@@ -53,17 +54,17 @@ func createTransaction(receiverPubKey []byte, k *account.AccountKey, amount uint
 	if bill.Value() <= amount {
 		ownerPredicate := templates.NewP2pkh256BytesFromKey(receiverPubKey)
 		return bill.Transfer(ownerPredicate,
-			sdktypes.WithTimeout(timeout),
-			sdktypes.WithFeeCreditRecordID(fcrID),
-			sdktypes.WithReferenceNumber(refNo),
-			sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
+			tx.WithTimeout(timeout),
+			tx.WithFeeCreditRecordID(fcrID),
+			tx.WithReferenceNumber(refNo),
+			tx.WithOwnerProof(tx.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
 	}
 	targetUnits := []*money.TargetUnit{
 		{Amount: amount, OwnerCondition: templates.NewP2pkh256BytesFromKey(receiverPubKey)},
 	}
 	return bill.Split(targetUnits,
-		sdktypes.WithTimeout(timeout),
-		sdktypes.WithFeeCreditRecordID(fcrID),
-		sdktypes.WithReferenceNumber(refNo),
-		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
+		tx.WithTimeout(timeout),
+		tx.WithFeeCreditRecordID(fcrID),
+		tx.WithReferenceNumber(refNo),
+		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
 }

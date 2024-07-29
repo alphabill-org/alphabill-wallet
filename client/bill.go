@@ -10,6 +10,7 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
 
+	"github.com/alphabill-org/alphabill-wallet/client/tx"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 )
 
@@ -45,25 +46,28 @@ func (b *bill) LockStatus() uint64 {
 	return b.lockStatus
 }
 
-func (b *bill) Transfer(ownerPredicate []byte, txOptions ...sdktypes.TxOption) (*types.TransactionOrder, error) {
-	opts := sdktypes.TxOptionsWithDefaults(txOptions)
+func (b *bill) Transfer(ownerPredicate []byte, txOptions ...tx.TxOption) (*types.TransactionOrder, error) {
+	opts := tx.TxOptionsWithDefaults(txOptions)
 	attr := &money.TransferAttributes{
 		NewBearer:   ownerPredicate,
 		TargetValue: b.value,
 		Counter:     b.counter,
 	}
-	txPayload, err := sdktypes.NewPayload(b.systemID, b.id, money.PayloadTypeTransfer, attr, opts)
+	txPayload, err := tx.NewPayload(b.systemID, b.id, money.PayloadTypeTransfer, attr, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	tx := sdktypes.NewTransactionOrder(txPayload)
-	sdktypes.GenerateAndSetProofs(tx, nil, nil, opts)
-	return tx, nil
+	txo := tx.NewTransactionOrder(txPayload)
+	err = tx.GenerateAndSetProofs(txo, nil, nil, opts)
+	if err != nil {
+		return nil, err
+	}
+	return txo, nil
 }
 
-func (b *bill) Split(targetUnits []*money.TargetUnit, txOptions ...sdktypes.TxOption) (*types.TransactionOrder, error) {
-	opts := sdktypes.TxOptionsWithDefaults(txOptions)
+func (b *bill) Split(targetUnits []*money.TargetUnit, txOptions ...tx.TxOption) (*types.TransactionOrder, error) {
+	opts := tx.TxOptionsWithDefaults(txOptions)
 
 	var totalAmount uint64
 	for _, tu := range targetUnits {
@@ -75,18 +79,21 @@ func (b *bill) Split(targetUnits []*money.TargetUnit, txOptions ...sdktypes.TxOp
 		RemainingValue: remainingValue,
 		Counter:        b.counter,
 	}
-	txPayload, err := sdktypes.NewPayload(b.systemID, b.id, money.PayloadTypeSplit, attr, opts)
+	txPayload, err := tx.NewPayload(b.systemID, b.id, money.PayloadTypeSplit, attr, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	tx := sdktypes.NewTransactionOrder(txPayload)
-	sdktypes.GenerateAndSetProofs(tx, nil, nil, opts)
-	return tx, nil
+	txo := tx.NewTransactionOrder(txPayload)
+	err = tx.GenerateAndSetProofs(txo, nil, nil, opts)
+	if err != nil {
+		return nil, err
+	}
+	return txo, nil
 }
 
-func (b *bill) TransferToDustCollector(targetBill sdktypes.Bill, txOptions ...sdktypes.TxOption) (*types.TransactionOrder, error) {
-	opts := sdktypes.TxOptionsWithDefaults(txOptions)
+func (b *bill) TransferToDustCollector(targetBill sdktypes.Bill, txOptions ...tx.TxOption) (*types.TransactionOrder, error) {
+	opts := tx.TxOptionsWithDefaults(txOptions)
 
 	attr := &money.TransferDCAttributes{
 		TargetUnitID:      targetBill.ID(),
@@ -94,18 +101,22 @@ func (b *bill) TransferToDustCollector(targetBill sdktypes.Bill, txOptions ...sd
 		Value:             b.value,
 		Counter:           b.counter,
 	}
-	txPayload, err := sdktypes.NewPayload(b.systemID, b.id, money.PayloadTypeTransDC, attr, opts)
+	txPayload, err := tx.NewPayload(b.systemID, b.id, money.PayloadTypeTransDC, attr, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	tx := sdktypes.NewTransactionOrder(txPayload)
-	sdktypes.GenerateAndSetProofs(tx, nil, nil, opts)
-	return tx, nil
+	txo := tx.NewTransactionOrder(txPayload)
+	err = tx.GenerateAndSetProofs(txo, nil, nil, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return txo, nil
 }
 
-func (b *bill) SwapWithDustCollector(transDCProofs []*sdktypes.Proof, txOptions ...sdktypes.TxOption) (*types.TransactionOrder, error) {
-	opts := sdktypes.TxOptionsWithDefaults(txOptions)
+func (b *bill) SwapWithDustCollector(transDCProofs []*sdktypes.Proof, txOptions ...tx.TxOption) (*types.TransactionOrder, error) {
+	opts := tx.TxOptionsWithDefaults(txOptions)
 
 	if len(transDCProofs) == 0 {
 		return nil, errors.New("cannot create swap transaction as no dust transfer proofs exist")
@@ -131,18 +142,21 @@ func (b *bill) SwapWithDustCollector(transDCProofs []*sdktypes.Proof, txOptions 
 		DcTransferProofs: dustTransferProofs,
 		TargetValue:      billValueSum,
 	}
-	txPayload, err := sdktypes.NewPayload(b.systemID, b.id, money.PayloadTypeSwapDC, attr, opts)
+	txPayload, err := tx.NewPayload(b.systemID, b.id, money.PayloadTypeSwapDC, attr, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build swap transaction: %w", err)
 	}
 
-	tx := sdktypes.NewTransactionOrder(txPayload)
-	sdktypes.GenerateAndSetProofs(tx, nil, nil, opts)
-	return tx, nil
+	txo := tx.NewTransactionOrder(txPayload)
+	err = tx.GenerateAndSetProofs(txo, nil, nil, opts)
+	if err != nil {
+		return nil, err
+	}
+	return txo, nil
 }
 
-func (b *bill) TransferToFeeCredit(fcr sdktypes.FeeCreditRecord, amount uint64, latestAdditionTime uint64, txOptions ...sdktypes.TxOption) (*types.TransactionOrder, error) {
-	opts := sdktypes.TxOptionsWithDefaults(txOptions)
+func (b *bill) TransferToFeeCredit(fcr sdktypes.FeeCreditRecord, amount uint64, latestAdditionTime uint64, txOptions ...tx.TxOption) (*types.TransactionOrder, error) {
+	opts := tx.TxOptionsWithDefaults(txOptions)
 
 	attr := &fc.TransferFeeCreditAttributes{
 		Amount:                 amount,
@@ -153,63 +167,75 @@ func (b *bill) TransferToFeeCredit(fcr sdktypes.FeeCreditRecord, amount uint64, 
 		TargetUnitCounter:      fcr.Counter(),
 		Counter:                b.counter,
 	}
-	txPayload, err := sdktypes.NewPayload(b.systemID, b.id, fc.PayloadTypeTransferFeeCredit, attr, opts)
+	txPayload, err := tx.NewPayload(b.systemID, b.id, fc.PayloadTypeTransferFeeCredit, attr, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	tx := sdktypes.NewTransactionOrder(txPayload)
-	sdktypes.GenerateAndSetProofs(tx, nil, nil, opts)
-	return tx, nil
+	txo := tx.NewTransactionOrder(txPayload)
+	err = tx.GenerateAndSetProofs(txo, nil, nil, opts)
+	if err != nil {
+		return nil, err
+	}
+	return txo, nil
 }
 
-func (b *bill) ReclaimFromFeeCredit(closeFCProof *sdktypes.Proof, txOptions ...sdktypes.TxOption) (*types.TransactionOrder, error) {
-	opts := sdktypes.TxOptionsWithDefaults(txOptions)
+func (b *bill) ReclaimFromFeeCredit(closeFCProof *sdktypes.Proof, txOptions ...tx.TxOption) (*types.TransactionOrder, error) {
+	opts := tx.TxOptionsWithDefaults(txOptions)
 
 	attr := &fc.ReclaimFeeCreditAttributes{
 		CloseFeeCreditTransfer: closeFCProof.TxRecord,
 		CloseFeeCreditProof:    closeFCProof.TxProof,
 		Counter:                b.counter,
 	}
-	txPayload, err := sdktypes.NewPayload(b.systemID, b.id, fc.PayloadTypeReclaimFeeCredit, attr, opts)
+	txPayload, err := tx.NewPayload(b.systemID, b.id, fc.PayloadTypeReclaimFeeCredit, attr, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	tx := sdktypes.NewTransactionOrder(txPayload)
-	sdktypes.GenerateAndSetProofs(tx, nil, nil, opts)
-	return tx, nil
+	txo := tx.NewTransactionOrder(txPayload)
+	err = tx.GenerateAndSetProofs(txo, nil, nil, opts)
+	if err != nil {
+		return nil, err
+	}
+	return txo, nil
 }
 
-func (b *bill) Lock(lockStatus uint64, txOptions ...sdktypes.TxOption) (*types.TransactionOrder, error) {
-	opts := sdktypes.TxOptionsWithDefaults(txOptions)
+func (b *bill) Lock(lockStatus uint64, txOptions ...tx.TxOption) (*types.TransactionOrder, error) {
+	opts := tx.TxOptionsWithDefaults(txOptions)
 
 	attr := &money.LockAttributes{
 		LockStatus: lockStatus,
 		Counter:    b.counter,
 	}
-	txPayload, err := sdktypes.NewPayload(b.systemID, b.id, money.PayloadTypeLock, attr, opts)
+	txPayload, err := tx.NewPayload(b.systemID, b.id, money.PayloadTypeLock, attr, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	tx := sdktypes.NewTransactionOrder(txPayload)
-	sdktypes.GenerateAndSetProofs(tx, nil, nil, opts)
-	return tx, nil
+	txo := tx.NewTransactionOrder(txPayload)
+	err = tx.GenerateAndSetProofs(txo, nil, nil, opts)
+	if err != nil {
+		return nil, err
+	}
+	return txo, nil
 }
 
-func (b *bill) Unlock(txOptions ...sdktypes.TxOption) (*types.TransactionOrder, error) {
-	opts := sdktypes.TxOptionsWithDefaults(txOptions)
+func (b *bill) Unlock(txOptions ...tx.TxOption) (*types.TransactionOrder, error) {
+	opts := tx.TxOptionsWithDefaults(txOptions)
 
 	attr := &money.UnlockAttributes{
 		Counter: b.counter,
 	}
-	txPayload, err := sdktypes.NewPayload(b.systemID, b.id, money.PayloadTypeUnlock, attr, opts)
+	txPayload, err := tx.NewPayload(b.systemID, b.id, money.PayloadTypeUnlock, attr, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	tx := sdktypes.NewTransactionOrder(txPayload)
-	sdktypes.GenerateAndSetProofs(tx, nil, nil, opts)
-	return tx, nil
+	txo := tx.NewTransactionOrder(txPayload)
+	err = tx.GenerateAndSetProofs(txo, nil, nil, opts)
+	if err != nil {
+		return nil, err
+	}
+	return txo, nil
 }

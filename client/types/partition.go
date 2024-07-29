@@ -5,6 +5,8 @@ import (
 	"log/slog"
 
 	"github.com/alphabill-org/alphabill-go-base/types"
+
+	"github.com/alphabill-org/alphabill-wallet/client/tx"
 )
 
 type (
@@ -26,10 +28,10 @@ type (
 		Timeout() uint64
 		LockStatus() uint64
 
-		AddFreeCredit(ownerPredicate []byte, transFCProof *Proof, txOptions ...TxOption) (*types.TransactionOrder, error)
-		CloseFreeCredit(targetBill Bill, txOptions ...TxOption) (*types.TransactionOrder, error)
-		Lock(lockStatus uint64, txOptions ...TxOption) (*types.TransactionOrder, error)
-		Unlock(txOptions ...TxOption) (*types.TransactionOrder, error)
+		AddFreeCredit(ownerPredicate []byte, transFCProof *Proof, txOptions ...tx.TxOption) (*types.TransactionOrder, error)
+		CloseFreeCredit(targetBill Bill, txOptions ...tx.TxOption) (*types.TransactionOrder, error)
+		Lock(lockStatus uint64, txOptions ...tx.TxOption) (*types.TransactionOrder, error)
+		Unlock(txOptions ...tx.TxOption) (*types.TransactionOrder, error)
 	}
 
 	NodeInfoResponse struct {

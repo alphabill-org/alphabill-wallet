@@ -8,6 +8,7 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-go-base/util"
 
+	"github.com/alphabill-org/alphabill-wallet/client/tx"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
@@ -122,11 +123,11 @@ func (w *Wallet) joinTokenForDC(ctx context.Context, acc *accountKey, burnProofs
 	}
 
 	tx, err := targetToken.Join(burnTxs, burnTxProofs,
-		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
-		sdktypes.WithFeeCreditRecordID(fcrID),
-		sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		sdktypes.WithExtraProofs(newProofGenerators(invariantProofs)))
+		tx.WithTimeout(roundNumber+txTimeoutRoundCount),
+		tx.WithFeeCreditRecordID(fcrID),
+		tx.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		tx.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		tx.WithExtraProofs(newProofGenerators(invariantProofs)))
 	if err != nil {
 		return 0, err
 	}
@@ -149,11 +150,11 @@ func (w *Wallet) burnTokensForDC(ctx context.Context, acc *accountKey, tokensToB
 	for _, token := range tokensToBurn {
 		burnBatchAmount += token.Amount()
 		tx, err := token.Burn(targetToken.ID(), targetToken.Counter(),
-			sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
-			sdktypes.WithFeeCreditRecordID(fcrID),
-			sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
-			sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
-			sdktypes.WithExtraProofs(newProofGenerators(invariantProofs)))
+			tx.WithTimeout(roundNumber+txTimeoutRoundCount),
+			tx.WithFeeCreditRecordID(fcrID),
+			tx.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
+			tx.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
+			tx.WithExtraProofs(newProofGenerators(invariantProofs)))
 		if err != nil {
 			return 0, 0, nil, fmt.Errorf("failed to prepare burn tx: %w", err)
 		}
@@ -210,11 +211,11 @@ func (w *Wallet) lockTokenForDC(ctx context.Context, acc *accountKey, fcrID type
 		return 0, err
 	}
 	tx, err := targetToken.Lock(wallet.LockReasonCollectDust,
-		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
-		sdktypes.WithFeeCreditRecordID(fcrID),
-		sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		sdktypes.WithExtraProofs(newProofGenerators(invariantProofs)))
+		tx.WithTimeout(roundNumber+txTimeoutRoundCount),
+		tx.WithFeeCreditRecordID(fcrID),
+		tx.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		tx.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		tx.WithExtraProofs(newProofGenerators(invariantProofs)))
 	if err != nil {
 		return 0, err
 	}

@@ -5,6 +5,8 @@ import (
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
+
+	"github.com/alphabill-org/alphabill-wallet/client/tx"
 )
 
 type (
@@ -23,13 +25,13 @@ type (
 		IncreaseCounter()
 		LockStatus() uint64
 
-		Transfer(ownerPredicate []byte, txOptions ...TxOption) (*types.TransactionOrder, error)
-		Split(targetUnits []*money.TargetUnit, txOptions ...TxOption) (*types.TransactionOrder, error)
-		TransferToDustCollector(targetBill Bill, txOptions ...TxOption) (*types.TransactionOrder, error)
-		SwapWithDustCollector(transDCProofs []*Proof, txOptions ...TxOption) (*types.TransactionOrder, error)
-		TransferToFeeCredit(fcr FeeCreditRecord, amount uint64, latestAdditionTime uint64, txOptions ...TxOption) (*types.TransactionOrder, error)
-		ReclaimFromFeeCredit(closeFCProof *Proof, txOptions ...TxOption) (*types.TransactionOrder, error)
-		Lock(lockStatus uint64, txOptions ...TxOption) (*types.TransactionOrder, error)
-		Unlock(txOptions ...TxOption) (*types.TransactionOrder, error)
+		Transfer(ownerPredicate []byte, txOptions ...tx.TxOption) (*types.TransactionOrder, error)
+		Split(targetUnits []*money.TargetUnit, txOptions ...tx.TxOption) (*types.TransactionOrder, error)
+		TransferToDustCollector(targetBill Bill, txOptions ...tx.TxOption) (*types.TransactionOrder, error)
+		SwapWithDustCollector(transDCProofs []*Proof, txOptions ...tx.TxOption) (*types.TransactionOrder, error)
+		TransferToFeeCredit(fcr FeeCreditRecord, amount uint64, latestAdditionTime uint64, txOptions ...tx.TxOption) (*types.TransactionOrder, error)
+		ReclaimFromFeeCredit(closeFCProof *Proof, txOptions ...tx.TxOption) (*types.TransactionOrder, error)
+		Lock(lockStatus uint64, txOptions ...tx.TxOption) (*types.TransactionOrder, error)
+		Unlock(txOptions ...tx.TxOption) (*types.TransactionOrder, error)
 	}
 )

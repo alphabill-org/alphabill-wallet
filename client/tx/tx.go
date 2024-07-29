@@ -1,4 +1,4 @@
-package types
+package tx
 
 import (
 	"github.com/alphabill-org/alphabill-go-base/crypto"
@@ -19,6 +19,45 @@ type (
 
 	TxOption func(*TxOptions)
 )
+
+func NewTransactionOrder(payload *types.Payload) *types.TransactionOrder {
+	return &types.TransactionOrder{
+		Payload:    payload,
+		OwnerProof: nil,
+	}
+}
+
+// NewPayload creates a new transaction payload.
+func NewPayload(systemID types.SystemID, unitID types.UnitID, txType string, attr any, opts *TxOptions) (*types.Payload, error) {
+	attrBytes, err := types.Cbor.Marshal(attr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &types.Payload{
+		SystemID:   systemID,
+		Type:       txType,
+		UnitID:     unitID,
+		Attributes: attrBytes,
+		ClientMetadata: &types.ClientMetadata{
+			Timeout:           opts.timeout,
+			MaxTransactionFee: opts.maxFee,
+			FeeCreditRecordID: opts.feeCreditRecordID,
+			ReferenceNumber:   opts.referenceNumber,
+		},
+	}, nil
+}
+
+func TxOptionsWithDefaults(txOptions []TxOption) *TxOptions {
+	opts := &TxOptions{
+		maxFee:            10,
+	}
+	for _, txOption := range txOptions {
+		txOption(opts)
+	}
+	return opts
+}
+
 
 func WithReferenceNumber(referenceNumber []byte) TxOption {
 	return func(os *TxOptions) {
@@ -62,18 +101,6 @@ func WithExtraProofs(proofGenerators []types.ProofGenerator) TxOption {
 	}
 }
 
-// TODO: move to client/ or where the impl are
-func TxOptionsWithDefaults(txOptions []TxOption) *TxOptions {
-	opts := &TxOptions{
-		maxFee:            10,
-	}
-	for _, txOption := range txOptions {
-		txOption(opts)
-	}
-	return opts
-}
-
-// TODO: move to client/ or where the impl are
 func GenerateAndSetProofs(tx *types.TransactionOrder, attr any, attrField *[][]byte, opts *TxOptions) error {
 	if opts.ownerProofGenerator != nil {
 		if err := tx.SetOwnerProof(opts.ownerProofGenerator); err != nil {
@@ -102,6 +129,29 @@ func GenerateAndSetProofs(tx *types.TransactionOrder, attr any, attrField *[][]b
 	return nil
 }
 
+func NewP2pkhProofGenerator(pubKey []byte, privKey []byte) types.ProofGenerator {
+	return func(payloadBytes []byte) ([]byte, error) {
+		sig, err := SignBytes(payloadBytes, privKey)
+		if err != nil {
+			return nil, err
+		}
+		return templates.NewP2pkh256SignatureBytes(sig, pubKey), nil
+	}
+}
+
+// SignBytes signs the given bytes with the given key.
+func SignBytes(bytes []byte, signingPrivateKey []byte) ([]byte, error) {
+	signer, err := crypto.NewInMemorySecp256K1SignerFromKey(signingPrivateKey)
+	if err != nil {
+		return nil, err
+	}
+	sig, err := signer.SignBytes(bytes)
+	if err != nil {
+		return nil, err
+	}
+	return sig, nil
+}
+
 func generateProofs(tx *types.TransactionOrder, proofGenerators []types.ProofGenerator) ([][]byte, error) {
 	payloadBytes, err := tx.PayloadBytes()
 	if err != nil {
@@ -118,56 +168,4 @@ func generateProofs(tx *types.TransactionOrder, proofGenerators []types.ProofGen
 	}
 
 	return proofs, nil
-}
-
-// NewPayload creates a new transaction payload.
-func NewPayload(systemID types.SystemID, unitID types.UnitID, txType string, attr any, opts *TxOptions) (*types.Payload, error) {
-	attrBytes, err := types.Cbor.Marshal(attr)
-	if err != nil {
-		return nil, err
-	}
-
-	return &types.Payload{
-		SystemID:   systemID,
-		Type:       txType,
-		UnitID:     unitID,
-		Attributes: attrBytes,
-		ClientMetadata: &types.ClientMetadata{
-			Timeout:           opts.timeout,
-			MaxTransactionFee: opts.maxFee,
-			FeeCreditRecordID: opts.feeCreditRecordID,
-			ReferenceNumber:   opts.referenceNumber,
-		},
-	}, nil
-}
-
-func NewTransactionOrder(payload *types.Payload) *types.TransactionOrder {
-	return &types.TransactionOrder{
-		Payload:    payload,
-		OwnerProof: nil,
-	}
-}
-
-func NewP2pkhProofGenerator(pubKey []byte, privKey []byte) types.ProofGenerator {
-	return func(payloadBytes []byte) ([]byte, error) {
-		sig, err := SignBytes(payloadBytes, privKey)
-		if err != nil {
-			return nil, err
-		}
-		return templates.NewP2pkh256SignatureBytes(sig, pubKey), nil
-	}
-}
-
-// TODO: should not be here, this package is for types
-// SignBytes signs the given bytes with the given key.
-func SignBytes(bytes []byte, signingPrivateKey []byte) ([]byte, error) {
-	signer, err := crypto.NewInMemorySecp256K1SignerFromKey(signingPrivateKey)
-	if err != nil {
-		return nil, err
-	}
-	sig, err := signer.SignBytes(bytes)
-	if err != nil {
-		return nil, err
-	}
-	return sig, nil
 }

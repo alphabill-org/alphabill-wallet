@@ -7,6 +7,7 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill-go-base/types"
 
+	"github.com/alphabill-org/alphabill-wallet/client/tx"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 )
 
@@ -102,8 +103,8 @@ func NewNonFungibleTokenType(params *sdktypes.NonFungibleTokenTypeParams) (sdkty
 	}, nil
 }
 
-func (tt *fungibleTokenType) Create(txOptions ...sdktypes.TxOption) (*types.TransactionOrder, error) {
-	opts := sdktypes.TxOptionsWithDefaults(txOptions)
+func (tt *fungibleTokenType) Create(txOptions ...tx.TxOption) (*types.TransactionOrder, error) {
+	opts := tx.TxOptionsWithDefaults(txOptions)
 	attr := &tokens.CreateFungibleTokenTypeAttributes{
 		Symbol:                             tt.symbol,
 		Name:                               tt.name,
@@ -116,22 +117,25 @@ func (tt *fungibleTokenType) Create(txOptions ...sdktypes.TxOption) (*types.Tran
 		SubTypeCreationPredicateSignatures: nil,
 	}
 
-	txPayload, err := sdktypes.NewPayload(tt.systemID, tt.id, tokens.PayloadTypeCreateFungibleTokenType, attr, opts)
+	txPayload, err := tx.NewPayload(tt.systemID, tt.id, tokens.PayloadTypeCreateFungibleTokenType, attr, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	tx := sdktypes.NewTransactionOrder(txPayload)
-	sdktypes.GenerateAndSetProofs(tx, attr, &attr.SubTypeCreationPredicateSignatures, opts)
-	return tx, nil
+	txo := tx.NewTransactionOrder(txPayload)
+	err = tx.GenerateAndSetProofs(txo, attr, &attr.SubTypeCreationPredicateSignatures, opts)
+	if err != nil {
+		return nil, err
+	}
+	return txo, nil
 }
 
 func (tt *fungibleTokenType) DecimalPlaces() uint32 {
 	return tt.decimalPlaces
 }
 
-func (tt *nonFungibleTokenType) Create(txOptions ...sdktypes.TxOption) (*types.TransactionOrder, error) {
-	opts := sdktypes.TxOptionsWithDefaults(txOptions)
+func (tt *nonFungibleTokenType) Create(txOptions ...tx.TxOption) (*types.TransactionOrder, error) {
+	opts := tx.TxOptionsWithDefaults(txOptions)
 	attr := &tokens.CreateNonFungibleTokenTypeAttributes{
 		Symbol:                             tt.symbol,
 		Name:                               tt.name,
@@ -143,14 +147,17 @@ func (tt *nonFungibleTokenType) Create(txOptions ...sdktypes.TxOption) (*types.T
 		InvariantPredicate:                 tt.invariantPredicate,
 		SubTypeCreationPredicateSignatures: nil,
 	}
-	txPayload, err := sdktypes.NewPayload(tt.systemID, tt.id, tokens.PayloadTypeCreateNFTType, attr, opts)
+	txPayload, err := tx.NewPayload(tt.systemID, tt.id, tokens.PayloadTypeCreateNFTType, attr, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	tx := sdktypes.NewTransactionOrder(txPayload)
-	sdktypes.GenerateAndSetProofs(tx, attr, &attr.SubTypeCreationPredicateSignatures, opts)
-	return tx, nil
+	txo := tx.NewTransactionOrder(txPayload)
+	err = tx.GenerateAndSetProofs(txo, attr, &attr.SubTypeCreationPredicateSignatures, opts)
+	if err != nil {
+		return nil, err
+	}
+	return txo, nil
 }
 
 func (tt *nonFungibleTokenType) DataUpdatePredicate() sdktypes.Predicate {

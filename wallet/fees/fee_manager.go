@@ -14,6 +14,7 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/types"
 
 	"github.com/alphabill-org/alphabill-wallet/client"
+	"github.com/alphabill-org/alphabill-wallet/client/tx"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
@@ -308,8 +309,8 @@ func (w *FeeManager) LockFeeCredit(ctx context.Context, cmd LockFeeCreditCmd) (*
 		return nil, err
 	}
 	tx, err := fcb.Lock(cmd.LockStatus,
-		sdktypes.WithTimeout(timeout),
-		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+		tx.WithTimeout(timeout),
+		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create lockFC transaction: %w", err)
 	}
@@ -343,8 +344,8 @@ func (w *FeeManager) UnlockFeeCredit(ctx context.Context, cmd UnlockFeeCreditCmd
 		return nil, err
 	}
 	tx, err := fcb.Unlock(
-		sdktypes.WithTimeout(timeout),
-		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+		tx.WithTimeout(timeout),
+		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create unlockFC transaction: %w", err)
 	}
@@ -500,8 +501,8 @@ func (w *FeeManager) sendLockFCTx(ctx context.Context, accountKey *account.Accou
 	// create lockFC
 	w.log.InfoContext(ctx, "sending lock fee credit transaction")
 	tx, err := fcb.Lock(wallet.LockReasonAddFees,
-		sdktypes.WithTimeout(targetPartitionTimeout),
-		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+		tx.WithTimeout(targetPartitionTimeout),
+		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return fmt.Errorf("failed to create lockFC transaction: %w", err)
 	}
@@ -593,8 +594,8 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 		fcr = client.NewFeeCreditRecord(w.targetPartitionSystemID, fcrID)
 	}
 	tx, err := feeCtx.TargetBill.TransferToFeeCredit(fcr, feeCtx.TargetAmount, latestAdditionTime,
-		sdktypes.WithTimeout(moneyTimeout),
-		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+		tx.WithTimeout(moneyTimeout),
+		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return fmt.Errorf("failed to create transferFC transaction: %w", err)
 	}
@@ -673,8 +674,8 @@ func (w *FeeManager) sendAddFCTx(ctx context.Context, accountKey *account.Accoun
 	// need to use same FCR that was calculated form transferFC timeout, best to store it in WAL
 	ownerPredicate := templates.NewP2pkh256BytesFromKeyHash(accountKey.PubKeyHash.Sha256)
 	addFCTx, err := feeCtx.FeeCreditRecord.AddFreeCredit(ownerPredicate, feeCtx.TransferFCProof,
-		sdktypes.WithTimeout(timeout),
-		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+		tx.WithTimeout(timeout),
+		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return fmt.Errorf("failed to create addFC transaction: %w", err)
 	}
@@ -808,9 +809,9 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 		return err
 	}
 	tx, err := feeCtx.TargetBill.Lock(wallet.LockReasonReclaimFees,
-		sdktypes.WithTimeout(timeout),
-		sdktypes.WithFeeCreditRecordID(moneyFCB.ID()),
-		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+		tx.WithTimeout(timeout),
+		tx.WithFeeCreditRecordID(moneyFCB.ID()),
+		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return fmt.Errorf("failed to create lock transaction: %w", err)
 	}
@@ -873,8 +874,8 @@ func (w *FeeManager) sendCloseFCTx(ctx context.Context, accountKey *account.Acco
 
 	// create closeFC transaction
 	tx, err := fcb.CloseFreeCredit(feeCtx.TargetBill,
-		sdktypes.WithTimeout(targetPartitionTimeout),
-		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+		tx.WithTimeout(targetPartitionTimeout),
+		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return fmt.Errorf("failed to create closeFC transaction: %w", err)
 	}
@@ -946,8 +947,8 @@ func (w *FeeManager) sendReclaimFCTx(ctx context.Context, accountKey *account.Ac
 	}
 
 	reclaimFC, err := feeCtx.TargetBill.ReclaimFromFeeCredit(feeCtx.CloseFCProof,
-		sdktypes.WithTimeout(moneyTimeout),
-		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+		tx.WithTimeout(moneyTimeout),
+		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return fmt.Errorf("failed to create reclaimFC transaction: %w", err)
 	}
@@ -1030,8 +1031,8 @@ func (w *FeeManager) unlockFeeCreditRecord(ctx context.Context, accountKey *acco
 		return nil, err
 	}
 	tx, err := fcb.Unlock(
-		sdktypes.WithTimeout(timeout),
-		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+		tx.WithTimeout(timeout),
+		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create unlockFC transaction: %w", err)
 	}
@@ -1063,9 +1064,9 @@ func (w *FeeManager) unlockBill(ctx context.Context, accountKey *account.Account
 			return nil, fmt.Errorf("fee credit bill not found")
 		}
 		unlockTx, err := bill.Unlock(
-			sdktypes.WithTimeout(timeout),
-			sdktypes.WithFeeCreditRecordID(fcr.ID()),
-			sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+			tx.WithTimeout(timeout),
+			tx.WithFeeCreditRecordID(fcr.ID()),
+			tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create unlock tx: %w", err)
 		}
