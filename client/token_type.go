@@ -14,7 +14,6 @@ var NoParent = sdktypes.TokenTypeID(make([]byte, crypto.SHA256.Size()))
 
 type (
 	tokenType struct {
-		// TODO: not sure SystemID here is good
 		systemID                 types.SystemID
 		id                       sdktypes.TokenTypeID
 		parentTypeID             sdktypes.TokenTypeID

@@ -12,11 +12,9 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 )
 
-type (
-	tokensPartitionClient struct {
-		*partitionClient
-	}
-)
+type tokensPartitionClient struct {
+	*partitionClient
+}
 
 // NewTokensPartitionClient creates a tokens partition client for the given RPC URL.
 func NewTokensPartitionClient(ctx context.Context, rpcUrl string) (sdktypes.TokensPartitionClient, error) {
@@ -55,7 +53,7 @@ func (c *tokensPartitionClient) GetFungibleToken(ctx context.Context, tokenID sd
 
 	return &fungibleToken{
 		token: token{
-			systemID:       0, // TODO
+			systemID:       ft.SystemID,
 			id:             ft.UnitID,
 			symbol:         ftType.Data.Symbol,
 			typeID:         ft.Data.TokenType,
@@ -94,6 +92,7 @@ func (c *tokensPartitionClient) GetNonFungibleToken(ctx context.Context, tokenID
 
 	return &nonFungibleToken{
 		token: token{
+			systemID:       nft.SystemID,
 			id:             nft.UnitID,
 			symbol:         nftType.Data.Symbol,
 			typeID:         nft.Data.TypeID,
@@ -210,7 +209,7 @@ func (c *tokensPartitionClient) getFungibleTokenType(ctx context.Context, typeID
 	}
 	return &fungibleTokenType{
 		tokenType: tokenType{
-			systemID:                 1, // TODO
+			systemID:                 ftType.SystemID,
 			id:                       ftType.UnitID,
 			parentTypeID:             ftType.Data.ParentTypeID,
 			symbol:                   ftType.Data.Symbol,
@@ -237,7 +236,7 @@ func (c *tokensPartitionClient) getNonFungibleTokenType(ctx context.Context, typ
 	}
 	return &nonFungibleTokenType{
 		tokenType: tokenType{
-			systemID:                 1, // TODO
+			systemID:                 nftType.SystemID,
 			id:                       nftType.UnitID,
 			parentTypeID:             nftType.Data.ParentTypeID,
 			symbol:                   nftType.Data.Symbol,

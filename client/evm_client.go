@@ -56,7 +56,7 @@ func (c *evmPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ow
 	}
 	counterCopy := fcr.Counter
 	return &feeCreditRecord{
-		systemID:   0, // TODO:
+		systemID:   u.SystemID,
 		id:         u.UnitID,
 		balance:    fcr.Balance,
 		counter:    &counterCopy,

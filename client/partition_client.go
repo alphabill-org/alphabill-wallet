@@ -64,7 +64,7 @@ func (c *partitionClient) getFeeCreditRecord(ctx context.Context, unitID types.U
 
 	counterCopy := u.Data.Counter
 	return &feeCreditRecord{
-		systemID:   0, // TODO:
+		systemID:   u.SystemID,
 		id:         u.UnitID,
 		balance:    u.Data.Balance,
 		counter:    &counterCopy,

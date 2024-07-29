@@ -12,11 +12,9 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 )
 
-type (
-	moneyPartitionClient struct {
-		*partitionClient
-	}
-)
+type moneyPartitionClient struct {
+	*partitionClient
+}
 
 // NewMoneyPartitionClient creates a money partition client for the given RPC URL.
 func NewMoneyPartitionClient(ctx context.Context, rpcUrl string) (sdktypes.MoneyPartitionClient, error) {
@@ -42,7 +40,7 @@ func (c *moneyPartitionClient) GetBill(ctx context.Context, unitID types.UnitID)
 	}
 
 	return &bill{
-		systemID:   money.DefaultSystemID, // TODO: should come from server
+		systemID:   u.SystemID,
 		id:         u.UnitID,
 		value:      u.Data.V,
 		counter:    u.Data.Counter,
