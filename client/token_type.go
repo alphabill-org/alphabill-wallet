@@ -103,8 +103,7 @@ func NewNonFungibleTokenType(params *sdktypes.NonFungibleTokenTypeParams) (sdkty
 	}, nil
 }
 
-func (tt *fungibleTokenType) Create(txOptions ...tx.TxOption) (*types.TransactionOrder, error) {
-	opts := tx.TxOptionsWithDefaults(txOptions)
+func (tt *fungibleTokenType) Create(txOptions ...tx.Option) (*types.TransactionOrder, error) {
 	attr := &tokens.CreateFungibleTokenTypeAttributes{
 		Symbol:                             tt.symbol,
 		Name:                               tt.name,
@@ -117,13 +116,13 @@ func (tt *fungibleTokenType) Create(txOptions ...tx.TxOption) (*types.Transactio
 		SubTypeCreationPredicateSignatures: nil,
 	}
 
-	txPayload, err := tx.NewPayload(tt.systemID, tt.id, tokens.PayloadTypeCreateFungibleTokenType, attr, opts)
+	txPayload, err := tx.NewPayload(tt.systemID, tt.id, tokens.PayloadTypeCreateFungibleTokenType, attr, txOptions...)
 	if err != nil {
 		return nil, err
 	}
 
 	txo := tx.NewTransactionOrder(txPayload)
-	err = tx.GenerateAndSetProofs(txo, attr, &attr.SubTypeCreationPredicateSignatures, opts)
+	err = tx.GenerateAndSetProofs(txo, attr, &attr.SubTypeCreationPredicateSignatures, txOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -134,8 +133,7 @@ func (tt *fungibleTokenType) DecimalPlaces() uint32 {
 	return tt.decimalPlaces
 }
 
-func (tt *nonFungibleTokenType) Create(txOptions ...tx.TxOption) (*types.TransactionOrder, error) {
-	opts := tx.TxOptionsWithDefaults(txOptions)
+func (tt *nonFungibleTokenType) Create(txOptions ...tx.Option) (*types.TransactionOrder, error) {
 	attr := &tokens.CreateNonFungibleTokenTypeAttributes{
 		Symbol:                             tt.symbol,
 		Name:                               tt.name,
@@ -147,13 +145,13 @@ func (tt *nonFungibleTokenType) Create(txOptions ...tx.TxOption) (*types.Transac
 		InvariantPredicate:                 tt.invariantPredicate,
 		SubTypeCreationPredicateSignatures: nil,
 	}
-	txPayload, err := tx.NewPayload(tt.systemID, tt.id, tokens.PayloadTypeCreateNFTType, attr, opts)
+	txPayload, err := tx.NewPayload(tt.systemID, tt.id, tokens.PayloadTypeCreateNFTType, attr, txOptions...)
 	if err != nil {
 		return nil, err
 	}
 
 	txo := tx.NewTransactionOrder(txPayload)
-	err = tx.GenerateAndSetProofs(txo, attr, &attr.SubTypeCreationPredicateSignatures, opts)
+	err = tx.GenerateAndSetProofs(txo, attr, &attr.SubTypeCreationPredicateSignatures, txOptions...)
 	if err != nil {
 		return nil, err
 	}

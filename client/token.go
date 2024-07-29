@@ -93,8 +93,7 @@ func NewNonFungibleToken(params *sdktypes.NonFungibleTokenParams) (sdktypes.NonF
 	}, nil
 }
 
-func (t *fungibleToken) Create(txOptions ...tx.TxOption) (*types.TransactionOrder, error) {
-	opts := tx.TxOptionsWithDefaults(txOptions)
+func (t *fungibleToken) Create(txOptions ...tx.Option) (*types.TransactionOrder, error) {
 	attr := &tokens.MintFungibleTokenAttributes{
 		Bearer:                           t.ownerPredicate,
 		TypeID:                           t.typeID,
@@ -102,7 +101,7 @@ func (t *fungibleToken) Create(txOptions ...tx.TxOption) (*types.TransactionOrde
 		Nonce:                            0,
 		TokenCreationPredicateSignatures: nil,
 	}
-	txPayload, err := tx.NewPayload(t.systemID, nil, tokens.PayloadTypeMintFungibleToken, attr, opts)
+	txPayload, err := tx.NewPayload(t.systemID, nil, tokens.PayloadTypeMintFungibleToken, attr, txOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +115,7 @@ func (t *fungibleToken) Create(txOptions ...tx.TxOption) (*types.TransactionOrde
 	t.id = txPayload.UnitID
 
 	txo := tx.NewTransactionOrder(txPayload)
-	err = tx.GenerateAndSetProofs(txo, attr, &attr.TokenCreationPredicateSignatures, opts)
+	err = tx.GenerateAndSetProofs(txo, attr, &attr.TokenCreationPredicateSignatures, txOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -124,8 +123,7 @@ func (t *fungibleToken) Create(txOptions ...tx.TxOption) (*types.TransactionOrde
 	return txo, nil
 }
 
-func (t *fungibleToken) Transfer(ownerPredicate []byte, txOptions ...tx.TxOption) (*types.TransactionOrder, error) {
-	opts := tx.TxOptionsWithDefaults(txOptions)
+func (t *fungibleToken) Transfer(ownerPredicate []byte, txOptions ...tx.Option) (*types.TransactionOrder, error) {
 	attr := &tokens.TransferFungibleTokenAttributes{
 		NewBearer:                    ownerPredicate,
 		Value:                        t.amount,
@@ -134,21 +132,20 @@ func (t *fungibleToken) Transfer(ownerPredicate []byte, txOptions ...tx.TxOption
 		TypeID:                       t.typeID,
 		InvariantPredicateSignatures: nil,
 	}
-	txPayload, err := tx.NewPayload(t.systemID, t.id, tokens.PayloadTypeTransferFungibleToken, attr, opts)
+	txPayload, err := tx.NewPayload(t.systemID, t.id, tokens.PayloadTypeTransferFungibleToken, attr, txOptions...)
 	if err != nil {
 		return nil, err
 	}
 
 	txo := tx.NewTransactionOrder(txPayload)
-	err = tx.GenerateAndSetProofs(txo, attr, &attr.InvariantPredicateSignatures, opts)
+	err = tx.GenerateAndSetProofs(txo, attr, &attr.InvariantPredicateSignatures, txOptions...)
 	if err != nil {
 		return nil, err
 	}
 	return txo, nil
 }
 
-func (t *fungibleToken) Split(amount uint64, ownerPredicate []byte, txOptions ...tx.TxOption) (*types.TransactionOrder, error) {
-	opts := tx.TxOptionsWithDefaults(txOptions)
+func (t *fungibleToken) Split(amount uint64, ownerPredicate []byte, txOptions ...tx.Option) (*types.TransactionOrder, error) {
 	attr := &tokens.SplitFungibleTokenAttributes{
 		NewBearer:                    ownerPredicate,
 		TargetValue:                  amount,
@@ -158,21 +155,20 @@ func (t *fungibleToken) Split(amount uint64, ownerPredicate []byte, txOptions ..
 		RemainingValue:               t.amount - amount,
 		InvariantPredicateSignatures: [][]byte{nil}, // TODO: could be just nil?
 	}
-	txPayload, err := tx.NewPayload(t.systemID, t.id, tokens.PayloadTypeSplitFungibleToken, attr, opts)
+	txPayload, err := tx.NewPayload(t.systemID, t.id, tokens.PayloadTypeSplitFungibleToken, attr, txOptions...)
 	if err != nil {
 		return nil, err
 	}
 
 	txo := tx.NewTransactionOrder(txPayload)
-	err = tx.GenerateAndSetProofs(txo, attr, &attr.InvariantPredicateSignatures, opts)
+	err = tx.GenerateAndSetProofs(txo, attr, &attr.InvariantPredicateSignatures, txOptions...)
 	if err != nil {
 		return nil, err
 	}
 	return txo, nil
 }
 
-func (t *fungibleToken) Burn(targetTokenID types.UnitID, targetTokenCounter uint64, txOptions ...tx.TxOption) (*types.TransactionOrder, error) {
-	opts := tx.TxOptionsWithDefaults(txOptions)
+func (t *fungibleToken) Burn(targetTokenID types.UnitID, targetTokenCounter uint64, txOptions ...tx.Option) (*types.TransactionOrder, error) {
 	attr := &tokens.BurnFungibleTokenAttributes{
 		TypeID:                       t.typeID,
 		Value:                        t.amount,
@@ -181,34 +177,33 @@ func (t *fungibleToken) Burn(targetTokenID types.UnitID, targetTokenCounter uint
 		Counter:                      t.counter,
 		InvariantPredicateSignatures: nil,
 	}
-	txPayload, err := tx.NewPayload(t.systemID, t.id, tokens.PayloadTypeBurnFungibleToken, attr, opts)
+	txPayload, err := tx.NewPayload(t.systemID, t.id, tokens.PayloadTypeBurnFungibleToken, attr, txOptions...)
 	if err != nil {
 		return nil, err
 	}
 
 	txo := tx.NewTransactionOrder(txPayload)
-	err = tx.GenerateAndSetProofs(txo, attr, &attr.InvariantPredicateSignatures, opts)
+	err = tx.GenerateAndSetProofs(txo, attr, &attr.InvariantPredicateSignatures, txOptions...)
 	if err != nil {
 		return nil, err
 	}
 	return txo, nil
 }
 
-func (t *fungibleToken) Join(burnTxs []*types.TransactionRecord, burnProofs []*types.TxProof, txOptions ...tx.TxOption) (*types.TransactionOrder, error) {
-	opts := tx.TxOptionsWithDefaults(txOptions)
+func (t *fungibleToken) Join(burnTxs []*types.TransactionRecord, burnProofs []*types.TxProof, txOptions ...tx.Option) (*types.TransactionOrder, error) {
 	attr := &tokens.JoinFungibleTokenAttributes{
 		BurnTransactions:             burnTxs,
 		Proofs:                       burnProofs,
 		Counter:                      t.counter,
 		InvariantPredicateSignatures: nil,
 	}
-	txPayload, err := tx.NewPayload(t.systemID, t.id, tokens.PayloadTypeJoinFungibleToken, attr, opts)
+	txPayload, err := tx.NewPayload(t.systemID, t.id, tokens.PayloadTypeJoinFungibleToken, attr, txOptions...)
 	if err != nil {
 		return nil, err
 	}
 
 	txo := tx.NewTransactionOrder(txPayload)
-	err = tx.GenerateAndSetProofs(txo, attr, &attr.InvariantPredicateSignatures, opts)
+	err = tx.GenerateAndSetProofs(txo, attr, &attr.InvariantPredicateSignatures, txOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -227,8 +222,7 @@ func (t *fungibleToken) Burned() bool {
 	return t.burned
 }
 
-func (t *nonFungibleToken) Create(txOptions ...tx.TxOption) (*types.TransactionOrder, error) {
-	opts := tx.TxOptionsWithDefaults(txOptions)
+func (t *nonFungibleToken) Create(txOptions ...tx.Option) (*types.TransactionOrder, error) {
 	attr := &tokens.MintNonFungibleTokenAttributes{
 		Bearer:                           t.ownerPredicate,
 		TypeID:                           t.typeID,
@@ -239,7 +233,7 @@ func (t *nonFungibleToken) Create(txOptions ...tx.TxOption) (*types.TransactionO
 		Nonce:                            0,
 		TokenCreationPredicateSignatures: nil,
 	}
-	txPayload, err := tx.NewPayload(t.systemID, nil, tokens.PayloadTypeMintNFT, attr, opts)
+	txPayload, err := tx.NewPayload(t.systemID, nil, tokens.PayloadTypeMintNFT, attr, txOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -253,15 +247,14 @@ func (t *nonFungibleToken) Create(txOptions ...tx.TxOption) (*types.TransactionO
 	t.id = txPayload.UnitID
 
 	txo := tx.NewTransactionOrder(txPayload)
-	err = tx.GenerateAndSetProofs(txo, attr, &attr.TokenCreationPredicateSignatures, opts)
+	err = tx.GenerateAndSetProofs(txo, attr, &attr.TokenCreationPredicateSignatures, txOptions...)
 	if err != nil {
 		return nil, err
 	}
 	return txo, nil
 }
 
-func (t *nonFungibleToken) Transfer(ownerPredicate []byte, txOptions ...tx.TxOption) (*types.TransactionOrder, error) {
-	opts := tx.TxOptionsWithDefaults(txOptions)
+func (t *nonFungibleToken) Transfer(ownerPredicate []byte, txOptions ...tx.Option) (*types.TransactionOrder, error) {
 	attr := &tokens.TransferNonFungibleTokenAttributes{
 		NewBearer:                    ownerPredicate,
 		Nonce:                        t.nonce,
@@ -269,33 +262,32 @@ func (t *nonFungibleToken) Transfer(ownerPredicate []byte, txOptions ...tx.TxOpt
 		TypeID:                       t.typeID,
 		InvariantPredicateSignatures: nil,
 	}
-	txPayload, err := tx.NewPayload(t.systemID, t.id, tokens.PayloadTypeTransferNFT, attr, opts)
+	txPayload, err := tx.NewPayload(t.systemID, t.id, tokens.PayloadTypeTransferNFT, attr, txOptions...)
 	if err != nil {
 		return nil, err
 	}
 
 	txo := tx.NewTransactionOrder(txPayload)
-	err = tx.GenerateAndSetProofs(txo, attr, &attr.InvariantPredicateSignatures, opts)
+	err = tx.GenerateAndSetProofs(txo, attr, &attr.InvariantPredicateSignatures, txOptions...)
 	if err != nil {
 		return nil, err
 	}
 	return txo, nil
 }
 
-func (t *nonFungibleToken) Update(data []byte, txOptions ...tx.TxOption) (*types.TransactionOrder, error) {
-	opts := tx.TxOptionsWithDefaults(txOptions)
+func (t *nonFungibleToken) Update(data []byte, txOptions ...tx.Option) (*types.TransactionOrder, error) {
 	attr := &tokens.UpdateNonFungibleTokenAttributes{
 		Data:                 data,
 		Counter:              t.counter,
 		DataUpdateSignatures: nil,
 	}
-	txPayload, err := tx.NewPayload(t.systemID, t.id, tokens.PayloadTypeUpdateNFT, attr, opts)
+	txPayload, err := tx.NewPayload(t.systemID, t.id, tokens.PayloadTypeUpdateNFT, attr, txOptions...)
 	if err != nil {
 		return nil, err
 	}
 
 	txo := tx.NewTransactionOrder(txPayload)
-	err = tx.GenerateAndSetProofs(txo, attr, &attr.DataUpdateSignatures, opts)
+	err = tx.GenerateAndSetProofs(txo, attr, &attr.DataUpdateSignatures, txOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -318,39 +310,37 @@ func (t *nonFungibleToken) DataUpdatePredicate() sdktypes.Predicate {
 	return t.dataUpdatePredicate
 }
 
-func (t *token) Lock(lockStatus uint64, txOptions ...tx.TxOption) (*types.TransactionOrder, error) {
-	opts := tx.TxOptionsWithDefaults(txOptions)
+func (t *token) Lock(lockStatus uint64, txOptions ...tx.Option) (*types.TransactionOrder, error) {
 	attr := &tokens.LockTokenAttributes{
 		LockStatus:                   lockStatus,
 		Counter:                      t.counter,
 		InvariantPredicateSignatures: nil,
 	}
-	txPayload, err := tx.NewPayload(t.systemID, t.id, tokens.PayloadTypeLockToken, attr, opts)
+	txPayload, err := tx.NewPayload(t.systemID, t.id, tokens.PayloadTypeLockToken, attr, txOptions...)
 	if err != nil {
 		return nil, err
 	}
 
 	txo := tx.NewTransactionOrder(txPayload)
-	err = tx.GenerateAndSetProofs(txo, attr, &attr.InvariantPredicateSignatures, opts)
+	err = tx.GenerateAndSetProofs(txo, attr, &attr.InvariantPredicateSignatures, txOptions...)
 	if err != nil {
 		return nil, err
 	}
 	return txo, nil
 }
 
-func (t *token) Unlock(txOptions ...tx.TxOption) (*types.TransactionOrder, error) {
-	opts := tx.TxOptionsWithDefaults(txOptions)
+func (t *token) Unlock(txOptions ...tx.Option) (*types.TransactionOrder, error) {
 	attr := &tokens.LockTokenAttributes{
 		Counter:                      t.counter,
 		InvariantPredicateSignatures: nil,
 	}
-	txPayload, err := tx.NewPayload(t.systemID, t.id, tokens.PayloadTypeUnlockToken, attr, opts)
+	txPayload, err := tx.NewPayload(t.systemID, t.id, tokens.PayloadTypeUnlockToken, attr, txOptions...)
 	if err != nil {
 		return nil, err
 	}
 
 	txo := tx.NewTransactionOrder(txPayload)
-	err = tx.GenerateAndSetProofs(txo, attr, &attr.InvariantPredicateSignatures, opts)
+	err = tx.GenerateAndSetProofs(txo, attr, &attr.InvariantPredicateSignatures, txOptions...)
 	if err != nil {
 		return nil, err
 	}

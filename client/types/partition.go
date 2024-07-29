@@ -28,10 +28,10 @@ type (
 		Timeout() uint64
 		LockStatus() uint64
 
-		AddFreeCredit(ownerPredicate []byte, transFCProof *Proof, txOptions ...tx.TxOption) (*types.TransactionOrder, error)
-		CloseFreeCredit(targetBill Bill, txOptions ...tx.TxOption) (*types.TransactionOrder, error)
-		Lock(lockStatus uint64, txOptions ...tx.TxOption) (*types.TransactionOrder, error)
-		Unlock(txOptions ...tx.TxOption) (*types.TransactionOrder, error)
+		AddFreeCredit(ownerPredicate []byte, transFCProof *Proof, txOptions ...tx.Option) (*types.TransactionOrder, error)
+		CloseFreeCredit(targetBill Bill, txOptions ...tx.Option) (*types.TransactionOrder, error)
+		Lock(lockStatus uint64, txOptions ...tx.Option) (*types.TransactionOrder, error)
+		Unlock(txOptions ...tx.Option) (*types.TransactionOrder, error)
 	}
 
 	NodeInfoResponse struct {

@@ -18,11 +18,9 @@ func NewAddVarTx(varData orchestration.ValidatorAssignmentRecord, systemID types
 		Var: varData,
 	}
 
-	opts := &tx.TxOptions{}
-	tx.WithTimeout(timeout)(opts)
-	tx.WithMaxFee(MaxFee)(opts)
-
-	txPayload, err := tx.NewPayload(systemID, unitID, orchestration.PayloadTypeAddVAR, attr, opts)
+	txPayload, err := tx.NewPayload(systemID, unitID, orchestration.PayloadTypeAddVAR, attr,
+		tx.WithTimeout(timeout),
+		tx.WithMaxFee(MaxFee))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tx: %w", err)
 	}

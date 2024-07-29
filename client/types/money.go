@@ -25,13 +25,13 @@ type (
 		IncreaseCounter()
 		LockStatus() uint64
 
-		Transfer(ownerPredicate []byte, txOptions ...tx.TxOption) (*types.TransactionOrder, error)
-		Split(targetUnits []*money.TargetUnit, txOptions ...tx.TxOption) (*types.TransactionOrder, error)
-		TransferToDustCollector(targetBill Bill, txOptions ...tx.TxOption) (*types.TransactionOrder, error)
-		SwapWithDustCollector(transDCProofs []*Proof, txOptions ...tx.TxOption) (*types.TransactionOrder, error)
-		TransferToFeeCredit(fcr FeeCreditRecord, amount uint64, latestAdditionTime uint64, txOptions ...tx.TxOption) (*types.TransactionOrder, error)
-		ReclaimFromFeeCredit(closeFCProof *Proof, txOptions ...tx.TxOption) (*types.TransactionOrder, error)
-		Lock(lockStatus uint64, txOptions ...tx.TxOption) (*types.TransactionOrder, error)
-		Unlock(txOptions ...tx.TxOption) (*types.TransactionOrder, error)
+		Transfer(ownerPredicate []byte, txOptions ...tx.Option) (*types.TransactionOrder, error)
+		Split(targetUnits []*money.TargetUnit, txOptions ...tx.Option) (*types.TransactionOrder, error)
+		TransferToDustCollector(targetBill Bill, txOptions ...tx.Option) (*types.TransactionOrder, error)
+		SwapWithDustCollector(transDCProofs []*Proof, txOptions ...tx.Option) (*types.TransactionOrder, error)
+		TransferToFeeCredit(fcr FeeCreditRecord, amount uint64, latestAdditionTime uint64, txOptions ...tx.Option) (*types.TransactionOrder, error)
+		ReclaimFromFeeCredit(closeFCProof *Proof, txOptions ...tx.Option) (*types.TransactionOrder, error)
+		Lock(lockStatus uint64, txOptions ...tx.Option) (*types.TransactionOrder, error)
+		Unlock(txOptions ...tx.Option) (*types.TransactionOrder, error)
 	}
 )

@@ -38,7 +38,7 @@ type (
 		TokenCreationPredicate() Predicate
 		InvariantPredicate() Predicate
 
-		Create(txOptions ...tx.TxOption) (*types.TransactionOrder, error)
+		Create(txOptions ...tx.Option) (*types.TransactionOrder, error)
 	}
 
 	FungibleTokenType interface {
@@ -89,10 +89,10 @@ type (
 		Counter() uint64
 		IncreaseCounter()
 
-		Create(txOptions ...tx.TxOption) (*types.TransactionOrder, error)
-		Transfer(ownerPredicate []byte, txOptions ...tx.TxOption) (*types.TransactionOrder, error)
-		Lock(lockStatus uint64, txOptions ...tx.TxOption) (*types.TransactionOrder, error)
-		Unlock(txOptions ...tx.TxOption) (*types.TransactionOrder, error)
+		Create(txOptions ...tx.Option) (*types.TransactionOrder, error)
+		Transfer(ownerPredicate []byte, txOptions ...tx.Option) (*types.TransactionOrder, error)
+		Lock(lockStatus uint64, txOptions ...tx.Option) (*types.TransactionOrder, error)
+		Unlock(txOptions ...tx.Option) (*types.TransactionOrder, error)
 	}
 
 	FungibleToken interface {
@@ -101,9 +101,9 @@ type (
 		DecimalPlaces() uint32
 		Burned() bool
 
-		Split(amount uint64, ownerPredicate []byte, txOptions ...tx.TxOption) (*types.TransactionOrder, error)
-		Burn(targetTokenID types.UnitID, targetTokenCounter uint64, txOptions ...tx.TxOption) (*types.TransactionOrder, error)
-		Join(burnTxs []*types.TransactionRecord, burnProofs []*types.TxProof, txOptions ...tx.TxOption) (*types.TransactionOrder, error)
+		Split(amount uint64, ownerPredicate []byte, txOptions ...tx.Option) (*types.TransactionOrder, error)
+		Burn(targetTokenID types.UnitID, targetTokenCounter uint64, txOptions ...tx.Option) (*types.TransactionOrder, error)
+		Join(burnTxs []*types.TransactionRecord, burnProofs []*types.TxProof, txOptions ...tx.Option) (*types.TransactionOrder, error)
 	}
 
 	NonFungibleToken interface {
@@ -113,7 +113,7 @@ type (
 		Data() []byte
 		DataUpdatePredicate() Predicate
 
-		Update(data []byte, txOptions ...tx.TxOption) (*types.TransactionOrder, error)
+		Update(data []byte, txOptions ...tx.Option) (*types.TransactionOrder, error)
 	}
 
 	FungibleTokenParams struct {

@@ -7,7 +7,7 @@ import (
 )
 
 type (
-	TxOptions struct {
+	options struct {
 		timeout              uint64
 		feeCreditRecordID    types.UnitID
 		maxFee               uint64
@@ -17,7 +17,7 @@ type (
 		extraProofGenerators []types.ProofGenerator
 	}
 
-	TxOption func(*TxOptions)
+	Option func(*options)
 )
 
 func NewTransactionOrder(payload *types.Payload) *types.TransactionOrder {
@@ -28,88 +28,38 @@ func NewTransactionOrder(payload *types.Payload) *types.TransactionOrder {
 }
 
 // NewPayload creates a new transaction payload.
-func NewPayload(systemID types.SystemID, unitID types.UnitID, txType string, attr any, opts *TxOptions) (*types.Payload, error) {
+func NewPayload(systemID types.SystemID, unitID types.UnitID, txType string, attr any, opts ...Option) (*types.Payload, error) {
 	attrBytes, err := types.Cbor.Marshal(attr)
 	if err != nil {
 		return nil, err
 	}
 
+	o := optionsWithDefaults(opts)
 	return &types.Payload{
 		SystemID:   systemID,
 		Type:       txType,
 		UnitID:     unitID,
 		Attributes: attrBytes,
 		ClientMetadata: &types.ClientMetadata{
-			Timeout:           opts.timeout,
-			MaxTransactionFee: opts.maxFee,
-			FeeCreditRecordID: opts.feeCreditRecordID,
-			ReferenceNumber:   opts.referenceNumber,
+			Timeout:           o.timeout,
+			MaxTransactionFee: o.maxFee,
+			FeeCreditRecordID: o.feeCreditRecordID,
+			ReferenceNumber:   o.referenceNumber,
 		},
 	}, nil
 }
 
-func TxOptionsWithDefaults(txOptions []TxOption) *TxOptions {
-	opts := &TxOptions{
-		maxFee:            10,
-	}
-	for _, txOption := range txOptions {
-		txOption(opts)
-	}
-	return opts
-}
+func GenerateAndSetProofs(tx *types.TransactionOrder, attr any, attrField *[][]byte, opts ...Option) error {
+	o := optionsWithDefaults(opts)
 
-
-func WithReferenceNumber(referenceNumber []byte) TxOption {
-	return func(os *TxOptions) {
-		os.referenceNumber = referenceNumber
-	}
-}
-
-func WithTimeout(timeout uint64) TxOption {
-	return func(os *TxOptions) {
-		os.timeout = timeout
-	}
-}
-
-func WithFeeCreditRecordID(feeCreditRecordID types.UnitID) TxOption {
-	return func(os *TxOptions) {
-		os.feeCreditRecordID = feeCreditRecordID
-	}
-}
-
-func WithMaxFee(maxFee uint64) TxOption {
-	return func(os *TxOptions) {
-		os.maxFee = maxFee
-	}
-}
-
-func WithOwnerProof(proofGenerator types.ProofGenerator) TxOption {
-	return func(os *TxOptions) {
-		os.ownerProofGenerator = proofGenerator
-	}
-}
-
-func WithFeeProof(proofGenerator types.ProofGenerator) TxOption {
-	return func(os *TxOptions) {
-		os.feeProofGenerator = proofGenerator
-	}
-}
-
-func WithExtraProofs(proofGenerators []types.ProofGenerator) TxOption {
-	return func(os *TxOptions) {
-		os.extraProofGenerators = proofGenerators
-	}
-}
-
-func GenerateAndSetProofs(tx *types.TransactionOrder, attr any, attrField *[][]byte, opts *TxOptions) error {
-	if opts.ownerProofGenerator != nil {
-		if err := tx.SetOwnerProof(opts.ownerProofGenerator); err != nil {
+	if o.ownerProofGenerator != nil {
+		if err := tx.SetOwnerProof(o.ownerProofGenerator); err != nil {
 			return err
 		}
 	}
 
-	if opts.extraProofGenerators != nil && attr != nil {
-		proofs, err := generateProofs(tx, opts.extraProofGenerators)
+	if o.extraProofGenerators != nil && attr != nil {
+		proofs, err := generateProofs(tx, o.extraProofGenerators)
 		if err != nil {
 			return err
 		}
@@ -120,13 +70,65 @@ func GenerateAndSetProofs(tx *types.TransactionOrder, attr any, attrField *[][]b
 		}
 	}
 
-	if opts.feeProofGenerator != nil {
-		if err := tx.SetFeeProof(opts.feeProofGenerator); err != nil {
+	if o.feeProofGenerator != nil {
+		if err := tx.SetFeeProof(o.feeProofGenerator); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func WithReferenceNumber(referenceNumber []byte) Option {
+	return func(os *options) {
+		os.referenceNumber = referenceNumber
+	}
+}
+
+func WithTimeout(timeout uint64) Option {
+	return func(os *options) {
+		os.timeout = timeout
+	}
+}
+
+func WithFeeCreditRecordID(feeCreditRecordID types.UnitID) Option {
+	return func(os *options) {
+		os.feeCreditRecordID = feeCreditRecordID
+	}
+}
+
+func WithMaxFee(maxFee uint64) Option {
+	return func(os *options) {
+		os.maxFee = maxFee
+	}
+}
+
+func WithOwnerProof(proofGenerator types.ProofGenerator) Option {
+	return func(os *options) {
+		os.ownerProofGenerator = proofGenerator
+	}
+}
+
+func WithFeeProof(proofGenerator types.ProofGenerator) Option {
+	return func(os *options) {
+		os.feeProofGenerator = proofGenerator
+	}
+}
+
+func WithExtraProofs(proofGenerators []types.ProofGenerator) Option {
+	return func(os *options) {
+		os.extraProofGenerators = proofGenerators
+	}
+}
+
+func optionsWithDefaults(txOptions []Option) *options {
+	opts := &options{
+		maxFee: 10,
+	}
+	for _, txOption := range txOptions {
+		txOption(opts)
+	}
+	return opts
 }
 
 func NewP2pkhProofGenerator(pubKey []byte, privKey []byte) types.ProofGenerator {
