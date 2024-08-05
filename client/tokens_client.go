@@ -152,26 +152,26 @@ func (c *tokensPartitionClient) GetNonFungibleTokens(ctx context.Context, ownerI
 	return nonFungibleTokens, nil
 }
 
-func (c *tokensPartitionClient) GetFungibleTokenTypes(ctx context.Context, creator sdktypes.PubKey) ([]sdktypes.FungibleTokenType, error) {
+func (c *tokensPartitionClient) GetFungibleTokenTypes(ctx context.Context, creator sdktypes.PubKey) ([]*sdktypes.FungibleTokenType, error) {
 	// TODO AB-1448
 	return nil, nil
 }
 
-func (c *tokensPartitionClient) GetNonFungibleTokenTypes(ctx context.Context, creator sdktypes.PubKey) ([]sdktypes.NonFungibleTokenType, error) {
+func (c *tokensPartitionClient) GetNonFungibleTokenTypes(ctx context.Context, creator sdktypes.PubKey) ([]*sdktypes.NonFungibleTokenType, error) {
 	// TODO AB-1448
 	return nil, nil
 }
 
 // GetTypeHierarchy returns type hierarchy for given token type id where the root type is the last element (no parent).
-func (c *tokensPartitionClient) GetFungibleTokenTypeHierarchy(ctx context.Context, typeID sdktypes.TokenTypeID) ([]sdktypes.FungibleTokenType, error) {
-	var tokenTypes []sdktypes.FungibleTokenType
+func (c *tokensPartitionClient) GetFungibleTokenTypeHierarchy(ctx context.Context, typeID sdktypes.TokenTypeID) ([]*sdktypes.FungibleTokenType, error) {
+	var tokenTypes []*sdktypes.FungibleTokenType
 	for len(typeID) > 0 && !typeID.Eq(sdktypes.NoParent) {
 		tokenType, err := c.getFungibleTokenType(ctx, typeID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch token type: %w", err)
 		}
 		tokenTypes = append(tokenTypes, tokenType)
-		typeID = tokenType.ParentTypeID()
+		typeID = tokenType.ParentTypeID
 	}
 	return tokenTypes, nil
 }
@@ -196,7 +196,7 @@ func (c *tokensPartitionClient) Close() {
 	c.StateAPIClient.Close()
 }
 
-func (c *tokensPartitionClient) getFungibleTokenType(ctx context.Context, typeID sdktypes.TokenTypeID) (sdktypes.FungibleTokenType, error) {
+func (c *tokensPartitionClient) getFungibleTokenType(ctx context.Context, typeID sdktypes.TokenTypeID) (*sdktypes.FungibleTokenType, error) {
 	if !typeID.HasType(tokens.FungibleTokenTypeUnitType) {
 		return nil, fmt.Errorf("invalid fungible token type id: %s", typeID)
 	}
@@ -207,23 +207,21 @@ func (c *tokensPartitionClient) getFungibleTokenType(ctx context.Context, typeID
 	if ftType == nil {
 		return nil, nil
 	}
-	return &fungibleTokenType{
-		tokenType: tokenType{
-			systemID:                 ftType.SystemID,
-			id:                       ftType.UnitID,
-			parentTypeID:             ftType.Data.ParentTypeID,
-			symbol:                   ftType.Data.Symbol,
-			name:                     ftType.Data.Name,
-			icon:                     ftType.Data.Icon,
-			subTypeCreationPredicate: ftType.Data.SubTypeCreationPredicate,
-			tokenCreationPredicate:   ftType.Data.TokenCreationPredicate,
-			invariantPredicate:       ftType.Data.InvariantPredicate,
-		},
-		decimalPlaces: ftType.Data.DecimalPlaces,
+	return &sdktypes.FungibleTokenType{
+		SystemID:                 ftType.SystemID,
+		ID:                       ftType.UnitID,
+		ParentTypeID:             ftType.Data.ParentTypeID,
+		Symbol:                   ftType.Data.Symbol,
+		Name:                     ftType.Data.Name,
+		Icon:                     ftType.Data.Icon,
+		SubTypeCreationPredicate: ftType.Data.SubTypeCreationPredicate,
+		TokenCreationPredicate:   ftType.Data.TokenCreationPredicate,
+		InvariantPredicate:       ftType.Data.InvariantPredicate,
+		DecimalPlaces:            ftType.Data.DecimalPlaces,
 	}, nil
 }
 
-func (c *tokensPartitionClient) getNonFungibleTokenType(ctx context.Context, typeID sdktypes.TokenTypeID) (sdktypes.NonFungibleTokenType, error) {
+func (c *tokensPartitionClient) getNonFungibleTokenType(ctx context.Context, typeID sdktypes.TokenTypeID) (*sdktypes.NonFungibleTokenType, error) {
 	if !typeID.HasType(tokens.NonFungibleTokenTypeUnitType) {
 		return nil, fmt.Errorf("invalid non-fungible token type id: %s", typeID)
 	}
@@ -234,18 +232,16 @@ func (c *tokensPartitionClient) getNonFungibleTokenType(ctx context.Context, typ
 	if nftType == nil {
 		return nil, nil
 	}
-	return &nonFungibleTokenType{
-		tokenType: tokenType{
-			systemID:                 nftType.SystemID,
-			id:                       nftType.UnitID,
-			parentTypeID:             nftType.Data.ParentTypeID,
-			symbol:                   nftType.Data.Symbol,
-			name:                     nftType.Data.Name,
-			icon:                     nftType.Data.Icon,
-			subTypeCreationPredicate: nftType.Data.SubTypeCreationPredicate,
-			tokenCreationPredicate:   nftType.Data.TokenCreationPredicate,
-			invariantPredicate:       nftType.Data.InvariantPredicate,
-		},
-		dataUpdatePredicate: nftType.Data.DataUpdatePredicate,
+	return &sdktypes.NonFungibleTokenType{
+		SystemID:                 nftType.SystemID,
+		ID:                       nftType.UnitID,
+		ParentTypeID:             nftType.Data.ParentTypeID,
+		Symbol:                   nftType.Data.Symbol,
+		Name:                     nftType.Data.Name,
+		Icon:                     nftType.Data.Icon,
+		SubTypeCreationPredicate: nftType.Data.SubTypeCreationPredicate,
+		TokenCreationPredicate:   nftType.Data.TokenCreationPredicate,
+		InvariantPredicate:       nftType.Data.InvariantPredicate,
+		DataUpdatePredicate:      nftType.Data.DataUpdatePredicate,
 	}, nil
 }

@@ -19,36 +19,38 @@ type (
 
 		GetFungibleToken(ctx context.Context, id TokenID) (FungibleToken, error)
 		GetFungibleTokens(ctx context.Context, ownerID []byte) ([]FungibleToken, error)
-		GetFungibleTokenTypes(ctx context.Context, creator PubKey) ([]FungibleTokenType, error)
-		GetFungibleTokenTypeHierarchy(ctx context.Context, typeID TokenTypeID) ([]FungibleTokenType, error)
+		GetFungibleTokenTypes(ctx context.Context, creator PubKey) ([]*FungibleTokenType, error)
+		GetFungibleTokenTypeHierarchy(ctx context.Context, typeID TokenTypeID) ([]*FungibleTokenType, error)
 
 		GetNonFungibleToken(ctx context.Context, id TokenID) (NonFungibleToken, error)
 		GetNonFungibleTokens(ctx context.Context, ownerID []byte) ([]NonFungibleToken, error)
-		GetNonFungibleTokenTypes(ctx context.Context, creator PubKey) ([]NonFungibleTokenType, error)
+		GetNonFungibleTokenTypes(ctx context.Context, creator PubKey) ([]*NonFungibleTokenType, error)
 	}
 
-	TokenType interface {
-		SystemID() types.SystemID
-		ID() TokenTypeID
-		ParentTypeID() TokenTypeID
-		Symbol() string
-		Name() string
-		Icon() *tokens.Icon
-		SubTypeCreationPredicate() Predicate
-		TokenCreationPredicate() Predicate
-		InvariantPredicate() Predicate
-
-		Create(txOptions ...tx.Option) (*types.TransactionOrder, error)
+	FungibleTokenType struct {
+		SystemID                 types.SystemID
+		ID                       TokenTypeID
+		ParentTypeID             TokenTypeID
+		Symbol                   string
+		Name                     string
+		Icon                     *tokens.Icon
+		SubTypeCreationPredicate Predicate
+		TokenCreationPredicate   Predicate
+		InvariantPredicate       Predicate
+		DecimalPlaces            uint32
 	}
 
-	FungibleTokenType interface {
-		TokenType
-		DecimalPlaces() uint32
-	}
-
-	NonFungibleTokenType interface {
-		TokenType
-		DataUpdatePredicate() Predicate
+	NonFungibleTokenType struct {
+		SystemID                 types.SystemID
+		ID                       TokenTypeID
+		ParentTypeID             TokenTypeID
+		Symbol                   string
+		Name                     string
+		Icon                     *tokens.Icon
+		SubTypeCreationPredicate Predicate
+		TokenCreationPredicate   Predicate
+		InvariantPredicate       Predicate
+		DataUpdatePredicate      Predicate
 	}
 
 	Token interface {
@@ -98,6 +100,57 @@ type (
 	PubKey     []byte
 	PubKeyHash []byte
 )
+
+func (tt *FungibleTokenType) Create(txOptions ...tx.Option) (*types.TransactionOrder, error) {
+	attr := &tokens.CreateFungibleTokenTypeAttributes{
+		Symbol:                             tt.Symbol,
+		Name:                               tt.Name,
+		Icon:                               tt.Icon,
+		ParentTypeID:                       tt.ParentTypeID,
+		DecimalPlaces:                      tt.DecimalPlaces,
+		SubTypeCreationPredicate:           tt.SubTypeCreationPredicate,
+		TokenCreationPredicate:             tt.TokenCreationPredicate,
+		InvariantPredicate:                 tt.InvariantPredicate,
+		SubTypeCreationPredicateSignatures: nil,
+	}
+
+	txPayload, err := tx.NewPayload(tt.SystemID, tt.ID, tokens.PayloadTypeCreateFungibleTokenType, attr, txOptions...)
+	if err != nil {
+		return nil, err
+	}
+
+	txo := tx.NewTransactionOrder(txPayload)
+	err = tx.GenerateAndSetProofs(txo, attr, &attr.SubTypeCreationPredicateSignatures, txOptions...)
+	if err != nil {
+		return nil, err
+	}
+	return txo, nil
+}
+
+func (tt *NonFungibleTokenType) Create(txOptions ...tx.Option) (*types.TransactionOrder, error) {
+	attr := &tokens.CreateNonFungibleTokenTypeAttributes{
+		Symbol:                             tt.Symbol,
+		Name:                               tt.Name,
+		Icon:                               tt.Icon,
+		ParentTypeID:                       tt.ParentTypeID,
+		DataUpdatePredicate:                tt.DataUpdatePredicate,
+		SubTypeCreationPredicate:           tt.SubTypeCreationPredicate,
+		TokenCreationPredicate:             tt.TokenCreationPredicate,
+		InvariantPredicate:                 tt.InvariantPredicate,
+		SubTypeCreationPredicateSignatures: nil,
+	}
+	txPayload, err := tx.NewPayload(tt.SystemID, tt.ID, tokens.PayloadTypeCreateNFTType, attr, txOptions...)
+	if err != nil {
+		return nil, err
+	}
+
+	txo := tx.NewTransactionOrder(txPayload)
+	err = tx.GenerateAndSetProofs(txo, attr, &attr.SubTypeCreationPredicateSignatures, txOptions...)
+	if err != nil {
+		return nil, err
+	}
+	return txo, nil
+}
 
 func (pk PubKey) Hash() PubKeyHash {
 	return hash.Sum256(pk)

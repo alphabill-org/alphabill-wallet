@@ -25,32 +25,6 @@ var (
 )
 
 type (
-	FungibleTokenTypeParams struct {
-		SystemID                 types.SystemID
-		ID                       sdktypes.TokenTypeID
-		ParentTypeID             sdktypes.TokenTypeID
-		Symbol                   string
-		Name                     string
-		Icon                     *tokens.Icon
-		SubTypeCreationPredicate sdktypes.Predicate
-		TokenCreationPredicate   sdktypes.Predicate
-		InvariantPredicate       sdktypes.Predicate
-		DecimalPlaces            uint32
-	}
-
-	NonFungibleTokenTypeParams struct {
-		SystemID                 types.SystemID
-		ID                       sdktypes.TokenTypeID
-		ParentTypeID             sdktypes.TokenTypeID
-		Symbol                   string
-		Name                     string
-		Icon                     *tokens.Icon
-		SubTypeCreationPredicate sdktypes.Predicate
-		TokenCreationPredicate   sdktypes.Predicate
-		InvariantPredicate       sdktypes.Predicate
-		DataUpdatePredicate      sdktypes.Predicate
-	}
-
 	FungibleTokenParams struct {
 		SystemID       types.SystemID
 		TypeID         sdktypes.TokenTypeID

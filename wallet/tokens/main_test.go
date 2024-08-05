@@ -50,27 +50,23 @@ func Test_GetRoundNumber_OK(t *testing.T) {
 func Test_ListTokenTypes(t *testing.T) {
 	var firstPubKey *sdktypes.PubKey
 	rpcClient := &mockTokensPartitionClient{
-		getFungibleTokenTypes: func(ctx context.Context, pubKey sdktypes.PubKey) ([]sdktypes.FungibleTokenType, error) {
+		getFungibleTokenTypes: func(ctx context.Context, pubKey sdktypes.PubKey) ([]*sdktypes.FungibleTokenType, error) {
 			if !bytes.Equal(pubKey, *firstPubKey) {
-				return []sdktypes.FungibleTokenType{}, nil
+				return []*sdktypes.FungibleTokenType{}, nil
 			}
-
-			t1, err := client.NewFungibleTokenType(&client.FungibleTokenTypeParams{})
-			require.NoError(t, err)
-			t2, err := client.NewFungibleTokenType(&client.FungibleTokenTypeParams{})
-			require.NoError(t, err)
-			return []sdktypes.FungibleTokenType{t1, t2}, nil
+			return []*sdktypes.FungibleTokenType{
+				{ID: test.RandomBytes(33)},
+				{ID: test.RandomBytes(33)},
+			}, nil
 		},
-		getNonFungibleTokenTypes: func(ctx context.Context, pubKey sdktypes.PubKey) ([]sdktypes.NonFungibleTokenType, error) {
+		getNonFungibleTokenTypes: func(ctx context.Context, pubKey sdktypes.PubKey) ([]*sdktypes.NonFungibleTokenType, error) {
 			if !bytes.Equal(pubKey, *firstPubKey) {
-				return []sdktypes.NonFungibleTokenType{}, nil
+				return []*sdktypes.NonFungibleTokenType{}, nil
 			}
-			params := &client.NonFungibleTokenTypeParams{}
-			t1, err := client.NewNonFungibleTokenType(params)
-			require.NoError(t, err)
-			t2, err := client.NewNonFungibleTokenType(params)
-			require.NoError(t, err)
-			return []sdktypes.NonFungibleTokenType{t1, t2}, nil
+			return []*sdktypes.NonFungibleTokenType{
+				{ID: test.RandomBytes(33)},
+				{ID: test.RandomBytes(33)},
+			}, nil
 		},
 	}
 
@@ -96,18 +92,17 @@ func TestNewTypes(t *testing.T) {
 
 	recTxs := make(map[string]*types.TransactionOrder)
 	rpcClient := &mockTokensPartitionClient{
-		getFungibleTokenTypeHierarchy: func(ctx context.Context, id sdktypes.TokenTypeID) ([]sdktypes.FungibleTokenType, error) {
+		getFungibleTokenTypeHierarchy: func(ctx context.Context, id sdktypes.TokenTypeID) ([]*sdktypes.FungibleTokenType, error) {
 			tx, found := recTxs[string(id)]
 			if found {
 				attrs := &tokens.CreateFungibleTokenTypeAttributes{}
 				require.NoError(t, tx.UnmarshalAttributes(attrs))
-				tokenType, err := client.NewFungibleTokenType(&client.FungibleTokenTypeParams{
+				tokenType := &sdktypes.FungibleTokenType{
 					ID:            tx.UnitID(),
 					ParentTypeID:  attrs.ParentTypeID,
 					DecimalPlaces: attrs.DecimalPlaces,
-				})
-				require.NoError(t, err)
-				return []sdktypes.FungibleTokenType{tokenType}, nil
+				}
+				return []*sdktypes.FungibleTokenType{tokenType}, nil
 			}
 			return nil, fmt.Errorf("not found")
 		},
@@ -125,7 +120,7 @@ func TestNewTypes(t *testing.T) {
 
 	t.Run("fungible type", func(t *testing.T) {
 		typeID := tokens.NewFungibleTokenTypeID(nil, test.RandomBytes(32))
-		tt1, err := client.NewFungibleTokenType(&client.FungibleTokenTypeParams{
+		tt1 := &sdktypes.FungibleTokenType{
 			ID:                       typeID,
 			Symbol:                   "AB",
 			Name:                     "Long name for AB",
@@ -135,17 +130,25 @@ func TestNewTypes(t *testing.T) {
 			SubTypeCreationPredicate: sdktypes.Predicate(templates.AlwaysFalseBytes()),
 			TokenCreationPredicate:   sdktypes.Predicate(templates.AlwaysTrueBytes()),
 			InvariantPredicate:       sdktypes.Predicate(templates.AlwaysTrueBytes()),
-		})
+		}
 		result, err := tw.NewFungibleType(context.Background(), 1, tt1, nil)
 		require.NoError(t, err)
 		require.NotNil(t, result)
 		require.EqualValues(t, typeID, result.GetUnit())
 		tx, found := recTxs[string(typeID)]
 		require.True(t, found)
+		newFungibleTx := &tokens.CreateFungibleTokenTypeAttributes{}
+		require.NoError(t, tx.UnmarshalAttributes(newFungibleTx))
+		require.Equal(t, typeID, tx.UnitID())
+		require.Equal(t, tt1.Symbol, newFungibleTx.Symbol)
+		require.Equal(t, tt1.Name, newFungibleTx.Name)
+		require.Equal(t, tt1.Icon.Type, newFungibleTx.Icon.Type)
+		require.Equal(t, tt1.Icon.Data, newFungibleTx.Icon.Data)
+		require.Equal(t, tt1.DecimalPlaces, newFungibleTx.DecimalPlaces)
 		require.EqualValues(t, tx.Timeout(), 11)
 
 		// new subtype
-		tt2, err := client.NewFungibleTokenType(&client.FungibleTokenTypeParams{
+		tt2 := &sdktypes.FungibleTokenType{
 			Symbol:                   "AB",
 			Name:                     "Long name for AB",
 			DecimalPlaces:            2,
@@ -153,16 +156,34 @@ func TestNewTypes(t *testing.T) {
 			SubTypeCreationPredicate: sdktypes.Predicate(templates.AlwaysFalseBytes()),
 			TokenCreationPredicate:   sdktypes.Predicate(templates.AlwaysTrueBytes()),
 			InvariantPredicate:       sdktypes.Predicate(templates.AlwaysTrueBytes()),
-		})
+		}
 		require.NoError(t, err)
-		_, err = tw.NewFungibleType(context.Background(), 1, tt2, nil)
+
 		//check decimal places are validated against the parent type
+		_, err = tw.NewFungibleType(context.Background(), 1, tt2, nil)
 		require.ErrorContains(t, err, "parent type requires 0 decimal places, got 2")
+
+		//check typeId length validation
+		tt2.ID = []byte{2}
+		_, err = tw.NewFungibleType(context.Background(), 1, tt2, nil)
+		require.ErrorContains(t, err, "invalid token type ID: expected hex length is 66 characters (33 bytes)")
+
+		//check typeId unit type validation
+		tt2.ID = make([]byte, tokens.UnitIDLength)
+		_, err = tw.NewFungibleType(context.Background(), 1, tt2, nil)
+		require.ErrorContains(t, err, "invalid token type ID: expected unit type is 0x20")
+
+		//check typeId generation if typeId parameter is nil
+		tt2.ID = nil
+		tt2.DecimalPlaces = 0
+		result, err = tw.NewFungibleType(context.Background(), 1, tt2, nil)
+		require.NoError(t, err)
+		require.True(t, result.GetUnit().HasType(tokens.FungibleTokenTypeUnitType))
 	})
 
 	t.Run("non-fungible type", func(t *testing.T) {
 		typeID := tokens.NewNonFungibleTokenTypeID(nil, test.RandomBytes(32))
-		tt, err := client.NewNonFungibleTokenType(&client.NonFungibleTokenTypeParams{
+		tt := &sdktypes.NonFungibleTokenType{
 			ID:                       typeID,
 			Symbol:                   "ABNFT",
 			Name:                     "Long name for ABNFT",
@@ -171,7 +192,7 @@ func TestNewTypes(t *testing.T) {
 			SubTypeCreationPredicate: sdktypes.Predicate(templates.AlwaysFalseBytes()),
 			TokenCreationPredicate:   sdktypes.Predicate(templates.AlwaysTrueBytes()),
 			InvariantPredicate:       sdktypes.Predicate(templates.AlwaysTrueBytes()),
-		})
+		}
 
 		result, err := tw.NewNonFungibleType(context.Background(), 1, tt, nil)
 		require.NoError(t, err)
@@ -179,7 +200,28 @@ func TestNewTypes(t *testing.T) {
 		require.EqualValues(t, typeID, result.GetUnit())
 		tx, found := recTxs[string(typeID)]
 		require.True(t, found)
+		newNFTTx := &tokens.CreateNonFungibleTokenTypeAttributes{}
+		require.NoError(t, tx.UnmarshalAttributes(newNFTTx))
+		require.Equal(t, typeID, tx.UnitID())
+		require.Equal(t, tt.Symbol, newNFTTx.Symbol)
+		require.Equal(t, tt.Icon.Type, newNFTTx.Icon.Type)
+		require.Equal(t, tt.Icon.Data, newNFTTx.Icon.Data)
 		require.EqualValues(t, tx.Timeout(), 11)
+
+		//check typeId length validation
+		tt.ID = []byte{2}
+		_, err = tw.NewNonFungibleType(context.Background(), 1, tt, nil)
+		require.ErrorContains(t, err, "invalid token type ID: expected hex length is 66 characters (33 bytes)")
+
+		//check typeId unit type validation
+		tt.ID = make([]byte, tokens.UnitIDLength)
+		_, err = tw.NewNonFungibleType(context.Background(), 1, tt, nil)
+		require.ErrorContains(t, err, "invalid token type ID: expected unit type is 0x22")
+
+		//check typeId generation if typeId parameter is nil
+		tt.ID = nil
+		result, _ = tw.NewNonFungibleType(context.Background(), 1, tt, nil)
+		require.True(t, result.GetUnit().HasType(tokens.NonFungibleTokenTypeUnitType))
 	})
 }
 
@@ -770,12 +812,12 @@ func initAccountManager(t *testing.T) account.Manager {
 type mockTokensPartitionClient struct {
 	getFungibleToken              func(ctx context.Context, id sdktypes.TokenID) (sdktypes.FungibleToken, error)
 	getFungibleTokens             func(ctx context.Context, ownerID []byte) ([]sdktypes.FungibleToken, error)
-	getFungibleTokenTypes         func(ctx context.Context, creator sdktypes.PubKey) ([]sdktypes.FungibleTokenType, error)
-	getFungibleTokenTypeHierarchy func(ctx context.Context, id sdktypes.TokenTypeID) ([]sdktypes.FungibleTokenType, error)
+	getFungibleTokenTypes         func(ctx context.Context, creator sdktypes.PubKey) ([]*sdktypes.FungibleTokenType, error)
+	getFungibleTokenTypeHierarchy func(ctx context.Context, id sdktypes.TokenTypeID) ([]*sdktypes.FungibleTokenType, error)
 
 	getNonFungibleToken           func(ctx context.Context, id sdktypes.TokenID) (sdktypes.NonFungibleToken, error)
 	getNonFungibleTokens          func(ctx context.Context, ownerID []byte) ([]sdktypes.NonFungibleToken, error)
-	getNonFungibleTokenTypes      func(ctx context.Context, creator sdktypes.PubKey) ([]sdktypes.NonFungibleTokenType, error)
+	getNonFungibleTokenTypes      func(ctx context.Context, creator sdktypes.PubKey) ([]*sdktypes.NonFungibleTokenType, error)
 
 	getRoundNumber                func(ctx context.Context) (uint64, error)
 	sendTransaction               func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
@@ -807,14 +849,14 @@ func (m *mockTokensPartitionClient) GetFungibleTokens(ctx context.Context, owner
 	return nil, fmt.Errorf("GetFungibleTokens not implemented")
 }
 
-func (m *mockTokensPartitionClient) GetFungibleTokenTypes(ctx context.Context, creator sdktypes.PubKey) ([]sdktypes.FungibleTokenType, error) {
+func (m *mockTokensPartitionClient) GetFungibleTokenTypes(ctx context.Context, creator sdktypes.PubKey) ([]*sdktypes.FungibleTokenType, error) {
 	if m.getFungibleTokenTypes != nil {
 		return m.getFungibleTokenTypes(ctx, creator)
 	}
 	return nil, fmt.Errorf("GetFungibleTokenTypes not implemented")
 }
 
-func (m *mockTokensPartitionClient) GetFungibleTokenTypeHierarchy(ctx context.Context, id sdktypes.TokenTypeID) ([]sdktypes.FungibleTokenType, error) {
+func (m *mockTokensPartitionClient) GetFungibleTokenTypeHierarchy(ctx context.Context, id sdktypes.TokenTypeID) ([]*sdktypes.FungibleTokenType, error) {
 	if m.getFungibleTokenTypeHierarchy != nil {
 		return m.getFungibleTokenTypeHierarchy(ctx, id)
 	}
@@ -835,7 +877,7 @@ func (m *mockTokensPartitionClient) GetNonFungibleTokens(ctx context.Context, ow
 	return nil, fmt.Errorf("GetNonFungibleTokens not implemented")
 }
 
-func (m *mockTokensPartitionClient) GetNonFungibleTokenTypes(ctx context.Context, creator sdktypes.PubKey) ([]sdktypes.NonFungibleTokenType, error) {
+func (m *mockTokensPartitionClient) GetNonFungibleTokenTypes(ctx context.Context, creator sdktypes.PubKey) ([]*sdktypes.NonFungibleTokenType, error) {
 	if m.getNonFungibleTokenTypes != nil {
 		return m.getNonFungibleTokenTypes(ctx, creator)
 	}

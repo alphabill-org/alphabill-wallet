@@ -105,16 +105,32 @@ func (w *Wallet) SystemID() types.SystemID {
 	return w.systemID
 }
 
-func (w *Wallet) NewFungibleType(ctx context.Context, accountNumber uint64, ft sdktypes.FungibleTokenType, subtypePredicateInputs []*PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) NewFungibleType(ctx context.Context, accountNumber uint64, ft *sdktypes.FungibleTokenType, subtypePredicateInputs []*PredicateInput) (*SubmissionResult, error) {
 	w.log.Info("Creating new FT type")
 
-	if ft.ParentTypeID() != nil && !bytes.Equal(ft.ParentTypeID(), sdktypes.NoParent) {
-		parentType, err := w.GetFungibleTokenType(ctx, ft.ParentTypeID())
+	if ft.ID == nil {
+		var err error
+		ft.ID, err = tokens.NewRandomFungibleTokenTypeID(nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate fungible token type ID: %w", err)
+		}
+	}
+
+	if len(ft.ID) != tokens.UnitIDLength {
+		return nil, fmt.Errorf("invalid token type ID: expected hex length is %d characters (%d bytes)",
+			tokens.UnitIDLength*2, tokens.UnitIDLength)
+	}
+	if !ft.ID.HasType(tokens.FungibleTokenTypeUnitType) {
+		return nil, fmt.Errorf("invalid token type ID: expected unit type is 0x%X", tokens.FungibleTokenTypeUnitType)
+	}
+
+	if ft.ParentTypeID != nil && !bytes.Equal(ft.ParentTypeID, sdktypes.NoParent) {
+		parentType, err := w.GetFungibleTokenType(ctx, ft.ParentTypeID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get parent type: %w", err)
 		}
-		if parentType.DecimalPlaces() != ft.DecimalPlaces() {
-			return nil, fmt.Errorf("parent type requires %d decimal places, got %d", parentType.DecimalPlaces(), ft.DecimalPlaces())
+		if parentType.DecimalPlaces != ft.DecimalPlaces {
+			return nil, fmt.Errorf("parent type requires %d decimal places, got %d", parentType.DecimalPlaces, ft.DecimalPlaces)
 		}
 	}
 
@@ -144,8 +160,24 @@ func (w *Wallet) NewFungibleType(ctx context.Context, accountNumber uint64, ft s
 	return w.submitTx(ctx, tx, accountNumber)
 }
 
-func (w *Wallet) NewNonFungibleType(ctx context.Context, accountNumber uint64, nft sdktypes.NonFungibleTokenType, subtypePredicateInputs []*PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) NewNonFungibleType(ctx context.Context, accountNumber uint64, nft *sdktypes.NonFungibleTokenType, subtypePredicateInputs []*PredicateInput) (*SubmissionResult, error) {
 	w.log.Info("Creating new NFT type")
+
+	if nft.ID == nil {
+		var err error
+		nft.ID, err = tokens.NewRandomNonFungibleTokenTypeID(nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate non-fungible token type ID: %w", err)
+		}
+	}
+
+	if len(nft.ID) != tokens.UnitIDLength {
+		return nil, fmt.Errorf("invalid token type ID: expected hex length is %d characters (%d bytes)",
+			tokens.UnitIDLength*2, tokens.UnitIDLength)
+	}
+	if !nft.ID.HasType(tokens.NonFungibleTokenTypeUnitType) {
+		return nil, fmt.Errorf("invalid token type ID: expected unit type is 0x%X", tokens.NonFungibleTokenTypeUnitType)
+	}
 
 	acc, err := w.getAccount(accountNumber)
 	if err != nil {
@@ -231,13 +263,13 @@ func (w *Wallet) NewNFT(ctx context.Context, accountNumber uint64, nft sdktypes.
 	return w.submitTx(ctx, tx, accountNumber)
 }
 
-func (w *Wallet) ListFungibleTokenTypes(ctx context.Context, accountNumber uint64) ([]sdktypes.FungibleTokenType, error) {
+func (w *Wallet) ListFungibleTokenTypes(ctx context.Context, accountNumber uint64) ([]*sdktypes.FungibleTokenType, error) {
 	keys, err := w.getAccounts(accountNumber)
 	if err != nil {
 		return nil, err
 	}
-	allTokenTypes := make([]sdktypes.FungibleTokenType, 0)
-	fetchForPubKey := func(pubKey []byte) ([]sdktypes.FungibleTokenType, error) {
+	allTokenTypes := make([]*sdktypes.FungibleTokenType, 0)
+	fetchForPubKey := func(pubKey []byte) ([]*sdktypes.FungibleTokenType, error) {
 		typez, err := w.tokensClient.GetFungibleTokenTypes(ctx, pubKey)
 		if err != nil {
 			return nil, err
@@ -256,13 +288,13 @@ func (w *Wallet) ListFungibleTokenTypes(ctx context.Context, accountNumber uint6
 }
 
 
-func (w *Wallet) ListNonFungibleTokenTypes(ctx context.Context, accountNumber uint64) ([]sdktypes.NonFungibleTokenType, error) {
+func (w *Wallet) ListNonFungibleTokenTypes(ctx context.Context, accountNumber uint64) ([]*sdktypes.NonFungibleTokenType, error) {
 	keys, err := w.getAccounts(accountNumber)
 	if err != nil {
 		return nil, err
 	}
-	allTokenTypes := make([]sdktypes.NonFungibleTokenType, 0)
-	fetchForPubKey := func(pubKey []byte) ([]sdktypes.NonFungibleTokenType, error) {
+	allTokenTypes := make([]*sdktypes.NonFungibleTokenType, 0)
+	fetchForPubKey := func(pubKey []byte) ([]*sdktypes.NonFungibleTokenType, error) {
 		typez, err := w.tokensClient.GetNonFungibleTokenTypes(ctx, pubKey)
 		if err != nil {
 			return nil, err
@@ -281,13 +313,13 @@ func (w *Wallet) ListNonFungibleTokenTypes(ctx context.Context, accountNumber ui
 }
 
 // GetFungibleTokenType returns FungibleTokenType or nil if not found
-func (w *Wallet) GetFungibleTokenType(ctx context.Context, typeId sdktypes.TokenTypeID) (sdktypes.FungibleTokenType, error) {
+func (w *Wallet) GetFungibleTokenType(ctx context.Context, typeId sdktypes.TokenTypeID) (*sdktypes.FungibleTokenType, error) {
 	typez, err := w.tokensClient.GetFungibleTokenTypeHierarchy(ctx, typeId)
 	if err != nil {
 		return nil, err
 	}
 	for i := range typez {
-		if bytes.Equal(typez[i].ID(), typeId) {
+		if bytes.Equal(typez[i].ID, typeId) {
 			return typez[i], nil
 		}
 	}

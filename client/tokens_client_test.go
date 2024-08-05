@@ -21,42 +21,40 @@ func TestTokensRpcClient(t *testing.T) {
 	t.Run("GetFungibleToken_OK", func(t *testing.T) {
 		tokenID := tokentxs.NewFungibleTokenID(nil, []byte{1})
 		tokenTypeID := tokentxs.NewFungibleTokenTypeID(nil, []byte{2})
-		tokenType := &fungibleTokenType{
-			tokenType:     tokenType{
-				systemID: tokens.DefaultSystemID,
-				id:       tokenTypeID,
-				symbol:   "ABC",
-				name:     "Name of ABC Token Type",
-			},
-			decimalPlaces: 2,
+		tokenType := &types.FungibleTokenType{
+			SystemID:     tokens.DefaultSystemID,
+			ID:           tokenTypeID,
+			Symbol:       "ABC",
+			Name:         "Name of ABC Token Type",
+			DecimalPlaces: 2,
 		}
 		ft := &fungibleToken{
 			token: token{
-				systemID: tokenType.systemID,
+				systemID: tokenType.SystemID,
 				id:       tokenID,
-				symbol:   tokenType.symbol,
-				typeID:   tokenType.id,
-				typeName: tokenType.name,
+				symbol:   tokenType.Symbol,
+				typeID:   tokenType.ID,
+				typeName: tokenType.Name,
 				counter:  123,
 			},
 			amount:   100,
-			decimalPlaces: tokenType.decimalPlaces,
+			decimalPlaces: tokenType.DecimalPlaces,
 		}
 		*service = *mocksrv.NewStateServiceMock(
 			mocksrv.WithUnit(&types.Unit[any]{
-				SystemID: tokenType.systemID,
-				UnitID:   tokenType.id,
+				SystemID: tokenType.SystemID,
+				UnitID:   tokenType.ID,
 				Data: tokentxs.FungibleTokenTypeData{
-					Symbol:        tokenType.symbol,
-					Name:          tokenType.name,
-					DecimalPlaces: tokenType.decimalPlaces,
+					Symbol:        tokenType.Symbol,
+					Name:          tokenType.Name,
+					DecimalPlaces: tokenType.DecimalPlaces,
 				},
 			}),
 			mocksrv.WithUnit(&types.Unit[any]{
 				SystemID: ft.systemID,
 				UnitID:   ft.id,
 				Data: tokentxs.FungibleTokenData{
-					TokenType: tokenType.id,
+					TokenType: tokenType.ID,
 					Value:     ft.amount,
 					T:         168,
 					Counter:   ft.counter,
@@ -90,48 +88,43 @@ func TestTokensRpcClient(t *testing.T) {
 
 		ftTokenID := tokentxs.NewFungibleTokenID(nil, []byte{1})
 		ftTokenTypeID := tokentxs.NewFungibleTokenTypeID(nil, []byte{2})
-		ftTokenType := &fungibleTokenType{
-			tokenType: tokenType{
-				systemID: tokens.DefaultSystemID,
-				id:       ftTokenTypeID,
-				symbol:   "ABC",
-				name:     "Fungible ABC Token",
-			},
-			decimalPlaces: 2,
+		ftTokenType := &types.FungibleTokenType{
+			SystemID:     tokens.DefaultSystemID,
+			ID:           ftTokenTypeID,
+			Symbol:       "ABC",
+			Name:         "Fungible ABC Token",
+			DecimalPlaces: 2,
 		}
 
 		ft := &fungibleToken{
 			token: token{
 				systemID:       tokens.DefaultSystemID,
 				id:             ftTokenID,
-				symbol:         ftTokenType.symbol,
+				symbol:         ftTokenType.Symbol,
 				typeID:         ftTokenTypeID,
-				typeName:       ftTokenType.name,
+				typeName:       ftTokenType.Name,
 				counter:        123,
 				ownerPredicate: ownerID,
 			},
 			amount:   100,
-			decimalPlaces: ftTokenType.decimalPlaces,
+			decimalPlaces: ftTokenType.DecimalPlaces,
 		}
 
 		nftTokenID := tokentxs.NewNonFungibleTokenID(nil, []byte{3})
 		nftTokenTypeID := tokentxs.NewNonFungibleTokenTypeID(nil, []byte{4})
-		nftTokenType := &fungibleTokenType{
-			tokenType: tokenType{
-				systemID: tokens.DefaultSystemID,
-				id:       nftTokenTypeID,
-				symbol:   "ABC-NFT",
-				name:     "Non-Fungible ABC Token",
-			},
-			decimalPlaces: 2,
+		nftTokenType := &types.NonFungibleTokenType{
+			SystemID:     tokens.DefaultSystemID,
+			ID:           nftTokenTypeID,
+			Symbol:       "ABC-NFT",
+			Name:         "Non-Fungible ABC Token",
 		}
 		nft := &nonFungibleToken{
 			token: token{
 				systemID: tokens.DefaultSystemID,
 				id:       nftTokenID,
-				symbol:   nftTokenType.symbol,
+				symbol:   nftTokenType.Symbol,
 				typeID:   nftTokenTypeID,
-				typeName: nftTokenType.name,
+				typeName: nftTokenType.Name,
 				counter:  321,
 				ownerPredicate: ownerID,
 			},
@@ -145,9 +138,9 @@ func TestTokensRpcClient(t *testing.T) {
 				SystemID: tokens.DefaultSystemID,
 				UnitID:   ftTokenTypeID,
 				Data: tokentxs.FungibleTokenTypeData{
-					Symbol:        ftTokenType.symbol,
-					Name:          ftTokenType.name,
-					DecimalPlaces: ftTokenType.decimalPlaces,
+					Symbol:        ftTokenType.Symbol,
+					Name:          ftTokenType.Name,
+					DecimalPlaces: ftTokenType.DecimalPlaces,
 				},
 				OwnerPredicate: ownerID,
 			}),
@@ -169,8 +162,8 @@ func TestTokensRpcClient(t *testing.T) {
 				SystemID: tokens.DefaultSystemID,
 				UnitID:   nftTokenTypeID,
 				Data: tokentxs.NonFungibleTokenTypeData{
-					Symbol: nftTokenType.symbol,
-					Name:   nftTokenType.name,
+					Symbol: nftTokenType.Symbol,
+					Name:   nftTokenType.Name,
 				},
 				OwnerPredicate: ownerID,
 			}),
@@ -209,20 +202,18 @@ func TestTokensRpcClient(t *testing.T) {
 
 	t.Run("GetFungibleTokenTypeHierarchy_OK", func(t *testing.T) {
 		// create 3 levels deep type hierarchy
-		var tokenTypes []*fungibleTokenType
+		var tokenTypes []*types.FungibleTokenType
 		var units []*types.Unit[any]
 		prevTypeID := types.NoParent
 		for i := uint8(1); i <= 3; i++ {
 			typeID := tokentxs.NewFungibleTokenTypeID(nil, []byte{i})
-			tokenType := &fungibleTokenType{
-				tokenType:     tokenType{
-					systemID:     tokens.DefaultSystemID,
-					id:           typeID,
-					parentTypeID: prevTypeID,
-					symbol:       "ABC",
-					name:         fmt.Sprintf("ABC %d", i),
-				},
-				decimalPlaces: 2,
+			tokenType := &types.FungibleTokenType{
+				SystemID:     tokens.DefaultSystemID,
+				ID:           typeID,
+				ParentTypeID: prevTypeID,
+				Symbol:       "ABC",
+				Name:         fmt.Sprintf("ABC %d", i),
+				DecimalPlaces: 2,
 			}
 			prevTypeID = typeID
 			tokenTypes = append(tokenTypes, tokenType)
@@ -230,10 +221,10 @@ func TestTokensRpcClient(t *testing.T) {
 				SystemID: tokens.DefaultSystemID,
 				UnitID:   typeID,
 				Data: tokentxs.FungibleTokenTypeData{
-					Symbol:        tokenType.symbol,
-					Name:          tokenType.name,
-					DecimalPlaces: tokenType.decimalPlaces,
-					ParentTypeID:  tokenType.parentTypeID,
+					Symbol:        tokenType.Symbol,
+					Name:          tokenType.Name,
+					DecimalPlaces: tokenType.DecimalPlaces,
+					ParentTypeID:  tokenType.ParentTypeID,
 				},
 			})
 		}
@@ -243,16 +234,16 @@ func TestTokensRpcClient(t *testing.T) {
 		)
 
 		// type hierarchy: 3 -> 2 -> 1 (root)
-		typeHierarchy, err := client.GetFungibleTokenTypeHierarchy(context.Background(), tokenTypes[2].id)
+		typeHierarchy, err := client.GetFungibleTokenTypeHierarchy(context.Background(), tokenTypes[2].ID)
 		require.NoError(t, err)
 		require.Len(t, typeHierarchy, 3)
 		require.Equal(t, typeHierarchy[0], tokenTypes[2])
 		require.Equal(t, typeHierarchy[1], tokenTypes[1])
 		require.Equal(t, typeHierarchy[2], tokenTypes[0])
 
-		require.Equal(t, typeHierarchy[0].ParentTypeID(), typeHierarchy[1].ID())
-		require.Equal(t, typeHierarchy[1].ParentTypeID(), typeHierarchy[2].ID())
-		require.Equal(t, typeHierarchy[2].ParentTypeID(), types.NoParent)
+		require.Equal(t, typeHierarchy[0].ParentTypeID, typeHierarchy[1].ID)
+		require.Equal(t, typeHierarchy[1].ParentTypeID, typeHierarchy[2].ID)
+		require.Equal(t, typeHierarchy[2].ParentTypeID, types.NoParent)
 	})
 	t.Run("GetTypeHierarchy_NOK", func(t *testing.T) {
 		*service = *mocksrv.NewStateServiceMock(mocksrv.WithError(errors.New("some error")))

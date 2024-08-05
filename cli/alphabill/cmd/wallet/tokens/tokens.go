@@ -206,7 +206,7 @@ func execTokenCmdNewTypeFungible(cmd *cobra.Command, config *types.WalletConfig)
 	if err != nil {
 		return err
 	}
-	tt, err := client.NewFungibleTokenType(&client.FungibleTokenTypeParams{
+	tt := &sdktypes.FungibleTokenType{
 		SystemID:                 tw.SystemID(),
 		ID:                       typeID,
 		ParentTypeID:             parentType,
@@ -217,9 +217,6 @@ func execTokenCmdNewTypeFungible(cmd *cobra.Command, config *types.WalletConfig)
 		TokenCreationPredicate:   mintTokenPredicate,
 		InvariantPredicate:       invariantPredicate,
 		DecimalPlaces:            decimals,
-	})
-	if err != nil {
-		return err
 	}
 	result, err := tw.NewFungibleType(cmd.Context(), accountNumber, tt, creationInputs)
 	if err != nil {
@@ -300,7 +297,7 @@ func execTokenCmdNewTypeNonFungible(cmd *cobra.Command, config *types.WalletConf
 	if err != nil {
 		return err
 	}
-	tt, err := client.NewNonFungibleTokenType(&client.NonFungibleTokenTypeParams{
+	tt := &sdktypes.NonFungibleTokenType{
 		SystemID:                 tw.SystemID(),
 		ID:                       typeID,
 		ParentTypeID:             parentType,
@@ -310,10 +307,7 @@ func execTokenCmdNewTypeNonFungible(cmd *cobra.Command, config *types.WalletConf
 		SubTypeCreationPredicate: subTypeCreationPredicate,
 		TokenCreationPredicate:   mintTokenPredicate,
 		InvariantPredicate:       invariantPredicate,
-		DataUpdatePredicate: dataUpdatePredicate,
-	})
-	if err != nil {
-		return err
+		DataUpdatePredicate:      dataUpdatePredicate,
 	}
 	result, err := tw.NewNonFungibleType(cmd.Context(), accountNumber, tt, creationInputs)
 	if err != nil {
@@ -391,7 +385,7 @@ func execTokenCmdNewTokenFungible(cmd *cobra.Command, config *types.WalletConfig
 		return err
 	}
 	// convert amount from string to uint64
-	amount, err := util.StringToAmount(amountStr, tt.DecimalPlaces())
+	amount, err := util.StringToAmount(amountStr, tt.DecimalPlaces)
 	if err != nil {
 		return err
 	}
@@ -614,7 +608,7 @@ func execTokenCmdSendFungible(cmd *cobra.Command, config *types.WalletConfig) er
 		return err
 	}
 	// convert amount from string to uint64
-	targetValue, err := util.StringToAmount(amountStr, tt.DecimalPlaces())
+	targetValue, err := util.StringToAmount(amountStr, tt.DecimalPlaces)
 	if err != nil {
 		return err
 	}
@@ -1025,13 +1019,13 @@ func execTokenCmdListTypes(cmd *cobra.Command, config *types.WalletConfig, accou
 	}
 	defer tw.Close()
 
-	printTokenType := func(tt sdktypes.TokenType, kind Kind) {
-		name := ""
-		if tt.Name() != "" {
-			name = fmt.Sprintf(", name=%s", tt.Name())
+	printTokenType := func(id basetypes.UnitID, symbol, name string, kind Kind) {
+		optionalName := ""
+		if name != "" {
+			optionalName = fmt.Sprintf(", name=%s", name)
 		}
 		kindStr := fmt.Sprintf(" (%v)", kind)
-		config.Base.ConsoleWriter.Println(fmt.Sprintf("ID=%s, symbol=%s", tt.ID(), tt.Symbol()) + name + kindStr)
+		config.Base.ConsoleWriter.Println(fmt.Sprintf("ID=%s, symbol=%s", id, symbol) + optionalName + kindStr)
 	}
 
 	if kind == Any || kind == Fungible {
@@ -1040,7 +1034,7 @@ func execTokenCmdListTypes(cmd *cobra.Command, config *types.WalletConfig, accou
 			return err
 		}
 		for _, tt := range res {
-			printTokenType(tt, Fungible)
+			printTokenType(tt.ID, tt.Symbol, tt.Name, Fungible)
 		}
 	}
 	if kind == Any || kind == NonFungible {
@@ -1049,7 +1043,7 @@ func execTokenCmdListTypes(cmd *cobra.Command, config *types.WalletConfig, accou
 			return err
 		}
 		for _, tt := range res {
-			printTokenType(tt, NonFungible)
+			printTokenType(tt.ID, tt.Symbol, tt.Name, NonFungible)
 		}
 	}
 
