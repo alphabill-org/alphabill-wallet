@@ -43,6 +43,7 @@ func (c *moneyPartitionClient) GetBill(ctx context.Context, unitID types.UnitID)
 		systemID:   u.SystemID,
 		id:         u.UnitID,
 		value:      u.Data.V,
+		lastUpdate: u.Data.T,
 		counter:    u.Data.Counter,
 		lockStatus: u.Data.Locked,
 	}, nil

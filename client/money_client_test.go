@@ -18,22 +18,28 @@ func TestMoneyClient(t *testing.T) {
 
 	t.Run("GetBill_OK", func(t *testing.T) {
 		service.Reset()
-		bill := &sdktypes.Bill{
-			ID: []byte{1},
-			Data: &money.BillData{
-				V:       192,
-				T:       168,
-				Counter: 123,
-			},
+		bill := &bill{
+			systemID:   money.DefaultSystemID,
+			id:         []byte{1},
+			value:      192,
+			lastUpdate: 168,
+			counter:    123,
+			lockStatus: 0,
 		}
 		service.Units = map[string]*sdktypes.Unit[any]{
-			string(bill.ID): {
-				UnitID: bill.ID,
-				Data:   bill.Data,
+			string(bill.id): {
+				SystemID: money.DefaultSystemID,
+				UnitID:   bill.id,
+				Data: &money.BillData{
+					V: bill.value,
+					T: bill.lastUpdate,
+					Counter: bill.counter,
+					Locked: bill.lockStatus,
+				},
 			},
 		}
 
-		returnedBill, err := client.GetBill(context.Background(), bill.ID)
+		returnedBill, err := client.GetBill(context.Background(), bill.id)
 		require.NoError(t, err)
 		require.Equal(t, bill, returnedBill)
 	})

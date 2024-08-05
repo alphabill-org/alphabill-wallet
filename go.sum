@@ -63,6 +63,10 @@ github.com/alphabill-org/alphabill-go-base v0.0.0-20240616154029-bb83909452d4 h1
 github.com/alphabill-org/alphabill-go-base v0.0.0-20240616154029-bb83909452d4/go.mod h1:5y8Rsc6aJ+dThkA1wK4cfQaqTTttgSD8HIT1x207SC8=
 github.com/alphabill-org/alphabill-go-base v0.0.0-20240717222931-3520b00b0fea h1:gHV2QGSRzRrCByQDhp2rxmfbgKpVe8FWWP4aTedYkMg=
 github.com/alphabill-org/alphabill-go-base v0.0.0-20240717222931-3520b00b0fea/go.mod h1:5y8Rsc6aJ+dThkA1wK4cfQaqTTttgSD8HIT1x207SC8=
+github.com/alphabill-org/alphabill-go-base v0.0.0-20240722110436-86299f68454c h1:JlzJ7yUf5GwgU6CYb1O0f7lJeysHM4nUUrecJwTSAG4=
+github.com/alphabill-org/alphabill-go-base v0.0.0-20240722110436-86299f68454c/go.mod h1:5y8Rsc6aJ+dThkA1wK4cfQaqTTttgSD8HIT1x207SC8=
+github.com/alphabill-org/alphabill-go-base v0.0.0-20240730085847-81d54ba5641f h1:KxeaKSxkcF05AF+pf75QfXLp+fyjLhyGgRWhfFtLxv8=
+github.com/alphabill-org/alphabill-go-base v0.0.0-20240730085847-81d54ba5641f/go.mod h1:5y8Rsc6aJ+dThkA1wK4cfQaqTTttgSD8HIT1x207SC8=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/bits-and-blooms/bitset v1.13.0 h1:bAQ9OPNFYbGHV6Nez0tmNI0RiEu7/hxlYJRUA0wFAVE=

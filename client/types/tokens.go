@@ -116,23 +116,6 @@ type (
 		Update(data []byte, txOptions ...tx.Option) (*types.TransactionOrder, error)
 	}
 
-	FungibleTokenParams struct {
-		SystemID       types.SystemID
-		TypeID         TokenTypeID
-		OwnerPredicate Predicate
-		Amount         uint64
-	}
-
-	NonFungibleTokenParams struct {
-		SystemID            types.SystemID
-		TypeID              TokenTypeID
-		OwnerPredicate      Predicate
-		Name                string
-		URI                 string
-		Data                []byte
-		DataUpdatePredicate Predicate
-	}
-
 	TokenID     = types.UnitID
 	TokenTypeID = types.UnitID
 	

@@ -300,7 +300,11 @@ func listFees(ctx context.Context, accountNumber uint64, am account.Manager, c *
 				return err
 			}
 			accNum := accountIndex + 1
-			amountString := util.AmountToString(fcr.Balance(), 8)
+			balance := uint64(0)
+			if fcr != nil {
+				balance = fcr.Balance()
+			}
+			amountString := util.AmountToString(balance, 8)
 			consoleWriter.Println(fmt.Sprintf("Account #%d %s%s", accNum, amountString, getLockedReasonString(fcr)))
 		}
 	} else {
@@ -481,7 +485,7 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 }
 
 func getLockedReasonString(fcr types.FeeCreditRecord) string {
-	if fcr.LockStatus() != 0 {
+	if fcr != nil && fcr.LockStatus() != 0 {
 		return fmt.Sprintf(" (%s)", wallet.LockReason(fcr.LockStatus()).String())
 	}
 	return ""

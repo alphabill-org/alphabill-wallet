@@ -21,9 +21,10 @@ type (
 		SystemID() types.SystemID
 		ID() types.UnitID
 		Value() uint64
+		LastUpdate() uint64
+		LockStatus() uint64
 		Counter() uint64
 		IncreaseCounter()
-		LockStatus() uint64
 
 		Transfer(ownerPredicate []byte, txOptions ...tx.Option) (*types.TransactionOrder, error)
 		Split(targetUnits []*money.TargetUnit, txOptions ...tx.Option) (*types.TransactionOrder, error)

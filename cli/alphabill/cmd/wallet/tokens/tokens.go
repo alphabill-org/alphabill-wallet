@@ -403,7 +403,7 @@ func execTokenCmdNewTokenFungible(cmd *cobra.Command, config *types.WalletConfig
 		return err
 	}
 
-	ft, err := client.NewFungibleToken(&sdktypes.FungibleTokenParams{
+	ft, err := client.NewFungibleToken(&client.FungibleTokenParams{
 		SystemID:       tw.SystemID(),
 		TypeID:         typeID,
 		OwnerPredicate: bearerPredicate,
@@ -489,7 +489,7 @@ func execTokenCmdNewTokenNonFungible(cmd *cobra.Command, config *types.WalletCon
 		return err
 	}
 
-	nft, err := client.NewNonFungibleToken(&sdktypes.NonFungibleTokenParams{
+	nft, err := client.NewNonFungibleToken(&client.NonFungibleTokenParams{
 		SystemID:            tw.SystemID(),
 		TypeID:              typeID,
 		OwnerPredicate:      bearerPredicate,
@@ -928,7 +928,7 @@ func execTokenCmdList(cmd *cobra.Command, config *types.WalletConfig, accountNum
 	}
 
 	atLeastOneFound := false
-	for accountNumber := start; accountNumber < end; accountNumber++ {
+	for accountNumber := start; accountNumber <= end; accountNumber++ {
 		ownerAccount := fmt.Sprintf("Tokens owned by account #%v", accountNumber)
 		atLeastOneFoundForAccount := false
 

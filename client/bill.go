@@ -18,8 +18,19 @@ type bill struct {
 	systemID   types.SystemID
 	id         types.UnitID
 	value      uint64
-	counter    uint64
+	lastUpdate uint64
 	lockStatus uint64
+	counter    uint64
+}
+
+func NewBill(systemID types.SystemID, id types.UnitID, value, lockStatus, counter uint64) sdktypes.Bill {
+	return &bill{
+		systemID:   systemID,
+		id:         id,
+		value:      value,
+		lockStatus: lockStatus,
+		counter:    counter,
+	}
 }
 
 func (b *bill) SystemID() types.SystemID {
@@ -34,16 +45,20 @@ func (b *bill) Value() uint64 {
 	return b.value
 }
 
+func (b *bill) LastUpdate() uint64 {
+	return b.lastUpdate
+}
+
+func (b *bill) LockStatus() uint64 {
+	return b.lockStatus
+}
+
 func (b *bill) Counter() uint64 {
 	return b.counter
 }
 
 func (b *bill) IncreaseCounter() {
 	b.counter += 1
-}
-
-func (b *bill) LockStatus() uint64 {
-	return b.lockStatus
 }
 
 func (b *bill) Transfer(ownerPredicate []byte, txOptions ...tx.Option) (*types.TransactionOrder, error) {

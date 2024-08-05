@@ -356,7 +356,7 @@ func (w *Wallet) getAccounts(accountNumber uint64) ([]*accountKey, error) {
 func (w *Wallet) GetFungibleToken(ctx context.Context, tokenID sdktypes.TokenID) (sdktypes.FungibleToken, error) {
 	token, err := w.tokensClient.GetFungibleToken(ctx, tokenID)
 	if err != nil {
-		return nil, fmt.Errorf("error fetching token %X: %w", tokenID, err)
+		return nil, fmt.Errorf("error fetching token %s: %w", tokenID, err)
 	}
 	return token, nil
 }
@@ -364,7 +364,7 @@ func (w *Wallet) GetFungibleToken(ctx context.Context, tokenID sdktypes.TokenID)
 func (w *Wallet) GetNonFungibleToken(ctx context.Context, tokenID sdktypes.TokenID) (sdktypes.NonFungibleToken, error) {
 	token, err := w.tokensClient.GetNonFungibleToken(ctx, tokenID)
 	if err != nil {
-		return nil, fmt.Errorf("error fetching token %X: %w", tokenID, err)
+		return nil, fmt.Errorf("error fetching token %s: %w", tokenID, err)
 	}
 	return token, nil
 }
@@ -532,7 +532,7 @@ func (w *Wallet) SendFungibleByID(ctx context.Context, accountNumber uint64, tok
 		return nil, err
 	}
 	if targetAmount > token.Amount() {
-		return nil, fmt.Errorf("insufficient FT value: got %v, need %v", token.Amount, targetAmount)
+		return nil, fmt.Errorf("insufficient FT value: got %v, need %v", token.Amount(), targetAmount)
 	}
 	roundNumber, err := w.GetRoundNumber(ctx)
 	if err != nil {
@@ -603,7 +603,7 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID ty
 	if tokenID.HasType(tokens.FungibleTokenUnitType) {
 		token, err = w.GetFungibleToken(ctx, tokenID)
 	} else if tokenID.HasType(tokens.NonFungibleTokenUnitType) {
-		token, err = w.GetFungibleToken(ctx, tokenID)
+		token, err = w.GetNonFungibleToken(ctx, tokenID)
 	} else {
 		return nil, errors.New("invalid token ID")
 	}
@@ -653,7 +653,7 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	if tokenID.HasType(tokens.FungibleTokenUnitType) {
 		token, err = w.GetFungibleToken(ctx, tokenID)
 	} else if tokenID.HasType(tokens.NonFungibleTokenUnitType) {
-		token, err = w.GetFungibleToken(ctx, tokenID)
+		token, err = w.GetNonFungibleToken(ctx, tokenID)
 	} else {
 		return nil, errors.New("invalid token ID")
 	}

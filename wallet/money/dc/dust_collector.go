@@ -123,7 +123,7 @@ func (w *DustCollector) submitDCBatch(ctx context.Context, k *account.AccountKey
 	}
 
 	// send dc batch
-	w.log.InfoContext(ctx, fmt.Sprintf("submitting dc batch of %d dust transfers with target bill %x", len(dcBatch.Submissions()), targetBill.ID()))
+	w.log.InfoContext(ctx, fmt.Sprintf("submitting dc batch of %d dust transfers with target bill %s", len(dcBatch.Submissions()), targetBill.ID()))
 	if err := dcBatch.SendTx(ctx, true); err != nil {
 		return nil, fmt.Errorf("failed to send dust transfer transactions: %w", err)
 	}
@@ -163,7 +163,7 @@ func (w *DustCollector) swapDCBills(ctx context.Context, k *account.AccountKey, 
 	dcBatch.Add(sub)
 
 	// send swap tx
-	w.log.InfoContext(ctx, fmt.Sprintf("sending swap tx with timeout=%d, unitID=%X", timeout, targetBill.ID()))
+	w.log.InfoContext(ctx, fmt.Sprintf("sending swap tx with timeout=%d, unitID=%s", timeout, targetBill.ID()))
 	if err := dcBatch.SendTx(ctx, true); err != nil {
 		return nil, fmt.Errorf("failed to send swap tx: %w", err)
 	}
@@ -186,7 +186,7 @@ func (w *DustCollector) lockTargetBill(ctx context.Context, k *account.AccountKe
 	}
 
 	// lock target bill server side
-	w.log.InfoContext(ctx, fmt.Sprintf("locking target bill in node %x", targetBill.ID()))
+	w.log.InfoContext(ctx, fmt.Sprintf("locking target bill in node %s", targetBill.ID()))
 	lockTxBatch := txsubmitter.NewBatch(w.moneyClient, w.log)
 	lockTxBatch.Add(txsubmitter.New(lockTx))
 	if err := lockTxBatch.SendTx(ctx, true); err != nil {

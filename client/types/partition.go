@@ -28,8 +28,8 @@ type (
 		Timeout() uint64
 		LockStatus() uint64
 
-		AddFreeCredit(ownerPredicate []byte, transFCProof *Proof, txOptions ...tx.Option) (*types.TransactionOrder, error)
-		CloseFreeCredit(targetBill Bill, txOptions ...tx.Option) (*types.TransactionOrder, error)
+		AddFeeCredit(ownerPredicate []byte, transFCProof *Proof, txOptions ...tx.Option) (*types.TransactionOrder, error)
+		CloseFeeCredit(targetBillID types.UnitID, targetBillCounter uint64, txOptions ...tx.Option) (*types.TransactionOrder, error)
 		Lock(lockStatus uint64, txOptions ...tx.Option) (*types.TransactionOrder, error)
 		Unlock(txOptions ...tx.Option) (*types.TransactionOrder, error)
 	}

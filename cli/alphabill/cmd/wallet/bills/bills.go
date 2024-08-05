@@ -155,7 +155,7 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
 	}
-	if fcr.Balance() < txbuilder.MaxFee {
+	if fcr == nil || fcr.Balance() < txbuilder.MaxFee {
 		return errors.New("not enough fee credit in wallet")
 	}
 	bill, err := moneyClient.GetBill(cmd.Context(), types.UnitID(config.BillID))
@@ -232,7 +232,7 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
 	}
-	if fcr.Balance() < txbuilder.MaxFee {
+	if fcr == nil || fcr.Balance() < txbuilder.MaxFee {
 		return errors.New("not enough fee credit in wallet")
 	}
 

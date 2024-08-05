@@ -12,20 +12,22 @@ type feeCreditRecord struct {
 	systemID   types.SystemID
 	id         types.UnitID
 	balance    uint64
-	counter    *uint64
 	timeout    uint64
 	lockStatus uint64
+	counter    *uint64 // TODO: add a separate flag to inidicate if its a new fcr
 }
 
-func NewFeeCreditRecord(systemID types.SystemID, id types.UnitID) sdktypes.FeeCreditRecord {
+func NewFeeCreditRecord(systemID types.SystemID, id types.UnitID, balance uint64, lockStatus uint64, counter *uint64) sdktypes.FeeCreditRecord {
 	return &feeCreditRecord{
-		systemID: systemID,
-		id:       id,
-		counter:  nil,
+		systemID:   systemID,
+		id:         id,
+		balance:    balance,
+		lockStatus: lockStatus,
+		counter:    counter,
 	}
 }
 
-func (f *feeCreditRecord) AddFreeCredit(ownerPredicate []byte, transFCProof *sdktypes.Proof, txOptions ...tx.Option) (*types.TransactionOrder, error) {
+func (f *feeCreditRecord) AddFeeCredit(ownerPredicate []byte, transFCProof *sdktypes.Proof, txOptions ...tx.Option) (*types.TransactionOrder, error) {
 	attr := &fc.AddFeeCreditAttributes{
 		FeeCreditOwnerCondition: ownerPredicate,
 		FeeCreditTransfer:       transFCProof.TxRecord,
@@ -43,11 +45,11 @@ func (f *feeCreditRecord) AddFreeCredit(ownerPredicate []byte, transFCProof *sdk
 	return txo, nil
 }
 
-func (f *feeCreditRecord) CloseFreeCredit(targetBill sdktypes.Bill, txOptions ...tx.Option) (*types.TransactionOrder, error) {
+func (f *feeCreditRecord) CloseFeeCredit(targetBillID types.UnitID, targetBillCounter uint64, txOptions ...tx.Option) (*types.TransactionOrder, error) {
 	attr := &fc.CloseFeeCreditAttributes{
 		Amount:            f.balance,
-		TargetUnitID:      targetBill.ID(),
-		TargetUnitCounter: targetBill.Counter(),
+		TargetUnitID:      targetBillID,
+		TargetUnitCounter: targetBillCounter,
 		Counter:           *f.counter,
 	}
 	txPayload, err := tx.NewPayload(f.systemID, f.id, fc.PayloadTypeCloseFeeCredit, attr, txOptions...)

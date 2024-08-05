@@ -25,6 +25,23 @@ var (
 )
 
 type (
+	FungibleTokenParams struct {
+		SystemID       types.SystemID
+		TypeID         sdktypes.TokenTypeID
+		OwnerPredicate sdktypes.Predicate
+		Amount         uint64
+	}
+
+	NonFungibleTokenParams struct {
+		SystemID            types.SystemID
+		TypeID              sdktypes.TokenTypeID
+		OwnerPredicate      sdktypes.Predicate
+		Name                string
+		URI                 string
+		Data                []byte
+		DataUpdatePredicate sdktypes.Predicate
+	}
+
 	token struct {
 		systemID       types.SystemID
 		id             sdktypes.TokenID
@@ -55,7 +72,7 @@ type (
 	}
 )
 
-func NewFungibleToken(params *sdktypes.FungibleTokenParams) (sdktypes.FungibleToken, error) {
+func NewFungibleToken(params *FungibleTokenParams) (sdktypes.FungibleToken, error) {
 	return &fungibleToken{
 		token: token{
 			systemID:       params.SystemID,
@@ -66,7 +83,7 @@ func NewFungibleToken(params *sdktypes.FungibleTokenParams) (sdktypes.FungibleTo
 	}, nil
 }
 
-func NewNonFungibleToken(params *sdktypes.NonFungibleTokenParams) (sdktypes.NonFungibleToken, error) {
+func NewNonFungibleToken(params *NonFungibleTokenParams) (sdktypes.NonFungibleToken, error) {
 	if len(params.Name) > nameMaxSize {
 		return nil, errInvalidNameLength
 	}
@@ -153,7 +170,7 @@ func (t *fungibleToken) Split(amount uint64, ownerPredicate []byte, txOptions ..
 		Counter:                      t.counter,
 		TypeID:                       t.typeID,
 		RemainingValue:               t.amount - amount,
-		InvariantPredicateSignatures: [][]byte{nil}, // TODO: could be just nil?
+		InvariantPredicateSignatures: nil,
 	}
 	txPayload, err := tx.NewPayload(t.systemID, t.id, tokens.PayloadTypeSplitFungibleToken, attr, txOptions...)
 	if err != nil {
@@ -243,7 +260,7 @@ func (t *nonFungibleToken) Create(txOptions ...tx.Option) (*types.TransactionOrd
 	if err != nil {
 		return nil, err
 	}
-	txPayload.UnitID = tokens.NewFungibleTokenID(t.id, unitPart)
+	txPayload.UnitID = tokens.NewNonFungibleTokenID(t.id, unitPart)
 	t.id = txPayload.UnitID
 
 	txo := tx.NewTransactionOrder(txPayload)
@@ -330,7 +347,7 @@ func (t *token) Lock(lockStatus uint64, txOptions ...tx.Option) (*types.Transact
 }
 
 func (t *token) Unlock(txOptions ...tx.Option) (*types.TransactionOrder, error) {
-	attr := &tokens.LockTokenAttributes{
+	attr := &tokens.UnlockTokenAttributes{
 		Counter:                      t.counter,
 		InvariantPredicateSignatures: nil,
 	}
