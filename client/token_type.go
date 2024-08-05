@@ -37,7 +37,7 @@ type (
 	}
 )
 
-func NewFungibleTokenType(params *sdktypes.FungibleTokenTypeParams) (sdktypes.FungibleTokenType, error) {
+func NewFungibleTokenType(params *FungibleTokenTypeParams) (sdktypes.FungibleTokenType, error) {
 	if params.ID == nil {
 		var err error
 		params.ID, err = tokens.NewRandomFungibleTokenTypeID(nil)
@@ -70,7 +70,7 @@ func NewFungibleTokenType(params *sdktypes.FungibleTokenTypeParams) (sdktypes.Fu
 	}, nil
 }
 
-func NewNonFungibleTokenType(params *sdktypes.NonFungibleTokenTypeParams) (sdktypes.NonFungibleTokenType, error) {
+func NewNonFungibleTokenType(params *NonFungibleTokenTypeParams) (sdktypes.NonFungibleTokenType, error) {
 	if params.ID == nil {
 		var err error
 		params.ID, err = tokens.NewRandomNonFungibleTokenTypeID(nil)

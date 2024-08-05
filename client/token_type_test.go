@@ -12,7 +12,7 @@ import (
 func TestNewFungibleTokenType(t *testing.T) {
 	t.Parallel()
 
-	ttParams := &sdktypes.FungibleTokenTypeParams{
+	ttParams := &FungibleTokenTypeParams{
 		Symbol:                   "AB",
 		Name:                     "Long name for AB",
 		Icon:                     &tokens.Icon{Type: "image/png", Data: []byte{1}},
@@ -52,7 +52,7 @@ func TestNewFungibleTokenType(t *testing.T) {
 func TestNewNonFungibleTokenType(t *testing.T) {
 	t.Parallel()
 
-	ttParams := &sdktypes.NonFungibleTokenTypeParams{
+	ttParams := &NonFungibleTokenTypeParams{
 		Symbol:                   "AB",
 		Name:                     "Long name for AB",
 		Icon:                     &tokens.Icon{Type: "image/png", Data: []byte{1}},

@@ -206,7 +206,7 @@ func execTokenCmdNewTypeFungible(cmd *cobra.Command, config *types.WalletConfig)
 	if err != nil {
 		return err
 	}
-	tt, err := client.NewFungibleTokenType(&sdktypes.FungibleTokenTypeParams{
+	tt, err := client.NewFungibleTokenType(&client.FungibleTokenTypeParams{
 		SystemID:                 tw.SystemID(),
 		ID:                       typeID,
 		ParentTypeID:             parentType,
@@ -300,7 +300,7 @@ func execTokenCmdNewTypeNonFungible(cmd *cobra.Command, config *types.WalletConf
 	if err != nil {
 		return err
 	}
-	tt, err := client.NewNonFungibleTokenType(&sdktypes.NonFungibleTokenTypeParams{
+	tt, err := client.NewNonFungibleTokenType(&client.NonFungibleTokenTypeParams{
 		SystemID:                 tw.SystemID(),
 		ID:                       typeID,
 		ParentTypeID:             parentType,

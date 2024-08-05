@@ -51,32 +51,6 @@ type (
 		DataUpdatePredicate() Predicate
 	}
 
-	FungibleTokenTypeParams struct {
-		SystemID                 types.SystemID
-		ID                       TokenTypeID
-		ParentTypeID             TokenTypeID
-		Symbol                   string
-		Name                     string
-		Icon                     *tokens.Icon
-		SubTypeCreationPredicate Predicate
-		TokenCreationPredicate   Predicate
-		InvariantPredicate       Predicate
-		DecimalPlaces            uint32
-	}
-
-	NonFungibleTokenTypeParams struct {
-		SystemID                 types.SystemID
-		ID                       TokenTypeID
-		ParentTypeID             TokenTypeID
-		Symbol                   string
-		Name                     string
-		Icon                     *tokens.Icon
-		SubTypeCreationPredicate Predicate
-		TokenCreationPredicate   Predicate
-		InvariantPredicate       Predicate
-		DataUpdatePredicate      Predicate
-	}
-
 	Token interface {
 		SystemID() types.SystemID
 		ID() TokenID

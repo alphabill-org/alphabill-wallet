@@ -55,9 +55,9 @@ func Test_ListTokenTypes(t *testing.T) {
 				return []sdktypes.FungibleTokenType{}, nil
 			}
 
-			t1, err := client.NewFungibleTokenType(&sdktypes.FungibleTokenTypeParams{})
+			t1, err := client.NewFungibleTokenType(&client.FungibleTokenTypeParams{})
 			require.NoError(t, err)
-			t2, err := client.NewFungibleTokenType(&sdktypes.FungibleTokenTypeParams{})
+			t2, err := client.NewFungibleTokenType(&client.FungibleTokenTypeParams{})
 			require.NoError(t, err)
 			return []sdktypes.FungibleTokenType{t1, t2}, nil
 		},
@@ -65,7 +65,7 @@ func Test_ListTokenTypes(t *testing.T) {
 			if !bytes.Equal(pubKey, *firstPubKey) {
 				return []sdktypes.NonFungibleTokenType{}, nil
 			}
-			params := &sdktypes.NonFungibleTokenTypeParams{}
+			params := &client.NonFungibleTokenTypeParams{}
 			t1, err := client.NewNonFungibleTokenType(params)
 			require.NoError(t, err)
 			t2, err := client.NewNonFungibleTokenType(params)
@@ -101,7 +101,7 @@ func TestNewTypes(t *testing.T) {
 			if found {
 				attrs := &tokens.CreateFungibleTokenTypeAttributes{}
 				require.NoError(t, tx.UnmarshalAttributes(attrs))
-				tokenType, err := client.NewFungibleTokenType(&sdktypes.FungibleTokenTypeParams{
+				tokenType, err := client.NewFungibleTokenType(&client.FungibleTokenTypeParams{
 					ID:            tx.UnitID(),
 					ParentTypeID:  attrs.ParentTypeID,
 					DecimalPlaces: attrs.DecimalPlaces,
@@ -125,7 +125,7 @@ func TestNewTypes(t *testing.T) {
 
 	t.Run("fungible type", func(t *testing.T) {
 		typeID := tokens.NewFungibleTokenTypeID(nil, test.RandomBytes(32))
-		tt1, err := client.NewFungibleTokenType(&sdktypes.FungibleTokenTypeParams{
+		tt1, err := client.NewFungibleTokenType(&client.FungibleTokenTypeParams{
 			ID:                       typeID,
 			Symbol:                   "AB",
 			Name:                     "Long name for AB",
@@ -145,7 +145,7 @@ func TestNewTypes(t *testing.T) {
 		require.EqualValues(t, tx.Timeout(), 11)
 
 		// new subtype
-		tt2, err := client.NewFungibleTokenType(&sdktypes.FungibleTokenTypeParams{
+		tt2, err := client.NewFungibleTokenType(&client.FungibleTokenTypeParams{
 			Symbol:                   "AB",
 			Name:                     "Long name for AB",
 			DecimalPlaces:            2,
@@ -162,7 +162,7 @@ func TestNewTypes(t *testing.T) {
 
 	t.Run("non-fungible type", func(t *testing.T) {
 		typeID := tokens.NewNonFungibleTokenTypeID(nil, test.RandomBytes(32))
-		tt, err := client.NewNonFungibleTokenType(&sdktypes.NonFungibleTokenTypeParams{
+		tt, err := client.NewNonFungibleTokenType(&client.NonFungibleTokenTypeParams{
 			ID:                       typeID,
 			Symbol:                   "ABNFT",
 			Name:                     "Long name for ABNFT",
