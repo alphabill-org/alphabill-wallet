@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/alphabill-org/alphabill-go-base/types"
-	testtransaction "github.com/alphabill-org/alphabill/txsystem/testutils/transaction"
 	"github.com/stretchr/testify/require"
 
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
@@ -20,16 +19,19 @@ type MockClient struct {
 	ProofError   error
 }
 
-func createTxOrder(t *testing.T) *types.TransactionOrder {
-	transaction := testtransaction.NewTransactionOrder(t,
-		testtransaction.WithAttributes([]byte{0, 0, 0, 0, 0, 0, 0}),
-		testtransaction.WithUnitID([]byte{0, 0, 0, 1}),
-		testtransaction.WithSystemID(3),
-		testtransaction.WithOwnerProof([]byte{0, 0, 0, 2}),
-		testtransaction.WithClientMetadata(&types.ClientMetadata{Timeout: 3}),
-		testtransaction.WithPayloadType("test"),
-	)
-	return transaction
+func createTxOrder() *types.TransactionOrder {
+	return &types.TransactionOrder{
+		Payload: &types.Payload{
+			SystemID:       3,
+			UnitID:         []byte{0, 0, 0, 1},
+			Type:           "test",
+			Attributes:     []byte{0, 0, 0, 0, 0, 0, 0},
+			ClientMetadata: &types.ClientMetadata{
+				Timeout: 3,
+			},
+		},
+		OwnerProof: []byte{0, 0, 0, 2},
+	}
 }
 
 func NewClientMock(round uint64, proof *sdktypes.Proof) Client {
@@ -61,7 +63,7 @@ func TestTxPublisher_SendTx_Cancel(t *testing.T) {
 	require.NotNil(t, txPublisher)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	txOrder := createTxOrder(t)
+	txOrder := createTxOrder()
 	proof, err := txPublisher.SendTx(ctx, txOrder, nil)
 	require.Nil(t, proof)
 	require.ErrorContains(t, err, "confirming transaction interrupted: context canceled")
@@ -72,7 +74,7 @@ func TestTxPublisher_SendTx_RoundTimeout(t *testing.T) {
 	txPublisher := NewTxPublisher(client)
 	require.NotNil(t, txPublisher)
 	ctx := context.Background()
-	txOrder := createTxOrder(t)
+	txOrder := createTxOrder()
 	proof, err := txPublisher.SendTx(ctx, txOrder, nil)
 	require.Nil(t, proof)
 	require.ErrorContains(t, err, "confirmation timeout evm round 3, tx timeout round 3")

@@ -9,13 +9,26 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/types"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
-	"github.com/alphabill-org/alphabill/txsystem/evm/statedb"
 	"github.com/holiman/uint256"
 )
 
 type (
 	evmPartitionClient struct {
 		*partitionClient
+	}
+
+	stateObject struct {
+		Account   *account
+		AlphaBill *alphaBillLink
+	}
+
+	account struct {
+		Balance  *uint256.Int
+	}
+
+	alphaBillLink struct {
+		Counter uint64
+		Timeout uint64
 	}
 )
 
@@ -41,7 +54,7 @@ func (c *evmPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ow
 	if len(unitIDs) == 0 {
 		return nil, nil
 	}
-	var u *sdktypes.Unit[statedb.StateObject]
+	var u *sdktypes.Unit[stateObject]
 	if err := c.RpcClient.CallContext(ctx, &u, "state_getUnit", unitIDs[0], false); err != nil {
 		return nil, err
 	}
