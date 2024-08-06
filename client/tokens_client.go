@@ -158,7 +158,7 @@ func (c *tokensPartitionClient) GetNonFungibleTokenTypes(ctx context.Context, cr
 	return nil, nil
 }
 
-// GetTypeHierarchy returns type hierarchy for given token type id where the root type is the last element (no parent).
+// GetFungibleTokenTypeHierarchy returns type hierarchy for given token type id where the root type is the last element (no parent).
 func (c *tokensPartitionClient) GetFungibleTokenTypeHierarchy(ctx context.Context, typeID sdktypes.TokenTypeID) ([]*sdktypes.FungibleTokenType, error) {
 	var tokenTypes []*sdktypes.FungibleTokenType
 	for len(typeID) > 0 && !typeID.Eq(sdktypes.NoParent) {
