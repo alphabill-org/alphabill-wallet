@@ -6,8 +6,6 @@ import (
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/types"
-
-	"github.com/alphabill-org/alphabill-wallet/client/tx"
 )
 
 type (
@@ -53,74 +51,74 @@ type (
 	}
 )
 
-func (f *FeeCreditRecord) AddFeeCredit(ownerPredicate []byte, transFCProof *Proof, txOptions ...tx.Option) (*types.TransactionOrder, error) {
+func (f *FeeCreditRecord) AddFeeCredit(ownerPredicate []byte, transFCProof *Proof, txOptions ...Option) (*types.TransactionOrder, error) {
 	attr := &fc.AddFeeCreditAttributes{
 		FeeCreditOwnerCondition: ownerPredicate,
 		FeeCreditTransfer:       transFCProof.TxRecord,
 		FeeCreditTransferProof:  transFCProof.TxProof,
 	}
-	txPayload, err := tx.NewPayload(f.SystemID, f.ID, fc.PayloadTypeAddFeeCredit, attr, txOptions...)
+	txPayload, err := NewPayload(f.SystemID, f.ID, fc.PayloadTypeAddFeeCredit, attr, txOptions...)
 	if err != nil {
 		return nil, err
 	}
-	txo := tx.NewTransactionOrder(txPayload)
-	err = tx.GenerateAndSetProofs(txo, nil, nil, txOptions...)
+	tx := NewTransactionOrder(txPayload)
+	err = GenerateAndSetProofs(tx, nil, nil, txOptions...)
 	if err != nil {
 		return nil, err
 	}
-	return txo, nil
+	return tx, nil
 }
 
-func (f *FeeCreditRecord) CloseFeeCredit(targetBillID types.UnitID, targetBillCounter uint64, txOptions ...tx.Option) (*types.TransactionOrder, error) {
+func (f *FeeCreditRecord) CloseFeeCredit(targetBillID types.UnitID, targetBillCounter uint64, txOptions ...Option) (*types.TransactionOrder, error) {
 	attr := &fc.CloseFeeCreditAttributes{
 		Amount:            f.Balance,
 		TargetUnitID:      targetBillID,
 		TargetUnitCounter: targetBillCounter,
 		Counter:           *f.Counter,
 	}
-	txPayload, err := tx.NewPayload(f.SystemID, f.ID, fc.PayloadTypeCloseFeeCredit, attr, txOptions...)
+	txPayload, err := NewPayload(f.SystemID, f.ID, fc.PayloadTypeCloseFeeCredit, attr, txOptions...)
 	if err != nil {
 		return nil, err
 	}
-	txo := tx.NewTransactionOrder(txPayload)
-	err = tx.GenerateAndSetProofs(txo, nil, nil, txOptions...)
+	tx := NewTransactionOrder(txPayload)
+	err = GenerateAndSetProofs(tx, nil, nil, txOptions...)
 	if err != nil {
 		return nil, err
 	}
-	return txo, nil
+	return tx, nil
 }
 
-func (f *FeeCreditRecord) Lock(lockStatus uint64, txOptions ...tx.Option) (*types.TransactionOrder, error) {
+func (f *FeeCreditRecord) Lock(lockStatus uint64, txOptions ...Option) (*types.TransactionOrder, error) {
 	attr := &fc.LockFeeCreditAttributes{
 		LockStatus: lockStatus,
 		Counter:    *f.Counter,
 	}
-	txPayload, err := tx.NewPayload(f.SystemID, f.ID, fc.PayloadTypeLockFeeCredit, attr, txOptions...)
+	txPayload, err := NewPayload(f.SystemID, f.ID, fc.PayloadTypeLockFeeCredit, attr, txOptions...)
 	if err != nil {
 		return nil, err
 	}
-	txo := tx.NewTransactionOrder(txPayload)
-	err = tx.GenerateAndSetProofs(txo, nil, nil, txOptions...)
+	tx := NewTransactionOrder(txPayload)
+	err = GenerateAndSetProofs(tx, nil, nil, txOptions...)
 	if err != nil {
 		return nil, err
 	}
-	return txo, nil
+	return tx, nil
 }
 
-func (f *FeeCreditRecord) Unlock(txOptions ...tx.Option) (*types.TransactionOrder, error) {
+func (f *FeeCreditRecord) Unlock(txOptions ...Option) (*types.TransactionOrder, error) {
 	attr := &fc.UnlockFeeCreditAttributes{
 		Counter: *f.Counter,
 	}
-	txPayload, err := tx.NewPayload(f.SystemID, f.ID, fc.PayloadTypeUnlockFeeCredit, attr, txOptions...)
+	txPayload, err := NewPayload(f.SystemID, f.ID, fc.PayloadTypeUnlockFeeCredit, attr, txOptions...)
 	if err != nil {
 		return nil, err
 	}
-	txo := tx.NewTransactionOrder(txPayload)
-	err = tx.GenerateAndSetProofs(txo, nil, nil, txOptions...)
+	tx := NewTransactionOrder(txPayload)
+	err = GenerateAndSetProofs(tx, nil, nil, txOptions...)
 	if err != nil {
 		return nil, err
 	}
-	return txo, nil
+	return tx, nil
 }
 
 func (p *Proof) GetActualFee() uint64 {

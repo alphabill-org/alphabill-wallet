@@ -11,7 +11,6 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alphabill-org/alphabill-wallet/client/tx"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
@@ -753,8 +752,8 @@ func TestAddFeeCredit_ExistingAddFC(t *testing.T) {
 	}
 
 	addFCTx, err := fcr.AddFeeCredit(nil, transFCProof,
-		tx.WithTimeout(5),
-		tx.WithMaxFee(2))
+		sdktypes.WithTimeout(5),
+		sdktypes.WithMaxFee(2))
 	require.NoError(t, err)
 	addFCAttr := fc.AddFeeCreditAttributes{}
 	require.NoError(t, addFCTx.Payload.UnmarshalAttributes(&addFCAttr))
@@ -970,8 +969,8 @@ func TestReclaimFeeCredit_ExistingCloseFC(t *testing.T) {
 	targetBill := testutil.NewBill(50, 200)
 
 	closeFCTx, err := fcr.CloseFeeCredit(targetBill.ID, targetBill.Counter,
-		tx.WithTimeout(5),
-		tx.WithMaxFee(2))
+		sdktypes.WithTimeout(5),
+		sdktypes.WithMaxFee(2))
 	require.NoError(t, err)
 	closeFCAttr := fc.CloseFeeCreditAttributes{}
 	require.NoError(t, closeFCTx.Payload.UnmarshalAttributes(&closeFCAttr))
@@ -1075,7 +1074,7 @@ func TestReclaimFeeCredit_ExistingReclaimFC(t *testing.T) {
 		TxRecord: &types.TransactionRecord{},
 		TxProof: &types.TxProof{},
 	}
-	reclaimFCTx, err := targetBill.ReclaimFromFeeCredit(closeFCProof, tx.WithTimeout(5), tx.WithMaxFee(2))
+	reclaimFCTx, err := targetBill.ReclaimFromFeeCredit(closeFCProof, sdktypes.WithTimeout(5), sdktypes.WithMaxFee(2))
 	require.NoError(t, err)
 	reclaimFCAttr := fc.ReclaimFeeCreditAttributes{}
 	require.NoError(t, reclaimFCTx.Payload.UnmarshalAttributes(&reclaimFCAttr))

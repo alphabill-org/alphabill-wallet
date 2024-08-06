@@ -6,7 +6,6 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/hash"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
-	"github.com/alphabill-org/alphabill-wallet/client/tx"
 	"github.com/stretchr/testify/require"
 )
 
@@ -30,9 +29,8 @@ func TestSplitTransactionAmount(t *testing.T) {
 		},
 	}
 	tx, err := b.Split(targetUnits,
-		tx.WithTimeout(timeout),
-		tx.WithReferenceNumber(refNo))
-
+		WithTimeout(timeout),
+		WithReferenceNumber(refNo))
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 	require.EqualValues(t, b.SystemID, tx.SystemID())

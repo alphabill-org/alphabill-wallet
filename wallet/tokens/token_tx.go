@@ -7,7 +7,6 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/hash"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 
-	"github.com/alphabill-org/alphabill-wallet/client/tx"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 )
@@ -72,22 +71,22 @@ func (w *Wallet) doSendMultiple(ctx context.Context, amount uint64, tokens []*sd
 func (w *Wallet) prepareSplitOrTransferTx(ctx context.Context, acc *accountKey, amount uint64, ft *sdktypes.FungibleToken, fcrID, receiverPubKey []byte, invariantPredicateArgs []*PredicateInput, timeout uint64, ownerProof *PredicateInput) (*txsubmitter.TxSubmission, error) {
 	if amount >= ft.Amount {
 		tx, err := ft.Transfer(BearerPredicateFromPubKey(receiverPubKey),
-			tx.WithTimeout(timeout),
-			tx.WithFeeCreditRecordID(fcrID),
-			tx.WithOwnerProof(newProofGenerator(ownerProof)),
-			tx.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
-			tx.WithExtraProofs(newProofGenerators(invariantPredicateArgs)))
+			sdktypes.WithTimeout(timeout),
+			sdktypes.WithFeeCreditRecordID(fcrID),
+			sdktypes.WithOwnerProof(newProofGenerator(ownerProof)),
+			sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
+			sdktypes.WithExtraProofs(newProofGenerators(invariantPredicateArgs)))
 		if err != nil {
 			return nil, err
 		}
 		return 	txsubmitter.New(tx), nil
 	} else {
 		tx, err := ft.Split(amount, BearerPredicateFromPubKey(receiverPubKey),
-			tx.WithTimeout(timeout),
-			tx.WithFeeCreditRecordID(fcrID),
-			tx.WithOwnerProof(newProofGenerator(ownerProof)),
-			tx.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
-			tx.WithExtraProofs(newProofGenerators(invariantPredicateArgs)))
+			sdktypes.WithTimeout(timeout),
+			sdktypes.WithFeeCreditRecordID(fcrID),
+			sdktypes.WithOwnerProof(newProofGenerator(ownerProof)),
+			sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
+			sdktypes.WithExtraProofs(newProofGenerators(invariantPredicateArgs)))
 		if err != nil {
 			return nil, err
 		}

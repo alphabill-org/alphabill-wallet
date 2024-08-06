@@ -13,7 +13,6 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
 
-	"github.com/alphabill-org/alphabill-wallet/client/tx"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
@@ -222,10 +221,10 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*sdktypes.Proof, erro
 			})
 		}
 		tx, err := largestBill.Split(targetUnits,
-			tx.WithTimeout(timeout),
-			tx.WithFeeCreditRecordID(fcr.ID),
-			tx.WithReferenceNumber(cmd.ReferenceNumber),
-			tx.WithOwnerProof(tx.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
+			sdktypes.WithTimeout(timeout),
+			sdktypes.WithFeeCreditRecordID(fcr.ID),
+			sdktypes.WithReferenceNumber(cmd.ReferenceNumber),
+			sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create N-way split tx: %w", err)
 		}

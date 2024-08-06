@@ -9,7 +9,6 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
 
-	"github.com/alphabill-org/alphabill-wallet/client/tx"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
@@ -113,9 +112,9 @@ func (w *DustCollector) submitDCBatch(ctx context.Context, k *account.AccountKey
 	dcBatch := txsubmitter.NewBatch(w.moneyClient, w.log)
 	for _, b := range billsToSwap {
 		tx, err := b.TransferToDustCollector(targetBill,
-			tx.WithTimeout(timeout),
-			tx.WithFeeCreditRecordID(fcrID),
-			tx.WithOwnerProof(tx.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
+			sdktypes.WithTimeout(timeout),
+			sdktypes.WithFeeCreditRecordID(fcrID),
+			sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
 		if err != nil {
 			return nil, fmt.Errorf("failed to build dust transfer transaction: %w", err)
 		}
@@ -150,9 +149,9 @@ func (w *DustCollector) swapDCBills(ctx context.Context, k *account.AccountKey, 
 
 	// create swap tx
 	swapTx, err  := targetBill.SwapWithDustCollector(dcProofs,
-		tx.WithTimeout(timeout),
-		tx.WithFeeCreditRecordID(fcrID),
-		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
+		sdktypes.WithTimeout(timeout),
+		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to build swap tx: %w", err)
 	}
@@ -178,9 +177,9 @@ func (w *DustCollector) lockTargetBill(ctx context.Context, k *account.AccountKe
 	}
 	lockTx, err := targetBill.Lock(
 		wallet.LockReasonCollectDust,
-		tx.WithTimeout(timeout),
-		tx.WithFeeCreditRecordID(fcrID),
-		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
+		sdktypes.WithTimeout(timeout),
+		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
 	if err != nil {
 		return nil, err
 	}

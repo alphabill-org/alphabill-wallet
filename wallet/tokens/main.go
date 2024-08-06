@@ -13,7 +13,6 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-go-base/util"
-	"github.com/alphabill-org/alphabill-wallet/client/tx"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
@@ -58,8 +57,8 @@ type (
 		GetID() sdktypes.TokenID
 		GetOwnerPredicate() sdktypes.Predicate
 		GetLockStatus() uint64
-		Lock(lockStatus uint64, txOptions ...tx.Option) (*types.TransactionOrder, error)
-		Unlock(txOptions ...tx.Option) (*types.TransactionOrder, error)
+		Lock(lockStatus uint64, txOptions ...sdktypes.Option) (*types.TransactionOrder, error)
+		Unlock(txOptions ...sdktypes.Option) (*types.TransactionOrder, error)
 	}
 )
 
@@ -162,11 +161,11 @@ func (w *Wallet) NewFungibleType(ctx context.Context, accountNumber uint64, ft *
 	}
 
 	tx, err := ft.Create(
-		tx.WithTimeout(roundNumber+txTimeoutRoundCount),
-		tx.WithFeeCreditRecordID(fcrID),
-		tx.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		tx.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		tx.WithExtraProofs(newProofGenerators(subtypePredicateInputs)))
+		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
+		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithExtraProofs(newProofGenerators(subtypePredicateInputs)))
 	if err != nil {
 		return nil, err
 	}
@@ -207,11 +206,11 @@ func (w *Wallet) NewNonFungibleType(ctx context.Context, accountNumber uint64, n
 	}
 
 	tx, err := nft.Create(
-		tx.WithTimeout(roundNumber+txTimeoutRoundCount),
-		tx.WithFeeCreditRecordID(fcrID),
-		tx.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		tx.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		tx.WithExtraProofs(newProofGenerators(subtypePredicateInputs)))
+		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
+		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithExtraProofs(newProofGenerators(subtypePredicateInputs)))
 	if err != nil {
 		return nil, err
 	}
@@ -236,11 +235,11 @@ func (w *Wallet) NewFungibleToken(ctx context.Context, accountNumber uint64, ft 
 	}
 
 	tx, err := ft.Create(
-		tx.WithTimeout(roundNumber+txTimeoutRoundCount),
-		tx.WithFeeCreditRecordID(fcrID),
-		tx.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		tx.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		tx.WithExtraProofs(newProofGenerators(mintPredicateInputs)))
+		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
+		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithExtraProofs(newProofGenerators(mintPredicateInputs)))
 	if err != nil {
 		return nil, err
 	}
@@ -278,11 +277,11 @@ func (w *Wallet) NewNFT(ctx context.Context, accountNumber uint64, nft *sdktypes
 	}
 
 	tx, err := nft.Create(
-		tx.WithTimeout(roundNumber+txTimeoutRoundCount),
-		tx.WithFeeCreditRecordID(fcrID),
-		tx.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		tx.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		tx.WithExtraProofs(newProofGenerators(mintPredicateArgs)))
+		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
+		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithExtraProofs(newProofGenerators(mintPredicateArgs)))
 	if err != nil {
 		return nil, err
 	}
@@ -453,11 +452,11 @@ func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID 
 	}
 
 	tx, err := token.Transfer(BearerPredicateFromPubKey(receiverPubKey),
-		tx.WithTimeout(roundNumber+txTimeoutRoundCount),
-		tx.WithFeeCreditRecordID(fcrID),
-		tx.WithOwnerProof(newProofGenerator(ownerProof)),
-		tx.WithFeeProof(newProofGenerator(defaultProof(key.AccountKey))),
-		tx.WithExtraProofs(newProofGenerators(invariantProofs)))
+		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
+		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithOwnerProof(newProofGenerator(ownerProof)),
+		sdktypes.WithFeeProof(newProofGenerator(defaultProof(key.AccountKey))),
+		sdktypes.WithExtraProofs(newProofGenerators(invariantProofs)))
 	if err != nil {
 		return nil, err
 	}
@@ -561,11 +560,11 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 	}
 
 	tx, err := t.Update(data,
-		tx.WithTimeout(roundNumber+txTimeoutRoundCount),
-		tx.WithFeeCreditRecordID(fcrID),
-		tx.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		tx.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		tx.WithExtraProofs(newProofGenerators(updateProofs)))
+		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
+		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithExtraProofs(newProofGenerators(updateProofs)))
 	if err != nil {
 		return nil, err
 	}
@@ -682,11 +681,11 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID ty
 	}
 
 	tx, err := token.Lock(wallet.LockReasonManual,
-		tx.WithTimeout(roundNumber+txTimeoutRoundCount),
-		tx.WithFeeCreditRecordID(fcrID),
-		tx.WithOwnerProof(newProofGenerator(ownerProof)),
-		tx.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		tx.WithExtraProofs(newProofGenerators(invariantProofs)))
+		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
+		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithOwnerProof(newProofGenerator(ownerProof)),
+		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithExtraProofs(newProofGenerators(invariantProofs)))
 	if err != nil {
 		return nil, err
 	}
@@ -732,11 +731,11 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	}
 
 	tx, err := token.Unlock(
-		tx.WithTimeout(roundNumber+txTimeoutRoundCount),
-		tx.WithFeeCreditRecordID(fcrID),
-		tx.WithOwnerProof(newProofGenerator(ownerProof)),
-		tx.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		tx.WithExtraProofs(newProofGenerators(invariantProofs)))
+		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
+		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithOwnerProof(newProofGenerator(ownerProof)),
+		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithExtraProofs(newProofGenerators(invariantProofs)))
 	if err != nil {
 		return nil, err
 	}
@@ -786,7 +785,7 @@ func newProofGenerator(input *PredicateInput) types.ProofGenerator {
 			return nil, errors.New("nil predicate input")
 		}
 		if input.AccountKey != nil {
-			sig, err := tx.SignBytes(payloadBytes, input.AccountKey.PrivKey)
+			sig, err := sdktypes.SignBytes(payloadBytes, input.AccountKey.PrivKey)
 			if err != nil {
 				return nil, err
 			}

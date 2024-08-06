@@ -13,7 +13,6 @@ import (
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
 	"github.com/alphabill-org/alphabill-wallet/client"
-	"github.com/alphabill-org/alphabill-wallet/client/tx"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
@@ -170,9 +169,9 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 		return fmt.Errorf("failed to fetch round number: %w", err)
 	}
 	tx, err := bill.Lock(wallet.LockReasonManual,
-		tx.WithTimeout(roundNumber+10),
-		tx.WithFeeCreditRecordID(fcr.ID),
-		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+		sdktypes.WithTimeout(roundNumber+10),
+		sdktypes.WithFeeCreditRecordID(fcr.ID),
+		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return fmt.Errorf("failed to create lock tx: %w", err)
 	}
@@ -249,9 +248,9 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 		return fmt.Errorf("failed to fetch round number: %w", err)
 	}
 	tx, err := bill.Unlock(
-		tx.WithTimeout(roundNumber+10),
-		tx.WithFeeCreditRecordID(fcr.ID),
-		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+		sdktypes.WithTimeout(roundNumber+10),
+		sdktypes.WithFeeCreditRecordID(fcr.ID),
+		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return fmt.Errorf("failed to create unlock tx: %w", err)
 	}

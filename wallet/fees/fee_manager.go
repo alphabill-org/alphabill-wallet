@@ -13,7 +13,6 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/types"
 
-	"github.com/alphabill-org/alphabill-wallet/client/tx"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
@@ -313,8 +312,8 @@ func (w *FeeManager) LockFeeCredit(ctx context.Context, cmd LockFeeCreditCmd) (*
 		return nil, err
 	}
 	tx, err := fcb.Lock(cmd.LockStatus,
-		tx.WithTimeout(timeout),
-		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+		sdktypes.WithTimeout(timeout),
+		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create lockFC transaction: %w", err)
 	}
@@ -348,8 +347,8 @@ func (w *FeeManager) UnlockFeeCredit(ctx context.Context, cmd UnlockFeeCreditCmd
 		return nil, err
 	}
 	tx, err := fcb.Unlock(
-		tx.WithTimeout(timeout),
-		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+		sdktypes.WithTimeout(timeout),
+		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create unlockFC transaction: %w", err)
 	}
@@ -507,8 +506,8 @@ func (w *FeeManager) sendLockFCTx(ctx context.Context, accountKey *account.Accou
 	// create lockFC
 	w.log.InfoContext(ctx, "sending lock fee credit transaction")
 	tx, err := fcr.Lock(wallet.LockReasonAddFees,
-		tx.WithTimeout(targetPartitionTimeout),
-		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+		sdktypes.WithTimeout(targetPartitionTimeout),
+		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return fmt.Errorf("failed to create lockFC transaction: %w", err)
 	}
@@ -608,8 +607,8 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 		Counter:  feeCtx.TargetBillCounter,
 	}
 	tx, err := sourceBill.TransferToFeeCredit(fcr, feeCtx.TargetAmount, latestAdditionTime,
-		tx.WithTimeout(moneyTimeout),
-		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+		sdktypes.WithTimeout(moneyTimeout),
+		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return fmt.Errorf("failed to create transferFC transaction: %w", err)
 	}
@@ -692,8 +691,8 @@ func (w *FeeManager) sendAddFCTx(ctx context.Context, accountKey *account.Accoun
 	}
 	ownerPredicate := templates.NewP2pkh256BytesFromKeyHash(accountKey.PubKeyHash.Sha256)
 	addFCTx, err := fcr.AddFeeCredit(ownerPredicate, feeCtx.TransferFCProof,
-		tx.WithTimeout(timeout),
-		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+		sdktypes.WithTimeout(timeout),
+		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return fmt.Errorf("failed to create addFC transaction: %w", err)
 	}
@@ -833,9 +832,9 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 		Counter:  feeCtx.TargetBillCounter,
 	}
 	tx, err := targetBill.Lock(wallet.LockReasonReclaimFees,
-		tx.WithTimeout(timeout),
-		tx.WithFeeCreditRecordID(moneyFCR.ID),
-		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+		sdktypes.WithTimeout(timeout),
+		sdktypes.WithFeeCreditRecordID(moneyFCR.ID),
+		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return fmt.Errorf("failed to create lock transaction: %w", err)
 	}
@@ -898,8 +897,8 @@ func (w *FeeManager) sendCloseFCTx(ctx context.Context, accountKey *account.Acco
 
 	// create closeFC transaction
 	tx, err := fcr.CloseFeeCredit(feeCtx.TargetBillID, feeCtx.TargetBillCounter,
-		tx.WithTimeout(targetPartitionTimeout),
-		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+		sdktypes.WithTimeout(targetPartitionTimeout),
+		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return fmt.Errorf("failed to create closeFC transaction: %w", err)
 	}
@@ -978,8 +977,8 @@ func (w *FeeManager) sendReclaimFCTx(ctx context.Context, accountKey *account.Ac
 		Counter:  feeCtx.TargetBillCounter,
 	}
 	reclaimFC, err := targetBill.ReclaimFromFeeCredit(feeCtx.CloseFCProof,
-		tx.WithTimeout(moneyTimeout),
-		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+		sdktypes.WithTimeout(moneyTimeout),
+		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return fmt.Errorf("failed to create reclaimFC transaction: %w", err)
 	}
@@ -1062,8 +1061,8 @@ func (w *FeeManager) unlockFeeCreditRecord(ctx context.Context, accountKey *acco
 		return nil, err
 	}
 	tx, err := fcr.Unlock(
-		tx.WithTimeout(timeout),
-		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+		sdktypes.WithTimeout(timeout),
+		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create unlockFC transaction: %w", err)
 	}
@@ -1091,9 +1090,9 @@ func (w *FeeManager) unlockBill(ctx context.Context, accountKey *account.Account
 			return nil, fmt.Errorf("fee credit record not found")
 		}
 		unlockTx, err := bill.Unlock(
-			tx.WithTimeout(timeout),
-			tx.WithFeeCreditRecordID(fcr.ID),
-			tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+			sdktypes.WithTimeout(timeout),
+			sdktypes.WithFeeCreditRecordID(fcr.ID),
+			sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create unlock tx: %w", err)
 		}

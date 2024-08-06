@@ -1,4 +1,4 @@
-package tx
+package types
 
 import (
 	"github.com/alphabill-org/alphabill-go-base/crypto"
