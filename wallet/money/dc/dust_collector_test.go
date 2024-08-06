@@ -38,7 +38,7 @@ func TestDC_OK(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, attr.DcTransfers, 2)
 	require.Len(t, attr.DcTransferProofs, 2)
-	require.EqualValues(t, targetBill.ID(), txo.UnitID())
+	require.EqualValues(t, targetBill.ID, txo.UnitID())
 }
 
 func TestDCWontRunForSingleBill(t *testing.T) {
@@ -80,7 +80,7 @@ func TestAllBillsAreSwapped_WhenWalletBillCountEqualToMaxBillCount(t *testing.T)
 
 	// then swap tx should be returned
 	require.NotNil(t, dcResult.SwapProof)
-	require.EqualValues(t, targetBill.ID(), dcResult.SwapProof.TxRecord.TransactionOrder.UnitID())
+	require.EqualValues(t, targetBill.ID, dcResult.SwapProof.TxRecord.TransactionOrder.UnitID())
 
 	// and swap contains correct dc transfers
 	swapAttr := &money.SwapDCAttributes{}
@@ -89,7 +89,7 @@ func TestAllBillsAreSwapped_WhenWalletBillCountEqualToMaxBillCount(t *testing.T)
 	require.NoError(t, err)
 	require.Len(t, swapAttr.DcTransfers, maxBillsPerDC-1)
 	require.Len(t, swapAttr.DcTransferProofs, maxBillsPerDC-1)
-	require.EqualValues(t, targetBill.ID(), swapTxo.UnitID())
+	require.EqualValues(t, targetBill.ID, swapTxo.UnitID())
 }
 
 func TestOnlyFirstNBillsAreSwapped_WhenBillCountOverLimit(t *testing.T) {
@@ -116,9 +116,9 @@ func TestOnlyFirstNBillsAreSwapped_WhenBillCountOverLimit(t *testing.T) {
 	swapTxo := dcResult.SwapProof.TxRecord.TransactionOrder
 	swapAttr := &money.SwapDCAttributes{}
 	err = swapTxo.UnmarshalAttributes(swapAttr)
-	require.EqualValues(t, targetBill.ID(), swapTxo.UnitID())
+	require.EqualValues(t, targetBill.ID, swapTxo.UnitID())
 	require.NoError(t, err)
 	require.Len(t, swapAttr.DcTransfers, maxBillsPerDC)
 	require.Len(t, swapAttr.DcTransferProofs, maxBillsPerDC)
-	require.EqualValues(t, targetBill.ID(), swapTxo.UnitID())
+	require.EqualValues(t, targetBill.ID, swapTxo.UnitID())
 }

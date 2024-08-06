@@ -390,13 +390,13 @@ func (w *FeeManager) addFees(ctx context.Context, accountKey *account.AccountKey
 	}
 
 	// filter locked bills
-	bills, _ = util.FilterSlice(bills, func(b sdktypes.Bill) (bool, error) {
-		return b.LockStatus() == 0, nil
+	bills, _ = util.FilterSlice(bills, func(b *sdktypes.Bill) (bool, error) {
+		return b.LockStatus == 0, nil
 	})
 
 	// filter bills of too small value
-	bills, _ = util.FilterSlice(bills, func(b sdktypes.Bill) (bool, error) {
-		return b.Value() >= MinimumFeeAmount, nil
+	bills, _ = util.FilterSlice(bills, func(b *sdktypes.Bill) (bool, error) {
+		return b.Value >= MinimumFeeAmount, nil
 	})
 
 	// sum bill values i.e. calculate effective balance
@@ -416,13 +416,13 @@ func (w *FeeManager) addFees(ctx context.Context, accountKey *account.AccountKey
 			break
 		}
 		// send fee credit transactions
-		amount := min(targetBill.Value(), targetAmount-totalTransferredAmount)
+		amount := min(targetBill.Value, targetAmount-totalTransferredAmount)
 		totalTransferredAmount += amount
 
 		feeCtx := &AddFeeCreditCtx{
 			TargetPartitionID: w.targetPartitionSystemID,
-			TargetBillID:      targetBill.ID(),
-			TargetBillCounter: targetBill.Counter(),
+			TargetBillID:      targetBill.ID,
+			TargetBillCounter: targetBill.Counter,
 			TargetAmount:      amount,
 			LockingDisabled:   cmd.DisableLocking,
 		}
@@ -561,7 +561,7 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 		if err != nil {
 			return fmt.Errorf("failed to fetch bill: %w", err)
 		}
-		if sourceBill == nil || sourceBill.Counter() != feeCtx.TargetBillCounter {
+		if sourceBill == nil || sourceBill.Counter != feeCtx.TargetBillCounter {
 			w.log.WarnContext(ctx, "transferFC target unit no longer usable, unlocking fee credit unit")
 			// unlock remote locked fee credit record if exists
 			if feeCtx.LockFCProof != nil {
@@ -600,7 +600,11 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 		fcrID := w.targetPartitionFcrIDFn(nil, accountKey.PubKey, latestAdditionTime)
 		fcr = client.NewFeeCreditRecord(w.targetPartitionSystemID, fcrID, 0, 0, nil)
 	}
-	sourceBill := client.NewBill(w.moneySystemID, feeCtx.TargetBillID, 0, 0, feeCtx.TargetBillCounter)
+	sourceBill := &sdktypes.Bill{
+		SystemID: w.moneySystemID,
+		ID:       feeCtx.TargetBillID,
+		Counter:  feeCtx.TargetBillCounter,
+	}
 	tx, err := sourceBill.TransferToFeeCredit(fcr, feeCtx.TargetAmount, latestAdditionTime,
 		tx.WithTimeout(moneyTimeout),
 		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
@@ -731,8 +735,8 @@ func (w *FeeManager) reclaimFees(ctx context.Context, accountKey *account.Accoun
 	if err != nil {
 		return nil, err
 	}
-	bills, _ = util.FilterSlice(bills, func(b sdktypes.Bill) (bool, error) {
-		return b.LockStatus() == 0, nil
+	bills, _ = util.FilterSlice(bills, func(b *sdktypes.Bill) (bool, error) {
+		return b.LockStatus == 0, nil
 	})
 	if len(bills) == 0 {
 		return nil, errors.New("wallet must have a source bill to which to add reclaimed fee credits")
@@ -742,8 +746,8 @@ func (w *FeeManager) reclaimFees(ctx context.Context, accountKey *account.Accoun
 	// create fee ctx to track reclaim process
 	feeCtx := &ReclaimFeeCreditCtx{
 		TargetPartitionID: w.targetPartitionSystemID,
-		TargetBillID:      targetBill.ID(),
-		TargetBillCounter: targetBill.Counter(),
+		TargetBillID:      targetBill.ID,
+		TargetBillCounter: targetBill.Counter,
 		LockingDisabled:   cmd.DisableLocking,
 	}
 	if err := w.db.SetReclaimFeeContext(accountKey.PubKey, feeCtx); err != nil {
@@ -818,7 +822,11 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 	if err != nil {
 		return err
 	}
-	targetBill := client.NewBill(w.moneySystemID, feeCtx.TargetBillID, 0, 0, feeCtx.TargetBillCounter)
+	targetBill := &sdktypes.Bill{
+		SystemID: w.moneySystemID,
+		ID:       feeCtx.TargetBillID,
+		Counter:  feeCtx.TargetBillCounter,
+	}
 	tx, err := targetBill.Lock(wallet.LockReasonReclaimFees,
 		tx.WithTimeout(timeout),
 		tx.WithFeeCreditRecordID(moneyFCR.ID()),
@@ -941,7 +949,7 @@ func (w *FeeManager) sendReclaimFCTx(ctx context.Context, accountKey *account.Ac
 			return fmt.Errorf("failed to fetch bill: %w", err)
 		}
 
-		if targetBill == nil || targetBill.Counter() != feeCtx.TargetBillCounter {
+		if targetBill == nil || targetBill.Counter != feeCtx.TargetBillCounter {
 			_, err := w.unlockBill(ctx, accountKey, targetBill)
 			if err != nil {
 				return fmt.Errorf("failed to unlock target bill: %w", err)
@@ -959,7 +967,11 @@ func (w *FeeManager) sendReclaimFCTx(ctx context.Context, accountKey *account.Ac
 		return err
 	}
 
-	targetBill := client.NewBill(w.moneySystemID, feeCtx.TargetBillID, 0, 0, feeCtx.TargetBillCounter)
+	targetBill := &sdktypes.Bill{
+		SystemID: w.moneySystemID,
+		ID:       feeCtx.TargetBillID,
+		Counter:  feeCtx.TargetBillCounter,
+	}
 	reclaimFC, err := targetBill.ReclaimFromFeeCredit(feeCtx.CloseFCProof,
 		tx.WithTimeout(moneyTimeout),
 		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
@@ -1005,21 +1017,21 @@ func (w *FeeManager) getTargetPartitionTimeout(ctx context.Context) (uint64, err
 }
 
 // fetchBills fetches bills from money rpc node and sorts them by value (descending, largest first)
-func (w *FeeManager) fetchBills(ctx context.Context, k *account.AccountKey) ([]sdktypes.Bill, error) {
+func (w *FeeManager) fetchBills(ctx context.Context, k *account.AccountKey) ([]*sdktypes.Bill, error) {
 	bills, err := w.moneyClient.GetBills(ctx, k.PubKeyHash.Sha256)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch bills: %w", err)
 	}
 	sort.Slice(bills, func(i, j int) bool {
-		return bills[i].Value() > bills[j].Value()
+		return bills[i].Value > bills[j].Value
 	})
 	return bills, nil
 }
 
-func (w *FeeManager) sumValues(bills []sdktypes.Bill) uint64 {
+func (w *FeeManager) sumValues(bills []*sdktypes.Bill) uint64 {
 	var sum uint64
 	for _, b := range bills {
-		sum += b.Value()
+		sum += b.Value
 	}
 	return sum
 }
@@ -1057,11 +1069,11 @@ func (w *FeeManager) unlockFeeCreditRecord(ctx context.Context, accountKey *acco
 	return proof, nil
 }
 
-func (w *FeeManager) unlockBill(ctx context.Context, accountKey *account.AccountKey, bill sdktypes.Bill) (*sdktypes.Proof, error) {
+func (w *FeeManager) unlockBill(ctx context.Context, accountKey *account.AccountKey, bill *sdktypes.Bill) (*sdktypes.Proof, error) {
 	if bill == nil {
 		return nil, nil
 	}
-	if bill.LockStatus() != 0 {
+	if bill.LockStatus != 0 {
 		timeout, err := w.getMoneyPartitionTimeout(ctx)
 		if err != nil {
 			return nil, err

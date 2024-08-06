@@ -19,8 +19,8 @@ const transferFCLatestAdditionTime = 65536 // relative timeout after which trans
 type (
 	RpcClientMock struct {
 		Err                   error
-		Bills                 map[string]sdktypes.Bill
-		OwnerBills            []sdktypes.Bill
+		Bills                 map[string]*sdktypes.Bill
+		OwnerBills            []*sdktypes.Bill
 		FeeCreditRecords      map[string]sdktypes.FeeCreditRecord
 		OwnerFeeCreditRecords []sdktypes.FeeCreditRecord
 		RoundNumber           uint64
@@ -33,8 +33,8 @@ type (
 		Err                   error
 		RoundNumber           uint64
 		TxProofs              map[string]*sdktypes.Proof
-		Bills                 map[string]sdktypes.Bill
-		OwnerBills            []sdktypes.Bill
+		Bills                 map[string]*sdktypes.Bill
+		OwnerBills            []*sdktypes.Bill
 		FeeCreditRecords      map[string]sdktypes.FeeCreditRecord
 		OwnerFeeCreditRecords []sdktypes.FeeCreditRecord
 	}
@@ -44,7 +44,7 @@ type (
 
 func NewRpcClientMock(opts ...Option) *RpcClientMock {
 	options := &Options{
-		Bills:            map[string]sdktypes.Bill{},
+		Bills:            map[string]*sdktypes.Bill{},
 		FeeCreditRecords: map[string]sdktypes.FeeCreditRecord{},
 		TxProofs:         map[string]*sdktypes.Proof{},
 	}
@@ -62,9 +62,9 @@ func NewRpcClientMock(opts ...Option) *RpcClientMock {
 	}
 }
 
-func WithOwnerBill(bill sdktypes.Bill) Option {
+func WithOwnerBill(bill *sdktypes.Bill) Option {
 	return func(o *Options) {
-		o.Bills[string(bill.ID())] = bill
+		o.Bills[string(bill.ID)] = bill
 		o.OwnerBills = append(o.OwnerBills, bill)
 	}
 }
@@ -108,7 +108,7 @@ func (c *RpcClientMock) GetRoundNumber(ctx context.Context) (uint64, error) {
 	return c.RoundNumber, nil
 }
 
-func (c *RpcClientMock) GetBill(ctx context.Context, unitID types.UnitID) (sdktypes.Bill, error) {
+func (c *RpcClientMock) GetBill(ctx context.Context, unitID types.UnitID) (*sdktypes.Bill, error) {
 	if c.Err != nil {
 		return nil, c.Err
 	}
@@ -119,7 +119,7 @@ func (c *RpcClientMock) GetBill(ctx context.Context, unitID types.UnitID) (sdkty
 	return nil, nil
 }
 
-func (c *RpcClientMock) GetBills(ctx context.Context, ownerID []byte) ([]sdktypes.Bill, error) {
+func (c *RpcClientMock) GetBills(ctx context.Context, ownerID []byte) ([]*sdktypes.Bill, error) {
 	if c.Err != nil {
 		return nil, c.Err
 	}
@@ -205,12 +205,18 @@ func newMockTx(id types.UnitID, payloadType string) *types.TransactionOrder {
 	}
 }
 
-func NewBill(value, counter uint64) sdktypes.Bill {
+func NewBill(value, counter uint64) *sdktypes.Bill {
 	return NewLockedBill(value, counter, 0)
 }
 
-func NewLockedBill(value uint64, counter, lockStatus uint64) sdktypes.Bill {
-	return client.NewBill(money.DefaultSystemID, money.NewBillID(nil, testutils.RandomBytes(32)), value, lockStatus, counter)
+func NewLockedBill(value uint64, counter, lockStatus uint64) *sdktypes.Bill {
+	return &sdktypes.Bill{
+		SystemID:   money.DefaultSystemID,
+		ID:         money.NewBillID(nil, testutils.RandomBytes(32)),
+		Value:      value,
+		LockStatus: lockStatus,
+		Counter:    counter,
+	}
 }
 
 func NewMoneyFCR(pubKeyHash []byte, balance uint64, lockStatus uint64, counter uint64) sdktypes.FeeCreditRecord {

@@ -119,7 +119,7 @@ func (w *Wallet) GetBalance(ctx context.Context, cmd GetBalanceCmd) (uint64, err
 	}
 	var sum uint64
 	for _, bill := range bills {
-		sum += bill.Value()
+		sum += bill.Value
 	}
 	return sum, nil
 }
@@ -188,7 +188,7 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*sdktypes.Proof, erro
 	}
 	var balance uint64
 	for _, b := range bills {
-		balance += b.Value()
+		balance += b.Value
 	}
 	totalAmount := cmd.totalAmount()
 	if totalAmount > balance {
@@ -201,14 +201,14 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*sdktypes.Proof, erro
 	if len(cmd.Receivers) > 1 {
 		// if more than one receiver then perform transaction as N-way split and require sufficiently large bill
 		largestBill := bills[0]
-		if largestBill.Value() < totalAmount {
+		if largestBill.Value < totalAmount {
 			return nil, fmt.Errorf("sending to multiple addresses is performed using N-way split transaction which "+
 				"requires a single sufficiently large bill, wallet needs a bill with at least %s tema value, "+
 				"largest bill in wallet currently is %s tema",
 				util.AmountToString(totalAmount+1, 8), // +1 because 0 remaining value is not allowed
-				util.AmountToString(largestBill.Value(), 8))
+				util.AmountToString(largestBill.Value, 8))
 		}
-		if largestBill.Value() == totalAmount {
+		if largestBill.Value == totalAmount {
 			return nil, errors.New("sending to multiple addresses is performed using N-way split transaction " +
 				"which requires a single sufficiently large bill and cannot result in a bill with 0 value after the " +
 				"transaction")
@@ -318,19 +318,19 @@ func (w *Wallet) CollectDust(ctx context.Context, accountNumber uint64) ([]*Dust
 	return res, nil
 }
 
-func (w *Wallet) getUnlockedBills(ctx context.Context, ownerID []byte) ([]sdktypes.Bill, error) {
-	var unlockedBills []sdktypes.Bill
+func (w *Wallet) getUnlockedBills(ctx context.Context, ownerID []byte) ([]*sdktypes.Bill, error) {
+	var unlockedBills []*sdktypes.Bill
 	bills, err := w.moneyClient.GetBills(ctx, ownerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch bills: %w", err)
 	}
 	// sort bills by value largest first
 	sort.Slice(bills, func(i, j int) bool {
-		return bills[i].Value() > bills[j].Value()
+		return bills[i].Value > bills[j].Value
 	})
 	// filter locked bills
 	for _, b := range bills {
-		if b.LockStatus() == 0 {
+		if b.LockStatus == 0 {
 			unlockedBills = append(unlockedBills, b)
 		}
 	}

@@ -1,4 +1,4 @@
-package client
+package types
 
 import (
 	"testing"
@@ -13,11 +13,11 @@ import (
 func TestSplitTransactionAmount(t *testing.T) {
 	receiverPubKeyHash := hash.Sum256([]byte{1})
 	billID := money.NewBillID(nil, nil)
-	b := &bill{
-		systemID: money.DefaultSystemID,
-		id:       billID,
-		value:    500,
-		counter:  1234,
+	b := &Bill{
+		SystemID: money.DefaultSystemID,
+		ID:       billID,
+		Value:    500,
+		Counter:  1234,
 	}
 	amount := uint64(150)
 	timeout := uint64(100)
@@ -35,7 +35,7 @@ func TestSplitTransactionAmount(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.EqualValues(t, b.systemID, tx.SystemID())
+	require.EqualValues(t, b.SystemID, tx.SystemID())
 	require.EqualValues(t, billID, tx.UnitID())
 	require.EqualValues(t, timeout, tx.Timeout())
 	require.Equal(t, refNo, tx.Payload.ClientMetadata.ReferenceNumber)
@@ -47,5 +47,5 @@ func TestSplitTransactionAmount(t *testing.T) {
 	require.Equal(t, amount, so.TargetUnits[0].Amount)
 	require.EqualValues(t, templates.NewP2pkh256BytesFromKeyHash(receiverPubKeyHash), so.TargetUnits[0].OwnerCondition)
 	require.EqualValues(t, 350, so.RemainingValue)
-	require.EqualValues(t, b.Counter(), so.Counter)
+	require.EqualValues(t, b.Counter, so.Counter)
 }

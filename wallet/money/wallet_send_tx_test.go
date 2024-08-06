@@ -162,7 +162,7 @@ func TestWalletSendFunction_BillWithExactAmount(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, txProofs, 1)
 	require.Equal(t, money.PayloadTypeTransfer, txProofs[0].TxRecord.TransactionOrder.PayloadType())
-	require.EqualValues(t, exactBill.ID(), txProofs[0].TxRecord.TransactionOrder.UnitID())
+	require.EqualValues(t, exactBill.ID, txProofs[0].TxRecord.TransactionOrder.UnitID())
 }
 
 func TestWalletSendFunction_NWaySplit(t *testing.T) {
@@ -192,7 +192,7 @@ func TestWalletSendFunction_NWaySplit(t *testing.T) {
 	require.Len(t, txProofs, 1)
 	txProof := txProofs[0]
 	require.Equal(t, money.PayloadTypeSplit, txProof.TxRecord.TransactionOrder.PayloadType())
-	require.EqualValues(t, bill.ID(), txProof.TxRecord.TransactionOrder.UnitID())
+	require.EqualValues(t, bill.ID, txProof.TxRecord.TransactionOrder.UnitID())
 	attr := &money.SplitAttributes{}
 	err = txProof.TxRecord.TransactionOrder.UnmarshalAttributes(attr)
 	require.NoError(t, err)

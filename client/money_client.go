@@ -30,7 +30,7 @@ func NewMoneyPartitionClient(ctx context.Context, rpcUrl string) (sdktypes.Money
 
 // GetBill returns bill for the given bill id.
 // Returns nil,nil if the bill does not exist.
-func (c *moneyPartitionClient) GetBill(ctx context.Context, unitID types.UnitID) (sdktypes.Bill, error) {
+func (c *moneyPartitionClient) GetBill(ctx context.Context, unitID types.UnitID) (*sdktypes.Bill, error) {
 	var u *sdktypes.Unit[money.BillData]
 	if err := c.RpcClient.CallContext(ctx, &u, "state_getUnit", unitID, false); err != nil {
 		return nil, err
@@ -39,22 +39,22 @@ func (c *moneyPartitionClient) GetBill(ctx context.Context, unitID types.UnitID)
 		return nil, nil
 	}
 
-	return &bill{
-		systemID:   u.SystemID,
-		id:         u.UnitID,
-		value:      u.Data.V,
-		lastUpdate: u.Data.T,
-		counter:    u.Data.Counter,
-		lockStatus: u.Data.Locked,
+	return &sdktypes.Bill{
+		SystemID:   u.SystemID,
+		ID:         u.UnitID,
+		Value:      u.Data.V,
+		LastUpdate: u.Data.T,
+		Counter:    u.Data.Counter,
+		LockStatus: u.Data.Locked,
 	}, nil
 }
 
-func (c *moneyPartitionClient) GetBills(ctx context.Context, ownerID []byte) ([]sdktypes.Bill, error) {
+func (c *moneyPartitionClient) GetBills(ctx context.Context, ownerID []byte) ([]*sdktypes.Bill, error) {
 	unitIDs, err := c.GetUnitsByOwnerID(ctx, ownerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch owner units: %w", err)
 	}
-	var bills []sdktypes.Bill
+	var bills []*sdktypes.Bill
 	for _, unitID := range unitIDs {
 		if !unitID.HasType(money.BillUnitType) {
 			continue

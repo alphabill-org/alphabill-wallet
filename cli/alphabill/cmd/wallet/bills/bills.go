@@ -67,7 +67,7 @@ func execListCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	type accountBillGroup struct {
 		accountIndex uint64
 		pubKey       []byte
-		bills        []sdktypes.Bill
+		bills        []*sdktypes.Bill
 	}
 	var accountBillGroups []*accountBillGroup
 	if accountNumber == 0 {
@@ -103,8 +103,8 @@ func execListCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 			config.WalletConfig.Base.ConsoleWriter.Println(fmt.Sprintf("Account #%d", group.accountIndex+1))
 		}
 		for j, bill := range group.bills {
-			billValueStr := util.AmountToString(bill.Value(), 8)
-			config.WalletConfig.Base.ConsoleWriter.Println(fmt.Sprintf("#%d 0x%s %s%s", j+1, bill.ID().String(), billValueStr, getLockedReasonString(bill)))
+			billValueStr := util.AmountToString(bill.Value, 8)
+			config.WalletConfig.Base.ConsoleWriter.Println(fmt.Sprintf("#%d 0x%s %s%s", j+1, bill.ID.String(), billValueStr, getLockedReasonString(bill)))
 		}
 	}
 	return nil
@@ -162,7 +162,7 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch bill: %w", err)
 	}
-	if bill.LockStatus() != 0 {
+	if bill.LockStatus != 0 {
 		return errors.New("bill is already locked")
 	}
 	roundNumber, err := moneyClient.GetRoundNumber(cmd.Context())
@@ -240,7 +240,7 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch bill: %w", err)
 	}
-	if bill.LockStatus() == 0 {
+	if bill.LockStatus == 0 {
 		return errors.New("bill is already unlocked")
 	}
 
@@ -265,9 +265,9 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	return nil
 }
 
-func getLockedReasonString(bill sdktypes.Bill) string {
-	if bill.LockStatus() != 0 {
-		return fmt.Sprintf(" (%s)", wallet.LockReason(bill.LockStatus()).String())
+func getLockedReasonString(bill *sdktypes.Bill) string {
+	if bill.LockStatus != 0 {
+		return fmt.Sprintf(" (%s)", wallet.LockReason(bill.LockStatus).String())
 	}
 	return ""
 }
