@@ -30,7 +30,7 @@ func NewTokensPartitionClient(ctx context.Context, rpcUrl string) (sdktypes.Toke
 
 // GetFungibleToken returns fungible token for the given token id.
 // Returns nil,nil if the token does not exist.
-func (c *tokensPartitionClient) GetFungibleToken(ctx context.Context, tokenID sdktypes.TokenID) (sdktypes.FungibleToken, error) {
+func (c *tokensPartitionClient) GetFungibleToken(ctx context.Context, tokenID sdktypes.TokenID) (*sdktypes.FungibleToken, error) {
 	if !tokenID.HasType(tokens.FungibleTokenUnitType) {
 		return nil, fmt.Errorf("invalid fungible token id: %s", tokenID)
 	}
@@ -51,25 +51,23 @@ func (c *tokensPartitionClient) GetFungibleToken(ctx context.Context, tokenID sd
 		return nil, nil
 	}
 
-	return &fungibleToken{
-		token: token{
-			systemID:       ft.SystemID,
-			id:             ft.UnitID,
-			symbol:         ftType.Data.Symbol,
-			typeID:         ft.Data.TokenType,
-			typeName:       ftType.Data.Name,
-			ownerPredicate: ft.OwnerPredicate,
-			counter:        ft.Data.Counter,
-			lockStatus:     ft.Data.Locked,
-		},
-		amount:        ft.Data.Value,
-		decimalPlaces: ftType.Data.DecimalPlaces,
+	return &sdktypes.FungibleToken{
+		SystemID:       ft.SystemID,
+		ID:             ft.UnitID,
+		Symbol:         ftType.Data.Symbol,
+		TypeID:         ft.Data.TokenType,
+		TypeName:       ftType.Data.Name,
+		OwnerPredicate: ft.OwnerPredicate,
+		Counter:        ft.Data.Counter,
+		LockStatus:     ft.Data.Locked,
+		Amount:         ft.Data.Value,
+		DecimalPlaces:  ftType.Data.DecimalPlaces,
 	}, nil
 }
 
 // GetNonFungibleToken returns non-fungible token for the given token id.
 // Returns nil,nil if the token does not exist.
-func (c *tokensPartitionClient) GetNonFungibleToken(ctx context.Context, tokenID sdktypes.TokenID) (sdktypes.NonFungibleToken, error) {
+func (c *tokensPartitionClient) GetNonFungibleToken(ctx context.Context, tokenID sdktypes.TokenID) (*sdktypes.NonFungibleToken, error) {
 	if !tokenID.HasType(tokens.NonFungibleTokenUnitType) {
 		return nil, fmt.Errorf("invalid non-fungible token id: %s", tokenID)
 	}
@@ -90,32 +88,30 @@ func (c *tokensPartitionClient) GetNonFungibleToken(ctx context.Context, tokenID
 		return nil, nil
 	}
 
-	return &nonFungibleToken{
-		token: token{
-			systemID:       nft.SystemID,
-			id:             nft.UnitID,
-			symbol:         nftType.Data.Symbol,
-			typeID:         nft.Data.TypeID,
-			typeName:       nftType.Data.Name,
-			ownerPredicate: nft.OwnerPredicate,
-			counter:        nft.Data.Counter,
-			lockStatus:     nft.Data.Locked,
-		},
-		name:                nft.Data.Name,
-		uri:                 nft.Data.URI,
-		data:                nft.Data.Data,
-		dataUpdatePredicate: nft.Data.DataUpdatePredicate,
+	return &sdktypes.NonFungibleToken{
+		SystemID:            nft.SystemID,
+		ID:                  nft.UnitID,
+		Symbol:              nftType.Data.Symbol,
+		TypeID:              nft.Data.TypeID,
+		TypeName:            nftType.Data.Name,
+		OwnerPredicate:      nft.OwnerPredicate,
+		Counter:             nft.Data.Counter,
+		LockStatus:          nft.Data.Locked,
+		Name:                nft.Data.Name,
+		URI:                 nft.Data.URI,
+		Data:                nft.Data.Data,
+		DataUpdatePredicate: nft.Data.DataUpdatePredicate,
 	}, nil
 }
 
 // GetFungibleTokens returns fungible tokens for the given owner id.
-func (c *tokensPartitionClient) GetFungibleTokens(ctx context.Context, ownerID []byte) ([]sdktypes.FungibleToken, error) {
+func (c *tokensPartitionClient) GetFungibleTokens(ctx context.Context, ownerID []byte) ([]*sdktypes.FungibleToken, error) {
 	unitIds, err := c.GetUnitsByOwnerID(ctx, ownerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch owner unit ids: %w", err)
 	}
 
-	var fungibleTokens []sdktypes.FungibleToken
+	var fungibleTokens []*sdktypes.FungibleToken
 	for _, unitID := range unitIds {
 		if !unitID.HasType(tokens.FungibleTokenUnitType) {
 			continue
@@ -131,13 +127,13 @@ func (c *tokensPartitionClient) GetFungibleTokens(ctx context.Context, ownerID [
 }
 
 // GetNonFungibleTokens returns non-fungible tokens for the given owner id.
-func (c *tokensPartitionClient) GetNonFungibleTokens(ctx context.Context, ownerID []byte) ([]sdktypes.NonFungibleToken, error) {
+func (c *tokensPartitionClient) GetNonFungibleTokens(ctx context.Context, ownerID []byte) ([]*sdktypes.NonFungibleToken, error) {
 	unitIds, err := c.GetUnitsByOwnerID(ctx, ownerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch owner unit ids: %w", err)
 	}
 
-	var nonFungibleTokens []sdktypes.NonFungibleToken
+	var nonFungibleTokens []*sdktypes.NonFungibleToken
 	for _, unitID := range unitIds {
 		if !unitID.HasType(tokens.NonFungibleTokenUnitType) {
 			continue

@@ -145,9 +145,9 @@ func TestNFTs_CustomBearer_Integration(t *testing.T) {
 	nft, err := client.GetNonFungibleToken(ctx, nftID)
 	require.NoError(t, err)
 	require.NotNil(t, nft)
-	require.Equal(t, nftID, nft.ID())
-	require.Equal(t, typeID, nft.TypeID())
-	require.EqualValues(t, templates.AlwaysTrueBytes(), nft.OwnerPredicate())
+	require.Equal(t, nftID, nft.ID)
+	require.Equal(t, typeID, nft.TypeID)
+	require.EqualValues(t, templates.AlwaysTrueBytes(), nft.OwnerPredicate)
 
 	// create temp file and write 'CBOR NULL' byte into it:
 	tmpfile, err := os.CreateTemp(t.TempDir(), "test")

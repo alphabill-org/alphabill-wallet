@@ -43,7 +43,7 @@ func (w *Wallet) CollectDust(ctx context.Context, accountNumber uint64, allowedT
 	return results, nil
 }
 
-func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, tokens []sdktypes.FungibleToken, invariantPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, tokens []*sdktypes.FungibleToken, invariantPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
 	batchCount := ((len(tokens) - 1) / maxBurnBatchSize) + 1
 	txCount := len(tokens) + batchCount*2 // +lock fee and join fee for every batch
 	fcrID, err := w.ensureFeeCredit(ctx, acc.AccountKey, txCount)
@@ -52,7 +52,7 @@ func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, tokens []sdkt
 	}
 	// first token to be joined into
 	targetToken := tokens[0]
-	totalAmountJoined := targetToken.Amount()
+	totalAmountJoined := targetToken.Amount
 	burnTokens := tokens[1:]
 	totalFees := uint64(0)
 
@@ -67,9 +67,9 @@ func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, tokens []sdkt
 		totalAmountToBeJoined := totalAmountJoined
 		var err error
 		for _, token := range burnBatch {
-			totalAmountToBeJoined, _, err = util.AddUint64(totalAmountToBeJoined, token.Amount())
+			totalAmountToBeJoined, _, err = util.AddUint64(totalAmountToBeJoined, token.Amount)
 			if err != nil {
-				w.log.WarnContext(ctx, fmt.Sprintf("unable to join tokens of type '%X', account key '0x%X': %v", token.TypeID(), acc.PubKey, err))
+				w.log.WarnContext(ctx, fmt.Sprintf("unable to join tokens of type '%X', account key '0x%X': %v", token.TypeID, acc.PubKey, err))
 				// just stop without returning error, so that we can continue with other token types
 				if totalFees > 0 {
 					return &SubmissionResult{FeeSum: totalFees}, nil
@@ -84,7 +84,7 @@ func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, tokens []sdkt
 			return nil, fmt.Errorf("failed to lock target token: %w", err)
 		}
 
-		targetToken.IncreaseCounter()
+		targetToken.Counter += 1
 		burnBatchAmount, burnFee, proofs, err := w.burnTokensForDC(ctx, acc, burnBatch, targetToken, fcrID, invariantPredicateArgs)
 		if err != nil {
 			return nil, err
@@ -96,7 +96,7 @@ func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, tokens []sdkt
 		if err != nil {
 			return nil, err
 		}
-		targetToken.IncreaseCounter()
+		targetToken.Counter += 1
 
 		totalAmountJoined += burnBatchAmount
 		totalFees += lockFee + burnFee + joinFee
@@ -104,7 +104,7 @@ func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, tokens []sdkt
 	return &SubmissionResult{FeeSum: totalFees}, nil
 }
 
-func (w *Wallet) joinTokenForDC(ctx context.Context, acc *accountKey, burnProofs []*sdktypes.Proof, targetToken sdktypes.FungibleToken, fcrID types.UnitID, invariantProofs []*PredicateInput) (uint64, error) {
+func (w *Wallet) joinTokenForDC(ctx context.Context, acc *accountKey, burnProofs []*sdktypes.Proof, targetToken *sdktypes.FungibleToken, fcrID types.UnitID, invariantProofs []*PredicateInput) (uint64, error) {
 	// explicitly sort proofs by unit ids in increasing order
 	sort.Slice(burnProofs, func(i, j int) bool {
 		a := burnProofs[i].TxRecord.TransactionOrder.UnitID()
@@ -139,7 +139,7 @@ func (w *Wallet) joinTokenForDC(ctx context.Context, acc *accountKey, burnProofs
 	return sub.Proof.TxRecord.ServerMetadata.ActualFee, nil
 }
 
-func (w *Wallet) burnTokensForDC(ctx context.Context, acc *accountKey, tokensToBurn []sdktypes.FungibleToken, targetToken sdktypes.FungibleToken, fcrID types.UnitID, invariantProofs []*PredicateInput) (uint64, uint64, []*sdktypes.Proof, error) {
+func (w *Wallet) burnTokensForDC(ctx context.Context, acc *accountKey, tokensToBurn []*sdktypes.FungibleToken, targetToken *sdktypes.FungibleToken, fcrID types.UnitID, invariantProofs []*PredicateInput) (uint64, uint64, []*sdktypes.Proof, error) {
 	burnBatch := txsubmitter.NewBatch(w.tokensClient, w.log)
 	burnBatchAmount := uint64(0)
 
@@ -148,8 +148,8 @@ func (w *Wallet) burnTokensForDC(ctx context.Context, acc *accountKey, tokensToB
 		return 0, 0, nil, fmt.Errorf("failed to get round number: %w", err)
 	}
 	for _, token := range tokensToBurn {
-		burnBatchAmount += token.Amount()
-		tx, err := token.Burn(targetToken.ID(), targetToken.Counter(),
+		burnBatchAmount += token.Amount
+		tx, err := token.Burn(targetToken.ID, targetToken.Counter,
 			tx.WithTimeout(roundNumber+txTimeoutRoundCount),
 			tx.WithFeeCreditRecordID(fcrID),
 			tx.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
@@ -174,25 +174,25 @@ func (w *Wallet) burnTokensForDC(ctx context.Context, acc *accountKey, tokensToB
 	return burnBatchAmount, feeSum, proofs, nil
 }
 
-func (w *Wallet) getTokensForDC(ctx context.Context, key sdktypes.PubKey, allowedTokenTypes []sdktypes.TokenTypeID) (map[string][]sdktypes.FungibleToken, error) {
+func (w *Wallet) getTokensForDC(ctx context.Context, key sdktypes.PubKey, allowedTokenTypes []sdktypes.TokenTypeID) (map[string][]*sdktypes.FungibleToken, error) {
 	// find tokens to join
 	allTokens, err := w.tokensClient.GetFungibleTokens(ctx, key.Hash())
 	if err != nil {
 		return nil, err
 	}
 	// group tokens by type
-	var tokensByTypes = make(map[string][]sdktypes.FungibleToken, len(allowedTokenTypes))
+	var tokensByTypes = make(map[string][]*sdktypes.FungibleToken, len(allowedTokenTypes))
 	for _, tokenType := range allowedTokenTypes {
-		tokensByTypes[string(tokenType)] = make([]sdktypes.FungibleToken, 0)
+		tokensByTypes[string(tokenType)] = make([]*sdktypes.FungibleToken, 0)
 	}
 	for _, tok := range allTokens {
-		typeID := string(tok.TypeID())
+		typeID := string(tok.TypeID)
 		tokenz, found := tokensByTypes[typeID]
 		if !found && len(allowedTokenTypes) > 0 {
 			// if filter is set, skip tokens of other types
 			continue
 		}
-		if tok.LockStatus() != 0 {
+		if tok.LockStatus != 0 {
 			continue
 		}
 		tokensByTypes[typeID] = append(tokenz, tok)
@@ -205,7 +205,7 @@ func (w *Wallet) getTokensForDC(ctx context.Context, key sdktypes.PubKey, allowe
 	return tokensByTypes, nil
 }
 
-func (w *Wallet) lockTokenForDC(ctx context.Context, acc *accountKey, fcrID types.UnitID, targetToken sdktypes.Token, invariantProofs []*PredicateInput) (uint64, error) {
+func (w *Wallet) lockTokenForDC(ctx context.Context, acc *accountKey, fcrID types.UnitID, targetToken Token, invariantProofs []*PredicateInput) (uint64, error) {
 	roundNumber, err := w.GetRoundNumber(ctx)
 	if err != nil {
 		return 0, err

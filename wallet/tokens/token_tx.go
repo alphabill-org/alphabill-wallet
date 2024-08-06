@@ -35,10 +35,10 @@ func BearerPredicateFromPubKey(receiverPubKey sdktypes.PubKey) sdktypes.Predicat
 }
 
 // assumes there's sufficient balance for the given amount, sends transactions immediately
-func (w *Wallet) doSendMultiple(ctx context.Context, amount uint64, tokens []sdktypes.FungibleToken, acc *accountKey, fcrID, receiverPubKey []byte, invariantPredicateArgs []*PredicateInput, ownerProof *PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) doSendMultiple(ctx context.Context, amount uint64, tokens []*sdktypes.FungibleToken, acc *accountKey, fcrID, receiverPubKey []byte, invariantPredicateArgs []*PredicateInput, ownerProof *PredicateInput) (*SubmissionResult, error) {
 	var accumulatedSum uint64
 	sort.Slice(tokens, func(i, j int) bool {
-		return tokens[i].Amount() > tokens[j].Amount()
+		return tokens[i].Amount > tokens[j].Amount
 	})
 
 	batch := txsubmitter.NewBatch(w.tokensClient, w.log)
@@ -54,7 +54,7 @@ func (w *Wallet) doSendMultiple(ctx context.Context, amount uint64, tokens []sdk
 			return nil, err
 		}
 		batch.Add(sub)
-		accumulatedSum += t.Amount()
+		accumulatedSum += t.Amount
 		if accumulatedSum >= amount {
 			break
 		}
@@ -69,8 +69,8 @@ func (w *Wallet) doSendMultiple(ctx context.Context, amount uint64, tokens []sdk
 	return &SubmissionResult{Submissions: batch.Submissions(), FeeSum: feeSum, AccountNumber: acc.AccountNumber()}, err
 }
 
-func (w *Wallet) prepareSplitOrTransferTx(ctx context.Context, acc *accountKey, amount uint64, ft sdktypes.FungibleToken, fcrID, receiverPubKey []byte, invariantPredicateArgs []*PredicateInput, timeout uint64, ownerProof *PredicateInput) (*txsubmitter.TxSubmission, error) {
-	if amount >= ft.Amount() {
+func (w *Wallet) prepareSplitOrTransferTx(ctx context.Context, acc *accountKey, amount uint64, ft *sdktypes.FungibleToken, fcrID, receiverPubKey []byte, invariantPredicateArgs []*PredicateInput, timeout uint64, ownerProof *PredicateInput) (*txsubmitter.TxSubmission, error) {
+	if amount >= ft.Amount {
 		tx, err := ft.Transfer(BearerPredicateFromPubKey(receiverPubKey),
 			tx.WithTimeout(timeout),
 			tx.WithFeeCreditRecordID(fcrID),

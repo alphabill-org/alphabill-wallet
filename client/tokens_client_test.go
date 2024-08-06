@@ -28,17 +28,15 @@ func TestTokensRpcClient(t *testing.T) {
 			Name:         "Name of ABC Token Type",
 			DecimalPlaces: 2,
 		}
-		ft := &fungibleToken{
-			token: token{
-				systemID: tokenType.SystemID,
-				id:       tokenID,
-				symbol:   tokenType.Symbol,
-				typeID:   tokenType.ID,
-				typeName: tokenType.Name,
-				counter:  123,
-			},
-			amount:   100,
-			decimalPlaces: tokenType.DecimalPlaces,
+		ft := &types.FungibleToken{
+			SystemID:      tokenType.SystemID,
+			ID:            tokenID,
+			Symbol:        tokenType.Symbol,
+			TypeID:        tokenType.ID,
+			TypeName:      tokenType.Name,
+			Counter:       123,
+			Amount:        100,
+			DecimalPlaces: tokenType.DecimalPlaces,
 		}
 		*service = *mocksrv.NewStateServiceMock(
 			mocksrv.WithUnit(&types.Unit[any]{
@@ -51,13 +49,13 @@ func TestTokensRpcClient(t *testing.T) {
 				},
 			}),
 			mocksrv.WithUnit(&types.Unit[any]{
-				SystemID: ft.systemID,
-				UnitID:   ft.id,
+				SystemID: ft.SystemID,
+				UnitID:   ft.ID,
 				Data: tokentxs.FungibleTokenData{
 					TokenType: tokenType.ID,
-					Value:     ft.amount,
+					Value:     ft.Amount,
 					T:         168,
-					Counter:   ft.counter,
+					Counter:   ft.Counter,
 				},
 			}),
 		)
@@ -96,18 +94,16 @@ func TestTokensRpcClient(t *testing.T) {
 			DecimalPlaces: 2,
 		}
 
-		ft := &fungibleToken{
-			token: token{
-				systemID:       tokens.DefaultSystemID,
-				id:             ftTokenID,
-				symbol:         ftTokenType.Symbol,
-				typeID:         ftTokenTypeID,
-				typeName:       ftTokenType.Name,
-				counter:        123,
-				ownerPredicate: ownerID,
-			},
-			amount:   100,
-			decimalPlaces: ftTokenType.DecimalPlaces,
+		ft := &types.FungibleToken{
+			SystemID:       tokens.DefaultSystemID,
+			ID:             ftTokenID,
+			Symbol:         ftTokenType.Symbol,
+			TypeID:         ftTokenTypeID,
+			TypeName:       ftTokenType.Name,
+			Counter:        123,
+			OwnerPredicate: ownerID,
+			Amount:         100,
+			DecimalPlaces:  ftTokenType.DecimalPlaces,
 		}
 
 		nftTokenID := tokentxs.NewNonFungibleTokenID(nil, []byte{3})
@@ -118,17 +114,15 @@ func TestTokensRpcClient(t *testing.T) {
 			Symbol:       "ABC-NFT",
 			Name:         "Non-Fungible ABC Token",
 		}
-		nft := &nonFungibleToken{
-			token: token{
-				systemID: tokens.DefaultSystemID,
-				id:       nftTokenID,
-				symbol:   nftTokenType.Symbol,
-				typeID:   nftTokenTypeID,
-				typeName: nftTokenType.Name,
-				counter:  321,
-				ownerPredicate: ownerID,
-			},
-			name:   "NFT name",
+		nft := &types.NonFungibleToken{
+			SystemID: tokens.DefaultSystemID,
+			ID:       nftTokenID,
+			Symbol:   nftTokenType.Symbol,
+			TypeID:   nftTokenTypeID,
+			TypeName: nftTokenType.Name,
+			Counter:  321,
+			OwnerPredicate: ownerID,
+			Name:   "NFT name",
 		}
 
 		// mock two tokens - one nft one ft
@@ -150,9 +144,9 @@ func TestTokensRpcClient(t *testing.T) {
 				UnitID:   ftTokenID,
 				Data: tokentxs.FungibleTokenData{
 					TokenType: ftTokenTypeID,
-					Value:     ft.amount,
+					Value:     ft.Amount,
 					T:         100,
-					Counter:   ft.counter,
+					Counter:   ft.Counter,
 				},
 				OwnerPredicate: ownerID,
 			}),
@@ -173,9 +167,9 @@ func TestTokensRpcClient(t *testing.T) {
 				UnitID:   nftTokenID,
 				Data: tokentxs.NonFungibleTokenData{
 					TypeID:  nftTokenTypeID,
-					Name:    nft.name,
+					Name:    nft.Name,
 					T:       100,
-					Counter: nft.counter,
+					Counter: nft.Counter,
 				},
 				OwnerPredicate: ownerID,
 			}),

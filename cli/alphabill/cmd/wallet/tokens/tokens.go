@@ -397,14 +397,11 @@ func execTokenCmdNewTokenFungible(cmd *cobra.Command, config *types.WalletConfig
 		return err
 	}
 
-	ft, err := client.NewFungibleToken(&client.FungibleTokenParams{
+	ft := &sdktypes.FungibleToken{
 		SystemID:       tw.SystemID(),
 		TypeID:         typeID,
 		OwnerPredicate: bearerPredicate,
 		Amount:         amount,
-	})
-	if err != nil {
-		return err
 	}
 	result, err := tw.NewFungibleToken(cmd.Context(), accountNumber, ft, ci)
 	if err != nil {
@@ -483,7 +480,7 @@ func execTokenCmdNewTokenNonFungible(cmd *cobra.Command, config *types.WalletCon
 		return err
 	}
 
-	nft, err := client.NewNonFungibleToken(&client.NonFungibleTokenParams{
+	nft := &sdktypes.NonFungibleToken{
 		SystemID:            tw.SystemID(),
 		TypeID:              typeID,
 		OwnerPredicate:      bearerPredicate,
@@ -491,9 +488,6 @@ func execTokenCmdNewTokenNonFungible(cmd *cobra.Command, config *types.WalletCon
 		URI:                 uri,
 		Data:                data,
 		DataUpdatePredicate: dataUpdatePredicate,
-	})
-	if err != nil {
-		return err
 	}
 	result, err := tw.NewNFT(cmd.Context(), accountNumber, nft, ci)
 	if err != nil {
@@ -939,11 +933,11 @@ func execTokenCmdList(cmd *cobra.Command, config *types.WalletConfig, accountNum
 			for _, t := range tokens {
 				var typeName string
 				if withAll || withTypeName {
-					typeName = fmt.Sprintf(", token-type-name='%s'", t.TypeName())
+					typeName = fmt.Sprintf(", token-type-name='%s'", t.TypeName)
 				}
-				amount := util.AmountToString(t.Amount(), t.DecimalPlaces())
+				amount := util.AmountToString(t.Amount, t.DecimalPlaces)
 				config.Base.ConsoleWriter.Println(fmt.Sprintf("ID='%s', symbol='%s', amount='%v', token-type='%s', locked='%s'",
-					t.ID(), t.Symbol(), amount, t.TypeID(), wallet.LockReason(t.LockStatus()).String()) + typeName + " (fungible)")
+					t.ID, t.Symbol, amount, t.TypeID, wallet.LockReason(t.LockStatus).String()) + typeName + " (fungible)")
 			}
 		}
 
@@ -961,17 +955,17 @@ func execTokenCmdList(cmd *cobra.Command, config *types.WalletConfig, accountNum
 			for _, t := range tokens {
 				var typeName, nftURI, nftData string
 				if withAll || withTypeName {
-					typeName = fmt.Sprintf(", token-type-name='%s'", t.TypeName())
+					typeName = fmt.Sprintf(", token-type-name='%s'", t.TypeName)
 				}
 				if withAll || withTokenURI {
-					nftURI = fmt.Sprintf(", URI='%s'", t.URI())
+					nftURI = fmt.Sprintf(", URI='%s'", t.URI)
 				}
 				if withAll || withTokenData {
-					nftData = fmt.Sprintf(", data='%X'", t.Data())
+					nftData = fmt.Sprintf(", data='%X'", t.Data)
 				}
 
 				config.Base.ConsoleWriter.Println(fmt.Sprintf("ID='%s', symbol='%s', name='%s', token-type='%s', locked='%s'",
-					t.ID(), t.Symbol(), t.Name(), t.TypeID(), wallet.LockReason(t.LockStatus()).String()) + typeName + nftURI + nftData + " (nft)")
+					t.ID, t.Symbol, t.Name, t.TypeID, wallet.LockReason(t.LockStatus).String()) + typeName + nftURI + nftData + " (nft)")
 			}
 		}
 	}

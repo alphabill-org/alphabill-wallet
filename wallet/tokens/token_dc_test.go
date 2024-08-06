@@ -18,7 +18,7 @@ func TestGetTokensForDC(t *testing.T) {
 	typeID3 := test.RandomBytes(32)
 	typeID4 := test.RandomBytes(32)
 
-	allTokens := []types.FungibleToken{
+	allTokens := []*types.FungibleToken{
 		newFungibleToken(t, testutils.RandomBytes(32), typeID1, "AB1", 100, 0),
 		newFungibleToken(t, testutils.RandomBytes(32), typeID1, "AB1", 100, 0),
 		newFungibleToken(t, testutils.RandomBytes(32), typeID2, "AB2", 100, 0),
@@ -27,7 +27,7 @@ func TestGetTokensForDC(t *testing.T) {
 	}
 
 	be := &mockTokensPartitionClient{
-		getFungibleTokens: func(_ context.Context, owner []byte) ([]types.FungibleToken, error) {
+		getFungibleTokens: func(_ context.Context, owner []byte) ([]*types.FungibleToken, error) {
 			return allTokens, nil
 		},
 	}
@@ -37,39 +37,39 @@ func TestGetTokensForDC(t *testing.T) {
 
 	tests := []struct {
 		allowedTypes []types.TokenTypeID
-		expected     map[string][]types.FungibleToken
+		expected     map[string][]*types.FungibleToken
 	}{
 		{
 			allowedTypes: nil,
-			expected:     map[string][]types.FungibleToken{string(typeID1): allTokens[:2], string(typeID2): allTokens[2:4]},
+			expected:     map[string][]*types.FungibleToken{string(typeID1): allTokens[:2], string(typeID2): allTokens[2:4]},
 		},
 		{
 			allowedTypes: make([]types.TokenTypeID, 0),
-			expected:     map[string][]types.FungibleToken{string(typeID1): allTokens[:2], string(typeID2): allTokens[2:4]},
+			expected:     map[string][]*types.FungibleToken{string(typeID1): allTokens[:2], string(typeID2): allTokens[2:4]},
 		},
 		{
 			allowedTypes: []types.TokenTypeID{test.RandomBytes(32)},
-			expected:     map[string][]types.FungibleToken{},
+			expected:     map[string][]*types.FungibleToken{},
 		},
 		{
 			allowedTypes: []types.TokenTypeID{typeID3},
-			expected:     map[string][]types.FungibleToken{},
+			expected:     map[string][]*types.FungibleToken{},
 		},
 		{
 			allowedTypes: []types.TokenTypeID{typeID1},
-			expected:     map[string][]types.FungibleToken{string(typeID1): allTokens[:2]},
+			expected:     map[string][]*types.FungibleToken{string(typeID1): allTokens[:2]},
 		},
 		{
 			allowedTypes: []types.TokenTypeID{typeID2},
-			expected:     map[string][]types.FungibleToken{string(typeID2): allTokens[2:4]},
+			expected:     map[string][]*types.FungibleToken{string(typeID2): allTokens[2:4]},
 		},
 		{
 			allowedTypes: []types.TokenTypeID{typeID1, typeID2},
-			expected:     map[string][]types.FungibleToken{string(typeID1): allTokens[:2], string(typeID2): allTokens[2:4]},
+			expected:     map[string][]*types.FungibleToken{string(typeID1): allTokens[:2], string(typeID2): allTokens[2:4]},
 		},
 		{
 			allowedTypes: []types.TokenTypeID{typeID4},
-			expected:     map[string][]types.FungibleToken{},
+			expected:     map[string][]*types.FungibleToken{},
 		},
 	}
 
