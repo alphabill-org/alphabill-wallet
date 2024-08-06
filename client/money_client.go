@@ -70,7 +70,7 @@ func (c *moneyPartitionClient) GetBills(ctx context.Context, ownerID []byte) ([]
 
 // GetFeeCreditRecordByOwnerID finds the first fee credit record in money partition for the given owner ID,
 // returns nil,nil if fee credit record does not exist.
-func (c *moneyPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (sdktypes.FeeCreditRecord, error) {
+func (c *moneyPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (*sdktypes.FeeCreditRecord, error) {
 	return c.getFeeCreditRecordByOwnerID(ctx, ownerID, money.FeeCreditRecordUnitType)
 }
 

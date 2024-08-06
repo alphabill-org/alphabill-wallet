@@ -279,7 +279,7 @@ func unlockFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
 }
 
 type FeeCreditManager interface {
-	GetFeeCredit(ctx context.Context, cmd fees.GetFeeCreditCmd) (types.FeeCreditRecord, error)
+	GetFeeCredit(ctx context.Context, cmd fees.GetFeeCreditCmd) (*types.FeeCreditRecord, error)
 	AddFeeCredit(ctx context.Context, cmd fees.AddFeeCmd) (*fees.AddFeeCmdResponse, error)
 	ReclaimFeeCredit(ctx context.Context, cmd fees.ReclaimFeeCmd) (*fees.ReclaimFeeCmdResponse, error)
 	LockFeeCredit(ctx context.Context, cmd fees.LockFeeCreditCmd) (*types.Proof, error)
@@ -302,20 +302,20 @@ func listFees(ctx context.Context, accountNumber uint64, am account.Manager, c *
 			accNum := accountIndex + 1
 			balance := uint64(0)
 			if fcr != nil {
-				balance = fcr.Balance()
+				balance = fcr.Balance
 			}
 			amountString := util.AmountToString(balance, 8)
 			consoleWriter.Println(fmt.Sprintf("Account #%d %s%s", accNum, amountString, getLockedReasonString(fcr)))
 		}
 	} else {
 		accountIndex := accountNumber - 1
-		fcb, err := w.GetFeeCredit(ctx, fees.GetFeeCreditCmd{AccountIndex: accountIndex})
+		fcr, err := w.GetFeeCredit(ctx, fees.GetFeeCreditCmd{AccountIndex: accountIndex})
 		if err != nil {
 			return err
 		}
-		amountString := util.AmountToString(fcb.Balance(), 8)
+		amountString := util.AmountToString(fcr.Balance, 8)
 		consoleWriter.Println("Partition: " + c.targetPartitionType)
-		consoleWriter.Println(fmt.Sprintf("Account #%d %s%s", accountNumber, amountString, getLockedReasonString(fcb)))
+		consoleWriter.Println(fmt.Sprintf("Account #%d %s%s", accountNumber, amountString, getLockedReasonString(fcr)))
 	}
 	return nil
 }
@@ -484,9 +484,9 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 	}
 }
 
-func getLockedReasonString(fcr types.FeeCreditRecord) string {
-	if fcr != nil && fcr.LockStatus() != 0 {
-		return fmt.Sprintf(" (%s)", wallet.LockReason(fcr.LockStatus()).String())
+func getLockedReasonString(fcr *types.FeeCreditRecord) string {
+	if fcr != nil && fcr.LockStatus != 0 {
+		return fmt.Sprintf(" (%s)", wallet.LockReason(fcr.LockStatus).String())
 	}
 	return ""
 }

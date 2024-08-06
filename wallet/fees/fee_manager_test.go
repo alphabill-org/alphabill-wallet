@@ -1279,6 +1279,6 @@ func testFeeCreditRecordIDFromPublicKey(shardPart, pubKey []byte, latestAddition
 	return money.NewFeeCreditRecordIDFromPublicKey(shardPart, pubKey, latestAdditionTime)
 }
 
-func newMoneyFCR(accountKey *account.AccountKey, fcr *fc.FeeCreditRecord) sdktypes.FeeCreditRecord {
+func newMoneyFCR(accountKey *account.AccountKey, fcr *fc.FeeCreditRecord) *sdktypes.FeeCreditRecord {
 	return testutil.NewMoneyFCR(accountKey.PubKeyHash.Sha256, fcr.Balance, fcr.Locked, fcr.Counter)
 }

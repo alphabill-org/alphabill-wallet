@@ -134,14 +134,14 @@ func (b *Bill) SwapWithDustCollector(transDCProofs []*Proof, txOptions ...tx.Opt
 	return txo, nil
 }
 
-func (b *Bill) TransferToFeeCredit(fcr FeeCreditRecord, amount uint64, latestAdditionTime uint64, txOptions ...tx.Option) (*types.TransactionOrder, error) {
+func (b *Bill) TransferToFeeCredit(fcr *FeeCreditRecord, amount uint64, latestAdditionTime uint64, txOptions ...tx.Option) (*types.TransactionOrder, error) {
 	attr := &fc.TransferFeeCreditAttributes{
 		Amount:                 amount,
-		TargetSystemIdentifier: fcr.SystemID(),
-		TargetRecordID:         fcr.ID(),
+		TargetSystemIdentifier: fcr.SystemID,
+		TargetRecordID:         fcr.ID,
 		LatestAdditionTime:     latestAdditionTime,
 		// TODO: rename to TargetRecordCounter? or TargetUnitID above?
-		TargetUnitCounter:      fcr.Counter(),
+		TargetUnitCounter:      fcr.Counter,
 		Counter:                b.Counter,
 	}
 	txPayload, err := tx.NewPayload(b.SystemID, b.ID, fc.PayloadTypeTransferFeeCredit, attr, txOptions...)

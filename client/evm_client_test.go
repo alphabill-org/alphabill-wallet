@@ -18,7 +18,7 @@ func TestGetFeeCreditRecordByOwnerID(t *testing.T) {
 		ownerID      []byte
 		setupMock    func() *mocksrv.StateServiceMock
 		expectError  bool
-		assertResult func(result sdktypes.FeeCreditRecord)
+		assertResult func(result *sdktypes.FeeCreditRecord)
 	}{
 		{
 			name:    "WithExistingOwnerID",
@@ -41,13 +41,13 @@ func TestGetFeeCreditRecordByOwnerID(t *testing.T) {
 				return service
 			},
 			expectError: false,
-			assertResult: func(fcr sdktypes.FeeCreditRecord) {
+			assertResult: func(fcr *sdktypes.FeeCreditRecord) {
 				require.NotNil(t, fcr)
-				require.EqualValues(t, []byte{11}, fcr.ID())
-				require.NotNil(t, fcr.Counter())
-				require.EqualValues(t, 1, fcr.Balance())
-				require.EqualValues(t, 5, *fcr.Counter())
-				require.EqualValues(t, 42, fcr.Timeout())
+				require.EqualValues(t, []byte{11}, fcr.ID)
+				require.NotNil(t, fcr.Counter)
+				require.EqualValues(t, 1, fcr.Balance)
+				require.EqualValues(t, 5, *fcr.Counter)
+				require.EqualValues(t, 42, fcr.Timeout)
 			},
 		},
 		{
@@ -55,7 +55,7 @@ func TestGetFeeCreditRecordByOwnerID(t *testing.T) {
 			ownerID:     []byte{2},
 			setupMock:   func() *mocksrv.StateServiceMock { return mocksrv.NewStateServiceMock() },
 			expectError: false,
-			assertResult: func(fcr sdktypes.FeeCreditRecord) {
+			assertResult: func(fcr *sdktypes.FeeCreditRecord) {
 				require.Nil(t, fcr)
 			},
 		},

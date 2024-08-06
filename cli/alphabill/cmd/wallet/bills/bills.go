@@ -155,7 +155,7 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
 	}
-	if fcr == nil || fcr.Balance() < txbuilder.MaxFee {
+	if fcr == nil || fcr.Balance < txbuilder.MaxFee {
 		return errors.New("not enough fee credit in wallet")
 	}
 	bill, err := moneyClient.GetBill(cmd.Context(), types.UnitID(config.BillID))
@@ -171,7 +171,7 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	}
 	tx, err := bill.Lock(wallet.LockReasonManual,
 		tx.WithTimeout(roundNumber+10),
-		tx.WithFeeCreditRecordID(fcr.ID()),
+		tx.WithFeeCreditRecordID(fcr.ID),
 		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return fmt.Errorf("failed to create lock tx: %w", err)
@@ -232,7 +232,7 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
 	}
-	if fcr == nil || fcr.Balance() < txbuilder.MaxFee {
+	if fcr == nil || fcr.Balance < txbuilder.MaxFee {
 		return errors.New("not enough fee credit in wallet")
 	}
 
@@ -250,7 +250,7 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	}
 	tx, err := bill.Unlock(
 		tx.WithTimeout(roundNumber+10),
-		tx.WithFeeCreditRecordID(fcr.ID()),
+		tx.WithFeeCreditRecordID(fcr.ID),
 		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return fmt.Errorf("failed to create unlock tx: %w", err)

@@ -86,13 +86,13 @@ func (w *DustCollector) runDustCollection(ctx context.Context, accountKey *accou
 
 	// verify balance
 	txsCost := txbuilder.MaxFee * uint64(len(billsToSwap)+2) // +2 for swap and lock tx
-	if fcr.Balance() < txsCost {
+	if fcr.Balance < txsCost {
 		return nil, fmt.Errorf("insufficient fee credit balance for transactions: need at least %d Tema "+
-			"but have %d Tema to send lock tx, %d dust transfer transactions and swap tx", txsCost, fcr.Balance(), len(billsToSwap))
+			"but have %d Tema to send lock tx, %d dust transfer transactions and swap tx", txsCost, fcr.Balance, len(billsToSwap))
 	}
 
 	// lock target bill
-	lockTxSub, err := w.lockTargetBill(ctx, accountKey, targetBill, fcr.ID())
+	lockTxSub, err := w.lockTargetBill(ctx, accountKey, targetBill, fcr.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to lock target bill: %w", err)
 	}
@@ -100,7 +100,7 @@ func (w *DustCollector) runDustCollection(ctx context.Context, accountKey *accou
 	targetBill.Counter += 1
 
 	// exec swap (increment counter for successful lock transaction)
-	return w.submitDCBatch(ctx, accountKey, fcr.ID(), lockTxSub, targetBill, billsToSwap)
+	return w.submitDCBatch(ctx, accountKey, fcr.ID, lockTxSub, targetBill, billsToSwap)
 }
 
 // submitDCBatch creates dust transfers from given bills and locked target bill.

@@ -33,7 +33,7 @@ func NewEvmPartitionClient(ctx context.Context, rpcUrl string) (sdktypes.Partiti
 
 // GetFeeCreditRecordByOwnerID finds the first fee credit record in evm partition for the given owner ID,
 // returns nil if fee credit record does not exist.
-func (c *evmPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (sdktypes.FeeCreditRecord, error) {
+func (c *evmPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (*sdktypes.FeeCreditRecord, error) {
 	unitIDs, err := c.GetUnitsByOwnerID(ctx, ownerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch units: %w", err)
@@ -55,13 +55,13 @@ func (c *evmPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ow
 		Timeout: stateObj.AlphaBill.Timeout,
 	}
 	counterCopy := fcr.Counter
-	return &feeCreditRecord{
-		systemID:   u.SystemID,
-		id:         u.UnitID,
-		balance:    fcr.Balance,
-		counter:    &counterCopy,
-		timeout:    fcr.Timeout,
-		lockStatus: 0,
+	return &sdktypes.FeeCreditRecord{
+		SystemID:   u.SystemID,
+		ID:         u.UnitID,
+		Balance:    fcr.Balance,
+		Counter:    &counterCopy,
+		Timeout:    fcr.Timeout,
+		LockStatus: 0,
 	}, nil
 }
 

@@ -17,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
 
-	"github.com/alphabill-org/alphabill-wallet/client"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
@@ -874,7 +873,7 @@ type mockTokensPartitionClient struct {
 	sendTransaction               func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
 	confirmTransaction            func(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*sdktypes.Proof, error)
 	getTransactionProof           func(ctx context.Context, txHash types.Bytes) (*sdktypes.Proof, error)
-	getFeeCreditRecordByOwnerID   func(ctx context.Context, ownerID []byte) (sdktypes.FeeCreditRecord, error)
+	getFeeCreditRecordByOwnerID   func(ctx context.Context, ownerID []byte) (*sdktypes.FeeCreditRecord, error)
 	getBlock                      func(ctx context.Context, roundNumber uint64) (*types.Block, error)
 	getUnitsByOwnerID             func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error)
 }
@@ -963,13 +962,18 @@ func (m *mockTokensPartitionClient) GetTransactionProof(ctx context.Context, txH
 	return nil, fmt.Errorf("GetTxProof not implemented")
 }
 
-func (m *mockTokensPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (sdktypes.FeeCreditRecord, error) {
+func (m *mockTokensPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (*sdktypes.FeeCreditRecord, error) {
 	if m.getFeeCreditRecordByOwnerID != nil {
 		return m.getFeeCreditRecordByOwnerID(ctx, ownerID)
 	}
 	c := uint64(2)
 	id := tokens.NewFeeCreditRecordID(nil, []byte{1})
-	return client.NewFeeCreditRecord(tokens.DefaultSystemID, id, 100000, 0, &c), nil
+	return &sdktypes.FeeCreditRecord{
+		SystemID: tokens.DefaultSystemID,
+		ID:       id,
+		Balance:  100000,
+		Counter:  &c,
+	}, nil
 }
 
 func (m *mockTokensPartitionClient) GetBlock(ctx context.Context, roundNumber uint64) (*types.Block, error) {

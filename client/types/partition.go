@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/types"
 
 	"github.com/alphabill-org/alphabill-wallet/client/tx"
@@ -16,22 +17,17 @@ type (
 		SendTransaction(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
 		ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*Proof, error)
 		GetTransactionProof(ctx context.Context, txHash types.Bytes) (*Proof, error)
-		GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (FeeCreditRecord, error)
+		GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (*FeeCreditRecord, error)
 		Close()
 	}
 
-	FeeCreditRecord interface {
-		SystemID() types.SystemID
-		ID() types.UnitID
-		Balance() uint64
-		Counter() *uint64
-		Timeout() uint64
-		LockStatus() uint64
-
-		AddFeeCredit(ownerPredicate []byte, transFCProof *Proof, txOptions ...tx.Option) (*types.TransactionOrder, error)
-		CloseFeeCredit(targetBillID types.UnitID, targetBillCounter uint64, txOptions ...tx.Option) (*types.TransactionOrder, error)
-		Lock(lockStatus uint64, txOptions ...tx.Option) (*types.TransactionOrder, error)
-		Unlock(txOptions ...tx.Option) (*types.TransactionOrder, error)
+	FeeCreditRecord struct {
+		SystemID   types.SystemID
+		ID         types.UnitID
+		Balance    uint64
+		Timeout    uint64
+		LockStatus uint64
+		Counter    *uint64 // TODO: add a separate flag to inidicate if its a new fcr
 	}
 
 	NodeInfoResponse struct {
@@ -56,6 +52,76 @@ type (
 		TxProof  *types.TxProof           `json:"txProof"`
 	}
 )
+
+func (f *FeeCreditRecord) AddFeeCredit(ownerPredicate []byte, transFCProof *Proof, txOptions ...tx.Option) (*types.TransactionOrder, error) {
+	attr := &fc.AddFeeCreditAttributes{
+		FeeCreditOwnerCondition: ownerPredicate,
+		FeeCreditTransfer:       transFCProof.TxRecord,
+		FeeCreditTransferProof:  transFCProof.TxProof,
+	}
+	txPayload, err := tx.NewPayload(f.SystemID, f.ID, fc.PayloadTypeAddFeeCredit, attr, txOptions...)
+	if err != nil {
+		return nil, err
+	}
+	txo := tx.NewTransactionOrder(txPayload)
+	err = tx.GenerateAndSetProofs(txo, nil, nil, txOptions...)
+	if err != nil {
+		return nil, err
+	}
+	return txo, nil
+}
+
+func (f *FeeCreditRecord) CloseFeeCredit(targetBillID types.UnitID, targetBillCounter uint64, txOptions ...tx.Option) (*types.TransactionOrder, error) {
+	attr := &fc.CloseFeeCreditAttributes{
+		Amount:            f.Balance,
+		TargetUnitID:      targetBillID,
+		TargetUnitCounter: targetBillCounter,
+		Counter:           *f.Counter,
+	}
+	txPayload, err := tx.NewPayload(f.SystemID, f.ID, fc.PayloadTypeCloseFeeCredit, attr, txOptions...)
+	if err != nil {
+		return nil, err
+	}
+	txo := tx.NewTransactionOrder(txPayload)
+	err = tx.GenerateAndSetProofs(txo, nil, nil, txOptions...)
+	if err != nil {
+		return nil, err
+	}
+	return txo, nil
+}
+
+func (f *FeeCreditRecord) Lock(lockStatus uint64, txOptions ...tx.Option) (*types.TransactionOrder, error) {
+	attr := &fc.LockFeeCreditAttributes{
+		LockStatus: lockStatus,
+		Counter:    *f.Counter,
+	}
+	txPayload, err := tx.NewPayload(f.SystemID, f.ID, fc.PayloadTypeLockFeeCredit, attr, txOptions...)
+	if err != nil {
+		return nil, err
+	}
+	txo := tx.NewTransactionOrder(txPayload)
+	err = tx.GenerateAndSetProofs(txo, nil, nil, txOptions...)
+	if err != nil {
+		return nil, err
+	}
+	return txo, nil
+}
+
+func (f *FeeCreditRecord) Unlock(txOptions ...tx.Option) (*types.TransactionOrder, error) {
+	attr := &fc.UnlockFeeCreditAttributes{
+		Counter: *f.Counter,
+	}
+	txPayload, err := tx.NewPayload(f.SystemID, f.ID, fc.PayloadTypeUnlockFeeCredit, attr, txOptions...)
+	if err != nil {
+		return nil, err
+	}
+	txo := tx.NewTransactionOrder(txPayload)
+	err = tx.GenerateAndSetProofs(txo, nil, nil, txOptions...)
+	if err != nil {
+		return nil, err
+	}
+	return txo, nil
+}
 
 func (p *Proof) GetActualFee() uint64 {
 	if p == nil {

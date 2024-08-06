@@ -613,7 +613,7 @@ func (w *Wallet) GetRoundNumber(ctx context.Context) (uint64, error) {
 // GetFeeCredit returns fee credit record for the given account,
 // can return nil if fee credit record has not been created yet.
 // Deprecated: faucet still uses, will be removed
-func (w *Wallet) GetFeeCredit(ctx context.Context, cmd fees.GetFeeCreditCmd) (sdktypes.FeeCreditRecord, error) {
+func (w *Wallet) GetFeeCredit(ctx context.Context, cmd fees.GetFeeCreditCmd) (*sdktypes.FeeCreditRecord, error) {
 	ac, err := w.am.GetAccountKey(cmd.AccountIndex)
 	if err != nil {
 		return nil, err
@@ -638,10 +638,10 @@ func (w *Wallet) ensureFeeCredit(ctx context.Context, accountKey *account.Accoun
 		return nil, ErrNoFeeCredit
 	}
 	maxFee := uint64(txCount) * maxFee
-	if fcr.Balance() < maxFee {
+	if fcr.Balance < maxFee {
 		return nil, ErrInsufficientFeeCredit
 	}
-	return fcr.ID(), nil
+	return fcr.ID, nil
 }
 
 func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID types.UnitID, invariantProofs []*PredicateInput, ownerProof *PredicateInput) (*SubmissionResult, error) {

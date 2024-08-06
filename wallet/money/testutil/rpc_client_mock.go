@@ -9,7 +9,6 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
 
-	"github.com/alphabill-org/alphabill-wallet/client"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 )
@@ -21,8 +20,8 @@ type (
 		Err                   error
 		Bills                 map[string]*sdktypes.Bill
 		OwnerBills            []*sdktypes.Bill
-		FeeCreditRecords      map[string]sdktypes.FeeCreditRecord
-		OwnerFeeCreditRecords []sdktypes.FeeCreditRecord
+		FeeCreditRecords      map[string]*sdktypes.FeeCreditRecord
+		OwnerFeeCreditRecords []*sdktypes.FeeCreditRecord
 		RoundNumber           uint64
 		TxProofs              map[string]*sdktypes.Proof
 
@@ -35,8 +34,8 @@ type (
 		TxProofs              map[string]*sdktypes.Proof
 		Bills                 map[string]*sdktypes.Bill
 		OwnerBills            []*sdktypes.Bill
-		FeeCreditRecords      map[string]sdktypes.FeeCreditRecord
-		OwnerFeeCreditRecords []sdktypes.FeeCreditRecord
+		FeeCreditRecords      map[string]*sdktypes.FeeCreditRecord
+		OwnerFeeCreditRecords []*sdktypes.FeeCreditRecord
 	}
 
 	Option func(*Options)
@@ -45,7 +44,7 @@ type (
 func NewRpcClientMock(opts ...Option) *RpcClientMock {
 	options := &Options{
 		Bills:            map[string]*sdktypes.Bill{},
-		FeeCreditRecords: map[string]sdktypes.FeeCreditRecord{},
+		FeeCreditRecords: map[string]*sdktypes.FeeCreditRecord{},
 		TxProofs:         map[string]*sdktypes.Proof{},
 	}
 	for _, option := range opts {
@@ -69,9 +68,9 @@ func WithOwnerBill(bill *sdktypes.Bill) Option {
 	}
 }
 
-func WithOwnerFeeCreditRecord(fcr sdktypes.FeeCreditRecord) Option {
+func WithOwnerFeeCreditRecord(fcr *sdktypes.FeeCreditRecord) Option {
 	return func(o *Options) {
-		o.FeeCreditRecords[string(fcr.ID())] = fcr
+		o.FeeCreditRecords[string(fcr.ID)] = fcr
 		o.OwnerFeeCreditRecords = append(o.OwnerFeeCreditRecords, fcr)
 	}
 }
@@ -129,7 +128,7 @@ func (c *RpcClientMock) GetBills(ctx context.Context, ownerID []byte) ([]*sdktyp
 	return nil, nil
 }
 
-func (c *RpcClientMock) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (sdktypes.FeeCreditRecord, error) {
+func (c *RpcClientMock) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (*sdktypes.FeeCreditRecord, error) {
 	if c.Err != nil {
 		return nil, c.Err
 	}
@@ -219,7 +218,14 @@ func NewLockedBill(value uint64, counter, lockStatus uint64) *sdktypes.Bill {
 	}
 }
 
-func NewMoneyFCR(pubKeyHash []byte, balance uint64, lockStatus uint64, counter uint64) sdktypes.FeeCreditRecord {
+func NewMoneyFCR(pubKeyHash []byte, balance uint64, lockStatus uint64, counter uint64) *sdktypes.FeeCreditRecord {
 	id := money.NewFeeCreditRecordIDFromPublicKeyHash(nil, pubKeyHash, 1000+transferFCLatestAdditionTime)
-	return client.NewFeeCreditRecord(money.DefaultSystemID, id, balance, lockStatus, &counter)
+	return &sdktypes.FeeCreditRecord{
+		SystemID:   money.DefaultSystemID,
+		ID:         id,
+		Balance:    balance,
+		LockStatus: lockStatus,
+		Counter:    &counter,
+	}
+
 }

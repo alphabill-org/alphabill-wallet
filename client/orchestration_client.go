@@ -29,7 +29,7 @@ func NewOrchestrationPartitionClient(ctx context.Context, rpcUrl string) (sdktyp
 
 // GetFeeCreditRecordByOwnerID finds the first fee credit record in orchestration partition for the given owner ID.
 // Returns nil if fee credit record does not exist.
-func (c *orchestrationPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (sdktypes.FeeCreditRecord, error) {
+func (c *orchestrationPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (*sdktypes.FeeCreditRecord, error) {
 	// No FeeCreditRecords in orchestration partition, yet?
 	return nil, nil
 }

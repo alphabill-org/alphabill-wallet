@@ -13,7 +13,6 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/types"
 
-	"github.com/alphabill-org/alphabill-wallet/client"
 	"github.com/alphabill-org/alphabill-wallet/client/tx"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/util"
@@ -281,7 +280,7 @@ func (w *FeeManager) ReclaimFeeCredit(ctx context.Context, cmd ReclaimFeeCmd) (*
 }
 
 // GetFeeCredit returns fee credit record for given account, returns nil if fee credit record has not been created yet.
-func (w *FeeManager) GetFeeCredit(ctx context.Context, cmd GetFeeCreditCmd) (sdktypes.FeeCreditRecord, error) {
+func (w *FeeManager) GetFeeCredit(ctx context.Context, cmd GetFeeCreditCmd) (*sdktypes.FeeCreditRecord, error) {
 	accountKey, err := w.am.GetAccountKey(cmd.AccountIndex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load account key: %w", err)
@@ -303,10 +302,10 @@ func (w *FeeManager) LockFeeCredit(ctx context.Context, cmd LockFeeCreditCmd) (*
 	if fcb == nil {
 		return nil, errors.New("fee credit record does not exist")
 	}
-	if fcb.Balance() < 2*txbuilder.MaxFee {
+	if fcb.Balance < 2*txbuilder.MaxFee {
 		return nil, errors.New("not enough fee credit in wallet")
 	}
-	if fcb.LockStatus() != 0 {
+	if fcb.LockStatus != 0 {
 		return nil, fmt.Errorf("fee credit record is already locked")
 	}
 	timeout, err := w.getTargetPartitionTimeout(ctx)
@@ -338,10 +337,10 @@ func (w *FeeManager) UnlockFeeCredit(ctx context.Context, cmd UnlockFeeCreditCmd
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch fee credit: %w", err)
 	}
-	if fcb.Balance() == 0 {
+	if fcb.Balance == 0 {
 		return nil, errors.New("no fee credit in wallet")
 	}
-	if fcb.LockStatus() == 0 {
+	if fcb.LockStatus == 0 {
 		return nil, fmt.Errorf("fee credit record is already unlocked")
 	}
 	timeout, err := w.getTargetPartitionTimeout(ctx)
@@ -375,7 +374,7 @@ func (w *FeeManager) addFees(ctx context.Context, accountKey *account.AccountKey
 		return nil, err
 	}
 	// verify fee credit record is not locked
-	if fcr != nil && fcr.LockStatus() != 0 {
+	if fcr != nil && fcr.LockStatus != 0 {
 		return nil, fmt.Errorf("fee credit record is locked")
 	}
 
@@ -490,12 +489,12 @@ func (w *FeeManager) sendLockFCTx(ctx context.Context, accountKey *account.Accou
 		return fmt.Errorf("failed to fetch fee credit record: %w", err)
 	}
 	// cannot lock fee credit record if it does not exist, or value is 0
-	if fcr == nil || fcr.Balance() == 0 {
+	if fcr == nil || fcr.Balance == 0 {
 		w.log.Info("skipping lockFC transaction, target partition fee credit record does not exist or has zero value")
 		return nil
 	}
 	// verify fee credit record is not locked
-	if fcr.LockStatus() != 0 {
+	if fcr.LockStatus != 0 {
 		return errors.New("fee credit record is locked")
 	}
 
@@ -598,7 +597,10 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 	}
 	if fcr == nil {
 		fcrID := w.targetPartitionFcrIDFn(nil, accountKey.PubKey, latestAdditionTime)
-		fcr = client.NewFeeCreditRecord(w.targetPartitionSystemID, fcrID, 0, 0, nil)
+		fcr = &sdktypes.FeeCreditRecord{
+			SystemID: w.targetPartitionSystemID,
+			ID:       fcrID,
+		}
 	}
 	sourceBill := &sdktypes.Bill{
 		SystemID: w.moneySystemID,
@@ -614,7 +616,7 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 
 	// store transferFC transaction write-ahead log
 	feeCtx.TransferFCTx = tx
-	feeCtx.FeeCreditRecordID = fcr.ID()
+	feeCtx.FeeCreditRecordID = fcr.ID
 	if err := w.db.SetAddFeeContext(accountKey.PubKey, feeCtx); err != nil {
 		return fmt.Errorf("failed to store transferFC write-ahead log: %w", err)
 	}
@@ -684,7 +686,10 @@ func (w *FeeManager) sendAddFCTx(ctx context.Context, accountKey *account.Accoun
 	}
 
 	// need to use same FCR that was calculated form transferFC timeout, best to store it in WAL
-	fcr := client.NewFeeCreditRecord(feeCtx.TargetPartitionID, feeCtx.FeeCreditRecordID, 0, 0, nil)
+	fcr := &sdktypes.FeeCreditRecord{
+		SystemID: feeCtx.TargetPartitionID,
+		ID:       feeCtx.FeeCreditRecordID,
+	}
 	ownerPredicate := templates.NewP2pkh256BytesFromKeyHash(accountKey.PubKeyHash.Sha256)
 	addFCTx, err := fcr.AddFeeCredit(ownerPredicate, feeCtx.TransferFCProof,
 		tx.WithTimeout(timeout),
@@ -719,14 +724,14 @@ func (w *FeeManager) sendAddFCTx(ctx context.Context, accountKey *account.Accoun
 // target bill, stores status in WriteAheadLog which can be used to continue the process later, in case of any errors.
 func (w *FeeManager) reclaimFees(ctx context.Context, accountKey *account.AccountKey, cmd ReclaimFeeCmd) (*ReclaimFeeCmdResponse, error) {
 	// fetch fee credit record
-	fcb, err := w.fetchTargetPartitionFCR(ctx, accountKey)
+	fcr, err := w.fetchTargetPartitionFCR(ctx, accountKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch fee credit record: %w", err)
 	}
-	if fcb.LockStatus() != 0 {
+	if fcr.LockStatus != 0 {
 		return nil, errors.New("fee credit record is locked")
 	}
-	if fcb.Balance() < MinimumFeeAmount {
+	if fcr.Balance < MinimumFeeAmount {
 		return nil, ErrMinimumFeeAmount
 	}
 
@@ -812,7 +817,7 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 		return fmt.Errorf("failed to fetch money fee credit record: %w", err)
 	}
 	// do not lock target bill if there's not enough fee credit on money partition
-	if moneyFCR == nil || moneyFCR.Balance() == 0 {
+	if moneyFCR == nil || moneyFCR.Balance == 0 {
 		w.log.Info("skipping lock transaction, not enough fee credit in money partition")
 		return nil
 	}
@@ -829,7 +834,7 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 	}
 	tx, err := targetBill.Lock(wallet.LockReasonReclaimFees,
 		tx.WithTimeout(timeout),
-		tx.WithFeeCreditRecordID(moneyFCR.ID()),
+		tx.WithFeeCreditRecordID(moneyFCR.ID),
 		tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return fmt.Errorf("failed to create lock transaction: %w", err)
@@ -1036,11 +1041,11 @@ func (w *FeeManager) sumValues(bills []*sdktypes.Bill) uint64 {
 	return sum
 }
 
-func (w *FeeManager) fetchTargetPartitionFCR(ctx context.Context, accountKey *account.AccountKey) (sdktypes.FeeCreditRecord, error) {
+func (w *FeeManager) fetchTargetPartitionFCR(ctx context.Context, accountKey *account.AccountKey) (*sdktypes.FeeCreditRecord, error) {
 	return w.targetPartitionClient.GetFeeCreditRecordByOwnerID(ctx, accountKey.PubKeyHash.Sha256)
 }
 
-func (w *FeeManager) fetchMoneyPartitionFCB(ctx context.Context, accountKey *account.AccountKey) (sdktypes.FeeCreditRecord, error) {
+func (w *FeeManager) fetchMoneyPartitionFCB(ctx context.Context, accountKey *account.AccountKey) (*sdktypes.FeeCreditRecord, error) {
 	return w.moneyClient.GetFeeCreditRecordByOwnerID(ctx, accountKey.PubKeyHash.Sha256)
 }
 
@@ -1049,7 +1054,7 @@ func (w *FeeManager) unlockFeeCreditRecord(ctx context.Context, accountKey *acco
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch fee credit record: %w", err)
 	}
-	if fcr == nil || fcr.LockStatus() == 0 {
+	if fcr == nil || fcr.LockStatus == 0 {
 		return nil, nil
 	}
 	timeout, err := w.getTargetPartitionTimeout(ctx)
@@ -1087,7 +1092,7 @@ func (w *FeeManager) unlockBill(ctx context.Context, accountKey *account.Account
 		}
 		unlockTx, err := bill.Unlock(
 			tx.WithTimeout(timeout),
-			tx.WithFeeCreditRecordID(fcr.ID()),
+			tx.WithFeeCreditRecordID(fcr.ID),
 			tx.WithOwnerProof(tx.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create unlock tx: %w", err)

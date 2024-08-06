@@ -203,7 +203,7 @@ func TestWalletSendFunction_NWaySplit(t *testing.T) {
 	}
 }
 
-func newMoneyFCR(t *testing.T, pubKeyHashHex string, balance, counter uint64) sdktypes.FeeCreditRecord {
+func newMoneyFCR(t *testing.T, pubKeyHashHex string, balance, counter uint64) *sdktypes.FeeCreditRecord {
 	pubKeyHash, err := hex.DecodeString(pubKeyHashHex)
 	require.NoError(t, err)
 	return testutil.NewMoneyFCR(pubKeyHash, balance, 0, counter)
