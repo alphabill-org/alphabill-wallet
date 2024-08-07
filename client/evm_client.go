@@ -17,6 +17,8 @@ type (
 		*partitionClient
 	}
 
+	// TODO: these structs are also defined in alphabill/txsystem/evm/statedb,
+	// should be moved to alphabill-go-base
 	stateObject struct {
 		Account   *account
 		AlphaBill *alphaBillLink
