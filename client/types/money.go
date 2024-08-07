@@ -138,7 +138,6 @@ func (b *Bill) TransferToFeeCredit(fcr *FeeCreditRecord, amount uint64, latestAd
 		TargetSystemIdentifier: fcr.SystemID,
 		TargetRecordID:         fcr.ID,
 		LatestAdditionTime:     latestAdditionTime,
-		// TODO: rename to TargetRecordCounter? or TargetUnitID above?
 		TargetUnitCounter:      fcr.Counter,
 		Counter:                b.Counter,
 	}
