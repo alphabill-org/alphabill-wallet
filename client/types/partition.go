@@ -25,7 +25,7 @@ type (
 		Balance    uint64
 		Timeout    uint64
 		LockStatus uint64
-		Counter    *uint64 // TODO: add a separate flag to inidicate if its a new fcr
+		Counter    *uint64
 	}
 
 	NodeInfoResponse struct {
