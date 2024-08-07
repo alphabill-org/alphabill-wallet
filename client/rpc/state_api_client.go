@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/ethereum/go-ethereum/rpc"
 
@@ -44,37 +43,6 @@ func (c *StateAPIClient) GetUnitsByOwnerID(ctx context.Context, ownerID types.By
 	var res []types.UnitID
 	err := c.RpcClient.CallContext(ctx, &res, "state_getUnitsByOwnerID", ownerID)
 	return res, err
-}
-
-// getFeeCreditRecord returns fee credit record for the given unit ID.
-// Returns api.ErrNotFound if the fee credit bill does not exist.
-func (c *StateAPIClient) getFeeCreditRecord(ctx context.Context, unitID types.UnitID) (*sdktypes.FeeCreditRecord, error) {
-	var u *sdktypes.Unit[fc.FeeCreditRecord]
-	if err := c.RpcClient.CallContext(ctx, &u, "state_getUnit", unitID, false); err != nil {
-		return nil, err
-	}
-	if u == nil {
-		return nil, nil
-	}
-	return &sdktypes.FeeCreditRecord{
-		ID:   u.UnitID,
-		Data: &u.Data,
-	}, nil
-}
-
-// GetFeeCreditRecordByOwnerID finds the first fee credit record that belongs to the given owner identifier,
-// returns nil if not found.
-func (c *StateAPIClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID, fcrUnitType []byte) (*sdktypes.FeeCreditRecord, error) {
-	unitIDs, err := c.GetUnitsByOwnerID(ctx, ownerID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch units: %w", err)
-	}
-	for _, unitID := range unitIDs {
-		if unitID.HasType(fcrUnitType) {
-			return c.getFeeCreditRecord(ctx, unitID)
-		}
-	}
-	return nil, nil
 }
 
 // SendTransaction sends the given transaction to the connected node.

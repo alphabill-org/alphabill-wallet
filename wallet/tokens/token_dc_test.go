@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/client/types"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 )
 
@@ -17,26 +18,17 @@ func TestGetTokensForDC(t *testing.T) {
 	typeID3 := test.RandomBytes(32)
 	typeID4 := test.RandomBytes(32)
 
-	allTokens := []*types.TokenUnit{
-		{ID: test.RandomBytes(32), Kind: types.Fungible, Symbol: "AB1", TypeID: typeID1, Amount: 100},
-		{ID: test.RandomBytes(32), Kind: types.Fungible, Symbol: "AB1", TypeID: typeID1, Amount: 100},
-		{ID: test.RandomBytes(32), Kind: types.Fungible, Symbol: "AB2", TypeID: typeID2, Amount: 100},
-		{ID: test.RandomBytes(32), Kind: types.Fungible, Symbol: "AB2", TypeID: typeID2, Amount: 100},
-		{ID: test.RandomBytes(32), Kind: types.NonFungible, Symbol: "AB3", TypeID: typeID3},
-		{ID: test.RandomBytes(32), Kind: types.Fungible, Symbol: "AB4", TypeID: typeID4, Locked: 1},
+	allTokens := []*types.FungibleToken{
+		newFungibleToken(t, testutils.RandomBytes(32), typeID1, "AB1", 100, 0),
+		newFungibleToken(t, testutils.RandomBytes(32), typeID1, "AB1", 100, 0),
+		newFungibleToken(t, testutils.RandomBytes(32), typeID2, "AB2", 100, 0),
+		newFungibleToken(t, testutils.RandomBytes(32), typeID2, "AB2", 100, 0),
+		newFungibleToken(t, testutils.RandomBytes(32), typeID4, "AB4", 0, 1),
 	}
 
-	be := &mockTokensRpcClient{
-		getTokens: func(_ context.Context, kind types.Kind, owner []byte) ([]*types.TokenUnit, error) {
-			require.Equal(t, types.Fungible, kind)
-			var res []*types.TokenUnit
-			for _, tok := range allTokens {
-				if tok.Kind != kind {
-					continue
-				}
-				res = append(res, tok)
-			}
-			return res, nil
+	be := &mockTokensPartitionClient{
+		getFungibleTokens: func(_ context.Context, owner []byte) ([]*types.FungibleToken, error) {
+			return allTokens, nil
 		},
 	}
 	tw := initTestWallet(t, be)
@@ -45,39 +37,39 @@ func TestGetTokensForDC(t *testing.T) {
 
 	tests := []struct {
 		allowedTypes []types.TokenTypeID
-		expected     map[string][]*types.TokenUnit
+		expected     map[string][]*types.FungibleToken
 	}{
 		{
 			allowedTypes: nil,
-			expected:     map[string][]*types.TokenUnit{string(typeID1): allTokens[:2], string(typeID2): allTokens[2:4]},
+			expected:     map[string][]*types.FungibleToken{string(typeID1): allTokens[:2], string(typeID2): allTokens[2:4]},
 		},
 		{
 			allowedTypes: make([]types.TokenTypeID, 0),
-			expected:     map[string][]*types.TokenUnit{string(typeID1): allTokens[:2], string(typeID2): allTokens[2:4]},
+			expected:     map[string][]*types.FungibleToken{string(typeID1): allTokens[:2], string(typeID2): allTokens[2:4]},
 		},
 		{
 			allowedTypes: []types.TokenTypeID{test.RandomBytes(32)},
-			expected:     map[string][]*types.TokenUnit{},
+			expected:     map[string][]*types.FungibleToken{},
 		},
 		{
 			allowedTypes: []types.TokenTypeID{typeID3},
-			expected:     map[string][]*types.TokenUnit{},
+			expected:     map[string][]*types.FungibleToken{},
 		},
 		{
 			allowedTypes: []types.TokenTypeID{typeID1},
-			expected:     map[string][]*types.TokenUnit{string(typeID1): allTokens[:2]},
+			expected:     map[string][]*types.FungibleToken{string(typeID1): allTokens[:2]},
 		},
 		{
 			allowedTypes: []types.TokenTypeID{typeID2},
-			expected:     map[string][]*types.TokenUnit{string(typeID2): allTokens[2:4]},
+			expected:     map[string][]*types.FungibleToken{string(typeID2): allTokens[2:4]},
 		},
 		{
 			allowedTypes: []types.TokenTypeID{typeID1, typeID2},
-			expected:     map[string][]*types.TokenUnit{string(typeID1): allTokens[:2], string(typeID2): allTokens[2:4]},
+			expected:     map[string][]*types.FungibleToken{string(typeID1): allTokens[:2], string(typeID2): allTokens[2:4]},
 		},
 		{
 			allowedTypes: []types.TokenTypeID{typeID4},
-			expected:     map[string][]*types.TokenUnit{},
+			expected:     map[string][]*types.FungibleToken{},
 		},
 	}
 

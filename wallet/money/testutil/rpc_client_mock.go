@@ -6,11 +6,11 @@ import (
 	"crypto"
 	"log/slog"
 
-	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
 
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 )
 
 const transferFCLatestAdditionTime = 65536 // relative timeout after which transferFC unit becomes unusable
@@ -68,10 +68,10 @@ func WithOwnerBill(bill *sdktypes.Bill) Option {
 	}
 }
 
-func WithOwnerFeeCreditRecord(fcb *sdktypes.FeeCreditRecord) Option {
+func WithOwnerFeeCreditRecord(fcr *sdktypes.FeeCreditRecord) Option {
 	return func(o *Options) {
-		o.FeeCreditRecords[string(fcb.ID)] = fcb
-		o.OwnerFeeCreditRecords = append(o.OwnerFeeCreditRecords, fcb)
+		o.FeeCreditRecords[string(fcr.ID)] = fcr
+		o.OwnerFeeCreditRecords = append(o.OwnerFeeCreditRecords, fcr)
 	}
 }
 
@@ -195,18 +195,37 @@ func (c *RpcClientMock) Close() {
 	// Nothing to close
 }
 
-func NewMoneyBill(unitIDPart []byte, billData *money.BillData) *sdktypes.Bill {
-	billID := money.NewBillID(nil, unitIDPart)
-	return &sdktypes.Bill{
-		ID:   billID,
-		Data: billData,
+func newMockTx(id types.UnitID, payloadType string) *types.TransactionOrder {
+	return &types.TransactionOrder{
+		Payload: &types.Payload{
+			Type:   payloadType,
+			UnitID: id,
+		},
 	}
 }
 
-func NewMoneyFCR(pubKeyHash []byte, fcrData *fc.FeeCreditRecord) *sdktypes.FeeCreditRecord {
-	fcrID := money.NewFeeCreditRecordIDFromPublicKeyHash(nil, pubKeyHash, 1000+transferFCLatestAdditionTime)
-	return &sdktypes.FeeCreditRecord{
-		ID:   fcrID,
-		Data: fcrData,
+func NewBill(value, counter uint64) *sdktypes.Bill {
+	return NewLockedBill(value, counter, 0)
+}
+
+func NewLockedBill(value uint64, counter, lockStatus uint64) *sdktypes.Bill {
+	return &sdktypes.Bill{
+		SystemID:   money.DefaultSystemID,
+		ID:         money.NewBillID(nil, testutils.RandomBytes(32)),
+		Value:      value,
+		LockStatus: lockStatus,
+		Counter:    counter,
 	}
+}
+
+func NewMoneyFCR(pubKeyHash []byte, balance uint64, lockStatus uint64, counter uint64) *sdktypes.FeeCreditRecord {
+	id := money.NewFeeCreditRecordIDFromPublicKeyHash(nil, pubKeyHash, 1000+transferFCLatestAdditionTime)
+	return &sdktypes.FeeCreditRecord{
+		SystemID:   money.DefaultSystemID,
+		ID:         id,
+		Balance:    balance,
+		LockStatus: lockStatus,
+		Counter:    &counter,
+	}
+
 }

@@ -14,7 +14,6 @@ import (
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/evm"
 	"github.com/alphabill-org/alphabill-go-base/types"
-	testtransaction "github.com/alphabill-org/alphabill/txsystem/testutils/transaction"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
@@ -45,16 +44,19 @@ func writeCBORError(t *testing.T, w http.ResponseWriter, e error, code int) {
 	}
 }
 
-func createTxOrder(t *testing.T) *types.TransactionOrder {
-	transaction := testtransaction.NewTransactionOrder(t,
-		testtransaction.WithAttributes([]byte{0, 0, 0, 0, 0, 0, 0}),
-		testtransaction.WithUnitID([]byte{0, 0, 0, 1}),
-		testtransaction.WithSystemID(1),
-		testtransaction.WithOwnerProof([]byte{0, 0, 0, 2}),
-		testtransaction.WithClientMetadata(&types.ClientMetadata{Timeout: 100}),
-		testtransaction.WithPayloadType("test"),
-	)
-	return transaction
+func createTxOrder() *types.TransactionOrder {
+	return &types.TransactionOrder{
+		Payload: &types.Payload{
+			SystemID:       1,
+			UnitID:         []byte{0, 0, 0, 1},
+			Type:           "test",
+			Attributes:     []byte{0, 0, 0, 0, 0, 0, 0},
+			ClientMetadata: &types.ClientMetadata{
+				Timeout: 100,
+			},
+		},
+		OwnerProof: []byte{0, 0, 0, 2},
+	}
 }
 
 func TestEvmClient_GetBalance(t *testing.T) {
@@ -430,7 +432,7 @@ func TestEvmClient_PostTransaction(t *testing.T) {
 			}},
 		}
 
-		tx := createTxOrder(t)
+		tx := createTxOrder()
 		err := cli.PostTransaction(context.Background(), tx)
 		require.NoError(t, err)
 	})
@@ -462,7 +464,7 @@ func TestEvmClient_PostTransaction(t *testing.T) {
 			}},
 		}
 
-		tx := createTxOrder(t)
+		tx := createTxOrder()
 		err := cli.PostTransaction(context.Background(), tx)
 		require.NoError(t, err)
 	})

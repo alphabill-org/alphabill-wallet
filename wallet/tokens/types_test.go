@@ -79,13 +79,14 @@ func TestParsePredicateArgument(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			argument, err := parsePredicateArgument(tt.input, tt.accNumber, mock)
+			argument, err := parsePredicateArgument(tt.input, 1, mock)
 			if tt.err != "" {
 				require.ErrorContains(t, err, tt.err)
 			} else {
 				require.NoError(t, err)
 				if tt.accNumber > 0 {
-					require.Equal(t, tt.accNumber, argument.AccountNumber)
+					require.NotNil(t, argument.AccountKey)
+					require.Equal(t, tt.accNumber, mock.recordedIndex+1)
 				} else {
 					require.EqualValues(t, tt.result, argument.Argument)
 				}

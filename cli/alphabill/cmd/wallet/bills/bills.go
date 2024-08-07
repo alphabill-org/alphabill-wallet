@@ -102,7 +102,7 @@ func execListCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 			config.WalletConfig.Base.ConsoleWriter.Println(fmt.Sprintf("Account #%d", group.accountIndex+1))
 		}
 		for j, bill := range group.bills {
-			billValueStr := util.AmountToString(bill.Value(), 8)
+			billValueStr := util.AmountToString(bill.Value, 8)
 			config.WalletConfig.Base.ConsoleWriter.Println(fmt.Sprintf("#%d 0x%s %s%s", j+1, bill.ID.String(), billValueStr, getLockedReasonString(bill)))
 		}
 	}
@@ -150,25 +150,28 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if !strings.HasPrefix(infoResponse.Name, moneyTypeVar.String()) {
 		return errors.New("invalid rpc url provided for money partition")
 	}
-	fcb, err := moneyClient.GetFeeCreditRecordByOwnerID(cmd.Context(), accountKey.PubKeyHash.Sha256)
+	fcr, err := moneyClient.GetFeeCreditRecordByOwnerID(cmd.Context(), accountKey.PubKeyHash.Sha256)
 	if err != nil {
 		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
 	}
-	if fcb.Balance() < txbuilder.MaxFee {
+	if fcr == nil || fcr.Balance < txbuilder.MaxFee {
 		return errors.New("not enough fee credit in wallet")
 	}
 	bill, err := moneyClient.GetBill(cmd.Context(), types.UnitID(config.BillID))
 	if err != nil {
 		return fmt.Errorf("failed to fetch bill: %w", err)
 	}
-	if bill.IsLocked() {
+	if bill.LockStatus != 0 {
 		return errors.New("bill is already locked")
 	}
 	roundNumber, err := moneyClient.GetRoundNumber(cmd.Context())
 	if err != nil {
 		return fmt.Errorf("failed to fetch round number: %w", err)
 	}
-	tx, err := txbuilder.NewLockTx(accountKey, types.SystemID(config.SystemID), bill.ID, fcb.ID, bill.Counter(), wallet.LockReasonManual, roundNumber+10)
+	tx, err := bill.Lock(wallet.LockReasonManual,
+		sdktypes.WithTimeout(roundNumber+10),
+		sdktypes.WithFeeCreditRecordID(fcr.ID),
+		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return fmt.Errorf("failed to create lock tx: %w", err)
 	}
@@ -224,11 +227,11 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 		return errors.New("invalid rpc url provided for money partition")
 	}
 
-	fcb, err := moneyClient.GetFeeCreditRecordByOwnerID(cmd.Context(), accountKey.PubKeyHash.Sha256)
+	fcr, err := moneyClient.GetFeeCreditRecordByOwnerID(cmd.Context(), accountKey.PubKeyHash.Sha256)
 	if err != nil {
 		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
 	}
-	if fcb.Balance() < txbuilder.MaxFee {
+	if fcr == nil || fcr.Balance < txbuilder.MaxFee {
 		return errors.New("not enough fee credit in wallet")
 	}
 
@@ -236,7 +239,7 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch bill: %w", err)
 	}
-	if !bill.IsLocked() {
+	if bill.LockStatus == 0 {
 		return errors.New("bill is already unlocked")
 	}
 
@@ -244,7 +247,10 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch round number: %w", err)
 	}
-	tx, err := txbuilder.NewUnlockTx(accountKey, types.SystemID(config.SystemID), bill, fcb.ID, roundNumber+10)
+	tx, err := bill.Unlock(
+		sdktypes.WithTimeout(roundNumber+10),
+		sdktypes.WithFeeCreditRecordID(fcr.ID),
+		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
 	if err != nil {
 		return fmt.Errorf("failed to create unlock tx: %w", err)
 	}
@@ -259,8 +265,8 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 }
 
 func getLockedReasonString(bill *sdktypes.Bill) string {
-	if bill.IsLocked() {
-		return fmt.Sprintf(" (%s)", wallet.LockReason(bill.Data.Locked).String())
+	if bill.LockStatus != 0 {
+		return fmt.Sprintf(" (%s)", wallet.LockReason(bill.LockStatus).String())
 	}
 	return ""
 }

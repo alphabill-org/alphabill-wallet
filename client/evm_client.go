@@ -7,33 +7,42 @@ import (
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/types"
-	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
-	"github.com/alphabill-org/alphabill/txsystem/evm/statedb"
 	"github.com/holiman/uint256"
 )
 
 type (
 	evmPartitionClient struct {
-		*rpc.AdminAPIClient
-		*rpc.StateAPIClient
+		*partitionClient
+	}
+
+	// TODO: these structs are also defined in alphabill/txsystem/evm/statedb,
+	// should be moved to alphabill-go-base
+	stateObject struct {
+		Account   *account
+		AlphaBill *alphaBillLink
+	}
+
+	account struct {
+		Balance  *uint256.Int
+	}
+
+	alphaBillLink struct {
+		Counter uint64
+		Timeout uint64
 	}
 )
 
 // NewEvmPartitionClient creates an evm partition client for the given RPC URL.
 func NewEvmPartitionClient(ctx context.Context, rpcUrl string) (sdktypes.PartitionClient, error) {
-	adminApiClient, err := rpc.NewAdminAPIClient(ctx, rpcUrl)
+	partitionClient, err := newPartitionClient(ctx, rpcUrl)
 	if err != nil {
 		return nil, err
 	}
-	stateApiClient, err := rpc.NewStateAPIClient(ctx, rpcUrl)
-	if err != nil {
-		return nil, err
-	}
+
 	return &evmPartitionClient{
-		AdminAPIClient: adminApiClient,
-		StateAPIClient: stateApiClient,
+		partitionClient: partitionClient,
 	}, nil
 }
 
@@ -47,7 +56,7 @@ func (c *evmPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ow
 	if len(unitIDs) == 0 {
 		return nil, nil
 	}
-	var u *sdktypes.Unit[statedb.StateObject]
+	var u *sdktypes.Unit[stateObject]
 	if err := c.RpcClient.CallContext(ctx, &u, "state_getUnit", unitIDs[0], false); err != nil {
 		return nil, err
 	}
@@ -60,9 +69,14 @@ func (c *evmPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ow
 		Counter: stateObj.AlphaBill.Counter,
 		Timeout: stateObj.AlphaBill.Timeout,
 	}
+	counterCopy := fcr.Counter
 	return &sdktypes.FeeCreditRecord{
-		ID:   u.UnitID,
-		Data: fcr,
+		SystemID:   u.SystemID,
+		ID:         u.UnitID,
+		Balance:    fcr.Balance,
+		Counter:    &counterCopy,
+		Timeout:    fcr.Timeout,
+		LockStatus: 0,
 	}, nil
 }
 

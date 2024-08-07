@@ -19,6 +19,15 @@ type (
 		Close()
 	}
 
+	FeeCreditRecord struct {
+		SystemID   types.SystemID
+		ID         types.UnitID
+		Balance    uint64
+		Timeout    uint64
+		LockStatus uint64
+		Counter    *uint64
+	}
+
 	NodeInfoResponse struct {
 		SystemID            types.SystemID `json:"systemId"` // hex encoded system identifier
 		Name                string         `json:"name"`     // one of [money node | tokens node | evm node]
@@ -34,11 +43,6 @@ type (
 		Addresses  []string `json:"addresses"`
 	}
 
-	FeeCreditRecord struct {
-		ID   types.UnitID
-		Data *fc.FeeCreditRecord
-	}
-
 	// Proof wrapper struct around TxRecord and TxProof
 	Proof struct {
 		_        struct{}                 `cbor:",toarray"`
@@ -47,28 +51,74 @@ type (
 	}
 )
 
-func (b *FeeCreditRecord) IsLocked() bool {
-	if b == nil {
-		return false
+func (f *FeeCreditRecord) AddFeeCredit(ownerPredicate []byte, transFCProof *Proof, txOptions ...Option) (*types.TransactionOrder, error) {
+	attr := &fc.AddFeeCreditAttributes{
+		FeeCreditOwnerCondition: ownerPredicate,
+		FeeCreditTransfer:       transFCProof.TxRecord,
+		FeeCreditTransferProof:  transFCProof.TxProof,
 	}
-	return b.Data.IsLocked()
+	txPayload, err := NewPayload(f.SystemID, f.ID, fc.PayloadTypeAddFeeCredit, attr, txOptions...)
+	if err != nil {
+		return nil, err
+	}
+	tx := NewTransactionOrder(txPayload)
+	err = GenerateAndSetProofs(tx, nil, nil, txOptions...)
+	if err != nil {
+		return nil, err
+	}
+	return tx, nil
 }
 
-func (b *FeeCreditRecord) Counter() uint64 {
-	if b == nil {
-		return 0
+func (f *FeeCreditRecord) CloseFeeCredit(targetBillID types.UnitID, targetBillCounter uint64, txOptions ...Option) (*types.TransactionOrder, error) {
+	attr := &fc.CloseFeeCreditAttributes{
+		Amount:            f.Balance,
+		TargetUnitID:      targetBillID,
+		TargetUnitCounter: targetBillCounter,
+		Counter:           *f.Counter,
 	}
-	return b.Data.GetCounter()
+	txPayload, err := NewPayload(f.SystemID, f.ID, fc.PayloadTypeCloseFeeCredit, attr, txOptions...)
+	if err != nil {
+		return nil, err
+	}
+	tx := NewTransactionOrder(txPayload)
+	err = GenerateAndSetProofs(tx, nil, nil, txOptions...)
+	if err != nil {
+		return nil, err
+	}
+	return tx, nil
 }
 
-func (b *FeeCreditRecord) Balance() uint64 {
-	if b == nil {
-		return 0
+func (f *FeeCreditRecord) Lock(lockStatus uint64, txOptions ...Option) (*types.TransactionOrder, error) {
+	attr := &fc.LockFeeCreditAttributes{
+		LockStatus: lockStatus,
+		Counter:    *f.Counter,
 	}
-	if b.Data == nil {
-		return 0
+	txPayload, err := NewPayload(f.SystemID, f.ID, fc.PayloadTypeLockFeeCredit, attr, txOptions...)
+	if err != nil {
+		return nil, err
 	}
-	return b.Data.Balance
+	tx := NewTransactionOrder(txPayload)
+	err = GenerateAndSetProofs(tx, nil, nil, txOptions...)
+	if err != nil {
+		return nil, err
+	}
+	return tx, nil
+}
+
+func (f *FeeCreditRecord) Unlock(txOptions ...Option) (*types.TransactionOrder, error) {
+	attr := &fc.UnlockFeeCreditAttributes{
+		Counter: *f.Counter,
+	}
+	txPayload, err := NewPayload(f.SystemID, f.ID, fc.PayloadTypeUnlockFeeCredit, attr, txOptions...)
+	if err != nil {
+		return nil, err
+	}
+	tx := NewTransactionOrder(txPayload)
+	err = GenerateAndSetProofs(tx, nil, nil, txOptions...)
+	if err != nil {
+		return nil, err
+	}
+	return tx, nil
 }
 
 func (p *Proof) GetActualFee() uint64 {

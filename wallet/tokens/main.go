@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"math"
 
+	"github.com/alphabill-org/alphabill-go-base/predicates"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill-go-base/types"
@@ -16,26 +17,23 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
-	"github.com/alphabill-org/alphabill/predicates"
 )
 
 const (
 	AllAccounts uint64 = 0
-
-	uriMaxSize  = 4 * 1024
-	dataMaxSize = 64 * 1024
-	nameMaxSize = 256
+	maxFee             = 10
+	uriMaxSize         = 4 * 1024
+	dataMaxSize        = 64 * 1024
+	nameMaxSize        = 256
 )
 
 var (
-	errInvalidURILength  = fmt.Errorf("URI exceeds the maximum allowed size of %v bytes", uriMaxSize)
-	errInvalidDataLength = fmt.Errorf("data exceeds the maximum allowed size of %v bytes", dataMaxSize)
-	errInvalidNameLength = fmt.Errorf("name exceeds the maximum allowed size of %v bytes", nameMaxSize)
-
 	ErrNoFeeCredit           = errors.New("no fee credit in token wallet")
 	ErrInsufficientFeeCredit = errors.New("insufficient fee credit balance for transaction(s)")
+	errInvalidURILength      = fmt.Errorf("URI exceeds the maximum allowed size of %v bytes", uriMaxSize)
+	errInvalidDataLength     = fmt.Errorf("data exceeds the maximum allowed size of %v bytes", dataMaxSize)
+	errInvalidNameLength     = fmt.Errorf("name exceeds the maximum allowed size of %v bytes", nameMaxSize)
 )
 
 type (
@@ -53,6 +51,14 @@ type (
 		Submissions   []*txsubmitter.TxSubmission
 		AccountNumber uint64
 		FeeSum        uint64
+	}
+
+	Token interface {
+		GetID() sdktypes.TokenID
+		GetOwnerPredicate() sdktypes.Predicate
+		GetLockStatus() uint64
+		Lock(lockStatus uint64, txOptions ...sdktypes.Option) (*types.TransactionOrder, error)
+		Unlock(txOptions ...sdktypes.Option) (*types.TransactionOrder, error)
 	}
 )
 
@@ -108,117 +114,194 @@ func (w *Wallet) GetAccountManager() account.Manager {
 	return w.am
 }
 
-func (w *Wallet) NewFungibleType(ctx context.Context, accountNumber uint64, attrs CreateFungibleTokenTypeAttributes, typeID sdktypes.TokenTypeID, subtypePredicateArgs []*PredicateInput) (*SubmissionResult, error) {
-	w.log.Info("Creating new fungible token type")
-	if typeID == nil {
+func (w *Wallet) SystemID() types.SystemID {
+	return w.systemID
+}
+
+func (w *Wallet) NewFungibleType(ctx context.Context, accountNumber uint64, ft *sdktypes.FungibleTokenType, subtypePredicateInputs []*PredicateInput) (*SubmissionResult, error) {
+	w.log.Info("Creating new FT type")
+
+	if ft.ID == nil {
 		var err error
-		typeID, err = tokens.NewRandomFungibleTokenTypeID(nil)
+		ft.ID, err = tokens.NewRandomFungibleTokenTypeID(nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate fungible token type ID: %w", err)
 		}
 	}
 
-	if len(typeID) != tokens.UnitIDLength {
+	if len(ft.ID) != tokens.UnitIDLength {
 		return nil, fmt.Errorf("invalid token type ID: expected hex length is %d characters (%d bytes)",
 			tokens.UnitIDLength*2, tokens.UnitIDLength)
 	}
-	if !typeID.HasType(tokens.FungibleTokenTypeUnitType) {
+	if !ft.ID.HasType(tokens.FungibleTokenTypeUnitType) {
 		return nil, fmt.Errorf("invalid token type ID: expected unit type is 0x%X", tokens.FungibleTokenTypeUnitType)
 	}
-	if attrs.ParentTypeID != nil && !bytes.Equal(attrs.ParentTypeID, sdktypes.NoParent) {
-		parentType, err := w.GetTokenType(ctx, attrs.ParentTypeID)
+
+	if ft.ParentTypeID != nil && !bytes.Equal(ft.ParentTypeID, sdktypes.NoParent) {
+		parentType, err := w.GetFungibleTokenType(ctx, ft.ParentTypeID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get parent type: %w", err)
 		}
-		if parentType.DecimalPlaces != attrs.DecimalPlaces {
-			return nil, fmt.Errorf("parent type requires %d decimal places, got %d", parentType.DecimalPlaces, attrs.DecimalPlaces)
+		if parentType.DecimalPlaces != ft.DecimalPlaces {
+			return nil, fmt.Errorf("parent type requires %d decimal places, got %d", parentType.DecimalPlaces, ft.DecimalPlaces)
 		}
 	}
-	sub, err := w.newType(ctx, accountNumber, tokens.PayloadTypeCreateFungibleTokenType, attrs.ToCBOR(), typeID, subtypePredicateArgs)
+
+	acc, err := w.getAccount(accountNumber)
+	if err != nil {
+		return nil, err
+	}
+	fcrID, err := w.ensureFeeCredit(ctx, acc.AccountKey, 1)
+	if err != nil {
+		return nil, err
+	}
+	roundNumber, err := w.GetRoundNumber(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return newSingleResult(sub, accountNumber), nil
+	tx, err := ft.Create(
+		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
+		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithExtraProofs(newProofGenerators(subtypePredicateInputs)))
+	if err != nil {
+		return nil, err
+	}
+
+	return w.submitTx(ctx, tx, accountNumber)
 }
 
-func (w *Wallet) NewNonFungibleType(ctx context.Context, accountNumber uint64, attrs CreateNonFungibleTokenTypeAttributes, typeId sdktypes.TokenTypeID, subtypePredicateArgs []*PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) NewNonFungibleType(ctx context.Context, accountNumber uint64, nft *sdktypes.NonFungibleTokenType, subtypePredicateInputs []*PredicateInput) (*SubmissionResult, error) {
 	w.log.Info("Creating new NFT type")
-	if typeId == nil {
+
+	if nft.ID == nil {
 		var err error
-		typeId, err = tokens.NewRandomNonFungibleTokenTypeID(nil)
+		nft.ID, err = tokens.NewRandomNonFungibleTokenTypeID(nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate non-fungible token type ID: %w", err)
 		}
 	}
 
-	if len(typeId) != tokens.UnitIDLength {
+	if len(nft.ID) != tokens.UnitIDLength {
 		return nil, fmt.Errorf("invalid token type ID: expected hex length is %d characters (%d bytes)",
 			tokens.UnitIDLength*2, tokens.UnitIDLength)
 	}
-	if !typeId.HasType(tokens.NonFungibleTokenTypeUnitType) {
+	if !nft.ID.HasType(tokens.NonFungibleTokenTypeUnitType) {
 		return nil, fmt.Errorf("invalid token type ID: expected unit type is 0x%X", tokens.NonFungibleTokenTypeUnitType)
 	}
 
-	sub, err := w.newType(ctx, accountNumber, tokens.PayloadTypeCreateNFTType, attrs.ToCBOR(), typeId, subtypePredicateArgs)
+	acc, err := w.getAccount(accountNumber)
 	if err != nil {
 		return nil, err
 	}
-	return newSingleResult(sub, accountNumber), nil
+	fcrID, err := w.ensureFeeCredit(ctx, acc.AccountKey, 1)
+	if err != nil {
+		return nil, err
+	}
+	roundNumber, err := w.GetRoundNumber(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := nft.Create(
+		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
+		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithExtraProofs(newProofGenerators(subtypePredicateInputs)))
+	if err != nil {
+		return nil, err
+	}
+
+	return w.submitTx(ctx, tx, accountNumber)
 }
 
-func (w *Wallet) NewFungibleToken(ctx context.Context, accountNumber uint64, typeID sdktypes.TokenTypeID, amount uint64, bearerPredicate sdktypes.Predicate, mintPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) NewFungibleToken(ctx context.Context, accountNumber uint64, ft *sdktypes.FungibleToken, mintPredicateInputs []*PredicateInput) (*SubmissionResult, error) {
 	w.log.Info("Creating new fungible token")
-	attrs := &tokens.MintFungibleTokenAttributes{
-		Bearer:                           bearerPredicate,
-		TypeID:                           typeID,
-		Value:                            amount,
-		Nonce:                            0,
-		TokenCreationPredicateSignatures: nil,
-	}
-	sub, err := w.newToken(ctx, accountNumber, tokens.PayloadTypeMintFungibleToken, attrs, mintPredicateArgs, tokens.NewFungibleTokenID)
+
+	acc, err := w.getAccount(accountNumber)
 	if err != nil {
 		return nil, err
 	}
-	return newSingleResult(sub, accountNumber), nil
+	fcrID, err := w.ensureFeeCredit(ctx, acc.AccountKey, 1)
+	if err != nil {
+		return nil, err
+	}
+	roundNumber, err := w.GetRoundNumber(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := ft.Create(
+		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
+		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithExtraProofs(newProofGenerators(mintPredicateInputs)))
+	if err != nil {
+		return nil, err
+	}
+
+	return w.submitTx(ctx, tx, accountNumber)
 }
 
-func (w *Wallet) NewNFT(ctx context.Context, accountNumber uint64, attrs *tokens.MintNonFungibleTokenAttributes, mintPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) NewNFT(ctx context.Context, accountNumber uint64, nft *sdktypes.NonFungibleToken, mintPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
 	w.log.Info("Creating new NFT")
-	if len(attrs.Name) > nameMaxSize {
+
+	if len(nft.Name) > nameMaxSize {
 		return nil, errInvalidNameLength
 	}
-	if len(attrs.URI) > uriMaxSize {
+	if len(nft.URI) > uriMaxSize {
 		return nil, errInvalidURILength
 	}
-	if attrs.URI != "" && !util.IsValidURI(attrs.URI) {
-		return nil, fmt.Errorf("URI '%s' is invalid", attrs.URI)
+	if nft.URI != "" && !util.IsValidURI(nft.URI) {
+		return nil, fmt.Errorf("URI '%s' is invalid", nft.URI)
 	}
-	if len(attrs.Data) > dataMaxSize {
+	if len(nft.Data) > dataMaxSize {
 		return nil, errInvalidDataLength
 	}
 
-	sub, err := w.newToken(ctx, accountNumber, tokens.PayloadTypeMintNFT, attrs, mintPredicateArgs, tokens.NewNonFungibleTokenID)
+	acc, err := w.getAccount(accountNumber)
 	if err != nil {
 		return nil, err
 	}
-	return newSingleResult(sub, accountNumber), nil
+	fcrID, err := w.ensureFeeCredit(ctx, acc.AccountKey, 1)
+	if err != nil {
+		return nil, err
+	}
+	roundNumber, err := w.GetRoundNumber(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := nft.Create(
+		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
+		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithExtraProofs(newProofGenerators(mintPredicateArgs)))
+	if err != nil {
+		return nil, err
+	}
+
+	return w.submitTx(ctx, tx, accountNumber)
 }
 
-func (w *Wallet) ListTokenTypes(ctx context.Context, accountNumber uint64, kind sdktypes.Kind) ([]*sdktypes.TokenTypeUnit, error) {
+func (w *Wallet) ListFungibleTokenTypes(ctx context.Context, accountNumber uint64) ([]*sdktypes.FungibleTokenType, error) {
 	keys, err := w.getAccounts(accountNumber)
 	if err != nil {
 		return nil, err
 	}
-	allTokenTypes := make([]*sdktypes.TokenTypeUnit, 0)
-	fetchForPubKey := func(pubKey []byte) ([]*sdktypes.TokenTypeUnit, error) {
-		typez, err := w.tokensClient.GetTokenTypes(ctx, kind, pubKey)
+	allTokenTypes := make([]*sdktypes.FungibleTokenType, 0)
+	fetchForPubKey := func(pubKey []byte) ([]*sdktypes.FungibleTokenType, error) {
+		typez, err := w.tokensClient.GetFungibleTokenTypes(ctx, pubKey)
 		if err != nil {
 			return nil, err
 		}
 		return typez, nil
 	}
-
 	for _, key := range keys {
 		typez, err := fetchForPubKey(key.PubKey)
 		if err != nil {
@@ -230,9 +313,34 @@ func (w *Wallet) ListTokenTypes(ctx context.Context, accountNumber uint64, kind 
 	return allTokenTypes, nil
 }
 
-// GetTokenType returns non-nil TokenUnitType or error if not found or other issues
-func (w *Wallet) GetTokenType(ctx context.Context, typeId sdktypes.TokenTypeID) (*sdktypes.TokenTypeUnit, error) {
-	typez, err := w.tokensClient.GetTypeHierarchy(ctx, typeId)
+
+func (w *Wallet) ListNonFungibleTokenTypes(ctx context.Context, accountNumber uint64) ([]*sdktypes.NonFungibleTokenType, error) {
+	keys, err := w.getAccounts(accountNumber)
+	if err != nil {
+		return nil, err
+	}
+	allTokenTypes := make([]*sdktypes.NonFungibleTokenType, 0)
+	fetchForPubKey := func(pubKey []byte) ([]*sdktypes.NonFungibleTokenType, error) {
+		typez, err := w.tokensClient.GetNonFungibleTokenTypes(ctx, pubKey)
+		if err != nil {
+			return nil, err
+		}
+		return typez, nil
+	}
+	for _, key := range keys {
+		typez, err := fetchForPubKey(key.PubKey)
+		if err != nil {
+			return nil, err
+		}
+		allTokenTypes = append(allTokenTypes, typez...)
+	}
+
+	return allTokenTypes, nil
+}
+
+// GetFungibleTokenType returns FungibleTokenType or nil if not found
+func (w *Wallet) GetFungibleTokenType(ctx context.Context, typeId sdktypes.TokenTypeID) (*sdktypes.FungibleTokenType, error) {
+	typez, err := w.tokensClient.GetFungibleTokenTypeHierarchy(ctx, typeId)
 	if err != nil {
 		return nil, err
 	}
@@ -241,27 +349,27 @@ func (w *Wallet) GetTokenType(ctx context.Context, typeId sdktypes.TokenTypeID) 
 			return typez[i], nil
 		}
 	}
-	return nil, fmt.Errorf("token type %X not found", typeId)
+	return nil, fmt.Errorf("fungible token type %X not found", typeId)
 }
 
-// ListTokens specify accountNumber=0 to list tokens from all accounts
-func (w *Wallet) ListTokens(ctx context.Context, kind sdktypes.Kind, accountNumber uint64) (map[uint64][]*sdktypes.TokenUnit, error) {
-	keys, err := w.getAccounts(accountNumber)
+// ListFungibleTokens returns all fungible tokens for the given accountNumber
+func (w *Wallet) ListFungibleTokens(ctx context.Context, accountNumber uint64) ([]*sdktypes.FungibleToken, error) {
+	key, err := w.getAccount(accountNumber)
 	if err != nil {
 		return nil, err
 	}
 
-	// account number -> list of its tokens
-	allTokensByAccountNumber := make(map[uint64][]*sdktypes.TokenUnit, len(keys))
-	for _, key := range keys {
-		ts, err := w.getTokens(ctx, kind, key.PubKeyHash.Sha256)
-		if err != nil {
-			return nil, err
-		}
-		allTokensByAccountNumber[key.idx+1] = ts
+	return w.tokensClient.GetFungibleTokens(ctx, key.PubKeyHash.Sha256)
+}
+
+// ListNonFungibleTokens returns all non-fungible tokens for the given accountNumber
+func (w *Wallet) ListNonFungibleTokens(ctx context.Context, accountNumber uint64) ([]*sdktypes.NonFungibleToken, error) {
+	key, err := w.getAccount(accountNumber)
+	if err != nil {
+		return nil, err
 	}
 
-	return allTokensByAccountNumber, nil
+	return w.tokensClient.GetNonFungibleTokens(ctx, key.PubKeyHash.Sha256)
 }
 
 type accountKey struct {
@@ -303,19 +411,23 @@ func (w *Wallet) getAccounts(accountNumber uint64) ([]*accountKey, error) {
 	return wrappers, nil
 }
 
-func (w *Wallet) getTokens(ctx context.Context, kind sdktypes.Kind, pubKeyHash sdktypes.PubKeyHash) ([]*sdktypes.TokenUnit, error) {
-	return w.tokensClient.GetTokens(ctx, kind, pubKeyHash)
-}
-
-func (w *Wallet) GetToken(ctx context.Context, tokenID sdktypes.TokenID) (*sdktypes.TokenUnit, error) {
-	token, err := w.tokensClient.GetToken(ctx, tokenID)
+func (w *Wallet) GetFungibleToken(ctx context.Context, tokenID sdktypes.TokenID) (*sdktypes.FungibleToken, error) {
+	token, err := w.tokensClient.GetFungibleToken(ctx, tokenID)
 	if err != nil {
-		return nil, fmt.Errorf("error fetching token %X: %w", tokenID, err)
+		return nil, fmt.Errorf("error fetching token %s: %w", tokenID, err)
 	}
 	return token, nil
 }
 
-func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID sdktypes.TokenID, receiverPubKey sdktypes.PubKey, invariantPredicateArgs []*PredicateInput, ownerProof *PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) GetNonFungibleToken(ctx context.Context, tokenID sdktypes.TokenID) (*sdktypes.NonFungibleToken, error) {
+	token, err := w.tokensClient.GetNonFungibleToken(ctx, tokenID)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching token %s: %w", tokenID, err)
+	}
+	return token, nil
+}
+
+func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID sdktypes.TokenID, receiverPubKey sdktypes.PubKey, invariantProofs []*PredicateInput, ownerProof *PredicateInput) (*SubmissionResult, error) {
 	key, err := w.getAccount(accountNumber)
 	if err != nil {
 		return nil, err
@@ -324,31 +436,32 @@ func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID 
 	if err != nil {
 		return nil, err
 	}
-	token, err := w.GetToken(ctx, tokenID)
+	token, err := w.GetNonFungibleToken(ctx, tokenID)
 	if err != nil {
 		return nil, err
 	}
 	if err = ensureTokenOwnership(key, token, ownerProof); err != nil {
 		return nil, err
 	}
-	if token.IsLocked() {
+	if token.GetLockStatus() != 0 {
 		return nil, errors.New("token is locked")
 	}
-	attrs := newNonFungibleTransferTxAttrs(token, receiverPubKey)
-	sub, err := w.prepareTxSubmission(ctx, key, tokens.PayloadTypeTransferNFT, attrs, tokenID, fcrID, w.GetRoundNumber, ownerProof, func(tx *types.TransactionOrder) error {
-		signatures, err := preparePredicateSignatures(w.am, invariantPredicateArgs, tx, attrs)
-		if err != nil {
-			return err
-		}
-		attrs.SetInvariantPredicateSignatures(signatures)
-		tx.Payload.Attributes, err = types.Cbor.Marshal(attrs)
-		return err
-	})
+	roundNumber, err := w.GetRoundNumber(ctx)
 	if err != nil {
 		return nil, err
 	}
-	err = sub.ToBatch(w.tokensClient, w.log).SendTx(ctx, w.confirmTx)
-	return newSingleResult(sub, accountNumber), err
+
+	tx, err := token.Transfer(BearerPredicateFromPubKey(receiverPubKey),
+		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
+		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithOwnerProof(newProofGenerator(ownerProof)),
+		sdktypes.WithFeeProof(newProofGenerator(defaultProof(key.AccountKey))),
+		sdktypes.WithExtraProofs(newProofGenerators(invariantProofs)))
+	if err != nil {
+		return nil, err
+	}
+
+	return w.submitTx(ctx, tx, accountNumber)
 }
 
 func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId sdktypes.TokenTypeID, targetAmount uint64, receiverPubKey []byte, invariantPredicateArgs []*PredicateInput, ownerProof *PredicateInput) (*SubmissionResult, error) {
@@ -366,42 +479,39 @@ func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId 
 	if err != nil {
 		return nil, err
 	}
-	tokensByAcc, err := w.ListTokens(ctx, sdktypes.Fungible, accountNumber)
+	tokens, err := w.ListFungibleTokens(ctx, accountNumber)
 	if err != nil {
 		return nil, err
 	}
-	tokenz, found := tokensByAcc[accountNumber]
-	if !found {
+	if len(tokens) == 0 {
 		return nil, fmt.Errorf("account %d has no tokens", accountNumber)
 	}
-	var matchingTokens []*sdktypes.TokenUnit
+	var matchingTokens []*sdktypes.FungibleToken
 	var totalBalance uint64
 	// find the best unit candidate for transfer or split, value must be equal or larger than the target amount
-	var closestMatch *sdktypes.TokenUnit
-	for _, token := range tokenz {
-		if token.Kind != sdktypes.Fungible {
-			return nil, fmt.Errorf("expected fungible token, got %v, token %X", token.Kind.String(), token.ID)
+	var closestMatch *sdktypes.FungibleToken
+	for _, token := range tokens {
+		if !typeId.Eq(token.TypeID) {
+			continue
 		}
-		if typeId.Eq(token.TypeID) {
-			if token.IsLocked() {
-				continue
-			}
-			matchingTokens = append(matchingTokens, token)
-			var overflow bool
-			totalBalance, overflow, _ = util.AddUint64(totalBalance, token.Amount)
-			if overflow {
-				// capping the total balance to maxUint64 should be enough to perform the transfer
-				totalBalance = math.MaxUint64
-			}
-			if closestMatch == nil {
+		if token.LockStatus != 0 {
+			continue
+		}
+		matchingTokens = append(matchingTokens, token)
+		var overflow bool
+		totalBalance, overflow, _ = util.AddUint64(totalBalance, token.Amount)
+		if overflow {
+			// capping the total balance to maxUint64 should be enough to perform the transfer
+			totalBalance = math.MaxUint64
+		}
+		if closestMatch == nil {
+			closestMatch = token
+		} else {
+			prevDiff := closestMatch.Amount - targetAmount
+			currDiff := token.Amount - targetAmount
+			// this should work with overflow nicely
+			if prevDiff > currDiff {
 				closestMatch = token
-			} else {
-				prevDiff := closestMatch.Amount - targetAmount
-				currDiff := token.Amount - targetAmount
-				// this should work with overflow nicely
-				if prevDiff > currDiff {
-					closestMatch = token
-				}
 			}
 		}
 	}
@@ -410,7 +520,11 @@ func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId 
 	}
 	// optimization: first try to make a single operation instead of iterating through all tokens in doSendMultiple
 	if closestMatch.Amount >= targetAmount {
-		sub, err := w.prepareSplitOrTransferTx(ctx, acc, targetAmount, closestMatch, fcrID, receiverPubKey, invariantPredicateArgs, w.GetRoundNumber, ownerProof)
+		roundNumber, err := w.GetRoundNumber(ctx)
+		if err != nil {
+			return nil, err
+		}
+		sub, err := w.prepareSplitOrTransferTx(ctx, acc, targetAmount, closestMatch, fcrID, receiverPubKey, invariantPredicateArgs, roundNumber+txTimeoutRoundCount, ownerProof)
 		if err != nil {
 			return nil, err
 		}
@@ -421,7 +535,7 @@ func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId 
 	}
 }
 
-func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenID sdktypes.TokenID, data []byte, updatePredicateArgs []*PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenID sdktypes.TokenID, data []byte, updateProofs []*PredicateInput) (*SubmissionResult, error) {
 	acc, err := w.getAccount(accountNumber)
 	if err != nil {
 		return nil, err
@@ -430,37 +544,32 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 	if err != nil {
 		return nil, err
 	}
-	t, err := w.GetToken(ctx, tokenID)
+	t, err := w.GetNonFungibleToken(ctx, tokenID)
 	if err != nil {
 		return nil, err
 	}
 	if t == nil {
 		return nil, fmt.Errorf("token with id=%X not found under account #%v", tokenID, accountNumber)
 	}
-	if t.IsLocked() {
+	if t.GetLockStatus() != 0 {
 		return nil, errors.New("token is locked")
 	}
-
-	attrs := &tokens.UpdateNonFungibleTokenAttributes{
-		Data:                 data,
-		Counter:              t.Counter,
-		DataUpdateSignatures: nil,
-	}
-
-	sub, err := w.prepareTxSubmission(ctx, acc, tokens.PayloadTypeUpdateNFT, attrs, tokenID, fcrID, w.GetRoundNumber, defaultOwnerProof(accountNumber), func(tx *types.TransactionOrder) error {
-		signatures, err := preparePredicateSignatures(w.am, updatePredicateArgs, tx, attrs)
-		if err != nil {
-			return err
-		}
-		attrs.SetDataUpdateSignatures(signatures)
-		tx.Payload.Attributes, err = types.Cbor.Marshal(attrs)
-		return err
-	})
+	roundNumber, err := w.GetRoundNumber(ctx)
 	if err != nil {
 		return nil, err
 	}
-	err = sub.ToBatch(w.tokensClient, w.log).SendTx(ctx, w.confirmTx)
-	return newSingleResult(sub, accountNumber), err
+
+	tx, err := t.Update(data,
+		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
+		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithExtraProofs(newProofGenerators(updateProofs)))
+	if err != nil {
+		return nil, err
+	}
+
+	return w.submitTx(ctx, tx, accountNumber)
 }
 
 // SendFungibleByID sends fungible tokens by given unit ID, if amount matches, does the transfer, otherwise splits the token
@@ -473,34 +582,27 @@ func (w *Wallet) SendFungibleByID(ctx context.Context, accountNumber uint64, tok
 	if err != nil {
 		return nil, err
 	}
-	token, err := w.GetToken(ctx, tokenID)
+	token, err := w.GetFungibleToken(ctx, tokenID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get token %X: %w", tokenID, err)
 	}
-	if err = ensureTokenOwnership(acc, token, defaultOwnerProof(accountNumber)); err != nil {
+	if err = ensureTokenOwnership(acc, token, defaultProof(acc.AccountKey)); err != nil {
 		return nil, err
 	}
 	if targetAmount > token.Amount {
 		return nil, fmt.Errorf("insufficient FT value: got %v, need %v", token.Amount, targetAmount)
 	}
-	sub, err := w.prepareSplitOrTransferTx(ctx, acc, targetAmount, token, fcrID, receiverPubKey, invariantPredicateArgs, w.GetRoundNumber, defaultOwnerProof(accountNumber))
+	roundNumber, err := w.GetRoundNumber(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	sub, err := w.prepareSplitOrTransferTx(ctx, acc, targetAmount, token, fcrID, receiverPubKey, invariantPredicateArgs, roundNumber+txTimeoutRoundCount, defaultProof(acc.AccountKey))
 	if err != nil {
 		return nil, err
 	}
 	err = sub.ToBatch(w.tokensClient, w.log).SendTx(ctx, w.confirmTx)
 	return newSingleResult(sub, accountNumber), err
-}
-
-func (w *Wallet) BurnTokens(ctx context.Context, accountNumber uint64, tokensToBurn []*sdktypes.TokenUnit, invariantPredicateArgs []*PredicateInput) (uint64, uint64, []*sdktypes.Proof, error) {
-	acc, err := w.getAccount(accountNumber)
-	if err != nil {
-		return 0, 0, nil, err
-	}
-	fcrID, err := w.ensureFeeCredit(ctx, acc.AccountKey, 1)
-	if err != nil {
-		return 0, 0, nil, err
-	}
-	return w.burnTokensForDC(ctx, acc, tokensToBurn, 0, nil, fcrID, invariantPredicateArgs)
 }
 
 func (w *Wallet) GetRoundNumber(ctx context.Context) (uint64, error) {
@@ -527,21 +629,21 @@ func (w *Wallet) ReclaimFeeCredit(ctx context.Context, cmd fees.ReclaimFeeCmd) (
 }
 
 func (w *Wallet) ensureFeeCredit(ctx context.Context, accountKey *account.AccountKey, txCount int) ([]byte, error) {
-	fcb, err := w.tokensClient.GetFeeCreditRecordByOwnerID(ctx, accountKey.PubKeyHash.Sha256)
+	fcr, err := w.tokensClient.GetFeeCreditRecordByOwnerID(ctx, accountKey.PubKeyHash.Sha256)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch fee credit bill: %w", err)
 	}
-	if fcb == nil {
+	if fcr == nil {
 		return nil, ErrNoFeeCredit
 	}
-	maxFee := uint64(txCount) * txbuilder.MaxFee
-	if fcb.Balance() < maxFee {
+	maxFee := uint64(txCount) * maxFee
+	if fcr.Balance < maxFee {
 		return nil, ErrInsufficientFeeCredit
 	}
-	return fcb.ID, nil
+	return fcr.ID, nil
 }
 
-func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID []byte, ib []*PredicateInput, ownerProof *PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID types.UnitID, invariantProofs []*PredicateInput, ownerProof *PredicateInput) (*SubmissionResult, error) {
 	key, err := w.getAccount(accountNumber)
 	if err != nil {
 		return nil, err
@@ -550,35 +652,48 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID []
 	if err != nil {
 		return nil, err
 	}
-
-	token, err := w.GetToken(ctx, tokenID)
+	acc, err := w.getAccount(accountNumber)
 	if err != nil {
 		return nil, err
 	}
+
+	var token Token
+	if tokenID.HasType(tokens.FungibleTokenUnitType) {
+		token, err = w.GetFungibleToken(ctx, tokenID)
+	} else if tokenID.HasType(tokens.NonFungibleTokenUnitType) {
+		token, err = w.GetNonFungibleToken(ctx, tokenID)
+	} else {
+		return nil, errors.New("invalid token ID")
+	}
+	if err != nil {
+		return nil, err
+	}
+
 	if err = ensureTokenOwnership(key, token, ownerProof); err != nil {
 		return nil, err
 	}
-	if token.IsLocked() {
+	if token.GetLockStatus() != 0 {
 		return nil, errors.New("token is already locked")
 	}
-	attrs := newLockTxAttrs(token.Counter, wallet.LockReasonManual)
-	sub, err := w.prepareTxSubmission(ctx, key, tokens.PayloadTypeLockToken, attrs, tokenID, fcrID, w.GetRoundNumber, ownerProof, func(tx *types.TransactionOrder) error {
-		signatures, err := preparePredicateSignatures(w.am, ib, tx, attrs)
-		if err != nil {
-			return err
-		}
-		attrs.InvariantPredicateSignatures = signatures
-		tx.Payload.Attributes, err = types.Cbor.Marshal(attrs)
-		return err
-	})
+	roundNumber, err := w.GetRoundNumber(ctx)
 	if err != nil {
 		return nil, err
 	}
-	err = sub.ToBatch(w.tokensClient, w.log).SendTx(ctx, w.confirmTx)
-	return newSingleResult(sub, accountNumber), err
+
+	tx, err := token.Lock(wallet.LockReasonManual,
+		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
+		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithOwnerProof(newProofGenerator(ownerProof)),
+		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithExtraProofs(newProofGenerators(invariantProofs)))
+	if err != nil {
+		return nil, err
+	}
+
+	return w.submitTx(ctx, tx, accountNumber)
 }
 
-func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID []byte, ib []*PredicateInput, ownerProof *PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID sdktypes.TokenID, invariantProofs []*PredicateInput, ownerProof *PredicateInput) (*SubmissionResult, error) {
 	key, err := w.getAccount(accountNumber)
 	if err != nil {
 		return nil, err
@@ -587,48 +702,104 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	if err != nil {
 		return nil, err
 	}
-	token, err := w.GetToken(ctx, tokenID)
+	acc, err := w.getAccount(accountNumber)
 	if err != nil {
 		return nil, err
 	}
+
+	var token Token
+	if tokenID.HasType(tokens.FungibleTokenUnitType) {
+		token, err = w.GetFungibleToken(ctx, tokenID)
+	} else if tokenID.HasType(tokens.NonFungibleTokenUnitType) {
+		token, err = w.GetNonFungibleToken(ctx, tokenID)
+	} else {
+		return nil, errors.New("invalid token ID")
+	}
+	if err != nil {
+		return nil, err
+	}
+
 	if err = ensureTokenOwnership(key, token, ownerProof); err != nil {
 		return nil, err
 	}
-	if !token.IsLocked() {
+	if token.GetLockStatus() == 0 {
 		return nil, errors.New("token is already unlocked")
 	}
-	attrs := newUnlockTxAttrs(token.Counter)
-	sub, err := w.prepareTxSubmission(ctx, key, tokens.PayloadTypeUnlockToken, attrs, tokenID, fcrID, w.GetRoundNumber, ownerProof, func(tx *types.TransactionOrder) error {
-		signatures, err := preparePredicateSignatures(w.am, ib, tx, attrs)
-		if err != nil {
-			return err
-		}
-		attrs.InvariantPredicateSignatures = signatures
-		tx.Payload.Attributes, err = types.Cbor.Marshal(attrs)
-		return err
-	})
+	roundNumber, err := w.GetRoundNumber(ctx)
 	if err != nil {
 		return nil, err
 	}
-	err = sub.ToBatch(w.tokensClient, w.log).SendTx(ctx, w.confirmTx)
-	return newSingleResult(sub, accountNumber), err
+
+	tx, err := token.Unlock(
+		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
+		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithOwnerProof(newProofGenerator(ownerProof)),
+		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithExtraProofs(newProofGenerators(invariantProofs)))
+	if err != nil {
+		return nil, err
+	}
+
+	return w.submitTx(ctx, tx, accountNumber)
 }
 
-func ensureTokenOwnership(acc *accountKey, unit *sdktypes.TokenUnit, ownerProof *PredicateInput) error {
-	if bytes.Equal(unit.Owner, templates.NewP2pkh256BytesFromKey(acc.PubKey)) {
+func (w *Wallet) submitTx(ctx context.Context, tx *types.TransactionOrder, accountNumber uint64) (*SubmissionResult, error) {
+	sub := txsubmitter.New(tx)
+	if err := sub.ToBatch(w.tokensClient, w.log).SendTx(ctx, w.confirmTx); err != nil {
+		return nil, err
+	}
+
+	return newSingleResult(sub, accountNumber), nil
+}
+
+func ensureTokenOwnership(acc *accountKey, token Token, ownerProof *PredicateInput) error {
+	if bytes.Equal(token.GetOwnerPredicate(), templates.NewP2pkh256BytesFromKey(acc.PubKey)) {
 		return nil
 	}
-	predicate, err := predicates.ExtractPredicate(unit.Owner)
+	predicate, err := extractPredicate(token.GetOwnerPredicate())
 	if err != nil {
 		return err
 	}
-	if !templates.IsP2pkhTemplate(predicate) && ownerProof != nil && ownerProof.AccountNumber == 0 && ownerProof.Argument != nil {
+	if !templates.IsP2pkhTemplate(predicate) && ownerProof != nil && ownerProof.AccountKey == nil && ownerProof.Argument != nil {
 		// this must be a "custom predicate" with provided owner proof
 		return nil
 	}
-	return fmt.Errorf("token '%s' does not belong to account #%d", unit.ID, acc.AccountNumber())
+	return fmt.Errorf("token '%s' does not belong to account #%d", token.GetID(), acc.AccountNumber())
 }
 
-func defaultOwnerProof(accNr uint64) *PredicateInput {
-	return &PredicateInput{AccountNumber: accNr}
+func defaultProof(accountKey *account.AccountKey) *PredicateInput {
+	return &PredicateInput{AccountKey: accountKey}
+}
+
+func newProofGenerators(inputs []*PredicateInput) []types.ProofGenerator {
+	proofGenerators := make([]types.ProofGenerator, 0, len(inputs))
+	for _, input := range inputs {
+		proofGenerators = append(proofGenerators, newProofGenerator(input))
+	}
+	return proofGenerators
+}
+
+func newProofGenerator(input *PredicateInput) types.ProofGenerator {
+	return func(payloadBytes []byte) ([]byte, error) {
+		if input == nil {
+			return nil, errors.New("nil predicate input")
+		}
+		if input.AccountKey != nil {
+			sig, err := sdktypes.SignBytes(payloadBytes, input.AccountKey.PrivKey)
+			if err != nil {
+				return nil, err
+			}
+			return templates.NewP2pkh256SignatureBytes(sig, input.AccountKey.PubKey), nil
+		} else {
+			return input.Argument, nil
+		}
+	}
+}
+
+func extractPredicate(predicateBytes []byte) (*predicates.Predicate, error) {
+	predicate := &predicates.Predicate{}
+	if err := types.Cbor.Unmarshal(predicateBytes, predicate); err != nil {
+		return nil, err
+	}
+	return predicate, nil
 }

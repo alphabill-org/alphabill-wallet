@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"testing"
 
+	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	tokentxs "github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/stretchr/testify/require"
 
@@ -18,29 +18,30 @@ func TestTokensRpcClient(t *testing.T) {
 	service := mocksrv.NewStateServiceMock()
 	client := startServerAndTokensClient(t, service)
 
-	t.Run("GetToken_OK", func(t *testing.T) {
+	t.Run("GetFungibleToken_OK", func(t *testing.T) {
 		tokenID := tokentxs.NewFungibleTokenID(nil, []byte{1})
 		tokenTypeID := tokentxs.NewFungibleTokenTypeID(nil, []byte{2})
-		tokenType := &types.TokenTypeUnit{
-			ID:            tokenTypeID,
-			Symbol:        "ABC",
-			Name:          "Name of ABC Token Type",
+		tokenType := &types.FungibleTokenType{
+			SystemID:     tokens.DefaultSystemID,
+			ID:           tokenTypeID,
+			Symbol:       "ABC",
+			Name:         "Name of ABC Token Type",
 			DecimalPlaces: 2,
-			Kind:          types.Fungible,
 		}
-		tokenUnit := &types.TokenUnit{
-			ID:       tokenID,
-			Symbol:   tokenType.Symbol,
-			TypeID:   tokenTypeID,
-			TypeName: tokenType.Name,
-			Amount:   100,
-			Decimals: tokenType.DecimalPlaces,
-			Kind:     types.Fungible,
-			Counter:  123,
+		ft := &types.FungibleToken{
+			SystemID:      tokenType.SystemID,
+			ID:            tokenID,
+			Symbol:        tokenType.Symbol,
+			TypeID:        tokenType.ID,
+			TypeName:      tokenType.Name,
+			Counter:       123,
+			Amount:        100,
+			DecimalPlaces: tokenType.DecimalPlaces,
 		}
 		*service = *mocksrv.NewStateServiceMock(
 			mocksrv.WithUnit(&types.Unit[any]{
-				UnitID: tokenTypeID,
+				SystemID: tokenType.SystemID,
+				UnitID:   tokenType.ID,
 				Data: tokentxs.FungibleTokenTypeData{
 					Symbol:        tokenType.Symbol,
 					Name:          tokenType.Name,
@@ -48,35 +49,36 @@ func TestTokensRpcClient(t *testing.T) {
 				},
 			}),
 			mocksrv.WithUnit(&types.Unit[any]{
-				UnitID: tokenID,
+				SystemID: ft.SystemID,
+				UnitID:   ft.ID,
 				Data: tokentxs.FungibleTokenData{
-					TokenType: tokenTypeID,
-					Value:     tokenUnit.Amount,
+					TokenType: tokenType.ID,
+					Value:     ft.Amount,
 					T:         168,
-					Counter:   tokenUnit.Counter,
+					Counter:   ft.Counter,
 				},
 			}),
 		)
 
-		actualTokenUnit, err := client.GetToken(context.Background(), tokenID)
+		actualToken, err := client.GetFungibleToken(context.Background(), tokenID)
 		require.NoError(t, err)
-		require.Equal(t, tokenUnit, actualTokenUnit)
+		require.Equal(t, ft, actualToken)
 	})
-	t.Run("GetToken_NOK", func(t *testing.T) {
+	t.Run("GetFungibleToken_NOK", func(t *testing.T) {
 		*service = *mocksrv.NewStateServiceMock(mocksrv.WithError(errors.New("some error")))
 		tokenID := tokentxs.NewFungibleTokenID(nil, []byte{1})
 
-		tokenUnit, err := client.GetToken(context.Background(), tokenID)
+		ft, err := client.GetFungibleToken(context.Background(), tokenID)
 		require.ErrorContains(t, err, "some error")
-		require.Nil(t, tokenUnit)
+		require.Nil(t, ft)
 	})
-	t.Run("GetToken_NotFound", func(t *testing.T) {
+	t.Run("GetFungibleToken_NotFound", func(t *testing.T) {
 		*service = *mocksrv.NewStateServiceMock()
 		tokenID := tokentxs.NewFungibleTokenID(nil, []byte{1})
 
-		tokenUnit, err := client.GetToken(context.Background(), tokenID)
+		ft, err := client.GetFungibleToken(context.Background(), tokenID)
 		require.Nil(t, err)
-		require.Nil(t, tokenUnit)
+		require.Nil(t, ft)
 	})
 
 	t.Run("GetTokens_OK", func(t *testing.T) {
@@ -84,49 +86,51 @@ func TestTokensRpcClient(t *testing.T) {
 
 		ftTokenID := tokentxs.NewFungibleTokenID(nil, []byte{1})
 		ftTokenTypeID := tokentxs.NewFungibleTokenTypeID(nil, []byte{2})
-		ftTokenType := &types.TokenTypeUnit{
-			ID:            ftTokenTypeID,
-			Symbol:        "ABC",
-			Name:          "Fungible ABC Token",
+		ftTokenType := &types.FungibleTokenType{
+			SystemID:     tokens.DefaultSystemID,
+			ID:           ftTokenTypeID,
+			Symbol:       "ABC",
+			Name:         "Fungible ABC Token",
 			DecimalPlaces: 2,
-			Kind:          types.Fungible,
 		}
-		ftTokenUnit := &types.TokenUnit{
-			ID:       ftTokenID,
-			Symbol:   ftTokenType.Symbol,
-			TypeID:   ftTokenTypeID,
-			TypeName: ftTokenType.Name,
-			Owner:    ownerID,
-			Amount:   100,
-			Decimals: ftTokenType.DecimalPlaces,
-			Kind:     types.Fungible,
-			Counter:  123,
+
+		ft := &types.FungibleToken{
+			SystemID:       tokens.DefaultSystemID,
+			ID:             ftTokenID,
+			Symbol:         ftTokenType.Symbol,
+			TypeID:         ftTokenTypeID,
+			TypeName:       ftTokenType.Name,
+			Counter:        123,
+			OwnerPredicate: ownerID,
+			Amount:         100,
+			DecimalPlaces:  ftTokenType.DecimalPlaces,
 		}
 
 		nftTokenID := tokentxs.NewNonFungibleTokenID(nil, []byte{3})
 		nftTokenTypeID := tokentxs.NewNonFungibleTokenTypeID(nil, []byte{4})
-		nftTokenType := &types.TokenTypeUnit{
-			ID:     nftTokenTypeID,
-			Symbol: "ABC-NFT",
-			Name:   "Non-fungible ABC Token",
-			Kind:   types.NonFungible,
+		nftTokenType := &types.NonFungibleTokenType{
+			SystemID:     tokens.DefaultSystemID,
+			ID:           nftTokenTypeID,
+			Symbol:       "ABC-NFT",
+			Name:         "Non-Fungible ABC Token",
 		}
-		nftTokenUnit := &types.TokenUnit{
+		nft := &types.NonFungibleToken{
+			SystemID: tokens.DefaultSystemID,
 			ID:       nftTokenID,
 			Symbol:   nftTokenType.Symbol,
 			TypeID:   nftTokenTypeID,
 			TypeName: nftTokenType.Name,
-			Owner:    ownerID,
-			NftName:  "NFT name",
-			Kind:     types.NonFungible,
 			Counter:  321,
+			OwnerPredicate: ownerID,
+			Name:   "NFT name",
 		}
 
 		// mock two tokens - one nft one ft
 		*service = *mocksrv.NewStateServiceMock(
 			// fungible token type
 			mocksrv.WithUnit(&types.Unit[any]{
-				UnitID: ftTokenTypeID,
+				SystemID: tokens.DefaultSystemID,
+				UnitID:   ftTokenTypeID,
 				Data: tokentxs.FungibleTokenTypeData{
 					Symbol:        ftTokenType.Symbol,
 					Name:          ftTokenType.Name,
@@ -136,19 +140,21 @@ func TestTokensRpcClient(t *testing.T) {
 			}),
 			// fungible token unit
 			mocksrv.WithOwnerUnit(&types.Unit[any]{
-				UnitID: ftTokenID,
+				SystemID: tokens.DefaultSystemID,
+				UnitID:   ftTokenID,
 				Data: tokentxs.FungibleTokenData{
 					TokenType: ftTokenTypeID,
-					Value:     ftTokenUnit.Amount,
+					Value:     ft.Amount,
 					T:         100,
-					Counter:   ftTokenUnit.Counter,
+					Counter:   ft.Counter,
 				},
 				OwnerPredicate: ownerID,
 			}),
 
 			// non-fungible token type
 			mocksrv.WithUnit(&types.Unit[any]{
-				UnitID: nftTokenTypeID,
+				SystemID: tokens.DefaultSystemID,
+				UnitID:   nftTokenTypeID,
 				Data: tokentxs.NonFungibleTokenTypeData{
 					Symbol: nftTokenType.Symbol,
 					Name:   nftTokenType.Name,
@@ -157,69 +163,57 @@ func TestTokensRpcClient(t *testing.T) {
 			}),
 			// non-fungible token unit
 			mocksrv.WithOwnerUnit(&types.Unit[any]{
-				UnitID: nftTokenID,
+				SystemID: tokens.DefaultSystemID,
+				UnitID:   nftTokenID,
 				Data: tokentxs.NonFungibleTokenData{
 					TypeID:  nftTokenTypeID,
-					Name:    nftTokenUnit.NftName,
+					Name:    nft.Name,
 					T:       100,
-					Counter: nftTokenUnit.Counter,
+					Counter: nft.Counter,
 				},
 				OwnerPredicate: ownerID,
 			}),
 		)
 
-		// test kind=Any returns both tokens
-		tokenz, err := client.GetTokens(context.Background(), types.Any, ownerID)
+		nfts, err := client.GetNonFungibleTokens(context.Background(), ownerID)
 		require.NoError(t, err)
-		require.Len(t, tokenz, 2)
-		// sort by type - so that fungible token comes first
-		slices.SortFunc(tokenz, func(a, b *types.TokenUnit) int {
-			return a.TypeID.Compare(b.TypeID)
-		})
-		require.Equal(t, ftTokenUnit, tokenz[0])
-		require.Equal(t, nftTokenUnit, tokenz[1])
+		require.Len(t, nfts, 1)
+		require.Equal(t, nft, nfts[0])
 
-		// test kind=NonFungible returns only non-fungible token
-		tokenz, err = client.GetTokens(context.Background(), types.NonFungible, ownerID)
+		fts, err := client.GetFungibleTokens(context.Background(), ownerID)
 		require.NoError(t, err)
-		require.Len(t, tokenz, 1)
-		require.Equal(t, nftTokenUnit, tokenz[0])
-
-		// test kind=Fungible returns only fungible token
-		tokenz, err = client.GetTokens(context.Background(), types.Fungible, ownerID)
-		require.NoError(t, err)
-		require.Len(t, tokenz, 1)
-		require.Equal(t, ftTokenUnit, tokenz[0])
-
+		require.Len(t, fts, 1)
+		require.Equal(t, ft, fts[0])
 	})
-	t.Run("GetTokens_NOK", func(t *testing.T) {
+	t.Run("GetFungibleToken_NOK", func(t *testing.T) {
 		*service = *mocksrv.NewStateServiceMock(mocksrv.WithError(errors.New("some error")))
 		tokenID := tokentxs.NewFungibleTokenID(nil, []byte{1})
 
-		tokenUnit, err := client.GetToken(context.Background(), tokenID)
+		ft, err := client.GetFungibleToken(context.Background(), tokenID)
 		require.ErrorContains(t, err, "some error")
-		require.Nil(t, tokenUnit)
+		require.Nil(t, ft)
 	})
 
-	t.Run("GetTypeHierarchy_OK", func(t *testing.T) {
+	t.Run("GetFungibleTokenTypeHierarchy_OK", func(t *testing.T) {
 		// create 3 levels deep type hierarchy
-		var tokenTypes []*types.TokenTypeUnit
+		var tokenTypes []*types.FungibleTokenType
 		var units []*types.Unit[any]
 		prevTypeID := types.NoParent
 		for i := uint8(1); i <= 3; i++ {
 			typeID := tokentxs.NewFungibleTokenTypeID(nil, []byte{i})
-			tokenType := &types.TokenTypeUnit{
-				ID:            typeID,
-				ParentTypeID:  prevTypeID,
-				Symbol:        "ABC",
-				Name:          fmt.Sprintf("ABC %d", i),
+			tokenType := &types.FungibleTokenType{
+				SystemID:     tokens.DefaultSystemID,
+				ID:           typeID,
+				ParentTypeID: prevTypeID,
+				Symbol:       "ABC",
+				Name:         fmt.Sprintf("ABC %d", i),
 				DecimalPlaces: 2,
-				Kind:          types.Fungible,
 			}
 			prevTypeID = typeID
 			tokenTypes = append(tokenTypes, tokenType)
 			units = append(units, &types.Unit[any]{
-				UnitID: typeID,
+				SystemID: tokens.DefaultSystemID,
+				UnitID:   typeID,
 				Data: tokentxs.FungibleTokenTypeData{
 					Symbol:        tokenType.Symbol,
 					Name:          tokenType.Name,
@@ -234,7 +228,7 @@ func TestTokensRpcClient(t *testing.T) {
 		)
 
 		// type hierarchy: 3 -> 2 -> 1 (root)
-		typeHierarchy, err := client.GetTypeHierarchy(context.Background(), tokenTypes[2].ID)
+		typeHierarchy, err := client.GetFungibleTokenTypeHierarchy(context.Background(), tokenTypes[2].ID)
 		require.NoError(t, err)
 		require.Len(t, typeHierarchy, 3)
 		require.Equal(t, typeHierarchy[0], tokenTypes[2])
@@ -249,7 +243,7 @@ func TestTokensRpcClient(t *testing.T) {
 		*service = *mocksrv.NewStateServiceMock(mocksrv.WithError(errors.New("some error")))
 		typeID := tokentxs.NewFungibleTokenTypeID(nil, []byte{1})
 
-		typeHierarchy, err := client.GetTypeHierarchy(context.Background(), typeID)
+		typeHierarchy, err := client.GetFungibleTokenTypeHierarchy(context.Background(), typeID)
 		require.ErrorContains(t, err, "some error")
 		require.Nil(t, typeHierarchy)
 	})

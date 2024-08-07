@@ -6,6 +6,7 @@ import (
 
 type (
 	Unit[T any] struct {
+		SystemID       types.SystemID        `json:"systemId"`
 		UnitID         types.UnitID          `json:"unitId"`
 		Data           T                     `json:"data"`
 		OwnerPredicate types.Bytes           `json:"ownerPredicate,omitempty"`

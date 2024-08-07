@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-go-base/util"
 
@@ -43,19 +42,17 @@ func (w *Wallet) CollectDust(ctx context.Context, accountNumber uint64, allowedT
 	return results, nil
 }
 
-func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, typedTokens []*sdktypes.TokenUnit, invariantPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
-	batchCount := ((len(typedTokens) - 1) / maxBurnBatchSize) + 1
-	txCount := len(typedTokens) + batchCount*2 // +lock fee and join fee for every batch
+func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, tokens []*sdktypes.FungibleToken, invariantPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
+	batchCount := ((len(tokens) - 1) / maxBurnBatchSize) + 1
+	txCount := len(tokens) + batchCount*2 // +lock fee and join fee for every batch
 	fcrID, err := w.ensureFeeCredit(ctx, acc.AccountKey, txCount)
 	if err != nil {
 		return nil, err
 	}
 	// first token to be joined into
-	targetToken := typedTokens[0]
-	targetTokenID := targetToken.ID
-	targetTokenCounter := targetToken.Counter
+	targetToken := tokens[0]
 	totalAmountJoined := targetToken.Amount
-	burnTokens := typedTokens[1:]
+	burnTokens := tokens[1:]
 	totalFees := uint64(0)
 
 	for startIdx := 0; startIdx < len(burnTokens); startIdx += maxBurnBatchSize {
@@ -81,24 +78,24 @@ func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, typedTokens [
 		}
 
 		var lockFee uint64
-		lockFee, err = w.lockTokenForDC(ctx, acc, fcrID, targetTokenID, targetTokenCounter, invariantPredicateArgs)
+		lockFee, err = w.lockTokenForDC(ctx, acc, fcrID, targetToken, invariantPredicateArgs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to lock target token: %w", err)
 		}
 
-		targetTokenCounter += 1
-		burnBatchAmount, burnFee, proofs, err := w.burnTokensForDC(ctx, acc, burnBatch, targetTokenCounter, targetTokenID, fcrID, invariantPredicateArgs)
+		targetToken.Counter += 1
+		burnBatchAmount, burnFee, proofs, err := w.burnTokensForDC(ctx, acc, burnBatch, targetToken, fcrID, invariantPredicateArgs)
 		if err != nil {
 			return nil, err
 		}
 
 		// if there's more to burn, update counter to continue
 		var joinFee uint64
-		joinFee, err = w.joinTokenForDC(ctx, acc, proofs, targetTokenCounter, targetTokenID, fcrID, invariantPredicateArgs)
+		joinFee, err = w.joinTokenForDC(ctx, acc, proofs, targetToken, fcrID, invariantPredicateArgs)
 		if err != nil {
 			return nil, err
 		}
-		targetTokenCounter += 1
+		targetToken.Counter += 1
 
 		totalAmountJoined += burnBatchAmount
 		totalFees += lockFee + burnFee + joinFee
@@ -106,7 +103,7 @@ func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, typedTokens [
 	return &SubmissionResult{FeeSum: totalFees}, nil
 }
 
-func (w *Wallet) joinTokenForDC(ctx context.Context, acc *accountKey, burnProofs []*sdktypes.Proof, targetTokenCounter uint64, targetTokenID, fcrID types.UnitID, invariantPredicateArgs []*PredicateInput) (uint64, error) {
+func (w *Wallet) joinTokenForDC(ctx context.Context, acc *accountKey, burnProofs []*sdktypes.Proof, targetToken *sdktypes.FungibleToken, fcrID types.UnitID, invariantProofs []*PredicateInput) (uint64, error) {
 	// explicitly sort proofs by unit ids in increasing order
 	sort.Slice(burnProofs, func(i, j int) bool {
 		a := burnProofs[i].TxRecord.TransactionOrder.UnitID()
@@ -119,53 +116,48 @@ func (w *Wallet) joinTokenForDC(ctx context.Context, acc *accountKey, burnProofs
 		burnTxs[i] = proof.TxRecord
 		burnTxProofs[i] = proof.TxProof
 	}
-
-	joinAttrs := &tokens.JoinFungibleTokenAttributes{
-		BurnTransactions:             burnTxs,
-		Proofs:                       burnTxProofs,
-		Counter:                      targetTokenCounter,
-		InvariantPredicateSignatures: nil,
-	}
-
-	sub, err := w.prepareTxSubmission(ctx, acc, tokens.PayloadTypeJoinFungibleToken, joinAttrs, targetTokenID, fcrID, w.GetRoundNumber, defaultOwnerProof(acc.AccountNumber()), func(tx *types.TransactionOrder) error {
-		signatures, err := preparePredicateSignatures(w.GetAccountManager(), invariantPredicateArgs, tx, joinAttrs)
-		if err != nil {
-			return err
-		}
-		joinAttrs.SetInvariantPredicateSignatures(signatures)
-		tx.Payload.Attributes, err = types.Cbor.Marshal(joinAttrs)
-		return err
-	})
+	roundNumber, err := w.GetRoundNumber(ctx)
 	if err != nil {
 		return 0, err
 	}
+
+	tx, err := targetToken.Join(burnTxs, burnTxProofs,
+		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
+		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithExtraProofs(newProofGenerators(invariantProofs)))
+	if err != nil {
+		return 0, err
+	}
+
+	sub := txsubmitter.New(tx)
 	if err = sub.ToBatch(w.tokensClient, w.log).SendTx(ctx, true); err != nil {
 		return 0, err
 	}
 	return sub.Proof.TxRecord.ServerMetadata.ActualFee, nil
 }
 
-func (w *Wallet) burnTokensForDC(ctx context.Context, acc *accountKey, tokensToBurn []*sdktypes.TokenUnit, targetTokenCounter uint64, targetTokenID, fcrID types.UnitID, invariantPredicateArgs []*PredicateInput) (uint64, uint64, []*sdktypes.Proof, error) {
+func (w *Wallet) burnTokensForDC(ctx context.Context, acc *accountKey, tokensToBurn []*sdktypes.FungibleToken, targetToken *sdktypes.FungibleToken, fcrID types.UnitID, invariantProofs []*PredicateInput) (uint64, uint64, []*sdktypes.Proof, error) {
 	burnBatch := txsubmitter.NewBatch(w.tokensClient, w.log)
-	rnFetcher := &cachingRoundNumberFetcher{delegate: w.GetRoundNumber}
 	burnBatchAmount := uint64(0)
 
+	roundNumber, err := w.GetRoundNumber(ctx)
+	if err != nil {
+		return 0, 0, nil, fmt.Errorf("failed to get round number: %w", err)
+	}
 	for _, token := range tokensToBurn {
 		burnBatchAmount += token.Amount
-		attrs := newBurnTxAttrs(token, targetTokenCounter, targetTokenID)
-		sub, err := w.prepareTxSubmission(ctx, acc, tokens.PayloadTypeBurnFungibleToken, attrs, token.ID, fcrID, rnFetcher.getRoundNumber, defaultOwnerProof(acc.AccountNumber()), func(tx *types.TransactionOrder) error {
-			signatures, err := preparePredicateSignatures(w.GetAccountManager(), invariantPredicateArgs, tx, attrs)
-			if err != nil {
-				return err
-			}
-			attrs.SetInvariantPredicateSignatures(signatures)
-			tx.Payload.Attributes, err = types.Cbor.Marshal(attrs)
-			return err
-		})
+		tx, err := token.Burn(targetToken.ID, targetToken.Counter,
+			sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
+			sdktypes.WithFeeCreditRecordID(fcrID),
+			sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
+			sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
+			sdktypes.WithExtraProofs(newProofGenerators(invariantProofs)))
 		if err != nil {
 			return 0, 0, nil, fmt.Errorf("failed to prepare burn tx: %w", err)
 		}
-		burnBatch.Add(sub)
+		burnBatch.Add(txsubmitter.New(tx))
 	}
 
 	if err := burnBatch.SendTx(ctx, true); err != nil {
@@ -181,16 +173,16 @@ func (w *Wallet) burnTokensForDC(ctx context.Context, acc *accountKey, tokensToB
 	return burnBatchAmount, feeSum, proofs, nil
 }
 
-func (w *Wallet) getTokensForDC(ctx context.Context, key sdktypes.PubKey, allowedTokenTypes []sdktypes.TokenTypeID) (map[string][]*sdktypes.TokenUnit, error) {
+func (w *Wallet) getTokensForDC(ctx context.Context, key sdktypes.PubKey, allowedTokenTypes []sdktypes.TokenTypeID) (map[string][]*sdktypes.FungibleToken, error) {
 	// find tokens to join
-	allTokens, err := w.getTokens(ctx, sdktypes.Fungible, key.Hash())
+	allTokens, err := w.tokensClient.GetFungibleTokens(ctx, key.Hash())
 	if err != nil {
 		return nil, err
 	}
 	// group tokens by type
-	var tokensByTypes = make(map[string][]*sdktypes.TokenUnit, len(allowedTokenTypes))
+	var tokensByTypes = make(map[string][]*sdktypes.FungibleToken, len(allowedTokenTypes))
 	for _, tokenType := range allowedTokenTypes {
-		tokensByTypes[string(tokenType)] = make([]*sdktypes.TokenUnit, 0)
+		tokensByTypes[string(tokenType)] = make([]*sdktypes.FungibleToken, 0)
 	}
 	for _, tok := range allTokens {
 		typeID := string(tok.TypeID)
@@ -199,7 +191,7 @@ func (w *Wallet) getTokensForDC(ctx context.Context, key sdktypes.PubKey, allowe
 			// if filter is set, skip tokens of other types
 			continue
 		}
-		if tok.IsLocked() {
+		if tok.LockStatus != 0 {
 			continue
 		}
 		tokensByTypes[typeID] = append(tokenz, tok)
@@ -212,25 +204,22 @@ func (w *Wallet) getTokensForDC(ctx context.Context, key sdktypes.PubKey, allowe
 	return tokensByTypes, nil
 }
 
-func (w *Wallet) lockTokenForDC(ctx context.Context, acc *accountKey, fcrID types.UnitID, targetTokenID types.UnitID, targetTokenCounter uint64, invariantPredicateArgs []*PredicateInput) (uint64, error) {
-	attr := &tokens.LockTokenAttributes{
-		LockStatus: wallet.LockReasonCollectDust,
-		Counter:    targetTokenCounter,
+func (w *Wallet) lockTokenForDC(ctx context.Context, acc *accountKey, fcrID types.UnitID, targetToken Token, invariantProofs []*PredicateInput) (uint64, error) {
+	roundNumber, err := w.GetRoundNumber(ctx)
+	if err != nil {
+		return 0, err
 	}
-
-	sub, err := w.prepareTxSubmission(ctx, acc, tokens.PayloadTypeLockToken, attr, targetTokenID, fcrID, w.GetRoundNumber, defaultOwnerProof(acc.AccountNumber()), func(tx *types.TransactionOrder) error {
-		signatures, err := preparePredicateSignatures(w.GetAccountManager(), invariantPredicateArgs, tx, attr)
-		if err != nil {
-			return err
-		}
-		attr.InvariantPredicateSignatures = signatures
-		tx.Payload.Attributes, err = types.Cbor.Marshal(attr)
-		return err
-	})
+	tx, err := targetToken.Lock(wallet.LockReasonCollectDust,
+		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
+		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
+		sdktypes.WithExtraProofs(newProofGenerators(invariantProofs)))
 	if err != nil {
 		return 0, err
 	}
 
+	sub := txsubmitter.New(tx)
 	if err = sub.ToBatch(w.tokensClient, w.log).SendTx(ctx, true); err != nil {
 		return 0, err
 	}
