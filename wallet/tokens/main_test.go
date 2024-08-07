@@ -271,7 +271,6 @@ func TestNewFungibleToken(t *testing.T) {
 			result, err := tw.NewFungibleToken(context.Background(), tt.accountNumber, ft, nil)
 			require.NoError(t, err)
 			tx := recTxs[len(recTxs)-1]
-			// TODO: tx construction should be tested in client/token_test.go
 			attr := &tokens.MintFungibleTokenAttributes{}
 			require.NotNil(t, result)
 			require.Len(t, tx.UnitID(), 33)
