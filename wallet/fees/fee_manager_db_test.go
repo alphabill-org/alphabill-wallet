@@ -10,7 +10,6 @@ import (
 func TestDB_GetSetDeleteAddFeeCtx(t *testing.T) {
 	s := createFeeManagerDB(t)
 	accountID := []byte{4}
-	systemID := types.SystemID(1)
 
 	// verify missing account returns nil and no error
 	feeCtx, err := s.GetAddFeeContext(accountID)
@@ -18,7 +17,7 @@ func TestDB_GetSetDeleteAddFeeCtx(t *testing.T) {
 	require.Nil(t, feeCtx)
 
 	// store fee ctx
-	feeCtx = &AddFeeCreditCtx{TargetPartitionID: systemID}
+	feeCtx = &AddFeeCreditCtx{TargetAmount: 400}
 	err = s.SetAddFeeContext(accountID, feeCtx)
 	require.NoError(t, err)
 

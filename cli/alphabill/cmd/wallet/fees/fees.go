@@ -295,23 +295,27 @@ func listFees(ctx context.Context, accountNumber uint64, am account.Manager, c *
 		}
 		consoleWriter.Println("Partition: " + c.targetPartitionType)
 		for accountIndex := range pubKeys {
-			fcb, err := w.GetFeeCredit(ctx, fees.GetFeeCreditCmd{AccountIndex: uint64(accountIndex)})
+			fcr, err := w.GetFeeCredit(ctx, fees.GetFeeCreditCmd{AccountIndex: uint64(accountIndex)})
 			if err != nil {
 				return err
 			}
 			accNum := accountIndex + 1
-			amountString := util.AmountToString(fcb.Balance(), 8)
-			consoleWriter.Println(fmt.Sprintf("Account #%d %s%s", accNum, amountString, getLockedReasonString(fcb)))
+			balance := uint64(0)
+			if fcr != nil {
+				balance = fcr.Balance
+			}
+			amountString := util.AmountToString(balance, 8)
+			consoleWriter.Println(fmt.Sprintf("Account #%d %s%s", accNum, amountString, getLockedReasonString(fcr)))
 		}
 	} else {
 		accountIndex := accountNumber - 1
-		fcb, err := w.GetFeeCredit(ctx, fees.GetFeeCreditCmd{AccountIndex: accountIndex})
+		fcr, err := w.GetFeeCredit(ctx, fees.GetFeeCreditCmd{AccountIndex: accountIndex})
 		if err != nil {
 			return err
 		}
-		amountString := util.AmountToString(fcb.Balance(), 8)
+		amountString := util.AmountToString(fcr.Balance, 8)
 		consoleWriter.Println("Partition: " + c.targetPartitionType)
-		consoleWriter.Println(fmt.Sprintf("Account #%d %s%s", accountNumber, amountString, getLockedReasonString(fcb)))
+		consoleWriter.Println(fmt.Sprintf("Account #%d %s%s", accountNumber, amountString, getLockedReasonString(fcr)))
 	}
 	return nil
 }
@@ -480,9 +484,9 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 	}
 }
 
-func getLockedReasonString(fcb *types.FeeCreditRecord) string {
-	if fcb.IsLocked() {
-		return fmt.Sprintf(" (%s)", wallet.LockReason(fcb.Data.Locked).String())
+func getLockedReasonString(fcr *types.FeeCreditRecord) string {
+	if fcr != nil && fcr.LockStatus != 0 {
+		return fmt.Sprintf(" (%s)", wallet.LockReason(fcr.LockStatus).String())
 	}
 	return ""
 }

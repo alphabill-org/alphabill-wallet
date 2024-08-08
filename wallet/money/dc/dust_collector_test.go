@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/stretchr/testify/require"
 
@@ -17,12 +16,13 @@ func TestDC_OK(t *testing.T) {
 	// create wallet with 3 normal bills
 	accountKeys, err := account.NewKeys("dinosaur simple verify deliver bless ridge monkey design venue six problem lucky")
 	require.NoError(t, err)
-	targetBillID := money.NewBillID(nil, []byte{3})
+	targetBill := testutil.NewBill(3, 3)
 	moneyClient := testutil.NewRpcClientMock(
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Counter: 1})),
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Counter: 2})),
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{3}, &money.BillData{V: 3, Counter: 3})),
-		testutil.WithOwnerFeeCreditRecord(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &fc.FeeCreditRecord{Balance: 100, Counter: 100})),
+		testutil.WithOwnerBill(testutil.NewBill(1, 1)),
+		testutil.WithOwnerBill(testutil.NewBill(2, 2)),
+		testutil.WithOwnerBill(targetBill),
+		testutil.WithOwnerFeeCreditRecord(
+			testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, 100, 0, 100)),
 	)
 	dc := NewDustCollector(money.DefaultSystemID, 10, 10, moneyClient, logger.New(t))
 
@@ -36,10 +36,9 @@ func TestDC_OK(t *testing.T) {
 	txo := dcResult.SwapProof.TxRecord.TransactionOrder
 	err = txo.UnmarshalAttributes(&attr)
 	require.NoError(t, err)
-	require.EqualValues(t, 3, attr.TargetValue)
 	require.Len(t, attr.DcTransfers, 2)
 	require.Len(t, attr.DcTransferProofs, 2)
-	require.EqualValues(t, targetBillID, txo.UnitID())
+	require.EqualValues(t, targetBill.ID, txo.UnitID())
 }
 
 func TestDCWontRunForSingleBill(t *testing.T) {
@@ -47,8 +46,9 @@ func TestDCWontRunForSingleBill(t *testing.T) {
 	accountKeys, err := account.NewKeys("dinosaur simple verify deliver bless ridge monkey design venue six problem lucky")
 	require.NoError(t, err)
 	moneyClient := testutil.NewRpcClientMock(
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Counter: 1})),
-		testutil.WithOwnerFeeCreditRecord(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &fc.FeeCreditRecord{Balance: 100, Counter: 100})),
+		testutil.WithOwnerBill(testutil.NewBill(1, 1)),
+		testutil.WithOwnerFeeCreditRecord(
+			testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, 100, 0, 100)),
 	)
 	dc := NewDustCollector(money.DefaultSystemID, 10, 10, moneyClient, logger.New(t))
 
@@ -65,12 +65,12 @@ func TestAllBillsAreSwapped_WhenWalletBillCountEqualToMaxBillCount(t *testing.T)
 	maxBillsPerDC := 3
 	accountKeys, err := account.NewKeys("dinosaur simple verify deliver bless ridge monkey design venue six problem lucky")
 	require.NoError(t, err)
-	targetBillID := money.NewBillID(nil, []byte{3})
+	targetBill := testutil.NewBill(3, 3)
 	moneyClient := testutil.NewRpcClientMock(
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Counter: 1})),
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Counter: 2})),
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{3}, &money.BillData{V: 3, Counter: 3})),
-		testutil.WithOwnerFeeCreditRecord(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &fc.FeeCreditRecord{Balance: 100, Counter: 100})),
+		testutil.WithOwnerBill(testutil.NewBill(1, 1)),
+		testutil.WithOwnerBill(testutil.NewBill(2, 2)),
+		testutil.WithOwnerBill(targetBill),
+		testutil.WithOwnerFeeCreditRecord(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, 100, 0, 100)),
 	)
 	w := NewDustCollector(money.DefaultSystemID, maxBillsPerDC, 10, moneyClient, logger.New(t))
 
@@ -80,7 +80,7 @@ func TestAllBillsAreSwapped_WhenWalletBillCountEqualToMaxBillCount(t *testing.T)
 
 	// then swap tx should be returned
 	require.NotNil(t, dcResult.SwapProof)
-	require.EqualValues(t, targetBillID, dcResult.SwapProof.TxRecord.TransactionOrder.UnitID())
+	require.EqualValues(t, targetBill.ID, dcResult.SwapProof.TxRecord.TransactionOrder.UnitID())
 
 	// and swap contains correct dc transfers
 	swapAttr := &money.SwapDCAttributes{}
@@ -89,8 +89,7 @@ func TestAllBillsAreSwapped_WhenWalletBillCountEqualToMaxBillCount(t *testing.T)
 	require.NoError(t, err)
 	require.Len(t, swapAttr.DcTransfers, maxBillsPerDC-1)
 	require.Len(t, swapAttr.DcTransferProofs, maxBillsPerDC-1)
-	require.EqualValues(t, 3, swapAttr.TargetValue)
-	require.EqualValues(t, targetBillID, swapTxo.UnitID())
+	require.EqualValues(t, targetBill.ID, swapTxo.UnitID())
 }
 
 func TestOnlyFirstNBillsAreSwapped_WhenBillCountOverLimit(t *testing.T) {
@@ -98,13 +97,13 @@ func TestOnlyFirstNBillsAreSwapped_WhenBillCountOverLimit(t *testing.T) {
 	maxBillsPerDC := 3
 	accountKeys, err := account.NewKeys("dinosaur simple verify deliver bless ridge monkey design venue six problem lucky")
 	require.NoError(t, err)
-	targetBillID := money.NewBillID(nil, []byte{4})
+	targetBill := testutil.NewBill(4, 4)
 	moneyClient := testutil.NewRpcClientMock(
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{1}, &money.BillData{V: 1, Counter: 1})),
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{2}, &money.BillData{V: 2, Counter: 2})),
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{3}, &money.BillData{V: 3, Counter: 3})),
-		testutil.WithOwnerBill(testutil.NewMoneyBill([]byte{4}, &money.BillData{V: 4, Counter: 4})),
-		testutil.WithOwnerFeeCreditRecord(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, &fc.FeeCreditRecord{Balance: 100, Counter: 100})),
+		testutil.WithOwnerBill(testutil.NewBill(1, 1)),
+		testutil.WithOwnerBill(testutil.NewBill(2, 2)),
+		testutil.WithOwnerBill(testutil.NewBill(3, 3)),
+		testutil.WithOwnerBill(targetBill),
+		testutil.WithOwnerFeeCreditRecord(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, 100, 0, 100)),
 	)
 	w := NewDustCollector(money.DefaultSystemID, maxBillsPerDC, 10, moneyClient, logger.New(t))
 
@@ -117,10 +116,9 @@ func TestOnlyFirstNBillsAreSwapped_WhenBillCountOverLimit(t *testing.T) {
 	swapTxo := dcResult.SwapProof.TxRecord.TransactionOrder
 	swapAttr := &money.SwapDCAttributes{}
 	err = swapTxo.UnmarshalAttributes(swapAttr)
-	require.EqualValues(t, targetBillID, swapTxo.UnitID())
+	require.EqualValues(t, targetBill.ID, swapTxo.UnitID())
 	require.NoError(t, err)
 	require.Len(t, swapAttr.DcTransfers, maxBillsPerDC)
 	require.Len(t, swapAttr.DcTransferProofs, maxBillsPerDC)
-	require.EqualValues(t, 6, swapAttr.TargetValue)
-	require.EqualValues(t, targetBillID, swapTxo.UnitID())
+	require.EqualValues(t, targetBill.ID, swapTxo.UnitID())
 }

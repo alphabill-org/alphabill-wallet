@@ -244,7 +244,7 @@ func TestWalletCreateFungibleTokenTypeAndTokenAndSendCmd_IntegrationTest(t *test
 	newFungibleCmd := tokensCmd.WithPrefixArgs("new", "fungible", "--type", typeID.String())
 
 	// new token creation fails
-	newFungibleCmd.ExecWithError(t, fmt.Sprintf("invalid token type id: %s", nonExistingTypeId),
+	newFungibleCmd.ExecWithError(t, fmt.Sprintf("invalid fungible token type id: %s", nonExistingTypeId),
 		"--amount", "3", "--type", nonExistingTypeId.String())
 	newFungibleCmd.ExecWithError(t, "0 is not valid amount", "--amount", "0")
 	newFungibleCmd.ExecWithError(t, "0 is not valid amount", "--amount", "00.000")
@@ -277,7 +277,7 @@ func TestWalletCreateFungibleTokenTypeAndTokenAndSendCmd_IntegrationTest(t *test
 		"--address", fmt.Sprintf("0x%X", wallets[1].PubKeys[0]))
 
 	// test send fails
-	sendFungibleCmd.ExecWithError(t, fmt.Sprintf("invalid token type id: %s", nonExistingTypeId), "--amount", "2", "--type", nonExistingTypeId.String())
+	sendFungibleCmd.ExecWithError(t, fmt.Sprintf("invalid fungible token type id: %s", nonExistingTypeId), "--amount", "2", "--type", nonExistingTypeId.String())
 	sendFungibleCmd.ExecWithError(t, "0 is not valid amount", "--amount", "0")
 	sendFungibleCmd.ExecWithError(t, "0 is not valid amount", "--amount", "000.000")
 	sendFungibleCmd.ExecWithError(t, "more than one comma", "--amount", "00.0.00")

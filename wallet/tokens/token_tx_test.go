@@ -15,7 +15,7 @@ import (
 )
 
 func TestConfirmUnitsTx_skip(t *testing.T) {
-	rpcClient := &mockTokensRpcClient{
+	rpcClient := &mockTokensPartitionClient{
 		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
 			return nil, nil
 		},
@@ -30,7 +30,7 @@ func TestConfirmUnitsTx_skip(t *testing.T) {
 func TestConfirmUnitsTx_ok(t *testing.T) {
 	getRoundNumberCalled := false
 	getTxProofCalled := false
-	rpcClient := &mockTokensRpcClient{
+	rpcClient := &mockTokensPartitionClient{
 		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
 			return nil, nil
 		},
@@ -55,7 +55,7 @@ func TestConfirmUnitsTx_timeout(t *testing.T) {
 	getRoundNumberCalled := 0
 	getTxProofCalled := 0
 	randomTxHash1 := testutils.RandomBytes(32)
-	rpcClient := &mockTokensRpcClient{
+	rpcClient := &mockTokensPartitionClient{
 		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
 			return nil, nil
 		},
@@ -86,23 +86,4 @@ func TestConfirmUnitsTx_timeout(t *testing.T) {
 	require.EqualValues(t, 2, getTxProofCalled)
 	require.True(t, sub1.Confirmed())
 	require.False(t, sub2.Confirmed())
-}
-
-func TestCachingRoundNumberFetcher(t *testing.T) {
-	getRoundNumberCalled := 0
-	rpcClient := &mockTokensRpcClient{
-		getRoundNumber: func(ctx context.Context) (uint64, error) {
-			getRoundNumberCalled++
-			return 100, nil
-		},
-	}
-	fetcher := &cachingRoundNumberFetcher{delegate: rpcClient.GetRoundNumber}
-	roundNumber, err := fetcher.getRoundNumber(context.Background())
-	require.NoError(t, err)
-	require.EqualValues(t, 100, roundNumber)
-	require.EqualValues(t, 1, getRoundNumberCalled)
-	roundNumber, err = fetcher.getRoundNumber(context.Background())
-	require.NoError(t, err)
-	require.EqualValues(t, 100, roundNumber)
-	require.EqualValues(t, 1, getRoundNumberCalled)
 }
