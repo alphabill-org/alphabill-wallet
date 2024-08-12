@@ -7,6 +7,7 @@ import (
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill-go-base/types"
+	"github.com/ethereum/go-ethereum/rpc"
 
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
@@ -17,8 +18,8 @@ type tokensPartitionClient struct {
 }
 
 // NewTokensPartitionClient creates a tokens partition client for the given RPC URL.
-func NewTokensPartitionClient(ctx context.Context, rpcUrl string) (sdktypes.TokensPartitionClient, error) {
-	partitionClient, err := newPartitionClient(ctx, rpcUrl)
+func NewTokensPartitionClient(ctx context.Context, rpcUrl string, opts ...Option) (sdktypes.TokensPartitionClient, error) {
+	partitionClient, err := newPartitionClient(ctx, rpcUrl, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -106,46 +107,169 @@ func (c *tokensPartitionClient) GetNonFungibleToken(ctx context.Context, tokenID
 
 // GetFungibleTokens returns fungible tokens for the given owner id.
 func (c *tokensPartitionClient) GetFungibleTokens(ctx context.Context, ownerID []byte) ([]*sdktypes.FungibleToken, error) {
-	unitIds, err := c.GetUnitsByOwnerID(ctx, ownerID)
+	unitIDs, err := c.GetUnitsByOwnerID(ctx, ownerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch owner unit ids: %w", err)
 	}
 
-	var fungibleTokens []*sdktypes.FungibleToken
-	for _, unitID := range unitIds {
+	var fts []*sdktypes.FungibleToken
+	var batch []rpc.BatchElem
+	for _, unitID := range unitIDs {
 		if !unitID.HasType(tokens.FungibleTokenUnitType) {
 			continue
 		}
-		fungibleToken, err := c.GetFungibleToken(ctx, unitID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch token: %w", err)
-		}
-		fungibleTokens = append(fungibleTokens, fungibleToken)
+
+		var u sdktypes.Unit[tokens.FungibleTokenData]
+		batch = append(batch, rpc.BatchElem{
+			Method: "state_getUnit",
+			Args:   []any{unitID, false},
+			Result: &u,
+		})
 	}
 
-	return fungibleTokens, nil
+	if len(batch) == 0 {
+		return fts, nil
+	}
+	if err := c.batchCallWithLimit(ctx, batch); err != nil {
+		return nil, fmt.Errorf("failed to fetch fungible tokens: %w", err)
+	}
+
+	types := make(map[string]*sdktypes.Unit[tokens.FungibleTokenTypeData])
+	for _, batchElem := range batch {
+		if batchElem.Error != nil {
+			return nil, fmt.Errorf("failed to fetch fungible token: %w", batchElem.Error)
+		}
+		u := batchElem.Result.(*sdktypes.Unit[tokens.FungibleTokenData])
+		typeID, _ := u.Data.TokenType.MarshalText()
+		types[string(typeID)] = nil
+	}
+
+	var typesBatch []rpc.BatchElem
+	for typeID := range types {
+		var u sdktypes.Unit[tokens.FungibleTokenTypeData]
+		typesBatch = append(typesBatch, rpc.BatchElem{
+			Method: "state_getUnit",
+			Args:   []any{typeID, false},
+			Result: &u,
+		})
+	}
+	if len(typesBatch) > 0 {
+		if err := c.batchCallWithLimit(ctx, typesBatch); err != nil {
+			return nil, fmt.Errorf("failed to fetch fungible token types: %w", err)
+		}
+		for _, batchElem := range typesBatch {
+			if batchElem.Error != nil {
+				return nil, fmt.Errorf("failed to fetch fungible token type: %w", batchElem.Error)
+			}
+			u := batchElem.Result.(*sdktypes.Unit[tokens.FungibleTokenTypeData])
+			types[batchElem.Args[0].(string)] = u
+		}
+	}
+
+	for _, batchElem := range batch {
+		u := batchElem.Result.(*sdktypes.Unit[tokens.FungibleTokenData])
+		typeID, _ := u.Data.TokenType.MarshalText()
+		ftType := types[string(typeID)]
+
+		fts = append(fts, &sdktypes.FungibleToken{
+			SystemID:       u.SystemID,
+			ID:             u.UnitID,
+			Symbol:         ftType.Data.Symbol,
+			TypeID:         u.Data.TokenType,
+			TypeName:       ftType.Data.Name,
+			OwnerPredicate: u.OwnerPredicate,
+			Counter:        u.Data.Counter,
+			LockStatus:     u.Data.Locked,
+			Amount:         u.Data.Value,
+			DecimalPlaces:  ftType.Data.DecimalPlaces,
+		})
+	}
+
+	return fts, nil
 }
 
 // GetNonFungibleTokens returns non-fungible tokens for the given owner id.
 func (c *tokensPartitionClient) GetNonFungibleTokens(ctx context.Context, ownerID []byte) ([]*sdktypes.NonFungibleToken, error) {
-	unitIds, err := c.GetUnitsByOwnerID(ctx, ownerID)
+	unitIDs, err := c.GetUnitsByOwnerID(ctx, ownerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch owner unit ids: %w", err)
 	}
 
-	var nonFungibleTokens []*sdktypes.NonFungibleToken
-	for _, unitID := range unitIds {
+	var nfts []*sdktypes.NonFungibleToken
+	var batch []rpc.BatchElem
+	for _, unitID := range unitIDs {
 		if !unitID.HasType(tokens.NonFungibleTokenUnitType) {
 			continue
 		}
-		nonFungibleToken, err := c.GetNonFungibleToken(ctx, unitID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch token: %w", err)
-		}
-		nonFungibleTokens = append(nonFungibleTokens, nonFungibleToken)
+
+		var u sdktypes.Unit[tokens.NonFungibleTokenData]
+		batch = append(batch, rpc.BatchElem{
+			Method: "state_getUnit",
+			Args:   []any{unitID, false},
+			Result: &u,
+		})
+	}
+	if len(batch) == 0 {
+		return nfts, nil
+	}
+	if err := c.batchCallWithLimit(ctx, batch); err != nil {
+		return nil, fmt.Errorf("failed to fetch non-fungible tokens: %w", err)
 	}
 
-	return nonFungibleTokens, nil
+	types := make(map[string]*sdktypes.Unit[tokens.NonFungibleTokenTypeData])
+	for _, batchElem := range batch {
+		if batchElem.Error != nil {
+			return nil, fmt.Errorf("failed to fetch non-fungible token: %w", batchElem.Error)
+		}
+		u := batchElem.Result.(*sdktypes.Unit[tokens.NonFungibleTokenData])
+		typeID, _ := u.Data.TypeID.MarshalText()
+		types[string(typeID)] = nil
+	}
+
+	var typesBatch []rpc.BatchElem
+	for typeID := range types {
+		var u sdktypes.Unit[tokens.NonFungibleTokenTypeData]
+		typesBatch = append(typesBatch, rpc.BatchElem{
+			Method: "state_getUnit",
+			Args:   []any{typeID, false},
+			Result: &u,
+		})
+	}
+	if len(typesBatch) > 0 {
+		if err := c.batchCallWithLimit(ctx, typesBatch); err != nil {
+			return nil, fmt.Errorf("failed to fetch non-fungible token types: %w", err)
+		}
+		for _, batchElem := range typesBatch {
+			if batchElem.Error != nil {
+				return nil, fmt.Errorf("failed to fetch non-fungible token type: %w", batchElem.Error)
+			}
+			u := batchElem.Result.(*sdktypes.Unit[tokens.NonFungibleTokenTypeData])
+			types[batchElem.Args[0].(string)] = u
+		}
+	}
+
+	for _, batchElem := range batch {
+		u := batchElem.Result.(*sdktypes.Unit[tokens.NonFungibleTokenData])
+		typeID, _ := u.Data.TypeID.MarshalText()
+		nftType := types[string(typeID)]
+
+		nfts = append(nfts, &sdktypes.NonFungibleToken{
+			SystemID:            u.SystemID,
+			ID:                  u.UnitID,
+			Symbol:              nftType.Data.Symbol,
+			TypeID:              u.Data.TypeID,
+			TypeName:            nftType.Data.Name,
+			OwnerPredicate:      u.OwnerPredicate,
+			Counter:             u.Data.Counter,
+			LockStatus:          u.Data.Locked,
+			Name:                u.Data.Name,
+			URI:                 u.Data.URI,
+			Data:                u.Data.Data,
+			DataUpdatePredicate: u.Data.DataUpdatePredicate,
+		})
+	}
+
+	return nfts, nil
 }
 
 func (c *tokensPartitionClient) GetFungibleTokenTypes(ctx context.Context, creator sdktypes.PubKey) ([]*sdktypes.FungibleTokenType, error) {

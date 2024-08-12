@@ -6,20 +6,37 @@ import (
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/types"
+	ethrpc "github.com/ethereum/go-ethereum/rpc"
 
 	"github.com/alphabill-org/alphabill-wallet/client/rpc"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 )
 
+const defaultBatchItemLimit int = 100
+
 type (
 	partitionClient struct {
 		*rpc.AdminAPIClient
 		*rpc.StateAPIClient
+
+		batchItemLimit int
 	}
+
+	Options struct {
+		BatchItemLimit int
+	}
+
+	Option func(*Options)
 )
 
+func WithBatchItemLimit(batchItemLimit int) Option {
+	return func(os *Options) {
+		os.BatchItemLimit = batchItemLimit
+	}
+}
+
 // newPartitionClient creates a generic partition client for the given RPC URL.
-func newPartitionClient(ctx context.Context, rpcUrl string) (*partitionClient, error) {
+func newPartitionClient(ctx context.Context, rpcUrl string, opts ...Option) (*partitionClient, error) {
 	// TODO: duplicate underlying rpc clients, could use one?
 	stateApiClient, err := rpc.NewStateAPIClient(ctx, rpcUrl)
 	if err != nil {
@@ -30,9 +47,12 @@ func newPartitionClient(ctx context.Context, rpcUrl string) (*partitionClient, e
 		return nil, err
 	}
 
+	o := optionsWithDefaults(opts)
 	return &partitionClient{
 		AdminAPIClient: adminApiClient,
 		StateAPIClient: stateApiClient,
+
+		batchItemLimit: o.BatchItemLimit,
 	}, nil
 }
 
@@ -73,7 +93,29 @@ func (c *partitionClient) getFeeCreditRecord(ctx context.Context, unitID types.U
 	}, nil
 }
 
+func (c *partitionClient) batchCallWithLimit(ctx context.Context, batch []ethrpc.BatchElem) error {
+	start, end := 0, 0
+	for len(batch) > end {
+		end = min(len(batch), start + c.batchItemLimit)
+		if err := c.RpcClient.BatchCallContext(ctx, batch[start:end]); err != nil {
+			return fmt.Errorf("failed to send batch request: %w", err)
+		}
+		start = end
+	}
+	return nil
+}
+
 func (c *partitionClient) Close() {
 	c.AdminAPIClient.Close()
 	c.StateAPIClient.Close()
+}
+
+func optionsWithDefaults(opts []Option) *Options {
+	res := &Options{
+		BatchItemLimit: defaultBatchItemLimit,
+	}
+	for _, opt := range opts {
+		opt(res)
+	}
+	return res
 }
