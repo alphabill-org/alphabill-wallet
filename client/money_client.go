@@ -7,6 +7,7 @@ import (
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
+	"github.com/ethereum/go-ethereum/rpc"
 
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
@@ -17,8 +18,8 @@ type moneyPartitionClient struct {
 }
 
 // NewMoneyPartitionClient creates a money partition client for the given RPC URL.
-func NewMoneyPartitionClient(ctx context.Context, rpcUrl string) (sdktypes.MoneyPartitionClient, error) {
-	partitionClient, err := newPartitionClient(ctx, rpcUrl)
+func NewMoneyPartitionClient(ctx context.Context, rpcUrl string, opts ...Option) (sdktypes.MoneyPartitionClient, error) {
+	partitionClient, err := newPartitionClient(ctx, rpcUrl, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -55,16 +56,40 @@ func (c *moneyPartitionClient) GetBills(ctx context.Context, ownerID []byte) ([]
 		return nil, fmt.Errorf("failed to fetch owner units: %w", err)
 	}
 	var bills []*sdktypes.Bill
+	var batch []rpc.BatchElem
 	for _, unitID := range unitIDs {
 		if !unitID.HasType(money.BillUnitType) {
 			continue
 		}
-		bill, err := c.GetBill(ctx, unitID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch unit: %w", err)
-		}
-		bills = append(bills, bill)
+
+		var u sdktypes.Unit[money.BillData]
+		batch = append(batch, rpc.BatchElem{
+			Method: "state_getUnit",
+			Args:   []any{unitID, false},
+			Result: &u,
+		})
 	}
+	if len(batch) == 0 {
+		return bills, nil
+	}
+	if err := c.batchCallWithLimit(ctx, batch); err != nil {
+		return nil, fmt.Errorf("failed to fetch bills: %w", err)
+	}
+	for _, batchElem := range batch {
+		if batchElem.Error != nil {
+			return nil, fmt.Errorf("failed to fetch bill: %w", batchElem.Error)
+		}
+		u := batchElem.Result.(*sdktypes.Unit[money.BillData])
+		bills = append(bills, &sdktypes.Bill{
+			SystemID:   u.SystemID,
+			ID:         u.UnitID,
+			Value:      u.Data.V,
+			LastUpdate: u.Data.T,
+			Counter:    u.Data.Counter,
+			LockStatus: u.Data.Locked,
+		})
+	}
+
 	return bills, nil
 }
 
