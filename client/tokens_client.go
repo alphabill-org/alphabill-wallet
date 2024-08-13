@@ -48,7 +48,7 @@ func (c *tokensPartitionClient) GetFungibleToken(ctx context.Context, tokenID sd
 		return nil, err
 	}
 	if ftType == nil {
-		return nil, nil
+		return nil, fmt.Errorf("fungible token type %X not found", ft.Data.TokenType)
 	}
 
 	return &sdktypes.FungibleToken{
@@ -85,7 +85,7 @@ func (c *tokensPartitionClient) GetNonFungibleToken(ctx context.Context, tokenID
 		return nil, err
 	}
 	if nftType == nil {
-		return nil, nil
+		return nil, fmt.Errorf("non-fungible token type %X not found", nft.Data.TypeID)
 	}
 
 	return &sdktypes.NonFungibleToken{
@@ -201,7 +201,7 @@ func (c *tokensPartitionClient) getFungibleTokenType(ctx context.Context, typeID
 		return nil, err
 	}
 	if ftType == nil {
-		return nil, nil
+		return nil, fmt.Errorf("fungible token type %X not found", typeID)
 	}
 	return &sdktypes.FungibleTokenType{
 		SystemID:                 ftType.SystemID,
@@ -226,7 +226,7 @@ func (c *tokensPartitionClient) getNonFungibleTokenType(ctx context.Context, typ
 		return nil, err
 	}
 	if nftType == nil {
-		return nil, nil
+		return nil, fmt.Errorf("non-fungible token type %X not found", typeID)
 	}
 	return &sdktypes.NonFungibleTokenType{
 		SystemID:                 nftType.SystemID,
