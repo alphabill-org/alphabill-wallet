@@ -31,7 +31,7 @@ type (
 
 func WithBatchItemLimit(batchItemLimit int) Option {
 	return func(os *Options) {
-		os.BatchItemLimit = batchItemLimit
+		os.BatchItemLimit = max(batchItemLimit, 1)
 	}
 }
 
