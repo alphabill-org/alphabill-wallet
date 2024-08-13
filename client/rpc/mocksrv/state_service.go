@@ -18,6 +18,7 @@ type (
 		Block        types.Bytes
 		SentTxs      map[string]*types.TransactionOrder
 		Err          error
+		GetUnitCalls int
 	}
 
 	Options struct {
@@ -98,6 +99,7 @@ func (s *StateServiceMock) GetRoundNumber(ctx context.Context) (types.Uint64, er
 }
 
 func (s *StateServiceMock) GetUnit(unitID types.UnitID, includeStateProof bool) (*sdktypes.Unit[any], error) {
+	s.GetUnitCalls += 1
 	if s.Err != nil {
 		return nil, s.Err
 	}
@@ -170,4 +172,5 @@ func (s *StateServiceMock) Reset() {
 	s.TxProofs = nil
 	s.Err = nil
 	s.Block = nil
+	s.GetUnitCalls = 0
 }
