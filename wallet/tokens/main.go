@@ -583,7 +583,7 @@ func (w *Wallet) SendFungibleByID(ctx context.Context, accountNumber uint64, tok
 	}
 	token, err := w.GetFungibleToken(ctx, tokenID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get token %X: %w", tokenID, err)
+		return nil, fmt.Errorf("failed to get token with id=%s: %w", tokenID, err)
 	}
 	if err = ensureTokenOwnership(acc, token, defaultProof(acc.AccountKey)); err != nil {
 		return nil, err
