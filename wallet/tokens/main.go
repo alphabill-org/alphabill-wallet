@@ -313,7 +313,6 @@ func (w *Wallet) ListFungibleTokenTypes(ctx context.Context, accountNumber uint6
 	return allTokenTypes, nil
 }
 
-
 func (w *Wallet) ListNonFungibleTokenTypes(ctx context.Context, accountNumber uint64) ([]*sdktypes.NonFungibleTokenType, error) {
 	keys, err := w.getAccounts(accountNumber)
 	if err != nil {
@@ -349,7 +348,7 @@ func (w *Wallet) GetFungibleTokenType(ctx context.Context, typeId sdktypes.Token
 			return typez[i], nil
 		}
 	}
-	return nil, fmt.Errorf("fungible token type %X not found", typeId)
+	return nil, nil
 }
 
 // ListFungibleTokens returns all fungible tokens for the given accountNumber
@@ -549,7 +548,7 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 		return nil, err
 	}
 	if t == nil {
-		return nil, fmt.Errorf("token with id=%X not found under account #%v", tokenID, accountNumber)
+		return nil, fmt.Errorf("token with id=%s not found under account #%v", tokenID, accountNumber)
 	}
 	if t.GetLockStatus() != 0 {
 		return nil, errors.New("token is locked")
@@ -584,7 +583,7 @@ func (w *Wallet) SendFungibleByID(ctx context.Context, accountNumber uint64, tok
 	}
 	token, err := w.GetFungibleToken(ctx, tokenID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get token %X: %w", tokenID, err)
+		return nil, fmt.Errorf("failed to get token with id=%s: %w", tokenID, err)
 	}
 	if err = ensureTokenOwnership(acc, token, defaultProof(acc.AccountKey)); err != nil {
 		return nil, err
