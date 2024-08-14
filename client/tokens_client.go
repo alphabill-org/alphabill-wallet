@@ -86,7 +86,7 @@ func (c *tokensPartitionClient) GetNonFungibleToken(ctx context.Context, tokenID
 		return nil, err
 	}
 	if nftType == nil {
-		return nil, nil
+		return nil, fmt.Errorf("non-fungible token with id %s has invalid token type %s", tokenID, nft.Data.TypeID)
 	}
 
 	return &sdktypes.NonFungibleToken{
@@ -289,6 +289,9 @@ func (c *tokensPartitionClient) GetFungibleTokenTypeHierarchy(ctx context.Contex
 		tokenType, err := c.getFungibleTokenType(ctx, typeID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch token type: %w", err)
+		}
+		if tokenType == nil {
+			return nil, fmt.Errorf("fungible token type %s not found", typeID)
 		}
 		tokenTypes = append(tokenTypes, tokenType)
 		typeID = tokenType.ParentTypeID
