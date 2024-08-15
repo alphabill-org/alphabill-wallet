@@ -55,6 +55,7 @@ func addVarCmd(orchestrationConfig *clitypes.OrchestrationConfig) *cobra.Command
 
 	cmd.Flags().StringVar(&config.VarFilePath, cmdFlagVarFilePath, "", "path to validator assignment record json file")
 	_ = cmd.MarkFlagRequired(cmdFlagVarFilePath)
+	args.AddMaxFeeFlag(cmd, cmd.Flags())
 
 	return cmd
 }
@@ -91,7 +92,11 @@ func execAddVarCmd(cmd *cobra.Command, config *clitypes.AddVarCmdConfig) error {
 		return fmt.Errorf("failed to fetch round number: %w", err)
 	}
 	timeout := roundNumber + txTimeoutBlockCount
-	txo, err := txbuilder.NewAddVarTx(*varFile, types.SystemID(config.OrchestrationConfig.SystemID), unitID, timeout, ac)
+	maxFee, err := args.ParseMaxFeeFlag(cmd)
+	if err != nil {
+		return err
+	}
+	txo, err := txbuilder.NewAddVarTx(*varFile, types.SystemID(config.OrchestrationConfig.SystemID), unitID, timeout, ac, maxFee)
 	if err != nil {
 		return fmt.Errorf("failed to create 'addVar' tx: %w", err)
 	}

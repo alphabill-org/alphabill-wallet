@@ -13,7 +13,6 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 )
 
@@ -23,6 +22,7 @@ type (
 		maxBillsPerDC int
 		txTimeout     uint64
 		moneyClient   sdktypes.MoneyPartitionClient
+		maxFee        uint64
 		log           *slog.Logger
 	}
 
@@ -32,12 +32,13 @@ type (
 	}
 )
 
-func NewDustCollector(systemID types.SystemID, maxBillsPerDC int, txTimeout uint64, moneyClient sdktypes.MoneyPartitionClient, log *slog.Logger) *DustCollector {
+func NewDustCollector(systemID types.SystemID, maxBillsPerDC int, txTimeout uint64, moneyClient sdktypes.MoneyPartitionClient, maxFee uint64, log *slog.Logger) *DustCollector {
 	return &DustCollector{
 		systemID:      systemID,
 		maxBillsPerDC: maxBillsPerDC,
 		txTimeout:     txTimeout,
 		moneyClient:   moneyClient,
+		maxFee:        maxFee,
 		log:           log,
 	}
 }
@@ -84,7 +85,7 @@ func (w *DustCollector) runDustCollection(ctx context.Context, accountKey *accou
 	billsToSwap := bills[:billCountToSwap]
 
 	// verify balance
-	txsCost := txbuilder.MaxFee * uint64(len(billsToSwap)+2) // +2 for swap and lock tx
+	txsCost := w.maxFee * uint64(len(billsToSwap)+2) // +2 for swap and lock tx
 	if fcr.Balance < txsCost {
 		return nil, fmt.Errorf("insufficient fee credit balance for transactions: need at least %d Tema "+
 			"but have %d Tema to send lock tx, %d dust transfer transactions and swap tx", txsCost, fcr.Balance, len(billsToSwap))

@@ -16,7 +16,6 @@ import (
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/txbuilder"
 )
 
 // NewBillsCmd creates a new cobra command for the wallet bills component.
@@ -122,6 +121,7 @@ func lockCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 	cmd.Flags().Uint64VarP(&config.Key, args.KeyCmdName, "k", 1, "account number of the bill to lock")
 	cmd.Flags().Var(&config.BillID, args.BillIdCmdName, "id of the bill to lock")
 	cmd.Flags().Uint32Var(&config.SystemID, args.SystemIdentifierCmdName, uint32(money.DefaultSystemID), "system identifier")
+	args.AddMaxFeeFlag(cmd, cmd.Flags())
 	return cmd
 }
 
@@ -150,11 +150,15 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if !strings.HasPrefix(infoResponse.Name, moneyTypeVar.String()) {
 		return errors.New("invalid rpc url provided for money partition")
 	}
+	maxFee, err := args.ParseMaxFeeFlag(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to parse maxFee parameter: %w", err)
+	}
 	fcr, err := moneyClient.GetFeeCreditRecordByOwnerID(cmd.Context(), accountKey.PubKeyHash.Sha256)
 	if err != nil {
 		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
 	}
-	if fcr == nil || fcr.Balance < txbuilder.MaxFee {
+	if fcr == nil || fcr.Balance < maxFee {
 		return errors.New("not enough fee credit in wallet")
 	}
 	bill, err := moneyClient.GetBill(cmd.Context(), types.UnitID(config.BillID))
@@ -198,6 +202,7 @@ func unlockCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 	cmd.Flags().Uint64VarP(&config.Key, args.KeyCmdName, "k", 1, "account number of the bill to unlock")
 	cmd.Flags().Var(&config.BillID, args.BillIdCmdName, "id of the bill to unlock")
 	cmd.Flags().Uint32Var(&config.SystemID, args.SystemIdentifierCmdName, uint32(money.DefaultSystemID), "system identifier")
+	args.AddMaxFeeFlag(cmd, cmd.Flags())
 	return cmd
 }
 
@@ -226,12 +231,16 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if !strings.HasPrefix(infoResponse.Name, moneyTypeVar.String()) {
 		return errors.New("invalid rpc url provided for money partition")
 	}
+	maxFee, err := args.ParseMaxFeeFlag(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to parse maxFee parameter: %w", err)
+	}
 
 	fcr, err := moneyClient.GetFeeCreditRecordByOwnerID(cmd.Context(), accountKey.PubKeyHash.Sha256)
 	if err != nil {
 		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
 	}
-	if fcr == nil || fcr.Balance < txbuilder.MaxFee {
+	if fcr == nil || fcr.Balance < maxFee {
 		return errors.New("not enough fee credit in wallet")
 	}
 

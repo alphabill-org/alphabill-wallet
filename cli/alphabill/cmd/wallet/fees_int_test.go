@@ -185,29 +185,30 @@ func TestWalletFeesCmds_MinimumFeeAmount(t *testing.T) {
 		"--rpc-url", abNet.MoneyRpcUrl).WithHome(wallets[0].Homedir)
 
 	// try to add invalid fee amount
-	err := fmt.Sprintf("minimum fee credit amount to add is %s", util.AmountToString(fees.MinimumFeeAmount, 8))
-	feesCmd.ExecWithError(t, err, "add", "--amount", "0.00000003")
+	maxFee := uint64(5)
+	err := fmt.Sprintf("minimum fee credit amount to add is %s", util.AmountToString(fees.MinimumFeeAmountMultiplier*maxFee, 8))
+	feesCmd.ExecWithError(t, err, "add", "--amount", "0.00000003", "--max-fee", strconv.FormatUint(maxFee, 10))
 
 	// add minimum fee amount
-	stdout := feesCmd.Exec(t, "add", "--amount=0.00000040")
-	require.Equal(t, "Successfully created 0.00000040 fee credits on money partition.", stdout.Lines[0])
+	stdout := feesCmd.Exec(t, "add", "--amount=0.00000020", "--max-fee", strconv.FormatUint(maxFee, 10))
+	require.Equal(t, "Successfully created 0.00000020 fee credits on money partition.", stdout.Lines[0])
 
 	// verify fee credit is below minimum
-	expectedFees := uint64(38)
+	expectedFees := uint64(18)
 	stdout = feesCmd.Exec(t, "list")
 	require.Equal(t, "Partition: money", stdout.Lines[0])
 	require.Equal(t, fmt.Sprintf("Account #1 %s", util.AmountToString(expectedFees, 8)), stdout.Lines[1])
 
 	// reclaim with invalid amount
-	err = fmt.Sprintf("insufficient fee credit balance. Minimum amount is %s", util.AmountToString(fees.MinimumFeeAmount, 8))
-	feesCmd.ExecWithError(t, err, "reclaim")
+	err = fmt.Sprintf("insufficient fee credit balance. Minimum amount is %s", util.AmountToString(fees.MinimumFeeAmountMultiplier*maxFee, 8))
+	feesCmd.ExecWithError(t, err, "reclaim", "--max-fee", strconv.FormatUint(maxFee, 10))
 
 	// add more fee credit
-	stdout = feesCmd.Exec(t, "add", "--amount=0.00000045")
+	stdout = feesCmd.Exec(t, "add", "--amount=0.00000045", "--max-fee", strconv.FormatUint(maxFee, 10))
 	require.Equal(t, "Successfully created 0.00000045 fee credits on money partition.", stdout.Lines[0])
 
 	// verify fee credit is valid for reclaim
-	expectedFees = uint64(80)
+	expectedFees = uint64(60)
 	stdout = feesCmd.Exec(t, "list")
 	require.Equal(t, "Partition: money", stdout.Lines[0])
 	require.Equal(t, fmt.Sprintf("Account #1 %s", util.AmountToString(expectedFees, 8)), stdout.Lines[1])

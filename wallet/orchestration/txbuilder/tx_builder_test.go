@@ -22,13 +22,13 @@ func TestNewAddVarTx_OK(t *testing.T) {
 	unitID := orchestration.NewVarID(nil, test.RandomBytes(32))
 	_var := orchestration.ValidatorAssignmentRecord{}
 
-	tx, err := NewAddVarTx(_var, systemID, unitID, timeout, accountKey.AccountKey)
+	tx, err := NewAddVarTx(_var, systemID, unitID, timeout, accountKey.AccountKey, 3)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 	require.EqualValues(t, systemID, tx.SystemID())
 	require.EqualValues(t, unitID, tx.UnitID())
 	require.EqualValues(t, timeout, tx.Timeout())
-	require.EqualValues(t, MaxFee, tx.GetClientMaxTxFee())
+	require.EqualValues(t, 3, tx.GetClientMaxTxFee())
 	require.Nil(t, tx.GetClientFeeCreditRecordID())
 	require.Nil(t, tx.FeeProof)
 	require.NotNil(t, tx.OwnerProof)
@@ -46,13 +46,13 @@ func TestNewAddVarTxUnsigned_OK(t *testing.T) {
 	unitID := orchestration.NewVarID(nil, test.RandomBytes(32))
 	_var := orchestration.ValidatorAssignmentRecord{}
 
-	tx, err := NewAddVarTx(_var, systemID, unitID, timeout, nil)
+	tx, err := NewAddVarTx(_var, systemID, unitID, timeout, nil, 5)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 	require.EqualValues(t, systemID, tx.SystemID())
 	require.EqualValues(t, unitID, tx.UnitID())
 	require.EqualValues(t, timeout, tx.Timeout())
-	require.EqualValues(t, MaxFee, tx.GetClientMaxTxFee())
+	require.EqualValues(t, 5, tx.GetClientMaxTxFee())
 	require.Nil(t, tx.GetClientFeeCreditRecordID())
 	require.Nil(t, tx.FeeProof)
 	require.Nil(t, tx.OwnerProof)
