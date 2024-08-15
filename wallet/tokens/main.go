@@ -351,7 +351,7 @@ func (w *Wallet) GetFungibleTokenType(ctx context.Context, typeId sdktypes.Token
 	return nil, nil
 }
 
-// GetNonFungibleTokenType returns FungibleTokenType or nil if not found
+// GetNonFungibleTokenType returns NonFungibleTokenType or nil if not found
 func (w *Wallet) GetNonFungibleTokenType(ctx context.Context, typeId sdktypes.TokenTypeID) (*sdktypes.NonFungibleTokenType, error) {
 	typez, err := w.tokensClient.GetNonFungibleTokenTypeHierarchy(ctx, typeId)
 	if err != nil {
