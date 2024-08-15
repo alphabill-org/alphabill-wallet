@@ -92,7 +92,7 @@ func WaitForProofArg(cmd *cobra.Command) (wait bool, filename string, _ error) {
 }
 
 func AddMaxFeeFlag(cmd *cobra.Command, flags *pflag.FlagSet) {
-	flags.String(MaxFeeFlagName, "10", "maximum fee for the transaction (in tema)")
+	flags.String(MaxFeeFlagName, "10", "maximum fee per transaction (in tema)")
 }
 
 func ParseMaxFeeFlag(cmd *cobra.Command) (uint64, error) {
