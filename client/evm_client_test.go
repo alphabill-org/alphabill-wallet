@@ -7,7 +7,6 @@ import (
 
 	"github.com/alphabill-org/alphabill-wallet/client/rpc/mocksrv"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
-	"github.com/alphabill-org/alphabill/txsystem/evm/statedb"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 )
@@ -26,11 +25,11 @@ func TestGetFeeCreditRecordByOwnerID(t *testing.T) {
 			setupMock: func() *mocksrv.StateServiceMock {
 				service := mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(&sdktypes.Unit[any]{
 					UnitID: []byte{11},
-					Data: &statedb.StateObject{
-						Account: &statedb.Account{
+					Data: &stateObject{
+						Account: &account{
 							Balance: uint256.NewInt(100 * 1e8),
 						},
-						AlphaBill: &statedb.AlphaBillLink{
+						AlphaBill: &alphaBillLink{
 							Counter: 5,
 							Timeout: 42,
 						},
@@ -44,10 +43,10 @@ func TestGetFeeCreditRecordByOwnerID(t *testing.T) {
 			assertResult: func(fcr *sdktypes.FeeCreditRecord) {
 				require.NotNil(t, fcr)
 				require.EqualValues(t, []byte{11}, fcr.ID)
-				require.NotNil(t, fcr.Data)
-				require.EqualValues(t, 1, fcr.Data.Balance)
-				require.EqualValues(t, 5, fcr.Data.Counter)
-				require.EqualValues(t, 42, fcr.Data.Timeout)
+				require.NotNil(t, fcr.Counter)
+				require.EqualValues(t, 1, fcr.Balance)
+				require.EqualValues(t, 5, *fcr.Counter)
+				require.EqualValues(t, 42, fcr.Timeout)
 			},
 		},
 		{

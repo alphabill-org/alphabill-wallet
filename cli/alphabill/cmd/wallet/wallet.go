@@ -170,7 +170,12 @@ func ExecSendCmd(ctx context.Context, cmd *cobra.Command, config *types.WalletCo
 	}
 	defer feeManagerDB.Close()
 
-	w, err := money.NewWallet(am, feeManagerDB, moneyClient, config.Base.Logger)
+	maxFee, err := args.ParseMaxFeeFlag(cmd)
+	if err != nil {
+		return err
+	}
+
+	w, err := money.NewWallet(am, feeManagerDB, moneyClient, maxFee, config.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -201,10 +206,6 @@ func ExecSendCmd(ctx context.Context, cmd *cobra.Command, config *types.WalletCo
 		return err
 	}
 	refNumber, err := parseReferenceNumberArg(cmd)
-	if err != nil {
-		return err
-	}
-	maxFee, err := args.ParseMaxFeeFlag(cmd)
 	if err != nil {
 		return err
 	}
@@ -278,7 +279,7 @@ func ExecGetBalanceCmd(cmd *cobra.Command, config *types.WalletConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	w, err := money.NewWallet(am, feeManagerDB, moneyClient, config.Base.Logger)
+	w, err := money.NewWallet(am, feeManagerDB, moneyClient, 0, config.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -378,6 +379,7 @@ func CollectDustCmd(config *types.WalletConfig) *cobra.Command {
 	}
 	cmd.Flags().StringP(args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "rpc node url")
 	cmd.Flags().Uint64P(args.KeyCmdName, "k", 0, "which key to use for dust collection, 0 for all bills from all accounts")
+	args.AddMaxFeeFlag(cmd, cmd.Flags())
 	return cmd
 }
 
@@ -409,7 +411,12 @@ func ExecCollectDust(cmd *cobra.Command, config *types.WalletConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	w, err := money.NewWallet(am, feeManagerDB, moneyClient, config.Base.Logger)
+	maxFee, err := args.ParseMaxFeeFlag(cmd)
+	if err != nil {
+		return err
+	}
+
+	w, err := money.NewWallet(am, feeManagerDB, moneyClient, maxFee, config.Base.Logger)
 	if err != nil {
 		return err
 	}

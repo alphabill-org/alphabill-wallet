@@ -33,6 +33,7 @@ type (
 		moneyClient   sdktypes.MoneyPartitionClient
 		feeManager    *fees.FeeManager
 		dustCollector *dc.DustCollector
+		maxFee        uint64
 		log           *slog.Logger
 	}
 
@@ -71,18 +72,19 @@ func GenerateKeys(am account.Manager, mnemonic string) error {
 }
 
 // NewWallet creates a new money wallet from specified parameters. The account manager must contain pre-generated keys.
-func NewWallet(am account.Manager, feeManagerDB fees.FeeManagerDB, moneyClient sdktypes.MoneyPartitionClient, log *slog.Logger) (*Wallet, error) {
+func NewWallet(am account.Manager, feeManagerDB fees.FeeManagerDB, moneyClient sdktypes.MoneyPartitionClient, maxFee uint64, log *slog.Logger) (*Wallet, error) {
 	moneySystemID := money.DefaultSystemID
 	feeManager := fees.NewFeeManager(am, feeManagerDB,
 		moneySystemID, moneyClient, money.NewFeeCreditRecordIDFromPublicKey,
 		moneySystemID, moneyClient, money.NewFeeCreditRecordIDFromPublicKey,
-		log)
-	dustCollector := dc.NewDustCollector(moneySystemID, maxBillsForDustCollection, txTimeoutBlockCount, moneyClient, log)
+		maxFee,	log)
+	dustCollector := dc.NewDustCollector(moneySystemID, maxBillsForDustCollection, txTimeoutBlockCount, moneyClient, maxFee, log)
 	return &Wallet{
 		am:            am,
 		moneyClient:   moneyClient,
 		feeManager:    feeManager,
 		dustCollector: dustCollector,
+		maxFee:        maxFee,
 		log:           log,
 	}, nil
 }
@@ -119,7 +121,7 @@ func (w *Wallet) GetBalance(ctx context.Context, cmd GetBalanceCmd) (uint64, err
 	}
 	var sum uint64
 	for _, bill := range bills {
-		sum += bill.Value()
+		sum += bill.Value
 	}
 	return sum, nil
 }
@@ -174,11 +176,11 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*sdktypes.Proof, erro
 		return nil, err
 	}
 
-	fcb, err := w.moneyClient.GetFeeCreditRecordByOwnerID(ctx, k.PubKeyHash.Sha256)
+	fcr, err := w.moneyClient.GetFeeCreditRecordByOwnerID(ctx, k.PubKeyHash.Sha256)
 	if err != nil {
 		return nil, err
 	}
-	if fcb == nil {
+	if fcr == nil {
 		return nil, errors.New("no fee credit in money wallet")
 	}
 
@@ -188,7 +190,7 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*sdktypes.Proof, erro
 	}
 	var balance uint64
 	for _, b := range bills {
-		balance += b.Value()
+		balance += b.Value
 	}
 	totalAmount := cmd.totalAmount()
 	if totalAmount > balance {
@@ -201,14 +203,14 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*sdktypes.Proof, erro
 	if len(cmd.Receivers) > 1 {
 		// if more than one receiver then perform transaction as N-way split and require sufficiently large bill
 		largestBill := bills[0]
-		if largestBill.Value() < totalAmount {
+		if largestBill.Value < totalAmount {
 			return nil, fmt.Errorf("sending to multiple addresses is performed using N-way split transaction which "+
 				"requires a single sufficiently large bill, wallet needs a bill with at least %s tema value, "+
 				"largest bill in wallet currently is %s tema",
 				util.AmountToString(totalAmount+1, 8), // +1 because 0 remaining value is not allowed
-				util.AmountToString(largestBill.Value(), 8))
+				util.AmountToString(largestBill.Value, 8))
 		}
-		if largestBill.Value() == totalAmount {
+		if largestBill.Value == totalAmount {
 			return nil, errors.New("sending to multiple addresses is performed using N-way split transaction " +
 				"which requires a single sufficiently large bill and cannot result in a bill with 0 value after the " +
 				"transaction")
@@ -221,15 +223,19 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*sdktypes.Proof, erro
 				OwnerCondition: templates.NewP2pkh256BytesFromKeyHash(hash.Sum256(r.PubKey)),
 			})
 		}
-		remainingValue := largestBill.Value() - totalAmount
-		tx, err := txbuilder.NewSplitTx(targetUnits, remainingValue, k, w.SystemID(), largestBill, timeout, fcb.ID, cmd.ReferenceNumber)
+		tx, err := largestBill.Split(targetUnits,
+			sdktypes.WithTimeout(timeout),
+			sdktypes.WithFeeCreditRecordID(fcr.ID),
+			sdktypes.WithMaxFee(cmd.MaxFee),
+			sdktypes.WithReferenceNumber(cmd.ReferenceNumber),
+			sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create N-way split tx: %w", err)
 		}
 		txs = append(txs, tx)
 	} else {
 		// if single receiver then perform up to N transfers (until target amount is reached)
-		txs, err = txbuilder.CreateTransactions(cmd.Receivers[0].PubKey, cmd.Receivers[0].Amount, w.SystemID(), bills, k, timeout, fcb.ID, cmd.ReferenceNumber)
+		txs, err = txbuilder.CreateTransactions(cmd.Receivers[0].PubKey, cmd.Receivers[0].Amount, w.SystemID(), bills, k, timeout, fcr.ID, cmd.ReferenceNumber, cmd.MaxFee)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create transactions: %w", err)
 		}
@@ -239,8 +245,8 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*sdktypes.Proof, erro
 		batch.Add(txsubmitter.New(tx))
 	}
 
-	txsCost := txbuilder.MaxFee * uint64(len(batch.Submissions()))
-	if fcb.Balance() < txsCost {
+	txsCost := cmd.MaxFee * uint64(len(batch.Submissions()))
+	if fcr.Balance < txsCost {
 		return nil, errors.New("insufficient fee credit balance for transaction(s)")
 	}
 
@@ -323,11 +329,11 @@ func (w *Wallet) getUnlockedBills(ctx context.Context, ownerID []byte) ([]*sdkty
 	}
 	// sort bills by value largest first
 	sort.Slice(bills, func(i, j int) bool {
-		return bills[i].Value() > bills[j].Value()
+		return bills[i].Value > bills[j].Value
 	})
 	// filter locked bills
 	for _, b := range bills {
-		if !b.IsLocked() {
+		if b.LockStatus == 0 {
 			unlockedBills = append(unlockedBills, b)
 		}
 	}

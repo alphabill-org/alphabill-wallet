@@ -116,12 +116,12 @@ func (t *TxSubmissionBatch) confirmUnitsTx(ctx context.Context) error {
 					}
 					switch status {
 					case types.TxStatusSuccessful:
-						t.log.DebugContext(ctx, fmt.Sprintf("Tx confirmed: hash=%X, unitID=%X", sub.TxHash, sub.UnitID))
+						t.log.DebugContext(ctx, fmt.Sprintf("Tx confirmed: hash=%X, unitID=%s", sub.TxHash, sub.UnitID))
 					case types.TxErrOutOfGas:
-						t.log.InfoContext(ctx, fmt.Sprintf("Tx failed: out of gas: hash=%X, unitID=%X", sub.TxHash, sub.UnitID))
+						t.log.InfoContext(ctx, fmt.Sprintf("Tx failed: out of gas: hash=%X, unitID=%s", sub.TxHash, sub.UnitID))
 						failed = true
 					case types.TxStatusFailed:
-						t.log.InfoContext(ctx, fmt.Sprintf("Tx failed: hash=%X, unitID=%X", sub.TxHash, sub.UnitID))
+						t.log.InfoContext(ctx, fmt.Sprintf("Tx failed: hash=%X, unitID=%s", sub.TxHash, sub.UnitID))
 						failed = true
 					}
 				}
@@ -136,7 +136,7 @@ func (t *TxSubmissionBatch) confirmUnitsTx(ctx context.Context) error {
 
 				for _, sub := range t.submissions {
 					if !sub.Confirmed() {
-						t.log.InfoContext(ctx, fmt.Sprintf("Tx not confirmed: hash=%X, unitID=%X", sub.TxHash, sub.UnitID))
+						t.log.InfoContext(ctx, fmt.Sprintf("Tx not confirmed: hash=%X, unitID=%s", sub.TxHash, sub.UnitID))
 					}
 				}
 				return errors.New("confirmation timeout")

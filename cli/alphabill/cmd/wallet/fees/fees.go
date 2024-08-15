@@ -59,6 +59,7 @@ func addFeeCreditCmd(config *feesConfig) *cobra.Command {
 	}
 	cmd.Flags().Uint64P(args.KeyCmdName, "k", 1, "specifies to which account to add the fee credit")
 	cmd.Flags().StringP(args.AmountCmdName, "v", "1", "specifies how much fee credit to create in ALPHA")
+	args.AddMaxFeeFlag(cmd, cmd.Flags())
 	return cmd
 }
 
@@ -68,6 +69,10 @@ func addFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
 		return err
 	}
 	amountString, err := cmd.Flags().GetString(args.AmountCmdName)
+	if err != nil {
+		return err
+	}
+	maxFee, err := args.ParseMaxFeeFlag(cmd)
 	if err != nil {
 		return err
 	}
@@ -84,8 +89,7 @@ func addFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
 		return fmt.Errorf("failed to create fee manager db: %w", err)
 	}
 	defer feeManagerDB.Close()
-
-	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Logger)
+	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, maxFee, walletConfig.Base.Logger)
 	if err != nil {
 		return fmt.Errorf("failed to create fee credit manager: %w", err)
 	}
@@ -111,7 +115,6 @@ func listFeesCmdExec(cmd *cobra.Command, config *feesConfig) error {
 	if err != nil {
 		return err
 	}
-
 	walletConfig := config.walletConfig
 	am, err := cliaccount.LoadExistingAccountManager(walletConfig)
 	if err != nil {
@@ -125,7 +128,7 @@ func listFeesCmdExec(cmd *cobra.Command, config *feesConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Logger)
+	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, 0, walletConfig.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -143,11 +146,16 @@ func reclaimFeeCreditCmd(config *feesConfig) *cobra.Command {
 		},
 	}
 	cmd.Flags().Uint64P(args.KeyCmdName, "k", 1, "specifies to which account to reclaim the fee credit")
+	args.AddMaxFeeFlag(cmd, cmd.Flags())
 	return cmd
 }
 
 func reclaimFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
 	accountNumber, err := cmd.Flags().GetUint64(args.KeyCmdName)
+	if err != nil {
+		return err
+	}
+	maxFee, err := args.ParseMaxFeeFlag(cmd)
 	if err != nil {
 		return err
 	}
@@ -165,7 +173,7 @@ func reclaimFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Logger)
+	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, maxFee, walletConfig.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -183,6 +191,7 @@ func lockFeeCreditCmd(config *feesConfig) *cobra.Command {
 		},
 	}
 	cmd.Flags().Uint64P(args.KeyCmdName, "k", 0, "specifies which account fee credit record to lock")
+	args.AddMaxFeeFlag(cmd, cmd.Flags())
 	_ = cmd.MarkFlagRequired(args.KeyCmdName)
 	return cmd
 }
@@ -198,6 +207,10 @@ func lockFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
 	if accountNumber == 0 {
 		return errors.New("account number must be greater than zero")
 	}
+	maxFee, err := args.ParseMaxFeeFlag(cmd)
+	if err != nil {
+		return err
+	}
 
 	walletConfig := config.walletConfig
 	am, err := cliaccount.LoadExistingAccountManager(walletConfig)
@@ -212,7 +225,7 @@ func lockFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Logger)
+	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, maxFee, walletConfig.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -235,6 +248,7 @@ func unlockFeeCreditCmd(config *feesConfig) *cobra.Command {
 		},
 	}
 	cmd.Flags().Uint64P(args.KeyCmdName, "k", 0, "specifies which account fee credit record to unlock")
+	args.AddMaxFeeFlag(cmd, cmd.Flags())
 	_ = cmd.MarkFlagRequired(args.KeyCmdName)
 	return cmd
 }
@@ -250,6 +264,10 @@ func unlockFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
 	if accountNumber == 0 {
 		return errors.New("account number must be greater than zero")
 	}
+	maxFee, err := args.ParseMaxFeeFlag(cmd)
+	if err != nil {
+		return err
+	}
 
 	walletConfig := config.walletConfig
 	am, err := cliaccount.LoadExistingAccountManager(walletConfig)
@@ -264,7 +282,7 @@ func unlockFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, walletConfig.Base.Logger)
+	fm, err := getFeeCreditManager(cmd.Context(), config, am, feeManagerDB, maxFee, walletConfig.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -284,6 +302,7 @@ type FeeCreditManager interface {
 	ReclaimFeeCredit(ctx context.Context, cmd fees.ReclaimFeeCmd) (*fees.ReclaimFeeCmdResponse, error)
 	LockFeeCredit(ctx context.Context, cmd fees.LockFeeCreditCmd) (*types.Proof, error)
 	UnlockFeeCredit(ctx context.Context, cmd fees.UnlockFeeCreditCmd) (*types.Proof, error)
+	MinimumFeeAmount() uint64
 	Close()
 }
 
@@ -295,23 +314,27 @@ func listFees(ctx context.Context, accountNumber uint64, am account.Manager, c *
 		}
 		consoleWriter.Println("Partition: " + c.targetPartitionType)
 		for accountIndex := range pubKeys {
-			fcb, err := w.GetFeeCredit(ctx, fees.GetFeeCreditCmd{AccountIndex: uint64(accountIndex)})
+			fcr, err := w.GetFeeCredit(ctx, fees.GetFeeCreditCmd{AccountIndex: uint64(accountIndex)})
 			if err != nil {
 				return err
 			}
 			accNum := accountIndex + 1
-			amountString := util.AmountToString(fcb.Balance(), 8)
-			consoleWriter.Println(fmt.Sprintf("Account #%d %s%s", accNum, amountString, getLockedReasonString(fcb)))
+			balance := uint64(0)
+			if fcr != nil {
+				balance = fcr.Balance
+			}
+			amountString := util.AmountToString(balance, 8)
+			consoleWriter.Println(fmt.Sprintf("Account #%d %s%s", accNum, amountString, getLockedReasonString(fcr)))
 		}
 	} else {
 		accountIndex := accountNumber - 1
-		fcb, err := w.GetFeeCredit(ctx, fees.GetFeeCreditCmd{AccountIndex: accountIndex})
+		fcr, err := w.GetFeeCredit(ctx, fees.GetFeeCreditCmd{AccountIndex: accountIndex})
 		if err != nil {
 			return err
 		}
-		amountString := util.AmountToString(fcb.Balance(), 8)
+		amountString := util.AmountToString(fcr.Balance, 8)
 		consoleWriter.Println("Partition: " + c.targetPartitionType)
-		consoleWriter.Println(fmt.Sprintf("Account #%d %s%s", accountNumber, amountString, getLockedReasonString(fcb)))
+		consoleWriter.Println(fmt.Sprintf("Account #%d %s%s", accountNumber, amountString, getLockedReasonString(fcr)))
 	}
 	return nil
 }
@@ -328,10 +351,10 @@ func addFees(ctx context.Context, accountNumber uint64, amountString string, c *
 	})
 	if err != nil {
 		if errors.Is(err, fees.ErrMinimumFeeAmount) {
-			return fmt.Errorf("minimum fee credit amount to add is %s", util.AmountToString(fees.MinimumFeeAmount, 8))
+			return fmt.Errorf("minimum fee credit amount to add is %s", util.AmountToString(w.MinimumFeeAmount(), 8))
 		}
 		if errors.Is(err, fees.ErrInsufficientBalance) {
-			return fmt.Errorf("insufficient balance for transaction. Bills smaller than the minimum amount (%s) are not counted", util.AmountToString(fees.MinimumFeeAmount, 8))
+			return fmt.Errorf("insufficient balance for transaction. Bills smaller than the minimum amount (%s) are not counted", util.AmountToString(w.MinimumFeeAmount(), 8))
 		}
 		if errors.Is(err, fees.ErrInvalidPartition) {
 			return fmt.Errorf("pending fee process exists for another partition, run the command for the correct partition: %w", err)
@@ -353,7 +376,7 @@ func reclaimFees(ctx context.Context, accountNumber uint64, c *feesConfig, w Fee
 	})
 	if err != nil {
 		if errors.Is(err, fees.ErrMinimumFeeAmount) {
-			return fmt.Errorf("insufficient fee credit balance. Minimum amount is %s", util.AmountToString(fees.MinimumFeeAmount, 8))
+			return fmt.Errorf("insufficient fee credit balance. Minimum amount is %s", util.AmountToString(w.MinimumFeeAmount(), 8))
 		}
 		if errors.Is(err, fees.ErrInvalidPartition) {
 			return fmt.Errorf("wallet contains locked bill for different partition, run the command for the correct partition: %w", err)
@@ -398,7 +421,7 @@ func (c *feesConfig) getTargetPartitionUrl() string {
 
 // Creates a fees.FeeManager that needs to be closed with the Close() method.
 // Does not close the account.Manager passed as an argument.
-func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager, feeManagerDB fees.FeeManagerDB, logger *slog.Logger) (*fees.FeeManager, error) {
+func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager, feeManagerDB fees.FeeManagerDB, maxFee uint64, logger *slog.Logger) (*fees.FeeManager, error) {
 	moneyClient, err := client.NewMoneyPartitionClient(ctx, c.getMoneyRpcUrl())
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial money rpc url: %w", err)
@@ -423,6 +446,7 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 			moneyInfo.SystemID,
 			moneyClient,
 			money.NewFeeCreditRecordIDFromPublicKey,
+			maxFee,
 			logger,
 		), nil
 	case clitypes.TokensType:
@@ -448,6 +472,7 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 			tokenInfo.SystemID,
 			tokensClient,
 			tokens.NewFeeCreditRecordIDFromPublicKey,
+			maxFee,
 			logger,
 		), nil
 	case clitypes.EvmType:
@@ -473,6 +498,7 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 			evmInfo.SystemID,
 			evmClient,
 			evmwallet.NewFeeCreditRecordIDFromPublicKey,
+			maxFee,
 			logger,
 		), nil
 	default:
@@ -480,9 +506,9 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 	}
 }
 
-func getLockedReasonString(fcb *types.FeeCreditRecord) string {
-	if fcb.IsLocked() {
-		return fmt.Sprintf(" (%s)", wallet.LockReason(fcb.Data.Locked).String())
+func getLockedReasonString(fcr *types.FeeCreditRecord) string {
+	if fcr != nil && fcr.LockStatus != 0 {
+		return fmt.Sprintf(" (%s)", wallet.LockReason(fcr.LockStatus).String())
 	}
 	return ""
 }

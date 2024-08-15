@@ -6,7 +6,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/stretchr/testify/require"
 
@@ -33,45 +32,6 @@ func TestRpcClient(t *testing.T) {
 		_, err := client.GetRoundNumber(context.Background())
 		require.ErrorContains(t, err, "some error")
 	})
-
-	t.Run("GetFeeCreditRecord_OK", func(t *testing.T) {
-		service.Reset()
-		fcb := &sdktypes.FeeCreditRecord{
-			ID: []byte{1},
-			Data: &fc.FeeCreditRecord{
-				Balance: 192,
-				Timeout: 168,
-				Counter: 12345,
-			},
-		}
-		service.Units = map[string]*sdktypes.Unit[any]{
-			string(fcb.ID): {
-				UnitID: fcb.ID,
-				Data:   fcb.Data,
-			},
-		}
-
-		returnedBill, err := client.getFeeCreditRecord(context.Background(), fcb.ID)
-		require.NoError(t, err)
-		require.Equal(t, fcb, returnedBill)
-	})
-	t.Run("GetFeeCreditRecord_NOK", func(t *testing.T) {
-		service.Reset()
-		service.Err = errors.New("some error")
-		unitID := []byte{1}
-
-		fcr, err := client.getFeeCreditRecord(context.Background(), unitID)
-		require.ErrorContains(t, err, "some error")
-		require.Nil(t, fcr)
-	})
-	t.Run("GetFeeCreditRecord_NotFound", func(t *testing.T) {
-		service.Reset()
-
-		fcr, err := client.getFeeCreditRecord(context.Background(), []byte{1})
-		require.Nil(t, err)
-		require.Nil(t, fcr)
-	})
-
 	t.Run("GetUnitsByOwnerID_OK", func(t *testing.T) {
 		service.Reset()
 		ownerID := []byte{1}
