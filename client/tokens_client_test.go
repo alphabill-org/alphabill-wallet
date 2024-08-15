@@ -22,10 +22,10 @@ func TestTokensRpcClient(t *testing.T) {
 		tokenID := tokentxs.NewFungibleTokenID(nil, []byte{1})
 		tokenTypeID := tokentxs.NewFungibleTokenTypeID(nil, []byte{2})
 		tokenType := &types.FungibleTokenType{
-			SystemID:     tokens.DefaultSystemID,
-			ID:           tokenTypeID,
-			Symbol:       "ABC",
-			Name:         "Name of ABC Token Type",
+			SystemID:      tokens.DefaultSystemID,
+			ID:            tokenTypeID,
+			Symbol:        "ABC",
+			Name:          "Name of ABC Token Type",
 			DecimalPlaces: 2,
 		}
 		ft := &types.FungibleToken{
@@ -87,10 +87,10 @@ func TestTokensRpcClient(t *testing.T) {
 		ftTokenID := tokentxs.NewFungibleTokenID(nil, []byte{1})
 		ftTokenTypeID := tokentxs.NewFungibleTokenTypeID(nil, []byte{2})
 		ftTokenType := &types.FungibleTokenType{
-			SystemID:     tokens.DefaultSystemID,
-			ID:           ftTokenTypeID,
-			Symbol:       "ABC",
-			Name:         "Fungible ABC Token",
+			SystemID:      tokens.DefaultSystemID,
+			ID:            ftTokenTypeID,
+			Symbol:        "ABC",
+			Name:          "Fungible ABC Token",
 			DecimalPlaces: 2,
 		}
 
@@ -109,20 +109,20 @@ func TestTokensRpcClient(t *testing.T) {
 		nftTokenID := tokentxs.NewNonFungibleTokenID(nil, []byte{3})
 		nftTokenTypeID := tokentxs.NewNonFungibleTokenTypeID(nil, []byte{4})
 		nftTokenType := &types.NonFungibleTokenType{
-			SystemID:     tokens.DefaultSystemID,
-			ID:           nftTokenTypeID,
-			Symbol:       "ABC-NFT",
-			Name:         "Non-Fungible ABC Token",
+			SystemID: tokens.DefaultSystemID,
+			ID:       nftTokenTypeID,
+			Symbol:   "ABC-NFT",
+			Name:     "Non-Fungible ABC Token",
 		}
 		nft := &types.NonFungibleToken{
-			SystemID: tokens.DefaultSystemID,
-			ID:       nftTokenID,
-			Symbol:   nftTokenType.Symbol,
-			TypeID:   nftTokenTypeID,
-			TypeName: nftTokenType.Name,
-			Counter:  321,
+			SystemID:       tokens.DefaultSystemID,
+			ID:             nftTokenID,
+			Symbol:         nftTokenType.Symbol,
+			TypeID:         nftTokenTypeID,
+			TypeName:       nftTokenType.Name,
+			Counter:        321,
 			OwnerPredicate: ownerID,
-			Name:   "NFT name",
+			Name:           "NFT name",
 		}
 
 		// mock two tokens - one nft one ft
@@ -202,11 +202,11 @@ func TestTokensRpcClient(t *testing.T) {
 		for i := uint8(1); i <= 3; i++ {
 			typeID := tokentxs.NewFungibleTokenTypeID(nil, []byte{i})
 			tokenType := &types.FungibleTokenType{
-				SystemID:     tokens.DefaultSystemID,
-				ID:           typeID,
-				ParentTypeID: prevTypeID,
-				Symbol:       "ABC",
-				Name:         fmt.Sprintf("ABC %d", i),
+				SystemID:      tokens.DefaultSystemID,
+				ID:            typeID,
+				ParentTypeID:  prevTypeID,
+				Symbol:        "ABC",
+				Name:          fmt.Sprintf("ABC %d", i),
 				DecimalPlaces: 2,
 			}
 			prevTypeID = typeID
@@ -239,12 +239,64 @@ func TestTokensRpcClient(t *testing.T) {
 		require.Equal(t, typeHierarchy[1].ParentTypeID, typeHierarchy[2].ID)
 		require.Equal(t, typeHierarchy[2].ParentTypeID, types.NoParent)
 	})
-	t.Run("GetTypeHierarchy_NOK", func(t *testing.T) {
-		*service = *mocksrv.NewStateServiceMock(mocksrv.WithError(errors.New("some error")))
+	t.Run("GetFungibleTokenTypeHierarchy_NOK", func(t *testing.T) {
+		*service = *mocksrv.NewStateServiceMock()
 		typeID := tokentxs.NewFungibleTokenTypeID(nil, []byte{1})
 
 		typeHierarchy, err := client.GetFungibleTokenTypeHierarchy(context.Background(), typeID)
-		require.ErrorContains(t, err, "some error")
+		require.ErrorContains(t, err, fmt.Sprintf("fungible token type %s not found", typeID.String()))
+		require.Nil(t, typeHierarchy)
+	})
+
+	t.Run("GetNonFungibleTokenTypeHierarchy_OK", func(t *testing.T) {
+		// create 3 levels deep type hierarchy
+		var tokenTypes []*types.NonFungibleTokenType
+		var units []*types.Unit[any]
+		prevTypeID := types.NoParent
+		for i := uint8(1); i <= 3; i++ {
+			typeID := tokentxs.NewNonFungibleTokenTypeID(nil, []byte{i})
+			tokenType := &types.NonFungibleTokenType{
+				SystemID:     tokens.DefaultSystemID,
+				ID:           typeID,
+				ParentTypeID: prevTypeID,
+				Symbol:       "ABC",
+				Name:         fmt.Sprintf("ABC %d", i),
+			}
+			prevTypeID = typeID
+			tokenTypes = append(tokenTypes, tokenType)
+			units = append(units, &types.Unit[any]{
+				SystemID: tokens.DefaultSystemID,
+				UnitID:   typeID,
+				Data: tokentxs.NonFungibleTokenTypeData{
+					Symbol:       tokenType.Symbol,
+					Name:         tokenType.Name,
+					ParentTypeID: tokenType.ParentTypeID,
+				},
+			})
+		}
+
+		*service = *mocksrv.NewStateServiceMock(
+			mocksrv.WithUnits(units...),
+		)
+
+		// type hierarchy: 3 -> 2 -> 1 (root)
+		typeHierarchy, err := client.GetNonFungibleTokenTypeHierarchy(context.Background(), tokenTypes[2].ID)
+		require.NoError(t, err)
+		require.Len(t, typeHierarchy, 3)
+		require.Equal(t, typeHierarchy[0], tokenTypes[2])
+		require.Equal(t, typeHierarchy[1], tokenTypes[1])
+		require.Equal(t, typeHierarchy[2], tokenTypes[0])
+
+		require.Equal(t, typeHierarchy[0].ParentTypeID, typeHierarchy[1].ID)
+		require.Equal(t, typeHierarchy[1].ParentTypeID, typeHierarchy[2].ID)
+		require.Equal(t, typeHierarchy[2].ParentTypeID, types.NoParent)
+	})
+	t.Run("GetNonFungibleTokenTypeHierarchy_NOK", func(t *testing.T) {
+		*service = *mocksrv.NewStateServiceMock()
+		typeID := tokentxs.NewNonFungibleTokenTypeID(nil, []byte{1})
+
+		typeHierarchy, err := client.GetNonFungibleTokenTypeHierarchy(context.Background(), typeID)
+		require.ErrorContains(t, err, fmt.Sprintf("non-fungible token type %s not found", typeID.String()))
 		require.Nil(t, typeHierarchy)
 	})
 }
@@ -252,7 +304,7 @@ func TestTokensRpcClient(t *testing.T) {
 func startServerAndTokensClient(t *testing.T, service *mocksrv.StateServiceMock) types.TokensPartitionClient {
 	srv := mocksrv.StartStateApiServer(t, service)
 
-	tokensClient, err := NewTokensPartitionClient(context.Background(), "http://" + srv)
+	tokensClient, err := NewTokensPartitionClient(context.Background(), "http://"+srv)
 	t.Cleanup(tokensClient.Close)
 	require.NoError(t, err)
 
