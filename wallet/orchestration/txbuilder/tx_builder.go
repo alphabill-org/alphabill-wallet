@@ -10,17 +10,15 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 )
 
-const MaxFee = uint64(10)
-
 // NewAddVarTx creates a 'addVar' transaction order.
-func NewAddVarTx(varData orchestration.ValidatorAssignmentRecord, systemID types.SystemID, unitID types.UnitID, timeout uint64, signingKey *account.AccountKey) (*types.TransactionOrder, error) {
+func NewAddVarTx(varData orchestration.ValidatorAssignmentRecord, systemID types.SystemID, unitID types.UnitID, timeout uint64, signingKey *account.AccountKey, maxFee uint64) (*types.TransactionOrder, error) {
 	attr := &orchestration.AddVarAttributes{
 		Var: varData,
 	}
 
 	txPayload, err := sdktypes.NewPayload(systemID, unitID, orchestration.PayloadTypeAddVAR, attr,
 		sdktypes.WithTimeout(timeout),
-		sdktypes.WithMaxFee(MaxFee))
+		sdktypes.WithMaxFee(maxFee))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tx: %w", err)
 	}

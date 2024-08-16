@@ -62,7 +62,7 @@ type (
 	}
 )
 
-func New(systemID types.SystemID, tokensClient sdktypes.TokensPartitionClient, am account.Manager, confirmTx bool, feeManager *fees.FeeManager, log *slog.Logger) (*Wallet, error) {
+func New(systemID types.SystemID, tokensClient sdktypes.TokensPartitionClient, am account.Manager, confirmTx bool, feeManager *fees.FeeManager, maxFee uint64, log *slog.Logger) (*Wallet, error) {
 	return &Wallet{
 		systemID:     systemID,
 		am:           am,

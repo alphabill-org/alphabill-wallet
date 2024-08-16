@@ -96,6 +96,7 @@ func NewTokenCmd(config *types.WalletConfig) *cobra.Command {
 	cmd.AddCommand(tokenCmdUnlock(config))
 	cmd.PersistentFlags().StringP(args.RpcUrl, "r", args.DefaultTokensRpcUrl, "rpc node url")
 	args.AddWaitForProofFlags(cmd, cmd.PersistentFlags())
+	args.AddMaxFeeFlag(cmd, cmd.PersistentFlags())
 	return cmd
 }
 
@@ -1169,6 +1170,10 @@ func initTokensWallet(cmd *cobra.Command, config *types.WalletConfig) (*tokenswa
 	if err != nil {
 		return nil, err
 	}
+	maxFee, err := args.ParseMaxFeeFlag(cmd)
+	if err != nil {
+		return nil, err
+	}
 	tokensClient, err := client.NewTokensPartitionClient(cmd.Context(), args.BuildRpcUrl(rpcUrl))
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial rpc client: %w", err)
@@ -1182,7 +1187,7 @@ func initTokensWallet(cmd *cobra.Command, config *types.WalletConfig) (*tokenswa
 	if !strings.HasPrefix(infoResponse.Name, tokensTypeVar.String()) {
 		return nil, errors.New("invalid rpc url provided for tokens partition")
 	}
-	return tokenswallet.New(infoResponse.SystemID, tokensClient, am, confirmTx, nil, config.Base.Logger)
+	return tokenswallet.New(infoResponse.SystemID, tokensClient, am, confirmTx, nil, maxFee, config.Base.Logger)
 }
 
 func readParentTypeInfo(cmd *cobra.Command, keyNr uint64, am account.Manager) (sdktypes.TokenTypeID, []*tokenswallet.PredicateInput, error) {

@@ -20,6 +20,7 @@ const (
 	testPubKey0Hash = "f52022bb450407d92f13bf1c53128a676bcf304818e9f41a5ef4ebeae9c0d6b0"
 	testPubKey1Hex  = "02d36c574db299904b285aaeb57eb7b1fa145c43af90bec3c635c4174c224587b6"
 	testPubKey2Hex  = "02f6cbeacfd97ebc9b657081eb8b6c9ed3a588646d618ddbd03e198290af94c9d2"
+	maxFee          = 10
 )
 
 func TestExistingWalletCanBeLoaded(t *testing.T) {
@@ -29,7 +30,7 @@ func TestExistingWalletCanBeLoaded(t *testing.T) {
 	rpcClient := testutil.NewRpcClientMock()
 	feeManagerDB, err := fees.NewFeeManagerDB(homedir)
 	require.NoError(t, err)
-	_, err = NewWallet(am, feeManagerDB, rpcClient, logger.New(t))
+	_, err = NewWallet(am, feeManagerDB, rpcClient, maxFee, logger.New(t))
 	require.NoError(t, err)
 }
 
@@ -105,7 +106,7 @@ func createTestWallet(t *testing.T, moneyClient sdktypes.MoneyPartitionClient) *
 	feeManagerDB, err := fees.NewFeeManagerDB(dir)
 	require.NoError(t, err)
 
-	w, err := NewWallet(am, feeManagerDB, moneyClient, logger.New(t))
+	w, err := NewWallet(am, feeManagerDB, moneyClient, maxFee, logger.New(t))
 	require.NoError(t, err)
 
 	return w

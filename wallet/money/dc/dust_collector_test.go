@@ -12,6 +12,8 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 )
 
+const maxFee = 10
+
 func TestDC_OK(t *testing.T) {
 	// create wallet with 3 normal bills
 	accountKeys, err := account.NewKeys("dinosaur simple verify deliver bless ridge monkey design venue six problem lucky")
@@ -22,9 +24,9 @@ func TestDC_OK(t *testing.T) {
 		testutil.WithOwnerBill(testutil.NewBill(2, 2)),
 		testutil.WithOwnerBill(targetBill),
 		testutil.WithOwnerFeeCreditRecord(
-			testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, 100, 0, 100)),
+			testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, 100, maxFee, 100)),
 	)
-	dc := NewDustCollector(money.DefaultSystemID, 10, 10, moneyClient, logger.New(t))
+	dc := NewDustCollector(money.DefaultSystemID, 10, 10, moneyClient, 10, logger.New(t))
 
 	// when dc runs
 	dcResult, err := dc.CollectDust(context.Background(), accountKeys.AccountKey)
@@ -50,7 +52,7 @@ func TestDCWontRunForSingleBill(t *testing.T) {
 		testutil.WithOwnerFeeCreditRecord(
 			testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, 100, 0, 100)),
 	)
-	dc := NewDustCollector(money.DefaultSystemID, 10, 10, moneyClient, logger.New(t))
+	dc := NewDustCollector(money.DefaultSystemID, 10, 10, moneyClient, maxFee, logger.New(t))
 
 	// when dc runs
 	dcResult, err := dc.CollectDust(context.Background(), accountKeys.AccountKey)
@@ -72,7 +74,7 @@ func TestAllBillsAreSwapped_WhenWalletBillCountEqualToMaxBillCount(t *testing.T)
 		testutil.WithOwnerBill(targetBill),
 		testutil.WithOwnerFeeCreditRecord(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, 100, 0, 100)),
 	)
-	w := NewDustCollector(money.DefaultSystemID, maxBillsPerDC, 10, moneyClient, logger.New(t))
+	w := NewDustCollector(money.DefaultSystemID, maxBillsPerDC, 10, moneyClient, maxFee, logger.New(t))
 
 	// when dc runs
 	dcResult, err := w.CollectDust(context.Background(), accountKeys.AccountKey)
@@ -105,7 +107,7 @@ func TestOnlyFirstNBillsAreSwapped_WhenBillCountOverLimit(t *testing.T) {
 		testutil.WithOwnerBill(targetBill),
 		testutil.WithOwnerFeeCreditRecord(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, 100, 0, 100)),
 	)
-	w := NewDustCollector(money.DefaultSystemID, maxBillsPerDC, 10, moneyClient, logger.New(t))
+	w := NewDustCollector(money.DefaultSystemID, maxBillsPerDC, 10, moneyClient, maxFee, logger.New(t))
 
 	// when dc runs
 	dcResult, err := w.CollectDust(context.Background(), accountKeys.AccountKey)

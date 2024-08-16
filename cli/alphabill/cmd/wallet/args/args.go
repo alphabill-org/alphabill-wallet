@@ -36,6 +36,7 @@ const (
 	SystemIdentifierCmdName = "system-identifier"
 	ReferenceNumber         = "reference-number"
 	proofOutputFlagName     = "proof-output"
+	MaxFeeFlagName          = "max-fee"
 )
 
 func BuildRpcUrl(url string) string {
@@ -88,4 +89,23 @@ func WaitForProofArg(cmd *cobra.Command) (wait bool, filename string, _ error) {
 	}
 
 	return wait || filename != "", filename, nil
+}
+
+func AddMaxFeeFlag(cmd *cobra.Command, flags *pflag.FlagSet) {
+	flags.String(MaxFeeFlagName, "10", "maximum fee per transaction (in tema)")
+}
+
+func ParseMaxFeeFlag(cmd *cobra.Command) (uint64, error) {
+	maxFee, err := cmd.Flags().GetString(MaxFeeFlagName)
+	if err != nil {
+		return 0, fmt.Errorf("reading %q flag: %w", MaxFeeFlagName, err)
+	}
+	if maxFee == "" {
+		return 0, nil
+	}
+	fee, err := strconv.ParseUint(maxFee, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("parsing %q flag: %w", MaxFeeFlagName, err)
+	}
+	return fee, nil
 }

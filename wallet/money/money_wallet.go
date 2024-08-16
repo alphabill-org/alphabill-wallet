@@ -33,6 +33,7 @@ type (
 		moneyClient   sdktypes.MoneyPartitionClient
 		feeManager    *fees.FeeManager
 		dustCollector *dc.DustCollector
+		maxFee        uint64
 		log           *slog.Logger
 	}
 
@@ -41,6 +42,7 @@ type (
 		WaitForConfirmation bool
 		AccountIndex        uint64
 		ReferenceNumber     []byte
+		MaxFee              uint64
 	}
 
 	ReceiverData struct {
@@ -70,18 +72,19 @@ func GenerateKeys(am account.Manager, mnemonic string) error {
 }
 
 // NewWallet creates a new money wallet from specified parameters. The account manager must contain pre-generated keys.
-func NewWallet(am account.Manager, feeManagerDB fees.FeeManagerDB, moneyClient sdktypes.MoneyPartitionClient, log *slog.Logger) (*Wallet, error) {
+func NewWallet(am account.Manager, feeManagerDB fees.FeeManagerDB, moneyClient sdktypes.MoneyPartitionClient, maxFee uint64, log *slog.Logger) (*Wallet, error) {
 	moneySystemID := money.DefaultSystemID
 	feeManager := fees.NewFeeManager(am, feeManagerDB,
 		moneySystemID, moneyClient, money.NewFeeCreditRecordIDFromPublicKey,
 		moneySystemID, moneyClient, money.NewFeeCreditRecordIDFromPublicKey,
-		log)
-	dustCollector := dc.NewDustCollector(moneySystemID, maxBillsForDustCollection, txTimeoutBlockCount, moneyClient, log)
+		maxFee,	log)
+	dustCollector := dc.NewDustCollector(moneySystemID, maxBillsForDustCollection, txTimeoutBlockCount, moneyClient, maxFee, log)
 	return &Wallet{
 		am:            am,
 		moneyClient:   moneyClient,
 		feeManager:    feeManager,
 		dustCollector: dustCollector,
+		maxFee:        maxFee,
 		log:           log,
 	}, nil
 }
@@ -223,6 +226,7 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*sdktypes.Proof, erro
 		tx, err := largestBill.Split(targetUnits,
 			sdktypes.WithTimeout(timeout),
 			sdktypes.WithFeeCreditRecordID(fcr.ID),
+			sdktypes.WithMaxFee(cmd.MaxFee),
 			sdktypes.WithReferenceNumber(cmd.ReferenceNumber),
 			sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
 		if err != nil {
@@ -231,7 +235,7 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*sdktypes.Proof, erro
 		txs = append(txs, tx)
 	} else {
 		// if single receiver then perform up to N transfers (until target amount is reached)
-		txs, err = txbuilder.CreateTransactions(cmd.Receivers[0].PubKey, cmd.Receivers[0].Amount, w.SystemID(), bills, k, timeout, fcr.ID, cmd.ReferenceNumber)
+		txs, err = txbuilder.CreateTransactions(cmd.Receivers[0].PubKey, cmd.Receivers[0].Amount, w.SystemID(), bills, k, timeout, fcr.ID, cmd.ReferenceNumber, cmd.MaxFee)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create transactions: %w", err)
 		}
@@ -241,7 +245,7 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*sdktypes.Proof, erro
 		batch.Add(txsubmitter.New(tx))
 	}
 
-	txsCost := txbuilder.MaxFee * uint64(len(batch.Submissions()))
+	txsCost := cmd.MaxFee * uint64(len(batch.Submissions()))
 	if fcr.Balance < txsCost {
 		return nil, errors.New("insufficient fee credit balance for transaction(s)")
 	}
