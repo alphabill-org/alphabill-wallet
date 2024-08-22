@@ -747,7 +747,7 @@ func (w *FeeManager) reclaimFees(ctx context.Context, accountKey *account.Accoun
 	if fcr.LockStatus != 0 {
 		return nil, errors.New("fee credit record is locked")
 	}
-	if fcr.Balance < w.MinAddFeeAmount() {
+	if fcr.Balance < w.MinReclaimFeeAmount() {
 		return nil, ErrMinimumFeeAmount
 	}
 
