@@ -356,6 +356,20 @@ func (w *Wallet) GetFungibleTokenType(ctx context.Context, typeId sdktypes.Token
 	return nil, nil
 }
 
+// GetNonFungibleTokenType returns NonFungibleTokenType or nil if not found
+func (w *Wallet) GetNonFungibleTokenType(ctx context.Context, typeId sdktypes.TokenTypeID) (*sdktypes.NonFungibleTokenType, error) {
+	typez, err := w.tokensClient.GetNonFungibleTokenTypeHierarchy(ctx, typeId)
+	if err != nil {
+		return nil, err
+	}
+	for i := range typez {
+		if bytes.Equal(typez[i].ID, typeId) {
+			return typez[i], nil
+		}
+	}
+	return nil, nil
+}
+
 // ListFungibleTokens returns all fungible tokens for the given accountNumber
 func (w *Wallet) ListFungibleTokens(ctx context.Context, accountNumber uint64) ([]*sdktypes.FungibleToken, error) {
 	key, err := w.getAccount(accountNumber)

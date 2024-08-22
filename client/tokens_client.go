@@ -299,6 +299,23 @@ func (c *tokensPartitionClient) GetFungibleTokenTypeHierarchy(ctx context.Contex
 	return tokenTypes, nil
 }
 
+// GetNonFungibleTokenTypeHierarchy returns type hierarchy for given token type id where the root type is the last element (no parent).
+func (c *tokensPartitionClient) GetNonFungibleTokenTypeHierarchy(ctx context.Context, typeID sdktypes.TokenTypeID) ([]*sdktypes.NonFungibleTokenType, error) {
+	var tokenTypes []*sdktypes.NonFungibleTokenType
+	for len(typeID) > 0 && !typeID.Eq(sdktypes.NoParent) {
+		tokenType, err := c.getNonFungibleTokenType(ctx, typeID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch token type: %w", err)
+		}
+		if tokenType == nil {
+			return nil, fmt.Errorf("non-fungible token type %s not found", typeID)
+		}
+		tokenTypes = append(tokenTypes, tokenType)
+		typeID = tokenType.ParentTypeID
+	}
+	return tokenTypes, nil
+}
+
 // GetFeeCreditRecordByOwnerID finds the first fee credit record in tokens partition for the given owner ID,
 // returns nil if fee credit record does not exist.
 func (c *tokensPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (*sdktypes.FeeCreditRecord, error) {

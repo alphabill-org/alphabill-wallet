@@ -204,7 +204,7 @@ func TestWalletCreateFungibleTokenTypeCmd_SymbolFlag(t *testing.T) {
 		"--symbol")
 }
 
-func TestWalletCreateFungibleTokenTypeCmd_TypeIdlFlag(t *testing.T) {
+func TestWalletCreateFungibleTokenTypeCmd_TypeIdFlag(t *testing.T) {
 	tokensCmd := testutils.NewSubCmdExecutor(NewTokenCmd, "new-type", "fungible", "--symbol", "\"@1\"")
 	tokensCmd.ExecWithError(t, "flag needs an argument: --type",
 		"--type")
