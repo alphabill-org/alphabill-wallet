@@ -22,7 +22,6 @@ import (
 
 const (
 	AllAccounts uint64 = 0
-	maxFee             = 10
 	uriMaxSize         = 4 * 1024
 	dataMaxSize        = 64 * 1024
 	nameMaxSize        = 256
@@ -43,6 +42,7 @@ type (
 		tokensClient sdktypes.TokensPartitionClient
 		confirmTx    bool
 		feeManager   *fees.FeeManager
+		maxFee       uint64
 		log          *slog.Logger
 	}
 
@@ -69,6 +69,7 @@ func New(systemID types.SystemID, tokensClient sdktypes.TokensPartitionClient, a
 		tokensClient: tokensClient,
 		confirmTx:    confirmTx,
 		feeManager:   feeManager,
+		maxFee:       maxFee,
 		log:          log,
 	}, nil
 }
@@ -163,6 +164,7 @@ func (w *Wallet) NewFungibleType(ctx context.Context, accountNumber uint64, ft *
 	tx, err := ft.Create(
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithMaxFee(w.maxFee),
 		sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
 		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
 		sdktypes.WithExtraProofs(newProofGenerators(subtypePredicateInputs)))
@@ -208,6 +210,7 @@ func (w *Wallet) NewNonFungibleType(ctx context.Context, accountNumber uint64, n
 	tx, err := nft.Create(
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithMaxFee(w.maxFee),
 		sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
 		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
 		sdktypes.WithExtraProofs(newProofGenerators(subtypePredicateInputs)))
@@ -237,6 +240,7 @@ func (w *Wallet) NewFungibleToken(ctx context.Context, accountNumber uint64, ft 
 	tx, err := ft.Create(
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithMaxFee(w.maxFee),
 		sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
 		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
 		sdktypes.WithExtraProofs(newProofGenerators(mintPredicateInputs)))
@@ -279,6 +283,7 @@ func (w *Wallet) NewNFT(ctx context.Context, accountNumber uint64, nft *sdktypes
 	tx, err := nft.Create(
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithMaxFee(w.maxFee),
 		sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
 		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
 		sdktypes.WithExtraProofs(newProofGenerators(mintPredicateArgs)))
@@ -453,6 +458,7 @@ func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID 
 	tx, err := token.Transfer(BearerPredicateFromPubKey(receiverPubKey),
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithMaxFee(w.maxFee),
 		sdktypes.WithOwnerProof(newProofGenerator(ownerProof)),
 		sdktypes.WithFeeProof(newProofGenerator(defaultProof(key.AccountKey))),
 		sdktypes.WithExtraProofs(newProofGenerators(invariantProofs)))
@@ -561,6 +567,7 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 	tx, err := t.Update(data,
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithMaxFee(w.maxFee),
 		sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
 		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
 		sdktypes.WithExtraProofs(newProofGenerators(updateProofs)))
@@ -635,7 +642,7 @@ func (w *Wallet) ensureFeeCredit(ctx context.Context, accountKey *account.Accoun
 	if fcr == nil {
 		return nil, ErrNoFeeCredit
 	}
-	maxFee := uint64(txCount) * maxFee
+	maxFee := uint64(txCount) * w.maxFee
 	if fcr.Balance < maxFee {
 		return nil, ErrInsufficientFeeCredit
 	}
@@ -682,6 +689,7 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID ty
 	tx, err := token.Lock(wallet.LockReasonManual,
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithMaxFee(w.maxFee),
 		sdktypes.WithOwnerProof(newProofGenerator(ownerProof)),
 		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
 		sdktypes.WithExtraProofs(newProofGenerators(invariantProofs)))
@@ -732,6 +740,7 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	tx, err := token.Unlock(
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithMaxFee(w.maxFee),
 		sdktypes.WithOwnerProof(newProofGenerator(ownerProof)),
 		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
 		sdktypes.WithExtraProofs(newProofGenerators(invariantProofs)))

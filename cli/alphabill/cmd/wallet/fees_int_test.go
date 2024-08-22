@@ -11,7 +11,6 @@ import (
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
 	"github.com/alphabill-org/alphabill-wallet/util"
-	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 )
 
 func TestWalletFeesCmds_MoneyPartition(t *testing.T) {
@@ -186,21 +185,21 @@ func TestWalletFeesCmds_MinimumFeeAmount(t *testing.T) {
 
 	// try to add invalid fee amount
 	maxFee := uint64(5)
-	err := fmt.Sprintf("minimum fee credit amount to add is %s", util.AmountToString(fees.MinimumFeeAmountMultiplier*maxFee, 8))
-	feesCmd.ExecWithError(t, err, "add", "--amount", "0.00000003", "--max-fee", strconv.FormatUint(maxFee, 10))
+	err := fmt.Sprintf("minimum fee credit amount to add is %s", util.AmountToString(2*maxFee+1, 8))
+	feesCmd.ExecWithError(t, err, "add", "--amount", "0.00000010", "--max-fee", strconv.FormatUint(maxFee, 10))
 
 	// add minimum fee amount
-	stdout := feesCmd.Exec(t, "add", "--amount=0.00000020", "--max-fee", strconv.FormatUint(maxFee, 10))
-	require.Equal(t, "Successfully created 0.00000020 fee credits on money partition.", stdout.Lines[0])
+	stdout := feesCmd.Exec(t, "add", "--amount=0.00000011", "--max-fee", strconv.FormatUint(maxFee, 10))
+	require.Equal(t, "Successfully created 0.00000011 fee credits on money partition.", stdout.Lines[0])
 
 	// verify fee credit is below minimum
-	expectedFees := uint64(18)
+	expectedFees := uint64(9)
 	stdout = feesCmd.Exec(t, "list")
 	require.Equal(t, "Partition: money", stdout.Lines[0])
 	require.Equal(t, fmt.Sprintf("Account #1 %s", util.AmountToString(expectedFees, 8)), stdout.Lines[1])
 
 	// reclaim with invalid amount
-	err = fmt.Sprintf("insufficient fee credit balance. Minimum amount is %s", util.AmountToString(fees.MinimumFeeAmountMultiplier*maxFee, 8))
+	err = fmt.Sprintf("insufficient fee credit balance. Minimum amount is %s", util.AmountToString(2*maxFee+1, 8))
 	feesCmd.ExecWithError(t, err, "reclaim", "--max-fee", strconv.FormatUint(maxFee, 10))
 
 	// add more fee credit
@@ -208,7 +207,7 @@ func TestWalletFeesCmds_MinimumFeeAmount(t *testing.T) {
 	require.Equal(t, "Successfully created 0.00000045 fee credits on money partition.", stdout.Lines[0])
 
 	// verify fee credit is valid for reclaim
-	expectedFees = uint64(60)
+	expectedFees = uint64(51) // 9 - 1 (lockFC) + 45 - 1 (transFC) - 1 (addFC) = 51
 	stdout = feesCmd.Exec(t, "list")
 	require.Equal(t, "Partition: money", stdout.Lines[0])
 	require.Equal(t, fmt.Sprintf("Account #1 %s", util.AmountToString(expectedFees, 8)), stdout.Lines[1])
