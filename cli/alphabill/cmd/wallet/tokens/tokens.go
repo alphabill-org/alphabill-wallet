@@ -77,7 +77,7 @@ type (
 	Kind byte
 
 	runTokenListTypesCmd func(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind Kind) error
-	runTokenListCmd func(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind Kind) error
+	runTokenListCmd      func(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind Kind) error
 )
 
 func NewTokenCmd(config *types.WalletConfig) *cobra.Command {
@@ -479,6 +479,14 @@ func execTokenCmdNewTokenNonFungible(cmd *cobra.Command, config *types.WalletCon
 	dataUpdatePredicate, err := parsePredicateClauseCmd(cmd, cmdFlagTokenDataUpdateClause, accountNumber, am)
 	if err != nil {
 		return err
+	}
+
+	tt, err := tw.GetNonFungibleTokenType(cmd.Context(), typeID)
+	if err != nil {
+		return err
+	}
+	if tt == nil {
+		return fmt.Errorf("non-fungible token type %s not found", typeID)
 	}
 
 	nft := &sdktypes.NonFungibleToken{
