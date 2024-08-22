@@ -115,6 +115,7 @@ func (w *DustCollector) submitDCBatch(ctx context.Context, k *account.AccountKey
 		tx, err := b.TransferToDustCollector(targetBill,
 			sdktypes.WithTimeout(timeout),
 			sdktypes.WithFeeCreditRecordID(fcrID),
+			sdktypes.WithMaxFee(w.maxFee),
 			sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
 		if err != nil {
 			return nil, fmt.Errorf("failed to build dust transfer transaction: %w", err)
@@ -152,6 +153,7 @@ func (w *DustCollector) swapDCBills(ctx context.Context, k *account.AccountKey, 
 	swapTx, err  := targetBill.SwapWithDustCollector(dcProofs,
 		sdktypes.WithTimeout(timeout),
 		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithMaxFee(w.maxFee),
 		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to build swap tx: %w", err)
@@ -180,6 +182,7 @@ func (w *DustCollector) lockTargetBill(ctx context.Context, k *account.AccountKe
 		wallet.LockReasonCollectDust,
 		sdktypes.WithTimeout(timeout),
 		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithMaxFee(w.maxFee),
 		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
 	if err != nil {
 		return nil, err

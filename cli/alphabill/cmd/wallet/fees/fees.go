@@ -302,7 +302,8 @@ type FeeCreditManager interface {
 	ReclaimFeeCredit(ctx context.Context, cmd fees.ReclaimFeeCmd) (*fees.ReclaimFeeCmdResponse, error)
 	LockFeeCredit(ctx context.Context, cmd fees.LockFeeCreditCmd) (*types.Proof, error)
 	UnlockFeeCredit(ctx context.Context, cmd fees.UnlockFeeCreditCmd) (*types.Proof, error)
-	MinimumFeeAmount() uint64
+	MinAddFeeAmount() uint64
+	MinReclaimFeeAmount() uint64
 	Close()
 }
 
@@ -351,10 +352,10 @@ func addFees(ctx context.Context, accountNumber uint64, amountString string, c *
 	})
 	if err != nil {
 		if errors.Is(err, fees.ErrMinimumFeeAmount) {
-			return fmt.Errorf("minimum fee credit amount to add is %s", util.AmountToString(w.MinimumFeeAmount(), 8))
+			return fmt.Errorf("minimum fee credit amount to add is %s", util.AmountToString(w.MinAddFeeAmount(), 8))
 		}
 		if errors.Is(err, fees.ErrInsufficientBalance) {
-			return fmt.Errorf("insufficient balance for transaction. Bills smaller than the minimum amount (%s) are not counted", util.AmountToString(w.MinimumFeeAmount(), 8))
+			return fmt.Errorf("insufficient balance for transaction. Bills smaller than the minimum amount (%s) are not counted", util.AmountToString(w.MinAddFeeAmount(), 8))
 		}
 		if errors.Is(err, fees.ErrInvalidPartition) {
 			return fmt.Errorf("pending fee process exists for another partition, run the command for the correct partition: %w", err)
@@ -376,7 +377,7 @@ func reclaimFees(ctx context.Context, accountNumber uint64, c *feesConfig, w Fee
 	})
 	if err != nil {
 		if errors.Is(err, fees.ErrMinimumFeeAmount) {
-			return fmt.Errorf("insufficient fee credit balance. Minimum amount is %s", util.AmountToString(w.MinimumFeeAmount(), 8))
+			return fmt.Errorf("insufficient fee credit balance. Minimum amount is %s", util.AmountToString(w.MinReclaimFeeAmount(), 8))
 		}
 		if errors.Is(err, fees.ErrInvalidPartition) {
 			return fmt.Errorf("wallet contains locked bill for different partition, run the command for the correct partition: %w", err)
