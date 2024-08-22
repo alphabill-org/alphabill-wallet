@@ -23,6 +23,7 @@ type (
 		GetNonFungibleToken(ctx context.Context, id TokenID) (*NonFungibleToken, error)
 		GetNonFungibleTokens(ctx context.Context, ownerID []byte) ([]*NonFungibleToken, error)
 		GetNonFungibleTokenTypes(ctx context.Context, creator PubKey) ([]*NonFungibleTokenType, error)
+		GetNonFungibleTokenTypeHierarchy(ctx context.Context, typeID TokenTypeID) ([]*NonFungibleTokenType, error)
 	}
 
 	FungibleTokenType struct {
@@ -84,7 +85,7 @@ type (
 
 	TokenID     = types.UnitID
 	TokenTypeID = types.UnitID
-	
+
 	TxHash     []byte
 	Predicate  []byte
 	PubKey     []byte
