@@ -19,8 +19,13 @@ func TestWalletFeesCmds_MoneyPartition(t *testing.T) {
 
 	feesCmd := newWalletCmdExecutor("fees", "--rpc-url", abNet.MoneyRpcUrl).WithHome(wallets[0].Homedir)
 
-	// list fees
-	stdout := feesCmd.Exec(t, "list")
+	// list fees for all accounts (explicitly specifying accNr 0 lists all)
+	stdout := feesCmd.Exec(t, "list", "--key", "0")
+	require.Equal(t, "Partition: money", stdout.Lines[0])
+	require.Equal(t, "Account #1 0.000'000'00", stdout.Lines[1])
+
+	// list fees for specific account
+	stdout = feesCmd.Exec(t, "list", "--key", "1")
 	require.Equal(t, "Partition: money", stdout.Lines[0])
 	require.Equal(t, "Account #1 0.000'000'00", stdout.Lines[1])
 
