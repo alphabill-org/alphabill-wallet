@@ -1,6 +1,8 @@
 package types
 
 import (
+	"fmt"
+
 	"github.com/alphabill-org/alphabill-go-base/crypto"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	"github.com/alphabill-org/alphabill-go-base/types"
@@ -8,13 +10,10 @@ import (
 
 type (
 	Options struct {
-		Timeout              uint64
-		FeeCreditRecordID    types.UnitID
-		MaxFee               uint64
-		ReferenceNumber      []byte
-		OwnerProofGenerator  types.ProofGenerator
-		FeeProofGenerator    types.ProofGenerator
-		ExtraProofGenerators []types.ProofGenerator
+		Timeout           uint64
+		FeeCreditRecordID types.UnitID
+		MaxFee            uint64
+		ReferenceNumber   []byte
 	}
 
 	Option func(*Options)
@@ -22,8 +21,7 @@ type (
 
 func NewTransactionOrder(payload *types.Payload) *types.TransactionOrder {
 	return &types.TransactionOrder{
-		Payload:    payload,
-		OwnerProof: nil,
+		Payload: payload,
 	}
 }
 
@@ -47,36 +45,6 @@ func NewPayload(systemID types.SystemID, unitID types.UnitID, txType string, att
 			ReferenceNumber:   o.ReferenceNumber,
 		},
 	}, nil
-}
-
-func GenerateAndSetProofs(tx *types.TransactionOrder, attr any, attrField *[][]byte, opts ...Option) error {
-	o := OptionsWithDefaults(opts)
-
-	if o.OwnerProofGenerator != nil {
-		if err := tx.SetOwnerProof(o.OwnerProofGenerator); err != nil {
-			return err
-		}
-	}
-
-	if o.ExtraProofGenerators != nil && attr != nil {
-		proofs, err := generateProofs(tx, o.ExtraProofGenerators)
-		if err != nil {
-			return err
-		}
-
-		*attrField = proofs
-		if err = tx.Payload.SetAttributes(attr); err != nil {
-			return err
-		}
-	}
-
-	if o.FeeProofGenerator != nil {
-		if err := tx.SetFeeProof(o.FeeProofGenerator); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func WithReferenceNumber(referenceNumber []byte) Option {
@@ -103,24 +71,6 @@ func WithMaxFee(maxFee uint64) Option {
 	}
 }
 
-func WithOwnerProof(proofGenerator types.ProofGenerator) Option {
-	return func(os *Options) {
-		os.OwnerProofGenerator = proofGenerator
-	}
-}
-
-func WithFeeProof(proofGenerator types.ProofGenerator) Option {
-	return func(os *Options) {
-		os.FeeProofGenerator = proofGenerator
-	}
-}
-
-func WithExtraProofs(proofGenerators []types.ProofGenerator) Option {
-	return func(os *Options) {
-		os.ExtraProofGenerators = proofGenerators
-	}
-}
-
 func OptionsWithDefaults(txOptions []Option) *Options {
 	opts := &Options{
 		MaxFee: 10,
@@ -131,43 +81,70 @@ func OptionsWithDefaults(txOptions []Option) *Options {
 	return opts
 }
 
-func NewP2pkhProofGenerator(privKey []byte, pubKey []byte) types.ProofGenerator {
-	return func(payloadBytes []byte) ([]byte, error) {
-		sig, err := SignBytes(payloadBytes, privKey)
-		if err != nil {
-			return nil, err
-		}
-		return templates.NewP2pkh256SignatureBytes(sig, pubKey), nil
+// NewPp2khSignature creates a standard P2PKH predicate signature aka the "OwnerProof"
+func NewPp2khSignature(txo *types.TransactionOrder, signer crypto.Signer) ([]byte, error) {
+	sigBytes, err := txo.PayloadBytes()
+	if err != nil {
+		return nil, err
 	}
+	sig, err := signer.SignBytes(sigBytes)
+	if err != nil {
+		return nil, err
+	}
+	verifier, err := signer.Verifier()
+	if err != nil {
+		return nil, err
+	}
+	pubKey, err := verifier.MarshalPublicKey()
+	if err != nil {
+		return nil, err
+	}
+	return templates.NewP2pkh256SignatureBytes(sig, pubKey), nil
 }
 
-// SignBytes signs the given bytes with the given key.
-func SignBytes(bytes []byte, signingPrivateKey []byte) ([]byte, error) {
-	signer, err := crypto.NewInMemorySecp256K1SignerFromKey(signingPrivateKey)
+// NewP2pkhSignatureFromKey creates a standard P2PKH predicate signature aka the "OwnerProof"
+func NewP2pkhSignatureFromKey(txo *types.TransactionOrder, privKey []byte) ([]byte, error) {
+	signer, err := crypto.NewInMemorySecp256K1SignerFromKey(privKey)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create signer from private key: %w", err)
 	}
-	sig, err := signer.SignBytes(bytes)
-	if err != nil {
-		return nil, err
-	}
-	return sig, nil
+	return NewPp2khSignature(txo, signer)
 }
 
-func generateProofs(tx *types.TransactionOrder, proofGenerators []types.ProofGenerator) ([][]byte, error) {
-	payloadBytes, err := tx.PayloadBytes()
+// NewP2pkhFeeSignature creates a standard P2PKH fee predicate signature aka the "FeeProof"
+func NewP2pkhFeeSignature(txo *types.TransactionOrder, signer crypto.Signer) ([]byte, error) {
+	sigBytes, err := txo.FeeProofSigBytes()
 	if err != nil {
 		return nil, err
 	}
-
-	proofs := make([][]byte, 0, len(proofGenerators))
-	for _, proofGenerator := range proofGenerators {
-		proof, err := proofGenerator(payloadBytes)
-		if err != nil {
-			return nil, err
-		}
-		proofs = append(proofs, proof)
+	sig, err := signer.SignBytes(sigBytes)
+	if err != nil {
+		return nil, err
 	}
+	pubKey, err := extractPubKey(signer)
+	if err != nil {
+		return nil, err
+	}
+	return templates.NewP2pkh256SignatureBytes(sig, pubKey), nil
+}
 
-	return proofs, nil
+// NewP2PKHFeeSignatureFromKey creates a standard P2PKH fee predicate signature aka the "FeeProof"
+func NewP2PKHFeeSignatureFromKey(txo *types.TransactionOrder, privKey []byte) ([]byte, error) {
+	signer, err := crypto.NewInMemorySecp256K1SignerFromKey(privKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create signer from private key: %w", err)
+	}
+	return NewP2pkhFeeSignature(txo, signer)
+}
+
+func extractPubKey(signer crypto.Signer) ([]byte, error) {
+	verifier, err := signer.Verifier()
+	if err != nil {
+		return nil, err
+	}
+	pubKey, err := verifier.MarshalPublicKey()
+	if err != nil {
+		return nil, err
+	}
+	return pubKey, nil
 }

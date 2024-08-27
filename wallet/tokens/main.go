@@ -160,14 +160,31 @@ func (w *Wallet) NewFungibleType(ctx context.Context, accountNumber uint64, ft *
 		return nil, err
 	}
 
-	tx, err := ft.Create(
+	tx, err := ft.Define(
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
-		sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		sdktypes.WithExtraProofs(newProofGenerators(subtypePredicateInputs)))
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	payloadBytes, err := tx.PayloadBytes()
+	if err != nil {
+		return nil, err
+	}
+	subTypePredicateSignatures, err := newPredicateSignatures(payloadBytes, subtypePredicateInputs)
+	if err != nil {
+		return nil, err
+	}
+	err = tx.SetAuthProof(tokens.DefineFungibleTokenAuthProof{
+		SubTypeCreationPredicateSignatures: subTypePredicateSignatures,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to set auth proof: %w", err)
+	}
+	tx.FeeProof, err = sdktypes.NewP2PKHFeeSignatureFromKey(tx, acc.PrivKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
 	}
 
 	return w.submitTx(ctx, tx, accountNumber)
@@ -205,21 +222,38 @@ func (w *Wallet) NewNonFungibleType(ctx context.Context, accountNumber uint64, n
 		return nil, err
 	}
 
-	tx, err := nft.Create(
+	tx, err := nft.Define(
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
-		sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		sdktypes.WithExtraProofs(newProofGenerators(subtypePredicateInputs)))
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	payloadBytes, err := tx.PayloadBytes()
+	if err != nil {
+		return nil, err
+	}
+	subTypePredicateSignatures, err := newPredicateSignatures(payloadBytes, subtypePredicateInputs)
+	if err != nil {
+		return nil, err
+	}
+	err = tx.SetAuthProof(tokens.DefineNonFungibleTokenAuthProof{
+		SubTypeCreationPredicateSignatures: subTypePredicateSignatures,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to set auth proof: %w", err)
+	}
+	tx.FeeProof, err = sdktypes.NewP2PKHFeeSignatureFromKey(tx, acc.PrivKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
 	}
 
 	return w.submitTx(ctx, tx, accountNumber)
 }
 
-func (w *Wallet) NewFungibleToken(ctx context.Context, accountNumber uint64, ft *sdktypes.FungibleToken, mintPredicateInputs []*PredicateInput) (*SubmissionResult, error) {
-	w.log.Info("Creating new fungible token")
+func (w *Wallet) NewFungibleToken(ctx context.Context, accountNumber uint64, ft *sdktypes.FungibleToken, mintPredicateInput *PredicateInput) (*SubmissionResult, error) {
+	w.log.Info("Minting new fungible token")
 
 	acc, err := w.getAccount(accountNumber)
 	if err != nil {
@@ -234,21 +268,38 @@ func (w *Wallet) NewFungibleToken(ctx context.Context, accountNumber uint64, ft 
 		return nil, err
 	}
 
-	tx, err := ft.Create(
+	tx, err := ft.Mint(
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
-		sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		sdktypes.WithExtraProofs(newProofGenerators(mintPredicateInputs)))
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	payloadBytes, err := tx.PayloadBytes()
+	if err != nil {
+		return nil, err
+	}
+	tokenMintingPredicateSignature, err := mintPredicateInput.PredicateSignature(payloadBytes)
+	if err != nil {
+		return nil, err
+	}
+	err = tx.SetAuthProof(tokens.MintFungibleTokenAuthProof{
+		TokenMintingPredicateSignature: tokenMintingPredicateSignature,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to set auth proof: %w", err)
+	}
+	tx.FeeProof, err = sdktypes.NewP2PKHFeeSignatureFromKey(tx, acc.PrivKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
 	}
 
 	return w.submitTx(ctx, tx, accountNumber)
 }
 
-func (w *Wallet) NewNFT(ctx context.Context, accountNumber uint64, nft *sdktypes.NonFungibleToken, mintPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
-	w.log.Info("Creating new NFT")
+func (w *Wallet) NewNFT(ctx context.Context, accountNumber uint64, nft *sdktypes.NonFungibleToken, mintPredicateInput *PredicateInput) (*SubmissionResult, error) {
+	w.log.Info("Minting new NFT")
 
 	if len(nft.Name) > nameMaxSize {
 		return nil, errInvalidNameLength
@@ -276,14 +327,31 @@ func (w *Wallet) NewNFT(ctx context.Context, accountNumber uint64, nft *sdktypes
 		return nil, err
 	}
 
-	tx, err := nft.Create(
+	tx, err := nft.Mint(
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
-		sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		sdktypes.WithExtraProofs(newProofGenerators(mintPredicateArgs)))
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	payloadBytes, err := tx.PayloadBytes()
+	if err != nil {
+		return nil, err
+	}
+	tokenMintingPredicateSignature, err := mintPredicateInput.PredicateSignature(payloadBytes)
+	if err != nil {
+		return nil, err
+	}
+	err = tx.SetAuthProof(tokens.MintNonFungibleTokenAuthProof{
+		TokenMintingPredicateSignature: tokenMintingPredicateSignature,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to set auth proof: %w", err)
+	}
+	tx.FeeProof, err = sdktypes.NewP2PKHFeeSignatureFromKey(tx, acc.PrivKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
 	}
 
 	return w.submitTx(ctx, tx, accountNumber)
@@ -426,12 +494,12 @@ func (w *Wallet) GetNonFungibleToken(ctx context.Context, tokenID sdktypes.Token
 	return token, nil
 }
 
-func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID sdktypes.TokenID, receiverPubKey sdktypes.PubKey, invariantProofs []*PredicateInput, ownerProof *PredicateInput) (*SubmissionResult, error) {
-	key, err := w.getAccount(accountNumber)
+func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID sdktypes.TokenID, receiverPubKey sdktypes.PubKey, typeOwnerPredicateInputs []*PredicateInput, ownerPredicateInput *PredicateInput) (*SubmissionResult, error) {
+	acc, err := w.getAccount(accountNumber)
 	if err != nil {
 		return nil, err
 	}
-	fcrID, err := w.ensureFeeCredit(ctx, key.AccountKey, 1)
+	fcrID, err := w.ensureFeeCredit(ctx, acc.AccountKey, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -439,7 +507,7 @@ func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID 
 	if err != nil {
 		return nil, err
 	}
-	if err = ensureTokenOwnership(key, token, ownerProof); err != nil {
+	if err = ensureTokenOwnership(acc, token, ownerPredicateInput); err != nil {
 		return nil, err
 	}
 	if token.GetLockStatus() != 0 {
@@ -453,17 +521,39 @@ func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID 
 	tx, err := token.Transfer(BearerPredicateFromPubKey(receiverPubKey),
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
-		sdktypes.WithOwnerProof(newProofGenerator(ownerProof)),
-		sdktypes.WithFeeProof(newProofGenerator(defaultProof(key.AccountKey))),
-		sdktypes.WithExtraProofs(newProofGenerators(invariantProofs)))
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	payloadBytes, err := tx.PayloadBytes()
+	if err != nil {
+		return nil, err
+	}
+	typeOwnerPredicateSignatures, err := newPredicateSignatures(payloadBytes, typeOwnerPredicateInputs)
+	if err != nil {
+		return nil, err
+	}
+	ownerPredicateSignature, err := ownerPredicateInput.PredicateSignature(payloadBytes)
+	if err != nil {
+		return nil, err
+	}
+	err = tx.SetAuthProof(tokens.TransferNonFungibleTokenAuthProof{
+		OwnerPredicateSignature:           ownerPredicateSignature,
+		TokenTypeOwnerPredicateSignatures: typeOwnerPredicateSignatures,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to set auth proof: %w", err)
+	}
+	tx.FeeProof, err = sdktypes.NewP2PKHFeeSignatureFromKey(tx, acc.PrivKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
 	}
 
 	return w.submitTx(ctx, tx, accountNumber)
 }
 
-func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId sdktypes.TokenTypeID, targetAmount uint64, receiverPubKey []byte, invariantPredicateArgs []*PredicateInput, ownerProof *PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId sdktypes.TokenTypeID, targetAmount uint64, receiverPubKey []byte, ownerPredicateInput *PredicateInput, typeOwnerPredicateInputs []*PredicateInput) (*SubmissionResult, error) {
 	if targetAmount == 0 {
 		return nil, fmt.Errorf("invalid amount: 0")
 	}
@@ -478,18 +568,18 @@ func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId 
 	if err != nil {
 		return nil, err
 	}
-	tokens, err := w.ListFungibleTokens(ctx, accountNumber)
+	tokenz, err := w.ListFungibleTokens(ctx, accountNumber)
 	if err != nil {
 		return nil, err
 	}
-	if len(tokens) == 0 {
+	if len(tokenz) == 0 {
 		return nil, fmt.Errorf("account %d has no tokens", accountNumber)
 	}
 	var matchingTokens []*sdktypes.FungibleToken
 	var totalBalance uint64
 	// find the best unit candidate for transfer or split, value must be equal or larger than the target amount
 	var closestMatch *sdktypes.FungibleToken
-	for _, token := range tokens {
+	for _, token := range tokenz {
 		if !typeId.Eq(token.TypeID) {
 			continue
 		}
@@ -523,18 +613,18 @@ func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId 
 		if err != nil {
 			return nil, err
 		}
-		sub, err := w.prepareSplitOrTransferTx(ctx, acc, targetAmount, closestMatch, fcrID, receiverPubKey, invariantPredicateArgs, roundNumber+txTimeoutRoundCount, ownerProof)
+		sub, err := w.prepareSplitOrTransferTx(acc, targetAmount, closestMatch, fcrID, receiverPubKey, roundNumber+txTimeoutRoundCount, ownerPredicateInput, typeOwnerPredicateInputs)
 		if err != nil {
 			return nil, err
 		}
 		err = sub.ToBatch(w.tokensClient, w.log).SendTx(ctx, w.confirmTx)
 		return newSingleResult(sub, accountNumber), err
 	} else {
-		return w.doSendMultiple(ctx, targetAmount, matchingTokens, acc, fcrID, receiverPubKey, invariantPredicateArgs, ownerProof)
+		return w.doSendMultiple(ctx, targetAmount, matchingTokens, acc, fcrID, receiverPubKey, ownerPredicateInput, typeOwnerPredicateInputs)
 	}
 }
 
-func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenID sdktypes.TokenID, data []byte, updateProofs []*PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenID sdktypes.TokenID, data []byte, tokenDataUpdatePredicateInput *PredicateInput, tokenTypeDataUpdatePredicateInputs []*PredicateInput) (*SubmissionResult, error) {
 	acc, err := w.getAccount(accountNumber)
 	if err != nil {
 		return nil, err
@@ -561,18 +651,40 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 	tx, err := t.Update(data,
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
-		sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		sdktypes.WithExtraProofs(newProofGenerators(updateProofs)))
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	payloadBytes, err := tx.PayloadBytes()
+	if err != nil {
+		return nil, err
+	}
+	tokenTypeOwnerPredicateSignatures, err := newPredicateSignatures(payloadBytes, tokenTypeDataUpdatePredicateInputs)
+	if err != nil {
+		return nil, err
+	}
+	ownerPredicateSignature, err := tokenDataUpdatePredicateInput.PredicateSignature(payloadBytes)
+	if err != nil {
+		return nil, err
+	}
+	err = tx.SetAuthProof(tokens.TransferNonFungibleTokenAuthProof{
+		OwnerPredicateSignature:           ownerPredicateSignature,
+		TokenTypeOwnerPredicateSignatures: tokenTypeOwnerPredicateSignatures,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to set auth proof: %w", err)
+	}
+	tx.FeeProof, err = sdktypes.NewP2PKHFeeSignatureFromKey(tx, acc.PrivKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
 	}
 
 	return w.submitTx(ctx, tx, accountNumber)
 }
 
 // SendFungibleByID sends fungible tokens by given unit ID, if amount matches, does the transfer, otherwise splits the token
-func (w *Wallet) SendFungibleByID(ctx context.Context, accountNumber uint64, tokenID sdktypes.TokenID, targetAmount uint64, receiverPubKey []byte, invariantPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) SendFungibleByID(ctx context.Context, accountNumber uint64, tokenID sdktypes.TokenID, targetAmount uint64, receiverPubKey []byte, typeOwnerPredicateInputs []*PredicateInput) (*SubmissionResult, error) {
 	acc, err := w.getAccount(accountNumber)
 	if err != nil {
 		return nil, err
@@ -596,7 +708,7 @@ func (w *Wallet) SendFungibleByID(ctx context.Context, accountNumber uint64, tok
 		return nil, err
 	}
 
-	sub, err := w.prepareSplitOrTransferTx(ctx, acc, targetAmount, token, fcrID, receiverPubKey, invariantPredicateArgs, roundNumber+txTimeoutRoundCount, defaultProof(acc.AccountKey))
+	sub, err := w.prepareSplitOrTransferTx(acc, targetAmount, token, fcrID, receiverPubKey, roundNumber+txTimeoutRoundCount, defaultProof(acc.AccountKey), typeOwnerPredicateInputs)
 	if err != nil {
 		return nil, err
 	}
@@ -642,7 +754,7 @@ func (w *Wallet) ensureFeeCredit(ctx context.Context, accountKey *account.Accoun
 	return fcr.ID, nil
 }
 
-func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID types.UnitID, invariantProofs []*PredicateInput, ownerProof *PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID types.UnitID, ownerPredicateInput *PredicateInput) (*SubmissionResult, error) {
 	key, err := w.getAccount(accountNumber)
 	if err != nil {
 		return nil, err
@@ -668,7 +780,7 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID ty
 		return nil, err
 	}
 
-	if err = ensureTokenOwnership(key, token, ownerProof); err != nil {
+	if err = ensureTokenOwnership(key, token, ownerPredicateInput); err != nil {
 		return nil, err
 	}
 	if token.GetLockStatus() != 0 {
@@ -682,17 +794,34 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID ty
 	tx, err := token.Lock(wallet.LockReasonManual,
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
-		sdktypes.WithOwnerProof(newProofGenerator(ownerProof)),
-		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		sdktypes.WithExtraProofs(newProofGenerators(invariantProofs)))
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	payloadBytes, err := tx.PayloadBytes()
+	if err != nil {
+		return nil, err
+	}
+	ownerPredicateSignature, err := ownerPredicateInput.PredicateSignature(payloadBytes)
+	if err != nil {
+		return nil, err
+	}
+	err = tx.SetAuthProof(tokens.LockTokenAuthProof{
+		OwnerPredicateSignature: ownerPredicateSignature,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to set auth proof: %w", err)
+	}
+	tx.FeeProof, err = sdktypes.NewP2PKHFeeSignatureFromKey(tx, acc.PrivKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
 	}
 
 	return w.submitTx(ctx, tx, accountNumber)
 }
 
-func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID sdktypes.TokenID, invariantProofs []*PredicateInput, ownerProof *PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID sdktypes.TokenID, ownerPredicateInput *PredicateInput) (*SubmissionResult, error) {
 	key, err := w.getAccount(accountNumber)
 	if err != nil {
 		return nil, err
@@ -718,7 +847,7 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 		return nil, err
 	}
 
-	if err = ensureTokenOwnership(key, token, ownerProof); err != nil {
+	if err = ensureTokenOwnership(key, token, ownerPredicateInput); err != nil {
 		return nil, err
 	}
 	if token.GetLockStatus() == 0 {
@@ -732,11 +861,28 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	tx, err := token.Unlock(
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
-		sdktypes.WithOwnerProof(newProofGenerator(ownerProof)),
-		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		sdktypes.WithExtraProofs(newProofGenerators(invariantProofs)))
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	payloadBytes, err := tx.PayloadBytes()
+	if err != nil {
+		return nil, err
+	}
+	ownerPredicateSignature, err := ownerPredicateInput.PredicateSignature(payloadBytes)
+	if err != nil {
+		return nil, err
+	}
+	err = tx.SetAuthProof(tokens.UnlockTokenAuthProof{
+		OwnerPredicateSignature: ownerPredicateSignature,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to set auth proof: %w", err)
+	}
+	tx.FeeProof, err = sdktypes.NewP2PKHFeeSignatureFromKey(tx, acc.PrivKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
 	}
 
 	return w.submitTx(ctx, tx, accountNumber)
@@ -747,7 +893,6 @@ func (w *Wallet) submitTx(ctx context.Context, tx *types.TransactionOrder, accou
 	if err := sub.ToBatch(w.tokensClient, w.log).SendTx(ctx, w.confirmTx); err != nil {
 		return nil, err
 	}
-
 	return newSingleResult(sub, accountNumber), nil
 }
 
@@ -770,35 +915,22 @@ func defaultProof(accountKey *account.AccountKey) *PredicateInput {
 	return &PredicateInput{AccountKey: accountKey}
 }
 
-func newProofGenerators(inputs []*PredicateInput) []types.ProofGenerator {
-	proofGenerators := make([]types.ProofGenerator, 0, len(inputs))
-	for _, input := range inputs {
-		proofGenerators = append(proofGenerators, newProofGenerator(input))
-	}
-	return proofGenerators
-}
-
-func newProofGenerator(input *PredicateInput) types.ProofGenerator {
-	return func(payloadBytes []byte) ([]byte, error) {
-		if input == nil {
-			return nil, errors.New("nil predicate input")
-		}
-		if input.AccountKey != nil {
-			sig, err := sdktypes.SignBytes(payloadBytes, input.AccountKey.PrivKey)
-			if err != nil {
-				return nil, err
-			}
-			return templates.NewP2pkh256SignatureBytes(sig, input.AccountKey.PubKey), nil
-		} else {
-			return input.Argument, nil
-		}
-	}
-}
-
 func extractPredicate(predicateBytes []byte) (*predicates.Predicate, error) {
 	predicate := &predicates.Predicate{}
 	if err := types.Cbor.Unmarshal(predicateBytes, predicate); err != nil {
 		return nil, err
 	}
 	return predicate, nil
+}
+
+func newPredicateSignatures(payloadBytes []byte, predicateInputs []*PredicateInput) ([][]byte, error) {
+	var predicateSigs [][]byte
+	for _, predicateInput := range predicateInputs {
+		predicateSig, err := predicateInput.PredicateSignature(payloadBytes)
+		if err != nil {
+			return nil, err
+		}
+		predicateSigs = append(predicateSigs, predicateSig)
+	}
+	return predicateSigs, nil
 }

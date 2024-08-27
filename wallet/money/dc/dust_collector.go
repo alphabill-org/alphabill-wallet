@@ -111,15 +111,24 @@ func (w *DustCollector) submitDCBatch(ctx context.Context, k *account.AccountKey
 		return nil, err
 	}
 	dcBatch := txsubmitter.NewBatch(w.moneyClient, w.log)
+
+	// create signer
+	txSigner, err := sdktypes.NewMoneyTxSignerFromKey(k.PrivKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create money tx signer: %w", err)
+	}
 	for _, b := range billsToSwap {
-		tx, err := b.TransferToDustCollector(targetBill,
+		txo, err := b.TransferToDustCollector(targetBill,
 			sdktypes.WithTimeout(timeout),
 			sdktypes.WithFeeCreditRecordID(fcrID),
-			sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build dust transfer transaction: %w", err)
 		}
-		dcBatch.Add(txsubmitter.New(tx))
+		if err = txSigner.SignTx(txo); err != nil {
+			return nil, fmt.Errorf("failed to sign tx: %w", err)
+		}
+		dcBatch.Add(txsubmitter.New(txo))
 	}
 
 	// send dc batch
@@ -133,7 +142,7 @@ func (w *DustCollector) submitDCBatch(ctx context.Context, k *account.AccountKey
 	}
 
 	// send swap tx, return swap proof
-	swapProof, err := w.swapDCBills(ctx, k, proofs, targetBill, fcrID)
+	swapProof, err := w.swapDCBills(ctx, txSigner, proofs, targetBill, fcrID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to swap dc bills: %w", err)
 	}
@@ -142,19 +151,22 @@ func (w *DustCollector) submitDCBatch(ctx context.Context, k *account.AccountKey
 
 // swapDCBills creates swap transfer from given dcProofs and target bill, joining the dcBills into the target bill,
 // the target bill is expected to be locked on server side.
-func (w *DustCollector) swapDCBills(ctx context.Context, k *account.AccountKey, dcProofs []*sdktypes.Proof, targetBill *sdktypes.Bill, fcrID []byte) (*sdktypes.Proof, error) {
+func (w *DustCollector) swapDCBills(ctx context.Context, txSigner *sdktypes.MoneyTxSigner, dcProofs []*sdktypes.Proof, targetBill *sdktypes.Bill, fcrID []byte) (*sdktypes.Proof, error) {
 	timeout, err := w.getTxTimeout(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// create swap tx
-	swapTx, err  := targetBill.SwapWithDustCollector(dcProofs,
+	swapTx, err := targetBill.SwapWithDustCollector(dcProofs,
 		sdktypes.WithTimeout(timeout),
 		sdktypes.WithFeeCreditRecordID(fcrID),
-		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build swap tx: %w", err)
+	}
+	if err = txSigner.SignTx(swapTx); err != nil {
+		return nil, fmt.Errorf("failed to sign tx: %w", err)
 	}
 
 	// create tx submitter batch
@@ -180,9 +192,16 @@ func (w *DustCollector) lockTargetBill(ctx context.Context, k *account.AccountKe
 		wallet.LockReasonCollectDust,
 		sdktypes.WithTimeout(timeout),
 		sdktypes.WithFeeCreditRecordID(fcrID),
-		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
+	)
 	if err != nil {
 		return nil, err
+	}
+	txSigner, err := sdktypes.NewMoneyTxSignerFromKey(k.PrivKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create money tx signer: %w", err)
+	}
+	if err = txSigner.SignTx(lockTx); err != nil {
+		return nil, fmt.Errorf("failed to sign tx: %w", err)
 	}
 
 	// lock target bill server side

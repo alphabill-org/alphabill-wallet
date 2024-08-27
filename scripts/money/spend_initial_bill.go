@@ -168,17 +168,16 @@ func createTransferFC(feeAmount uint64, unitID []byte, targetUnitID []byte, late
 			Attributes:     attr,
 			ClientMetadata: &types.ClientMetadata{Timeout: latestAdditionTime, MaxTransactionFee: 1},
 		},
-		OwnerProof: nil,
 	}
 	return tx, nil
 }
 
-func createAddFC(unitID []byte, ownerCondition []byte, transferFC *types.TransactionRecord, transferFCProof *types.TxProof, latestAdditionTime uint64, maxFee uint64) (*types.TransactionOrder, error) {
+func createAddFC(unitID []byte, ownerPredicate []byte, transferFC *types.TransactionRecord, transferFCProof *types.TxProof, latestAdditionTime uint64, maxFee uint64) (*types.TransactionOrder, error) {
 	attr, err := cbor.Marshal(
 		&fc.AddFeeCreditAttributes{
 			FeeCreditTransfer:       transferFC,
 			FeeCreditTransferProof:  transferFCProof,
-			FeeCreditOwnerCondition: ownerCondition,
+			FeeCreditOwnerPredicate: ownerPredicate,
 		},
 	)
 	if err != nil {
@@ -192,16 +191,15 @@ func createAddFC(unitID []byte, ownerCondition []byte, transferFC *types.Transac
 			Attributes:     attr,
 			ClientMetadata: &types.ClientMetadata{Timeout: latestAdditionTime, MaxTransactionFee: maxFee},
 		},
-		OwnerProof: nil,
 	}, nil
 }
 
 func createTransferTx(pubKey []byte, unitID []byte, billValue uint64, fcrID []byte, timeout uint64, counter uint64) (*types.TransactionOrder, error) {
 	attr, err := cbor.Marshal(
 		&money.TransferAttributes{
-			NewBearer:   templates.NewP2pkh256BytesFromKeyHash(hash.Sum256(pubKey)),
-			TargetValue: billValue,
-			Counter:     counter,
+			NewOwnerPredicate: templates.NewP2pkh256BytesFromKeyHash(hash.Sum256(pubKey)),
+			TargetValue:       billValue,
+			Counter:           counter,
 		},
 	)
 	if err != nil {
@@ -219,33 +217,32 @@ func createTransferTx(pubKey []byte, unitID []byte, billValue uint64, fcrID []by
 				FeeCreditRecordID: fcrID,
 			},
 		},
-		OwnerProof: nil,
 	}, nil
 }
 
 func waitForConf(ctx context.Context, c sdktypes.PartitionClient, tx *types.TransactionOrder) (*sdktypes.Proof, error) {
-       txHash := tx.Hash(crypto.SHA256)
-       for {
-               // fetch round number before proof to ensure that we cannot miss the proof
-               roundNumber, err := c.GetRoundNumber(ctx)
-               if err != nil {
-                       return nil, fmt.Errorf("failed to fetch target partition round number: %w", err)
-               }
-               proof, err := c.GetTransactionProof(ctx, txHash)
-	       if err != nil {
-		       return nil, err
-	       }
-               if proof != nil {
-		       return proof, nil
-               }
-               if roundNumber >= tx.Timeout() {
-                       break
-               }
-               select {
-               case <-time.After(time.Second):
-               case <-ctx.Done():
-                       return nil, errors.New("context canceled")
-               }
-       }
-       return nil, nil
+	txHash := tx.Hash(crypto.SHA256)
+	for {
+		// fetch round number before proof to ensure that we cannot miss the proof
+		roundNumber, err := c.GetRoundNumber(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch target partition round number: %w", err)
+		}
+		proof, err := c.GetTransactionProof(ctx, txHash)
+		if err != nil {
+			return nil, err
+		}
+		if proof != nil {
+			return proof, nil
+		}
+		if roundNumber >= tx.Timeout() {
+			break
+		}
+		select {
+		case <-time.After(time.Second):
+		case <-ctx.Done():
+			return nil, errors.New("context canceled")
+		}
+	}
+	return nil, nil
 }

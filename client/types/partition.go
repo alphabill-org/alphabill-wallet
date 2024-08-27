@@ -53,7 +53,7 @@ type (
 
 func (f *FeeCreditRecord) AddFeeCredit(ownerPredicate []byte, transFCProof *Proof, txOptions ...Option) (*types.TransactionOrder, error) {
 	attr := &fc.AddFeeCreditAttributes{
-		FeeCreditOwnerCondition: ownerPredicate,
+		FeeCreditOwnerPredicate: ownerPredicate,
 		FeeCreditTransfer:       transFCProof.TxRecord,
 		FeeCreditTransferProof:  transFCProof.TxProof,
 	}
@@ -61,12 +61,7 @@ func (f *FeeCreditRecord) AddFeeCredit(ownerPredicate []byte, transFCProof *Proo
 	if err != nil {
 		return nil, err
 	}
-	tx := NewTransactionOrder(txPayload)
-	err = GenerateAndSetProofs(tx, nil, nil, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-	return tx, nil
+	return NewTransactionOrder(txPayload), nil
 }
 
 func (f *FeeCreditRecord) CloseFeeCredit(targetBillID types.UnitID, targetBillCounter uint64, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -80,12 +75,7 @@ func (f *FeeCreditRecord) CloseFeeCredit(targetBillID types.UnitID, targetBillCo
 	if err != nil {
 		return nil, err
 	}
-	tx := NewTransactionOrder(txPayload)
-	err = GenerateAndSetProofs(tx, nil, nil, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-	return tx, nil
+	return NewTransactionOrder(txPayload), nil
 }
 
 func (f *FeeCreditRecord) Lock(lockStatus uint64, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -97,12 +87,7 @@ func (f *FeeCreditRecord) Lock(lockStatus uint64, txOptions ...Option) (*types.T
 	if err != nil {
 		return nil, err
 	}
-	tx := NewTransactionOrder(txPayload)
-	err = GenerateAndSetProofs(tx, nil, nil, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-	return tx, nil
+	return NewTransactionOrder(txPayload), nil
 }
 
 func (f *FeeCreditRecord) Unlock(txOptions ...Option) (*types.TransactionOrder, error) {
@@ -113,12 +98,7 @@ func (f *FeeCreditRecord) Unlock(txOptions ...Option) (*types.TransactionOrder, 
 	if err != nil {
 		return nil, err
 	}
-	tx := NewTransactionOrder(txPayload)
-	err = GenerateAndSetProofs(tx, nil, nil, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-	return tx, nil
+	return NewTransactionOrder(txPayload), nil
 }
 
 func (p *Proof) GetActualFee() uint64 {

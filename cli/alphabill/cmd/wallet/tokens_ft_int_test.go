@@ -318,10 +318,11 @@ func TestFungibleTokens_CollectDust_Integration(t *testing.T) {
 		2*testutils.WaitDuration, 2*testutils.WaitTick, expectedAmounts...)
 
 	// run DC
-	tokensCmd.Exec(t, "collect-dust")
+	output := tokensCmd.Exec(t, "collect-dust", "-k", "1")
+	testutils.VerifyStdout(t, output, "Paid 0.000'000'32 fees for dust collection on Account number 1.")
 
 	// verify there exists token with the expected amount
-	output := tokensCmd.Exec(t, "list", "fungible")
+	output = tokensCmd.Exec(t, "list", "fungible")
 	testutils.VerifyStdout(t, output, fmt.Sprintf("amount='%v'", util.InsertSeparator(fmt.Sprint(expectedTotal), false)))
 }
 

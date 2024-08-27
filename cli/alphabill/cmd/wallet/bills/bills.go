@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
-
 	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
@@ -16,6 +14,7 @@ import (
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
+	"github.com/spf13/cobra"
 )
 
 // NewBillsCmd creates a new cobra command for the wallet bills component.
@@ -175,9 +174,16 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	tx, err := bill.Lock(wallet.LockReasonManual,
 		sdktypes.WithTimeout(roundNumber+10),
 		sdktypes.WithFeeCreditRecordID(fcr.ID),
-		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create lock tx: %w", err)
+	}
+	txSigner, err := sdktypes.NewMoneyTxSignerFromKey(accountKey.PrivKey)
+	if err != nil {
+		return fmt.Errorf("failed to create money tx signer: %w", err)
+	}
+	if err = txSigner.SignTx(tx); err != nil {
+		return fmt.Errorf("failed to sign tx: %w", err)
 	}
 
 	_, err = moneyClient.ConfirmTransaction(cmd.Context(), tx, config.WalletConfig.Base.Logger)
@@ -259,9 +265,16 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	tx, err := bill.Unlock(
 		sdktypes.WithTimeout(roundNumber+10),
 		sdktypes.WithFeeCreditRecordID(fcr.ID),
-		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create unlock tx: %w", err)
+	}
+	txSigner, err := sdktypes.NewMoneyTxSignerFromKey(accountKey.PrivKey)
+	if err != nil {
+		return fmt.Errorf("failed to create money tx signer: %w", err)
+	}
+	if err = txSigner.SignTx(tx); err != nil {
+		return fmt.Errorf("failed to sign tx: %w", err)
 	}
 
 	_, err = moneyClient.ConfirmTransaction(cmd.Context(), tx, config.WalletConfig.Base.Logger)

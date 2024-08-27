@@ -19,7 +19,7 @@ import (
 func TestWalletSendFunction_Ok(t *testing.T) {
 	w := createTestWallet(t, testutil.NewRpcClientMock(
 		testutil.WithOwnerBill(testutil.NewBill(50, 1)),
-		testutil.WithOwnerFeeCreditRecord(newMoneyFCR(t, testPubKey0Hash, 100 * 1e8, 200)),
+		testutil.WithOwnerFeeCreditRecord(newMoneyFCR(t, testPubKey0Hash, 100*1e8, 200)),
 	))
 	validPubKey := make([]byte, 33)
 	amount := uint64(50)
@@ -60,7 +60,7 @@ func TestWalletSendFunction_ClientError(t *testing.T) {
 	w := createTestWallet(t, testutil.NewRpcClientMock(
 		testutil.WithError(errors.New("some error")),
 		testutil.WithOwnerBill(testutil.NewBill(50, 1)),
-		testutil.WithOwnerFeeCreditRecord(newMoneyFCR(t, testPubKey0Hash, 100 * 1e8, 200)),
+		testutil.WithOwnerFeeCreditRecord(newMoneyFCR(t, testPubKey0Hash, 100*1e8, 200)),
 	))
 	validPubKey := make([]byte, 33)
 	amount := uint64(50)
@@ -130,7 +130,7 @@ func TestWholeBalanceIsSentUsingBillTransferOrder(t *testing.T) {
 func TestWalletSendFunction_LockedBillIsNotUsed(t *testing.T) {
 	w := createTestWallet(t, testutil.NewRpcClientMock(
 		testutil.WithOwnerBill(testutil.NewLockedBill(50, 1, wallet.LockReasonManual)),
-		testutil.WithOwnerFeeCreditRecord(newMoneyFCR(t, testPubKey0Hash, 100 * 1e8, 200)),
+		testutil.WithOwnerFeeCreditRecord(newMoneyFCR(t, testPubKey0Hash, 100*1e8, 200)),
 	))
 	pubKey, err := hex.DecodeString(testPubKey0Hex)
 	require.NoError(t, err)
@@ -199,7 +199,7 @@ func TestWalletSendFunction_NWaySplit(t *testing.T) {
 	require.Len(t, attr.TargetUnits, 5)
 	for _, u := range attr.TargetUnits {
 		require.EqualValues(t, 5, u.Amount)
-		require.EqualValues(t, templates.NewP2pkh256BytesFromKeyHash(hash.Sum256(pubKey)), u.OwnerCondition)
+		require.EqualValues(t, templates.NewP2pkh256BytesFromKeyHash(hash.Sum256(pubKey)), u.OwnerPredicate)
 	}
 }
 

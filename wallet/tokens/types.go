@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	abcrypto "github.com/alphabill-org/alphabill-go-base/crypto"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill-go-base/types"
@@ -32,15 +33,15 @@ type (
 		AccountKey *account.AccountKey
 	}
 
-	CreateFungibleTokenTypeAttributes struct {
+	DefineFungibleTokenAttributes struct {
 		Symbol                   string
 		Name                     string
 		Icon                     *Icon
 		DecimalPlaces            uint32
 		ParentTypeID             sdktypes.TokenTypeID
 		SubTypeCreationPredicate sdktypes.Predicate
-		TokenCreationPredicate   sdktypes.Predicate
-		InvariantPredicate       sdktypes.Predicate
+		TokenMintingPredicate    sdktypes.Predicate
+		TokenTypeOwnerPredicate  sdktypes.Predicate
 	}
 
 	Icon struct {
@@ -48,14 +49,14 @@ type (
 		Data []byte
 	}
 
-	CreateNonFungibleTokenTypeAttributes struct {
+	DefineNonFungibleTokenAttributes struct {
 		Symbol                   string
 		Name                     string
 		Icon                     *Icon
 		ParentTypeID             sdktypes.TokenTypeID
 		SubTypeCreationPredicate sdktypes.Predicate
-		TokenCreationPredicate   sdktypes.Predicate
-		InvariantPredicate       sdktypes.Predicate
+		TokenMintingPredicate    sdktypes.Predicate
+		TokenTypeOwnerPredicate  sdktypes.Predicate
 		DataUpdatePredicate      sdktypes.Predicate
 	}
 
@@ -64,25 +65,22 @@ type (
 		Name                string
 		Uri                 string
 		Data                []byte
-		Bearer              sdktypes.Predicate
+		OwnerPredicate      sdktypes.Predicate
 		DataUpdatePredicate sdktypes.Predicate
 		Nonce               uint64
 	}
 
 	MintAttr interface {
-		types.SigBytesProvider
 		SetBearer([]byte)
 		GetTypeID() types.UnitID
-		SetTokenCreationPredicateSignatures([][]byte)
+		SetTokenMintingPredicateSignatures([][]byte)
 	}
 
 	AttrWithSubTypeCreationInputs interface {
-		types.SigBytesProvider
 		SetSubTypeCreationPredicateSignatures([][]byte)
 	}
 
 	AttrWithInvariantPredicateInputs interface {
-		types.SigBytesProvider
 		SetInvariantPredicateSignatures([][]byte)
 	}
 )
@@ -193,43 +191,43 @@ func ParsePredicateClause(clause string, keyNr uint64, am account.Manager) ([]by
 	return nil, fmt.Errorf("invalid predicate clause: '%s'", clause)
 }
 
-func (c *CreateFungibleTokenTypeAttributes) ToCBOR() *tokens.CreateFungibleTokenTypeAttributes {
+func (c *DefineFungibleTokenAttributes) ToCBOR() *tokens.DefineFungibleTokenAttributes {
 	var icon *tokens.Icon
 	if c.Icon != nil {
 		icon = &tokens.Icon{Type: c.Icon.Type, Data: c.Icon.Data}
 	}
-	return &tokens.CreateFungibleTokenTypeAttributes{
+	return &tokens.DefineFungibleTokenAttributes{
 		Symbol:                   c.Symbol,
 		Name:                     c.Name,
 		Icon:                     icon,
 		DecimalPlaces:            c.DecimalPlaces,
 		ParentTypeID:             c.ParentTypeID,
 		SubTypeCreationPredicate: c.SubTypeCreationPredicate,
-		TokenCreationPredicate:   c.TokenCreationPredicate,
-		InvariantPredicate:       c.InvariantPredicate,
+		TokenMintingPredicate:    c.TokenMintingPredicate,
+		TokenTypeOwnerPredicate:  c.TokenTypeOwnerPredicate,
 	}
 }
 
-func (c *CreateNonFungibleTokenTypeAttributes) ToCBOR() *tokens.CreateNonFungibleTokenTypeAttributes {
+func (c *DefineNonFungibleTokenAttributes) ToCBOR() *tokens.DefineNonFungibleTokenAttributes {
 	var icon *tokens.Icon
 	if c.Icon != nil {
 		icon = &tokens.Icon{Type: c.Icon.Type, Data: c.Icon.Data}
 	}
-	return &tokens.CreateNonFungibleTokenTypeAttributes{
+	return &tokens.DefineNonFungibleTokenAttributes{
 		Symbol:                   c.Symbol,
 		Name:                     c.Name,
 		Icon:                     icon,
 		ParentTypeID:             c.ParentTypeID,
 		SubTypeCreationPredicate: c.SubTypeCreationPredicate,
-		TokenCreationPredicate:   c.TokenCreationPredicate,
-		InvariantPredicate:       c.InvariantPredicate,
+		TokenMintingPredicate:    c.TokenMintingPredicate,
+		TokenTypeOwnerPredicate:  c.TokenTypeOwnerPredicate,
 		DataUpdatePredicate:      c.DataUpdatePredicate,
 	}
 }
 
 func (a *MintNonFungibleTokenAttributes) ToCBOR() *tokens.MintNonFungibleTokenAttributes {
 	return &tokens.MintNonFungibleTokenAttributes{
-		Bearer:              a.Bearer,
+		OwnerPredicate:      a.OwnerPredicate,
 		Name:                a.Name,
 		URI:                 a.Uri,
 		Data:                a.Data,
@@ -250,4 +248,22 @@ func DecodeHexOrEmpty(input string) ([]byte, error) {
 		return nil, nil
 	}
 	return decoded, nil
+}
+
+func (p *PredicateInput) PredicateSignature(sigBytes []byte) ([]byte, error) {
+	if p == nil {
+		return nil, nil
+	}
+	if p.AccountKey != nil {
+		signer, err := abcrypto.NewInMemorySecp256K1SignerFromKey(p.AccountKey.PrivKey)
+		if err != nil {
+			return nil, err
+		}
+		sig, err := signer.SignBytes(sigBytes)
+		if err != nil {
+			return nil, err
+		}
+		return templates.NewP2pkh256SignatureBytes(sig, p.AccountKey.PubKey), nil
+	}
+	return p.Argument, nil
 }
