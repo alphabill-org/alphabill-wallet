@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
@@ -20,6 +19,7 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	evmwallet "github.com/alphabill-org/alphabill-wallet/wallet/evm"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
+	"github.com/spf13/cobra"
 )
 
 // NewFeesCmd creates a new cobra command for the wallet fees component.
@@ -302,40 +302,33 @@ type FeeCreditManager interface {
 	ReclaimFeeCredit(ctx context.Context, cmd fees.ReclaimFeeCmd) (*fees.ReclaimFeeCmdResponse, error)
 	LockFeeCredit(ctx context.Context, cmd fees.LockFeeCreditCmd) (*types.Proof, error)
 	UnlockFeeCredit(ctx context.Context, cmd fees.UnlockFeeCreditCmd) (*types.Proof, error)
-	MinimumFeeAmount() uint64
+	MinAddFeeAmount() uint64
+	MinReclaimFeeAmount() uint64
 	Close()
 }
 
 func listFees(ctx context.Context, accountNumber uint64, am account.Manager, c *feesConfig, w FeeCreditManager, consoleWriter clitypes.ConsoleWrapper) error {
+	consoleWriter.Println("Partition: " + c.targetPartitionType)
 	if accountNumber == 0 {
 		pubKeys, err := am.GetPublicKeys()
 		if err != nil {
 			return err
 		}
-		consoleWriter.Println("Partition: " + c.targetPartitionType)
 		for accountIndex := range pubKeys {
-			fcr, err := w.GetFeeCredit(ctx, fees.GetFeeCreditCmd{AccountIndex: uint64(accountIndex)})
+			accountInfo, err := getAccountInfo(uint64(accountIndex), ctx, w)
 			if err != nil {
 				return err
 			}
-			accNum := accountIndex + 1
-			balance := uint64(0)
-			if fcr != nil {
-				balance = fcr.Balance
-			}
-			amountString := util.AmountToString(balance, 8)
-			consoleWriter.Println(fmt.Sprintf("Account #%d %s%s", accNum, amountString, getLockedReasonString(fcr)))
+			consoleWriter.Println(accountInfo.String())
 		}
-	} else {
-		accountIndex := accountNumber - 1
-		fcr, err := w.GetFeeCredit(ctx, fees.GetFeeCreditCmd{AccountIndex: accountIndex})
-		if err != nil {
-			return err
-		}
-		amountString := util.AmountToString(fcr.Balance, 8)
-		consoleWriter.Println("Partition: " + c.targetPartitionType)
-		consoleWriter.Println(fmt.Sprintf("Account #%d %s%s", accountNumber, amountString, getLockedReasonString(fcr)))
+		return nil
 	}
+	accountIndex := accountNumber - 1
+	accountInfo, err := getAccountInfo(accountIndex, ctx, w)
+	if err != nil {
+		return err
+	}
+	consoleWriter.Println(accountInfo.String())
 	return nil
 }
 
@@ -351,10 +344,10 @@ func addFees(ctx context.Context, accountNumber uint64, amountString string, c *
 	})
 	if err != nil {
 		if errors.Is(err, fees.ErrMinimumFeeAmount) {
-			return fmt.Errorf("minimum fee credit amount to add is %s", util.AmountToString(w.MinimumFeeAmount(), 8))
+			return fmt.Errorf("minimum fee credit amount to add is %s", util.AmountToString(w.MinAddFeeAmount(), 8))
 		}
 		if errors.Is(err, fees.ErrInsufficientBalance) {
-			return fmt.Errorf("insufficient balance for transaction. Bills smaller than the minimum amount (%s) are not counted", util.AmountToString(w.MinimumFeeAmount(), 8))
+			return fmt.Errorf("insufficient balance for transaction. Bills smaller than the minimum amount (%s) are not counted", util.AmountToString(w.MinAddFeeAmount(), 8))
 		}
 		if errors.Is(err, fees.ErrInvalidPartition) {
 			return fmt.Errorf("pending fee process exists for another partition, run the command for the correct partition: %w", err)
@@ -376,7 +369,7 @@ func reclaimFees(ctx context.Context, accountNumber uint64, c *feesConfig, w Fee
 	})
 	if err != nil {
 		if errors.Is(err, fees.ErrMinimumFeeAmount) {
-			return fmt.Errorf("insufficient fee credit balance. Minimum amount is %s", util.AmountToString(w.MinimumFeeAmount(), 8))
+			return fmt.Errorf("insufficient fee credit balance. Minimum amount is %s", util.AmountToString(w.MinReclaimFeeAmount(), 8))
 		}
 		if errors.Is(err, fees.ErrInvalidPartition) {
 			return fmt.Errorf("wallet contains locked bill for different partition, run the command for the correct partition: %w", err)
@@ -506,9 +499,36 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 	}
 }
 
+func getAccountInfo(accountIndex uint64, ctx context.Context, w FeeCreditManager) (*AccountInfoWrapper, error) {
+	fcr, err := w.GetFeeCredit(ctx, fees.GetFeeCreditCmd{AccountIndex: accountIndex})
+	if err != nil {
+		return nil, err
+	}
+	balance := uint64(0)
+	if fcr != nil {
+		balance = fcr.Balance
+	}
+	return &AccountInfoWrapper{
+		AccountNumber: accountIndex + 1,
+		Balance:       balance,
+		LockedReason:  getLockedReasonString(fcr),
+	}, nil
+}
+
 func getLockedReasonString(fcr *types.FeeCreditRecord) string {
 	if fcr != nil && fcr.LockStatus != 0 {
 		return fmt.Sprintf(" (%s)", wallet.LockReason(fcr.LockStatus).String())
 	}
 	return ""
+}
+
+type AccountInfoWrapper struct {
+	AccountNumber uint64
+	Balance       uint64
+	LockedReason  string
+}
+
+func (a AccountInfoWrapper) String() string {
+	accountAmount := util.AmountToString(a.Balance, 8)
+	return fmt.Sprintf("Account #%d %s%s", a.AccountNumber, accountAmount, a.LockedReason)
 }

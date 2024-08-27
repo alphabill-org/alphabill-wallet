@@ -104,6 +104,19 @@ func TestNewTypes(t *testing.T) {
 			}
 			return nil, fmt.Errorf("not found")
 		},
+		getNonFungibleTokenTypeHierarchy: func(ctx context.Context, id sdktypes.TokenTypeID) ([]*sdktypes.NonFungibleTokenType, error) {
+			tx, found := recTxs[string(id)]
+			if found {
+				attrs := &tokens.CreateNonFungibleTokenTypeAttributes{}
+				require.NoError(t, tx.UnmarshalAttributes(attrs))
+				tokenType := &sdktypes.NonFungibleTokenType{
+					ID:           tx.UnitID(),
+					ParentTypeID: attrs.ParentTypeID,
+				}
+				return []*sdktypes.NonFungibleTokenType{tokenType}, nil
+			}
+			return nil, fmt.Errorf("not found")
+		},
 		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
 			recTxs[string(tx.UnitID())] = tx
 			return tx.Hash(crypto.SHA256), nil
@@ -177,6 +190,11 @@ func TestNewTypes(t *testing.T) {
 		result, err = tw.NewFungibleType(context.Background(), 1, tt2, nil)
 		require.NoError(t, err)
 		require.True(t, result.GetUnit().HasType(tokens.FungibleTokenTypeUnitType))
+
+		//check fungible token type hierarchy
+		ftType, err := tw.GetFungibleTokenType(context.Background(), tt2.ID)
+		require.NoError(t, err)
+		require.NotNil(t, ftType)
 	})
 
 	t.Run("non-fungible type", func(t *testing.T) {
@@ -220,6 +238,11 @@ func TestNewTypes(t *testing.T) {
 		tt.ID = nil
 		result, _ = tw.NewNonFungibleType(context.Background(), 1, tt, nil)
 		require.True(t, result.GetUnit().HasType(tokens.NonFungibleTokenTypeUnitType))
+
+		//check non-fungible token type hierarchy
+		nftType, err := tw.GetNonFungibleTokenType(context.Background(), tt.ID)
+		require.NoError(t, err)
+		require.NotNil(t, nftType)
 	})
 }
 
@@ -864,9 +887,10 @@ type mockTokensPartitionClient struct {
 	getFungibleTokenTypes         func(ctx context.Context, creator sdktypes.PubKey) ([]*sdktypes.FungibleTokenType, error)
 	getFungibleTokenTypeHierarchy func(ctx context.Context, id sdktypes.TokenTypeID) ([]*sdktypes.FungibleTokenType, error)
 
-	getNonFungibleToken      func(ctx context.Context, id sdktypes.TokenID) (*sdktypes.NonFungibleToken, error)
-	getNonFungibleTokens     func(ctx context.Context, ownerID []byte) ([]*sdktypes.NonFungibleToken, error)
-	getNonFungibleTokenTypes func(ctx context.Context, creator sdktypes.PubKey) ([]*sdktypes.NonFungibleTokenType, error)
+	getNonFungibleToken              func(ctx context.Context, id sdktypes.TokenID) (*sdktypes.NonFungibleToken, error)
+	getNonFungibleTokens             func(ctx context.Context, ownerID []byte) ([]*sdktypes.NonFungibleToken, error)
+	getNonFungibleTokenTypes         func(ctx context.Context, creator sdktypes.PubKey) ([]*sdktypes.NonFungibleTokenType, error)
+	getNonFungibleTokenTypeHierarchy func(ctx context.Context, id sdktypes.TokenTypeID) ([]*sdktypes.NonFungibleTokenType, error)
 
 	getRoundNumber              func(ctx context.Context) (uint64, error)
 	sendTransaction             func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
@@ -910,6 +934,13 @@ func (m *mockTokensPartitionClient) GetFungibleTokenTypeHierarchy(ctx context.Co
 		return m.getFungibleTokenTypeHierarchy(ctx, id)
 	}
 	return nil, fmt.Errorf("GetFungibleTokenTypeHierarchy not implemented")
+}
+
+func (m *mockTokensPartitionClient) GetNonFungibleTokenTypeHierarchy(ctx context.Context, id sdktypes.TokenTypeID) ([]*sdktypes.NonFungibleTokenType, error) {
+	if m.getNonFungibleTokenTypeHierarchy != nil {
+		return m.getNonFungibleTokenTypeHierarchy(ctx, id)
+	}
+	return nil, fmt.Errorf("GetNonFungibleTokenTypeHierarchy not implemented")
 }
 
 func (m *mockTokensPartitionClient) GetNonFungibleToken(ctx context.Context, id sdktypes.TokenID) (*sdktypes.NonFungibleToken, error) {

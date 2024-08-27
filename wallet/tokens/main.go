@@ -22,7 +22,6 @@ import (
 
 const (
 	AllAccounts uint64 = 0
-	maxFee             = 10
 	uriMaxSize         = 4 * 1024
 	dataMaxSize        = 64 * 1024
 	nameMaxSize        = 256
@@ -43,6 +42,7 @@ type (
 		tokensClient sdktypes.TokensPartitionClient
 		confirmTx    bool
 		feeManager   *fees.FeeManager
+		maxFee       uint64
 		log          *slog.Logger
 	}
 
@@ -69,6 +69,7 @@ func New(systemID types.SystemID, tokensClient sdktypes.TokensPartitionClient, a
 		tokensClient: tokensClient,
 		confirmTx:    confirmTx,
 		feeManager:   feeManager,
+		maxFee:       maxFee,
 		log:          log,
 	}, nil
 }
@@ -163,6 +164,7 @@ func (w *Wallet) NewFungibleType(ctx context.Context, accountNumber uint64, ft *
 	tx, err := ft.Define(
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithMaxFee(w.maxFee),
 	)
 	if err != nil {
 		return nil, err
@@ -225,6 +227,7 @@ func (w *Wallet) NewNonFungibleType(ctx context.Context, accountNumber uint64, n
 	tx, err := nft.Define(
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithMaxFee(w.maxFee),
 	)
 	if err != nil {
 		return nil, err
@@ -271,6 +274,7 @@ func (w *Wallet) NewFungibleToken(ctx context.Context, accountNumber uint64, ft 
 	tx, err := ft.Mint(
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithMaxFee(w.maxFee),
 	)
 	if err != nil {
 		return nil, err
@@ -330,6 +334,7 @@ func (w *Wallet) NewNFT(ctx context.Context, accountNumber uint64, nft *sdktypes
 	tx, err := nft.Mint(
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithMaxFee(w.maxFee),
 	)
 	if err != nil {
 		return nil, err
@@ -408,6 +413,20 @@ func (w *Wallet) ListNonFungibleTokenTypes(ctx context.Context, accountNumber ui
 // GetFungibleTokenType returns FungibleTokenType or nil if not found
 func (w *Wallet) GetFungibleTokenType(ctx context.Context, typeId sdktypes.TokenTypeID) (*sdktypes.FungibleTokenType, error) {
 	typez, err := w.tokensClient.GetFungibleTokenTypeHierarchy(ctx, typeId)
+	if err != nil {
+		return nil, err
+	}
+	for i := range typez {
+		if bytes.Equal(typez[i].ID, typeId) {
+			return typez[i], nil
+		}
+	}
+	return nil, nil
+}
+
+// GetNonFungibleTokenType returns NonFungibleTokenType or nil if not found
+func (w *Wallet) GetNonFungibleTokenType(ctx context.Context, typeId sdktypes.TokenTypeID) (*sdktypes.NonFungibleTokenType, error) {
+	typez, err := w.tokensClient.GetNonFungibleTokenTypeHierarchy(ctx, typeId)
 	if err != nil {
 		return nil, err
 	}
@@ -521,6 +540,7 @@ func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID 
 	tx, err := token.Transfer(BearerPredicateFromPubKey(receiverPubKey),
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithMaxFee(w.maxFee),
 	)
 	if err != nil {
 		return nil, err
@@ -651,6 +671,7 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 	tx, err := t.Update(data,
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithMaxFee(w.maxFee),
 	)
 	if err != nil {
 		return nil, err
@@ -747,7 +768,7 @@ func (w *Wallet) ensureFeeCredit(ctx context.Context, accountKey *account.Accoun
 	if fcr == nil {
 		return nil, ErrNoFeeCredit
 	}
-	maxFee := uint64(txCount) * maxFee
+	maxFee := uint64(txCount) * w.maxFee
 	if fcr.Balance < maxFee {
 		return nil, ErrInsufficientFeeCredit
 	}
@@ -794,6 +815,7 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID ty
 	tx, err := token.Lock(wallet.LockReasonManual,
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithMaxFee(w.maxFee),
 	)
 	if err != nil {
 		return nil, err
@@ -861,6 +883,7 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	tx, err := token.Unlock(
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithMaxFee(w.maxFee),
 	)
 	if err != nil {
 		return nil, err

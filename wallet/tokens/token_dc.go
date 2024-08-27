@@ -125,6 +125,7 @@ func (w *Wallet) joinTokenForDC(ctx context.Context, acc *accountKey, burnProofs
 	tx, err := targetToken.Join(burnTxs, burnTxProofs,
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithMaxFee(w.maxFee),
 	)
 	if err != nil {
 		return 0, err
@@ -174,6 +175,7 @@ func (w *Wallet) burnTokensForDC(ctx context.Context, acc *accountKey, tokensToB
 		tx, err := token.Burn(targetToken.ID, targetToken.Counter,
 			sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 			sdktypes.WithFeeCreditRecordID(fcrID),
+			sdktypes.WithMaxFee(w.maxFee),
 		)
 		if err != nil {
 			return 0, 0, nil, fmt.Errorf("failed to prepare burn tx: %w", err)
@@ -258,6 +260,7 @@ func (w *Wallet) lockTokenForDC(ctx context.Context, acc *accountKey, fcrID type
 	tx, err := targetToken.Lock(wallet.LockReasonCollectDust,
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
+		sdktypes.WithMaxFee(w.maxFee),
 	)
 	if err != nil {
 		return 0, err

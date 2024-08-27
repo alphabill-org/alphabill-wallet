@@ -75,6 +75,7 @@ func (w *Wallet) prepareSplitOrTransferTx(acc *accountKey, amount uint64, ft *sd
 		tx, err := ft.Transfer(BearerPredicateFromPubKey(receiverPubKey),
 			sdktypes.WithTimeout(timeout),
 			sdktypes.WithFeeCreditRecordID(fcrID),
+			sdktypes.WithMaxFee(w.maxFee),
 		)
 		if err != nil {
 			return nil, err
@@ -108,6 +109,7 @@ func (w *Wallet) prepareSplitOrTransferTx(acc *accountKey, amount uint64, ft *sd
 		tx, err := ft.Split(amount, BearerPredicateFromPubKey(receiverPubKey),
 			sdktypes.WithTimeout(timeout),
 			sdktypes.WithFeeCreditRecordID(fcrID),
+			sdktypes.WithMaxFee(w.maxFee),
 		)
 		if err != nil {
 			return nil, err

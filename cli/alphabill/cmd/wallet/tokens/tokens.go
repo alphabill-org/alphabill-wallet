@@ -482,6 +482,14 @@ func execTokenCmdNewTokenNonFungible(cmd *cobra.Command, config *types.WalletCon
 		return err
 	}
 
+	tt, err := tw.GetNonFungibleTokenType(cmd.Context(), typeID)
+	if err != nil {
+		return err
+	}
+	if tt == nil {
+		return fmt.Errorf("non-fungible token type %s not found", typeID)
+	}
+
 	nft := &sdktypes.NonFungibleToken{
 		SystemID:            tw.SystemID(),
 		TypeID:              typeID,

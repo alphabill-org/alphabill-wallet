@@ -20,7 +20,6 @@ import (
 )
 
 const (
-	MinimumFeeAmountMultiplier   = 4
 	txTimeoutBlockCount          = 10
 	transferFCLatestAdditionTime = 65536 // relative timeout after which transferFC unit becomes unusable
 )
@@ -179,8 +178,14 @@ func NewFeeManager(
 	}
 }
 
-func (w *FeeManager) MinimumFeeAmount() uint64 {
-	return MinimumFeeAmountMultiplier * w.maxFee
+func (w *FeeManager) MinAddFeeAmount() uint64 {
+	// transFC + addFC transaction fees + at least 1 tema left for fcr balance
+	return 2*w.maxFee + 1
+}
+
+func (w *FeeManager) MinReclaimFeeAmount() uint64 {
+	// closeFC + reclFC transaction fees + at least 1 tema left for target bill
+	return 2*w.maxFee + 1
 }
 
 // AddFeeCredit creates fee credit for the given amount. If the wallet does not have a bill large enough for the
@@ -188,8 +193,8 @@ func (w *FeeManager) MinimumFeeAmount() uint64 {
 // (the add process was previously left in an incomplete state) only the partial bill is added to fee credit.
 // Returns transaction proofs that were used to add credit.
 func (w *FeeManager) AddFeeCredit(ctx context.Context, cmd AddFeeCmd) (*AddFeeCmdResponse, error) {
-	if err := cmd.isValid(w.maxFee); err != nil {
-		return nil, err
+	if cmd.Amount < w.MinAddFeeAmount() {
+		return nil, ErrMinimumFeeAmount
 	}
 	accountKey, err := w.am.GetAccountKey(cmd.AccountIndex)
 	if err != nil {
@@ -420,7 +425,7 @@ func (w *FeeManager) addFees(ctx context.Context, accountKey *account.AccountKey
 
 	// filter bills of too small value
 	bills, _ = util.FilterSlice(bills, func(b *sdktypes.Bill) (bool, error) {
-		return b.Value >= MinimumFeeAmountMultiplier*w.maxFee, nil
+		return b.Value >= w.MinAddFeeAmount(), nil
 	})
 
 	// sum bill values i.e. calculate effective balance
@@ -783,7 +788,7 @@ func (w *FeeManager) reclaimFees(ctx context.Context, accountKey *account.Accoun
 	if fcr.LockStatus != 0 {
 		return nil, errors.New("fee credit record is locked")
 	}
-	if fcr.Balance < MinimumFeeAmountMultiplier*w.maxFee {
+	if fcr.Balance < w.MinReclaimFeeAmount() {
 		return nil, ErrMinimumFeeAmount
 	}
 
@@ -1211,13 +1216,6 @@ func (w *FeeManager) unlockBill(ctx context.Context, accountKey *account.Account
 		return proof, nil
 	}
 	return nil, nil
-}
-
-func (c AddFeeCmd) isValid(maxFee uint64) error {
-	if c.Amount < MinimumFeeAmountMultiplier*maxFee {
-		return ErrMinimumFeeAmount
-	}
-	return nil
 }
 
 func (p *AddFeeTxProofs) GetFees() uint64 {

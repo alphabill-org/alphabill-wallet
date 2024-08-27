@@ -174,6 +174,7 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	tx, err := bill.Lock(wallet.LockReasonManual,
 		sdktypes.WithTimeout(roundNumber+10),
 		sdktypes.WithFeeCreditRecordID(fcr.ID),
+		sdktypes.WithMaxFee(maxFee),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create lock tx: %w", err)
@@ -265,6 +266,7 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	tx, err := bill.Unlock(
 		sdktypes.WithTimeout(roundNumber+10),
 		sdktypes.WithFeeCreditRecordID(fcr.ID),
+		sdktypes.WithMaxFee(maxFee),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create unlock tx: %w", err)
