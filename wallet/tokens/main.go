@@ -182,7 +182,7 @@ func (w *Wallet) NewFungibleType(ctx context.Context, accountNumber uint64, ft *
 	if err != nil {
 		return nil, fmt.Errorf("failed to set auth proof: %w", err)
 	}
-	tx.FeeProof, err = sdktypes.NewP2PKHFeeSignatureFromKey(tx, acc.PrivKey)
+	tx.FeeProof, err = sdktypes.NewP2pkhFeeSignatureFromKey(tx, acc.PrivKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
 	}
@@ -244,7 +244,7 @@ func (w *Wallet) NewNonFungibleType(ctx context.Context, accountNumber uint64, n
 	if err != nil {
 		return nil, fmt.Errorf("failed to set auth proof: %w", err)
 	}
-	tx.FeeProof, err = sdktypes.NewP2PKHFeeSignatureFromKey(tx, acc.PrivKey)
+	tx.FeeProof, err = sdktypes.NewP2pkhFeeSignatureFromKey(tx, acc.PrivKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
 	}
@@ -290,7 +290,7 @@ func (w *Wallet) NewFungibleToken(ctx context.Context, accountNumber uint64, ft 
 	if err != nil {
 		return nil, fmt.Errorf("failed to set auth proof: %w", err)
 	}
-	tx.FeeProof, err = sdktypes.NewP2PKHFeeSignatureFromKey(tx, acc.PrivKey)
+	tx.FeeProof, err = sdktypes.NewP2pkhFeeSignatureFromKey(tx, acc.PrivKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
 	}
@@ -349,7 +349,7 @@ func (w *Wallet) NewNFT(ctx context.Context, accountNumber uint64, nft *sdktypes
 	if err != nil {
 		return nil, fmt.Errorf("failed to set auth proof: %w", err)
 	}
-	tx.FeeProof, err = sdktypes.NewP2PKHFeeSignatureFromKey(tx, acc.PrivKey)
+	tx.FeeProof, err = sdktypes.NewP2pkhFeeSignatureFromKey(tx, acc.PrivKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
 	}
@@ -545,7 +545,7 @@ func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID 
 	if err != nil {
 		return nil, fmt.Errorf("failed to set auth proof: %w", err)
 	}
-	tx.FeeProof, err = sdktypes.NewP2PKHFeeSignatureFromKey(tx, acc.PrivKey)
+	tx.FeeProof, err = sdktypes.NewP2pkhFeeSignatureFromKey(tx, acc.PrivKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
 	}
@@ -675,7 +675,7 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 	if err != nil {
 		return nil, fmt.Errorf("failed to set auth proof: %w", err)
 	}
-	tx.FeeProof, err = sdktypes.NewP2PKHFeeSignatureFromKey(tx, acc.PrivKey)
+	tx.FeeProof, err = sdktypes.NewP2pkhFeeSignatureFromKey(tx, acc.PrivKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
 	}
@@ -813,7 +813,7 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID ty
 	if err != nil {
 		return nil, fmt.Errorf("failed to set auth proof: %w", err)
 	}
-	tx.FeeProof, err = sdktypes.NewP2PKHFeeSignatureFromKey(tx, acc.PrivKey)
+	tx.FeeProof, err = sdktypes.NewP2pkhFeeSignatureFromKey(tx, acc.PrivKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
 	}
@@ -880,7 +880,7 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	if err != nil {
 		return nil, fmt.Errorf("failed to set auth proof: %w", err)
 	}
-	tx.FeeProof, err = sdktypes.NewP2PKHFeeSignatureFromKey(tx, acc.PrivKey)
+	tx.FeeProof, err = sdktypes.NewP2pkhFeeSignatureFromKey(tx, acc.PrivKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
 	}

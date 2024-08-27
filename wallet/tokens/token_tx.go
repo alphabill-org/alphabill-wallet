@@ -99,7 +99,7 @@ func (w *Wallet) prepareSplitOrTransferTx(acc *accountKey, amount uint64, ft *sd
 		if err != nil {
 			return nil, fmt.Errorf("failed to set auth proof: %w", err)
 		}
-		tx.FeeProof, err = sdktypes.NewP2PKHFeeSignatureFromKey(tx, acc.PrivKey)
+		tx.FeeProof, err = sdktypes.NewP2pkhFeeSignatureFromKey(tx, acc.PrivKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
 		}
@@ -131,7 +131,7 @@ func (w *Wallet) prepareSplitOrTransferTx(acc *accountKey, amount uint64, ft *sd
 		if err != nil {
 			return nil, fmt.Errorf("failed to set auth proof: %w", err)
 		}
-		tx.FeeProof, err = sdktypes.NewP2PKHFeeSignatureFromKey(tx, acc.PrivKey)
+		tx.FeeProof, err = sdktypes.NewP2pkhFeeSignatureFromKey(tx, acc.PrivKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
 		}

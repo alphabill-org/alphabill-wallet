@@ -128,8 +128,8 @@ func NewP2pkhFeeSignature(txo *types.TransactionOrder, signer crypto.Signer) ([]
 	return templates.NewP2pkh256SignatureBytes(sig, pubKey), nil
 }
 
-// NewP2PKHFeeSignatureFromKey creates a standard P2PKH fee predicate signature aka the "FeeProof"
-func NewP2PKHFeeSignatureFromKey(txo *types.TransactionOrder, privKey []byte) ([]byte, error) {
+// NewP2pkhFeeSignatureFromKey creates a standard P2PKH fee predicate signature aka the "FeeProof"
+func NewP2pkhFeeSignatureFromKey(txo *types.TransactionOrder, privKey []byte) ([]byte, error) {
 	signer, err := crypto.NewInMemorySecp256K1SignerFromKey(privKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create signer from private key: %w", err)

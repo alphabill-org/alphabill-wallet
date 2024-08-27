@@ -149,7 +149,7 @@ func (w *Wallet) joinTokenForDC(ctx context.Context, acc *accountKey, burnProofs
 	if err != nil {
 		return 0, fmt.Errorf("failed to set auth proof: %w", err)
 	}
-	tx.FeeProof, err = sdktypes.NewP2PKHFeeSignatureFromKey(tx, acc.PrivKey)
+	tx.FeeProof, err = sdktypes.NewP2pkhFeeSignatureFromKey(tx, acc.PrivKey)
 	if err != nil {
 		return 0, fmt.Errorf("failed to sign tx fee proof: %w", err)
 	}
@@ -198,7 +198,7 @@ func (w *Wallet) burnTokensForDC(ctx context.Context, acc *accountKey, tokensToB
 		if err != nil {
 			return 0, 0, nil, fmt.Errorf("failed to set auth proof: %w", err)
 		}
-		tx.FeeProof, err = sdktypes.NewP2PKHFeeSignatureFromKey(tx, acc.PrivKey)
+		tx.FeeProof, err = sdktypes.NewP2pkhFeeSignatureFromKey(tx, acc.PrivKey)
 		if err != nil {
 			return 0, 0, nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
 		}
@@ -277,7 +277,7 @@ func (w *Wallet) lockTokenForDC(ctx context.Context, acc *accountKey, fcrID type
 	if err != nil {
 		return 0, fmt.Errorf("failed to set auth proof: %w", err)
 	}
-	tx.FeeProof, err = sdktypes.NewP2PKHFeeSignatureFromKey(tx, acc.PrivKey)
+	tx.FeeProof, err = sdktypes.NewP2pkhFeeSignatureFromKey(tx, acc.PrivKey)
 	if err != nil {
 		return 0, fmt.Errorf("failed to sign tx fee proof: %w", err)
 	}
