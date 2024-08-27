@@ -107,7 +107,7 @@ func TestNewTypes(t *testing.T) {
 		getNonFungibleTokenTypeHierarchy: func(ctx context.Context, id sdktypes.TokenTypeID) ([]*sdktypes.NonFungibleTokenType, error) {
 			tx, found := recTxs[string(id)]
 			if found {
-				attrs := &tokens.CreateNonFungibleTokenTypeAttributes{}
+				attrs := &tokens.DefineNonFungibleTokenAttributes{}
 				require.NoError(t, tx.UnmarshalAttributes(attrs))
 				tokenType := &sdktypes.NonFungibleTokenType{
 					ID:           tx.UnitID(),
