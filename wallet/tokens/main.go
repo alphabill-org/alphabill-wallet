@@ -660,17 +660,17 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 	if err != nil {
 		return nil, err
 	}
-	tokenTypeOwnerPredicateSignatures, err := newPredicateSignatures(payloadBytes, tokenTypeDataUpdatePredicateInputs)
+	tokenDataUpdatePredicateSignature, err := tokenDataUpdatePredicateInput.PredicateSignature(payloadBytes)
 	if err != nil {
 		return nil, err
 	}
-	ownerPredicateSignature, err := tokenDataUpdatePredicateInput.PredicateSignature(payloadBytes)
+	tokenTypeDataUpdatePredicateSignatures, err := newPredicateSignatures(payloadBytes, tokenTypeDataUpdatePredicateInputs)
 	if err != nil {
 		return nil, err
 	}
-	err = tx.SetAuthProof(tokens.TransferNonFungibleTokenAuthProof{
-		OwnerPredicateSignature:           ownerPredicateSignature,
-		TokenTypeOwnerPredicateSignatures: tokenTypeOwnerPredicateSignatures,
+	err = tx.SetAuthProof(tokens.UpdateNonFungibleTokenAuthProof{
+		TokenDataUpdatePredicateSignature:      tokenDataUpdatePredicateSignature,
+		TokenTypeDataUpdatePredicateSignatures: tokenTypeDataUpdatePredicateSignatures,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to set auth proof: %w", err)
