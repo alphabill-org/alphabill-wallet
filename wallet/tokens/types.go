@@ -88,7 +88,7 @@ type (
 func ParsePredicateArguments(arguments []string, keyNr uint64, am account.Manager) ([]*PredicateInput, error) {
 	creationInputs := make([]*PredicateInput, 0, len(arguments))
 	for _, argument := range arguments {
-		input, err := parsePredicateArgument(argument, keyNr, am)
+		input, err := ParsePredicateArgument(argument, keyNr, am)
 		if err != nil {
 			return nil, err
 		}
@@ -98,13 +98,13 @@ func ParsePredicateArguments(arguments []string, keyNr uint64, am account.Manage
 }
 
 /*
-parsePredicateArgument parses the "argument" using following format:
+ParsePredicateArgument parses the "argument" using following format:
   - empty | true | false -> will produce an empty predicate argument;
   - ptpkh (provided key #) or ptpkh:n -> will return either the default account number ("keyNr" param)
     or the user provided key index (the "n" part converted to int, must be greater than zero);
   - @filename -> will load content of the file to be used as predicate argument;
 */
-func parsePredicateArgument(argument string, keyNr uint64, am account.Manager) (*PredicateInput, error) {
+func ParsePredicateArgument(argument string, keyNr uint64, am account.Manager) (*PredicateInput, error) {
 	switch {
 	case len(argument) == 0 || argument == predicateEmpty || argument == predicateTrue || argument == predicateFalse:
 		return &PredicateInput{Argument: nil}, nil
