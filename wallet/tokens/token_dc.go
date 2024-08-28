@@ -135,17 +135,17 @@ func (w *Wallet) joinTokenForDC(ctx context.Context, acc *accountKey, burnProofs
 	if err != nil {
 		return 0, err
 	}
-	typeOwnerPredicateSignatures, err := newPredicateSignatures(payloadBytes, typeOwnerPredicateInputs)
+	typeOwnerProofs, err := newProofs(payloadBytes, typeOwnerPredicateInputs)
 	if err != nil {
 		return 0, err
 	}
-	ownerPredicateSignature, err := ownerPredicateInput.PredicateSignature(payloadBytes)
+	ownerProof, err := ownerPredicateInput.Proof(payloadBytes)
 	if err != nil {
 		return 0, err
 	}
 	err = tx.SetAuthProof(tokens.JoinFungibleTokenAuthProof{
-		OwnerPredicateSignature:           ownerPredicateSignature,
-		TokenTypeOwnerPredicateSignatures: typeOwnerPredicateSignatures,
+		OwnerProof:           ownerProof,
+		TokenTypeOwnerProofs: typeOwnerProofs,
 	})
 	if err != nil {
 		return 0, fmt.Errorf("failed to set auth proof: %w", err)
@@ -185,17 +185,17 @@ func (w *Wallet) burnTokensForDC(ctx context.Context, acc *accountKey, tokensToB
 		if err != nil {
 			return 0, 0, nil, err
 		}
-		typeOwnerPredicateSignatures, err := newPredicateSignatures(payloadBytes, typeOwnerPredicateInputs)
+		typeOwnerProofs, err := newProofs(payloadBytes, typeOwnerPredicateInputs)
 		if err != nil {
 			return 0, 0, nil, err
 		}
-		ownerPredicateSignature, err := ownerPredicateInput.PredicateSignature(payloadBytes)
+		ownerProof, err := ownerPredicateInput.Proof(payloadBytes)
 		if err != nil {
 			return 0, 0, nil, err
 		}
 		err = tx.SetAuthProof(tokens.BurnFungibleTokenAuthProof{
-			OwnerPredicateSignature:           ownerPredicateSignature,
-			TokenTypeOwnerPredicateSignatures: typeOwnerPredicateSignatures,
+			OwnerProof:           ownerProof,
+			TokenTypeOwnerProofs: typeOwnerProofs,
 		})
 		if err != nil {
 			return 0, 0, nil, fmt.Errorf("failed to set auth proof: %w", err)
@@ -270,12 +270,12 @@ func (w *Wallet) lockTokenForDC(ctx context.Context, acc *accountKey, fcrID type
 	if err != nil {
 		return 0, err
 	}
-	ownerPredicateSignature, err := ownerPredicateInput.PredicateSignature(payloadBytes)
+	ownerProof, err := ownerPredicateInput.Proof(payloadBytes)
 	if err != nil {
 		return 0, err
 	}
 	err = tx.SetAuthProof(tokens.LockTokenAuthProof{
-		OwnerPredicateSignature: ownerPredicateSignature,
+		OwnerProof: ownerProof,
 	})
 	if err != nil {
 		return 0, fmt.Errorf("failed to set auth proof: %w", err)

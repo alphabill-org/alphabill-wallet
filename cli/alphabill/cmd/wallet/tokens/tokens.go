@@ -200,7 +200,7 @@ func execTokenCmdNewTypeFungible(cmd *cobra.Command, config *types.WalletConfig)
 	if err != nil {
 		return err
 	}
-	mintTokenPredicate, err := parsePredicateClauseCmd(cmd, cmdFlagMintClause, accountNumber, am)
+	tokenMintingPredicate, err := parsePredicateClauseCmd(cmd, cmdFlagMintClause, accountNumber, am)
 	if err != nil {
 		return err
 	}
@@ -216,7 +216,7 @@ func execTokenCmdNewTypeFungible(cmd *cobra.Command, config *types.WalletConfig)
 		Name:                     name,
 		Icon:                     icon,
 		SubTypeCreationPredicate: subTypeCreationPredicate,
-		TokenMintingPredicate:    mintTokenPredicate,
+		TokenMintingPredicate:    tokenMintingPredicate,
 		TokenTypeOwnerPredicate:  tokenTypeOwnerPredicate,
 		DecimalPlaces:            decimals,
 	}
@@ -287,7 +287,7 @@ func execTokenCmdNewTypeNonFungible(cmd *cobra.Command, config *types.WalletConf
 	if err != nil {
 		return err
 	}
-	mintTokenPredicate, err := parsePredicateClauseCmd(cmd, cmdFlagMintClause, accountNumber, am)
+	tokenMintingPredicate, err := parsePredicateClauseCmd(cmd, cmdFlagMintClause, accountNumber, am)
 	if err != nil {
 		return err
 	}
@@ -307,7 +307,7 @@ func execTokenCmdNewTypeNonFungible(cmd *cobra.Command, config *types.WalletConf
 		Name:                     name,
 		Icon:                     icon,
 		SubTypeCreationPredicate: subTypeCreationPredicate,
-		TokenMintingPredicate:    mintTokenPredicate,
+		TokenMintingPredicate:    tokenMintingPredicate,
 		TokenTypeOwnerPredicate:  tokenTypeOwnerPredicate,
 		DataUpdatePredicate:      dataUpdatePredicate,
 	}

@@ -85,17 +85,17 @@ func (w *Wallet) prepareSplitOrTransferTx(acc *accountKey, amount uint64, ft *sd
 		if err != nil {
 			return nil, err
 		}
-		typeOwnerPredicateSignatures, err := newPredicateSignatures(payloadBytes, typeOwnerPredicateInputs)
+		typeOwnerProofs, err := newProofs(payloadBytes, typeOwnerPredicateInputs)
 		if err != nil {
 			return nil, err
 		}
-		ownerPredicateSignature, err := ownerPredicateInput.PredicateSignature(payloadBytes)
+		ownerProof, err := ownerPredicateInput.Proof(payloadBytes)
 		if err != nil {
 			return nil, err
 		}
 		err = tx.SetAuthProof(tokens.TransferFungibleTokenAuthProof{
-			OwnerPredicateSignature:           ownerPredicateSignature,
-			TokenTypeOwnerPredicateSignatures: typeOwnerPredicateSignatures,
+			OwnerProof:           ownerProof,
+			TokenTypeOwnerProofs: typeOwnerProofs,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to set auth proof: %w", err)
@@ -118,17 +118,17 @@ func (w *Wallet) prepareSplitOrTransferTx(acc *accountKey, amount uint64, ft *sd
 		if err != nil {
 			return nil, err
 		}
-		typeOwnerPredicateSignatures, err := newPredicateSignatures(payloadBytes, typeOwnerPredicateInputs)
+		typeOwnerProofs, err := newProofs(payloadBytes, typeOwnerPredicateInputs)
 		if err != nil {
 			return nil, err
 		}
-		ownerPredicateSignature, err := ownerPredicateInput.PredicateSignature(payloadBytes)
+		ownerProof, err := ownerPredicateInput.Proof(payloadBytes)
 		if err != nil {
 			return nil, err
 		}
 		err = tx.SetAuthProof(tokens.SplitFungibleTokenAuthProof{
-			OwnerPredicateSignature:           ownerPredicateSignature,
-			TokenTypeOwnerPredicateSignatures: typeOwnerPredicateSignatures,
+			OwnerProof:           ownerProof,
+			TokenTypeOwnerProofs: typeOwnerProofs,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to set auth proof: %w", err)

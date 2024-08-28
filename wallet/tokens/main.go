@@ -174,12 +174,12 @@ func (w *Wallet) NewFungibleType(ctx context.Context, accountNumber uint64, ft *
 	if err != nil {
 		return nil, err
 	}
-	subTypePredicateSignatures, err := newPredicateSignatures(payloadBytes, subtypePredicateInputs)
+	subTypeCreationProofs, err := newProofs(payloadBytes, subtypePredicateInputs)
 	if err != nil {
 		return nil, err
 	}
 	err = tx.SetAuthProof(tokens.DefineFungibleTokenAuthProof{
-		SubTypeCreationPredicateSignatures: subTypePredicateSignatures,
+		SubTypeCreationProofs: subTypeCreationProofs,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to set auth proof: %w", err)
@@ -237,12 +237,12 @@ func (w *Wallet) NewNonFungibleType(ctx context.Context, accountNumber uint64, n
 	if err != nil {
 		return nil, err
 	}
-	subTypePredicateSignatures, err := newPredicateSignatures(payloadBytes, subtypePredicateInputs)
+	subTypeProofs, err := newProofs(payloadBytes, subtypePredicateInputs)
 	if err != nil {
 		return nil, err
 	}
 	err = tx.SetAuthProof(tokens.DefineNonFungibleTokenAuthProof{
-		SubTypeCreationPredicateSignatures: subTypePredicateSignatures,
+		SubTypeCreationProofs: subTypeProofs,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to set auth proof: %w", err)
@@ -284,13 +284,11 @@ func (w *Wallet) NewFungibleToken(ctx context.Context, accountNumber uint64, ft 
 	if err != nil {
 		return nil, err
 	}
-	tokenMintingPredicateSignature, err := mintPredicateInput.PredicateSignature(payloadBytes)
+	tokenMintingProof, err := mintPredicateInput.Proof(payloadBytes)
 	if err != nil {
 		return nil, err
 	}
-	err = tx.SetAuthProof(tokens.MintFungibleTokenAuthProof{
-		TokenMintingPredicateSignature: tokenMintingPredicateSignature,
-	})
+	err = tx.SetAuthProof(tokens.MintFungibleTokenAuthProof{TokenMintingProof: tokenMintingProof})
 	if err != nil {
 		return nil, fmt.Errorf("failed to set auth proof: %w", err)
 	}
@@ -344,13 +342,11 @@ func (w *Wallet) NewNFT(ctx context.Context, accountNumber uint64, nft *sdktypes
 	if err != nil {
 		return nil, err
 	}
-	tokenMintingPredicateSignature, err := mintPredicateInput.PredicateSignature(payloadBytes)
+	tokenMintingProof, err := mintPredicateInput.Proof(payloadBytes)
 	if err != nil {
 		return nil, err
 	}
-	err = tx.SetAuthProof(tokens.MintNonFungibleTokenAuthProof{
-		TokenMintingPredicateSignature: tokenMintingPredicateSignature,
-	})
+	err = tx.SetAuthProof(tokens.MintNonFungibleTokenAuthProof{TokenMintingProof: tokenMintingProof})
 	if err != nil {
 		return nil, fmt.Errorf("failed to set auth proof: %w", err)
 	}
@@ -550,17 +546,17 @@ func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID 
 	if err != nil {
 		return nil, err
 	}
-	typeOwnerPredicateSignatures, err := newPredicateSignatures(payloadBytes, typeOwnerPredicateInputs)
+	typeOwnerProofs, err := newProofs(payloadBytes, typeOwnerPredicateInputs)
 	if err != nil {
 		return nil, err
 	}
-	ownerPredicateSignature, err := ownerPredicateInput.PredicateSignature(payloadBytes)
+	ownerProof, err := ownerPredicateInput.Proof(payloadBytes)
 	if err != nil {
 		return nil, err
 	}
 	err = tx.SetAuthProof(tokens.TransferNonFungibleTokenAuthProof{
-		OwnerPredicateSignature:           ownerPredicateSignature,
-		TokenTypeOwnerPredicateSignatures: typeOwnerPredicateSignatures,
+		OwnerProof:           ownerProof,
+		TokenTypeOwnerProofs: typeOwnerProofs,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to set auth proof: %w", err)
@@ -681,17 +677,17 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 	if err != nil {
 		return nil, err
 	}
-	tokenDataUpdatePredicateSignature, err := tokenDataUpdatePredicateInput.PredicateSignature(payloadBytes)
+	tokenDataUpdateProof, err := tokenDataUpdatePredicateInput.Proof(payloadBytes)
 	if err != nil {
 		return nil, err
 	}
-	tokenTypeDataUpdatePredicateSignatures, err := newPredicateSignatures(payloadBytes, tokenTypeDataUpdatePredicateInputs)
+	tokenTypeDataUpdateProofs, err := newProofs(payloadBytes, tokenTypeDataUpdatePredicateInputs)
 	if err != nil {
 		return nil, err
 	}
 	err = tx.SetAuthProof(tokens.UpdateNonFungibleTokenAuthProof{
-		TokenDataUpdatePredicateSignature:      tokenDataUpdatePredicateSignature,
-		TokenTypeDataUpdatePredicateSignatures: tokenTypeDataUpdatePredicateSignatures,
+		TokenDataUpdateProof:      tokenDataUpdateProof,
+		TokenTypeDataUpdateProofs: tokenTypeDataUpdateProofs,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to set auth proof: %w", err)
@@ -825,12 +821,12 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID ty
 	if err != nil {
 		return nil, err
 	}
-	ownerPredicateSignature, err := ownerPredicateInput.PredicateSignature(payloadBytes)
+	ownerProof, err := ownerPredicateInput.Proof(payloadBytes)
 	if err != nil {
 		return nil, err
 	}
 	err = tx.SetAuthProof(tokens.LockTokenAuthProof{
-		OwnerPredicateSignature: ownerPredicateSignature,
+		OwnerProof: ownerProof,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to set auth proof: %w", err)
@@ -893,12 +889,12 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	if err != nil {
 		return nil, err
 	}
-	ownerPredicateSignature, err := ownerPredicateInput.PredicateSignature(payloadBytes)
+	ownerProof, err := ownerPredicateInput.Proof(payloadBytes)
 	if err != nil {
 		return nil, err
 	}
 	err = tx.SetAuthProof(tokens.UnlockTokenAuthProof{
-		OwnerPredicateSignature: ownerPredicateSignature,
+		OwnerProof: ownerProof,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to set auth proof: %w", err)
@@ -946,10 +942,10 @@ func extractPredicate(predicateBytes []byte) (*predicates.Predicate, error) {
 	return predicate, nil
 }
 
-func newPredicateSignatures(payloadBytes []byte, predicateInputs []*PredicateInput) ([][]byte, error) {
+func newProofs(payloadBytes []byte, predicateInputs []*PredicateInput) ([][]byte, error) {
 	var predicateSigs [][]byte
 	for _, predicateInput := range predicateInputs {
-		predicateSig, err := predicateInput.PredicateSignature(payloadBytes)
+		predicateSig, err := predicateInput.Proof(payloadBytes)
 		if err != nil {
 			return nil, err
 		}

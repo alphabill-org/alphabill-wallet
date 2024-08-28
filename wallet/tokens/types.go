@@ -73,15 +73,15 @@ type (
 	MintAttr interface {
 		SetBearer([]byte)
 		GetTypeID() types.UnitID
-		SetTokenMintingPredicateSignatures([][]byte)
+		SetTokenMintingProofs([][]byte)
 	}
 
 	AttrWithSubTypeCreationInputs interface {
-		SetSubTypeCreationPredicateSignatures([][]byte)
+		SetSubTypeCreationProofs([][]byte)
 	}
 
 	AttrWithInvariantPredicateInputs interface {
-		SetInvariantPredicateSignatures([][]byte)
+		SetInvariantProofs([][]byte)
 	}
 )
 
@@ -250,7 +250,7 @@ func DecodeHexOrEmpty(input string) ([]byte, error) {
 	return decoded, nil
 }
 
-func (p *PredicateInput) PredicateSignature(sigBytes []byte) ([]byte, error) {
+func (p *PredicateInput) Proof(sigBytes []byte) ([]byte, error) {
 	if p == nil {
 		return nil, nil
 	}
