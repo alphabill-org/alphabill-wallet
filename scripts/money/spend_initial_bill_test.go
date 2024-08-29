@@ -31,6 +31,7 @@ func TestCreateTransferFC(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 	require.EqualValues(t, unitID, tx.Payload.UnitID)
+	require.NotNil(t, tx.AuthProof)
 }
 
 func TestCreateAddFC(t *testing.T) {
@@ -39,6 +40,7 @@ func TestCreateAddFC(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 	require.EqualValues(t, unitID, tx.Payload.UnitID)
+	require.NotNil(t, tx.AuthProof)
 }
 
 func TestCreateTransferTx(t *testing.T) {
@@ -47,6 +49,7 @@ func TestCreateTransferTx(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 	require.EqualValues(t, unitID, tx.Payload.UnitID)
+	require.NotNil(t, tx.AuthProof)
 }
 
 func TestExecBill_OK(t *testing.T) {

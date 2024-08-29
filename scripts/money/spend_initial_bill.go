@@ -102,7 +102,7 @@ func execInitialBill(ctx context.Context, moneyClient sdktypes.PartitionClient, 
 	// wait for transferFC proof
 	transferFCProof, err := waitForConf(ctx, moneyClient, transferFC)
 	if err != nil {
-		return fmt.Errorf("failed to confirm transferFC transaction %v", err)
+		return fmt.Errorf("failed to confirm transferFC transaction: %w", err)
 	} else {
 		log.Println("confirmed transferFC transaction")
 	}
@@ -121,7 +121,7 @@ func execInitialBill(ctx context.Context, moneyClient sdktypes.PartitionClient, 
 	// wait for addFC confirmation
 	_, err = waitForConf(ctx, moneyClient, addFC)
 	if err != nil {
-		return fmt.Errorf("failed to confirm addFC transaction %v", err)
+		return fmt.Errorf("failed to confirm addFC transaction: %w", err)
 	} else {
 		log.Println("confirmed addFC transaction")
 	}
@@ -140,7 +140,7 @@ func execInitialBill(ctx context.Context, moneyClient sdktypes.PartitionClient, 
 	// wait for transfer tx confirmation
 	_, err = waitForConf(ctx, moneyClient, transferTx)
 	if err != nil {
-		return fmt.Errorf("failed to confirm transfer transaction %v", err)
+		return fmt.Errorf("failed to confirm transfer transaction: %w", err)
 	} else {
 		log.Println("successfully confirmed initial bill transfer transaction")
 	}
@@ -169,6 +169,9 @@ func createTransferFC(feeAmount uint64, unitID []byte, targetUnitID []byte, late
 			ClientMetadata: &types.ClientMetadata{Timeout: latestAdditionTime, MaxTransactionFee: 1},
 		},
 	}
+	if err = tx.SetAuthProof(fc.TransferFeeCreditAuthProof{OwnerProof: templates.EmptyArgument()}); err != nil {
+		return nil, fmt.Errorf("failed to set auth proof: %w", err)
+	}
 	return tx, nil
 }
 
@@ -183,7 +186,7 @@ func createAddFC(unitID []byte, ownerPredicate []byte, transferFC *types.Transac
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal transferFC attributes: %w", err)
 	}
-	return &types.TransactionOrder{
+	tx := &types.TransactionOrder{
 		Payload: &types.Payload{
 			SystemID:       1,
 			Type:           fc.PayloadTypeAddFeeCredit,
@@ -191,7 +194,11 @@ func createAddFC(unitID []byte, ownerPredicate []byte, transferFC *types.Transac
 			Attributes:     attr,
 			ClientMetadata: &types.ClientMetadata{Timeout: latestAdditionTime, MaxTransactionFee: maxFee},
 		},
-	}, nil
+	}
+	if err = tx.SetAuthProof(fc.AddFeeCreditAuthProof{OwnerProof: templates.EmptyArgument()}); err != nil {
+		return nil, fmt.Errorf("failed to set auth proof: %w", err)
+	}
+	return tx, nil
 }
 
 func createTransferTx(pubKey []byte, unitID []byte, billValue uint64, fcrID []byte, timeout uint64, counter uint64) (*types.TransactionOrder, error) {
@@ -203,9 +210,9 @@ func createTransferTx(pubKey []byte, unitID []byte, billValue uint64, fcrID []by
 		},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal transferFC attributes: %w", err)
+		return nil, fmt.Errorf("failed to marshal transfer attributes: %w", err)
 	}
-	return &types.TransactionOrder{
+	tx := &types.TransactionOrder{
 		Payload: &types.Payload{
 			SystemID:   1,
 			Type:       money.PayloadTypeTransfer,
@@ -217,7 +224,11 @@ func createTransferTx(pubKey []byte, unitID []byte, billValue uint64, fcrID []by
 				FeeCreditRecordID: fcrID,
 			},
 		},
-	}, nil
+	}
+	if err = tx.SetAuthProof(money.TransferAuthProof{OwnerProof: templates.EmptyArgument()}); err != nil {
+		return nil, fmt.Errorf("failed to set auth proof: %w", err)
+	}
+	return tx, nil
 }
 
 func waitForConf(ctx context.Context, c sdktypes.PartitionClient, tx *types.TransactionOrder) (*sdktypes.Proof, error) {
@@ -236,7 +247,7 @@ func waitForConf(ctx context.Context, c sdktypes.PartitionClient, tx *types.Tran
 			return proof, nil
 		}
 		if roundNumber >= tx.Timeout() {
-			break
+			return nil, errors.New("transaction timed out")
 		}
 		select {
 		case <-time.After(time.Second):
@@ -244,5 +255,4 @@ func waitForConf(ctx context.Context, c sdktypes.PartitionClient, tx *types.Tran
 			return nil, errors.New("context canceled")
 		}
 	}
-	return nil, nil
 }
