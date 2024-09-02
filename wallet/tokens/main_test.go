@@ -287,7 +287,7 @@ func TestNewFungibleToken(t *testing.T) {
 			ft := &sdktypes.FungibleToken{
 				TypeID:         typeID,
 				Amount:         amount,
-				OwnerPredicate: bearerPredicateFromHash(key.PubKeyHash.Sha256),
+				OwnerPredicate: ownerPredicateFromHash(key.PubKeyHash.Sha256),
 			}
 			require.NoError(t, err)
 
@@ -599,7 +599,7 @@ func TestNewNFT(t *testing.T) {
 			nft := &sdktypes.NonFungibleToken{
 				SystemID:            tokens.DefaultSystemID,
 				TypeID:              tokens.NewNonFungibleTokenTypeID(nil, test.RandomBytes(32)),
-				OwnerPredicate:      bearerPredicateFromHash(key.PubKeyHash.Sha256),
+				OwnerPredicate:      ownerPredicateFromHash(key.PubKeyHash.Sha256),
 				URI:                 "https://alphabill.org",
 				Data:                nil,
 				DataUpdatePredicate: sdktypes.Predicate(templates.AlwaysTrueBytes()),
