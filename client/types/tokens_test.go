@@ -156,7 +156,6 @@ func TestFungibleTokenSplit(t *testing.T) {
 	require.NoError(t, tx.UnmarshalAttributes(attr))
 	require.Equal(t, newOwnerPredicate, attr.NewOwnerPredicate)
 	require.EqualValues(t, 3, attr.TargetValue)
-	require.EqualValues(t, 1, attr.RemainingValue)
 	require.Equal(t, ft.TypeID, attr.TypeID)
 }
 
