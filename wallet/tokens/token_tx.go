@@ -17,7 +17,7 @@ const (
 	txTimeoutRoundCount = 10
 )
 
-func bearerPredicateFromHash(receiverPubKeyHash []byte) sdktypes.Predicate {
+func ownerPredicateFromHash(receiverPubKeyHash []byte) sdktypes.Predicate {
 	var bytes []byte
 	if receiverPubKeyHash != nil {
 		bytes = templates.NewP2pkh256BytesFromKeyHash(receiverPubKeyHash)
@@ -27,12 +27,12 @@ func bearerPredicateFromHash(receiverPubKeyHash []byte) sdktypes.Predicate {
 	return bytes
 }
 
-func BearerPredicateFromPubKey(receiverPubKey sdktypes.PubKey) sdktypes.Predicate {
+func OwnerPredicateFromPubKey(receiverPubKey sdktypes.PubKey) sdktypes.Predicate {
 	var h []byte
 	if receiverPubKey != nil {
 		h = hash.Sum256(receiverPubKey)
 	}
-	return bearerPredicateFromHash(h)
+	return ownerPredicateFromHash(h)
 }
 
 // assumes there's sufficient balance for the given amount, sends transactions immediately
@@ -72,7 +72,7 @@ func (w *Wallet) doSendMultiple(ctx context.Context, amount uint64, tokens []*sd
 
 func (w *Wallet) prepareSplitOrTransferTx(acc *accountKey, amount uint64, ft *sdktypes.FungibleToken, fcrID, receiverPubKey []byte, timeout uint64, ownerPredicateInput *PredicateInput, typeOwnerPredicateInputs []*PredicateInput) (*txsubmitter.TxSubmission, error) {
 	if amount >= ft.Amount {
-		tx, err := ft.Transfer(BearerPredicateFromPubKey(receiverPubKey),
+		tx, err := ft.Transfer(OwnerPredicateFromPubKey(receiverPubKey),
 			sdktypes.WithTimeout(timeout),
 			sdktypes.WithFeeCreditRecordID(fcrID),
 			sdktypes.WithMaxFee(w.maxFee),
@@ -106,7 +106,7 @@ func (w *Wallet) prepareSplitOrTransferTx(acc *accountKey, amount uint64, ft *sd
 		}
 		return txsubmitter.New(tx), nil
 	} else {
-		tx, err := ft.Split(amount, BearerPredicateFromPubKey(receiverPubKey),
+		tx, err := ft.Split(amount, OwnerPredicateFromPubKey(receiverPubKey),
 			sdktypes.WithTimeout(timeout),
 			sdktypes.WithFeeCreditRecordID(fcrID),
 			sdktypes.WithMaxFee(w.maxFee),

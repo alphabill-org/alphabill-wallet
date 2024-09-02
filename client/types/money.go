@@ -48,11 +48,9 @@ func (b *Bill) Split(targetUnits []*money.TargetUnit, txOptions ...Option) (*typ
 	for _, tu := range targetUnits {
 		totalAmount += tu.Amount
 	}
-	remainingValue := b.Value - totalAmount
 	attr := &money.SplitAttributes{
-		TargetUnits:    targetUnits,
-		RemainingValue: remainingValue,
-		Counter:        b.Counter,
+		TargetUnits: targetUnits,
+		Counter:     b.Counter,
 	}
 	txPayload, err := NewPayload(b.SystemID, b.ID, money.PayloadTypeSplit, attr, txOptions...)
 	if err != nil {

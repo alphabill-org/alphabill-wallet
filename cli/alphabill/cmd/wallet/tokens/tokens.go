@@ -394,7 +394,7 @@ func execTokenCmdNewTokenFungible(cmd *cobra.Command, config *types.WalletConfig
 	if amount == 0 {
 		return fmt.Errorf("invalid parameter \"%s\" for \"--amount\": 0 is not valid amount", amountStr)
 	}
-	bearerPredicate, err := parsePredicateClauseCmd(cmd, cmdFlagBearerClause, accountNumber, am)
+	ownerPredicate, err := parsePredicateClauseCmd(cmd, cmdFlagBearerClause, accountNumber, am)
 	if err != nil {
 		return err
 	}
@@ -402,7 +402,7 @@ func execTokenCmdNewTokenFungible(cmd *cobra.Command, config *types.WalletConfig
 	ft := &sdktypes.FungibleToken{
 		SystemID:       tw.SystemID(),
 		TypeID:         typeID,
-		OwnerPredicate: bearerPredicate,
+		OwnerPredicate: ownerPredicate,
 		Amount:         amount,
 	}
 	result, err := tw.NewFungibleToken(cmd.Context(), accountNumber, ft, mintPredicateInput)
@@ -473,7 +473,7 @@ func execTokenCmdNewTokenNonFungible(cmd *cobra.Command, config *types.WalletCon
 	if err != nil {
 		return err
 	}
-	bearerPredicate, err := parsePredicateClauseCmd(cmd, cmdFlagBearerClause, accountNumber, am)
+	ownerPredicate, err := parsePredicateClauseCmd(cmd, cmdFlagBearerClause, accountNumber, am)
 	if err != nil {
 		return err
 	}
@@ -493,7 +493,7 @@ func execTokenCmdNewTokenNonFungible(cmd *cobra.Command, config *types.WalletCon
 	nft := &sdktypes.NonFungibleToken{
 		SystemID:            tw.SystemID(),
 		TypeID:              typeID,
-		OwnerPredicate:      bearerPredicate,
+		OwnerPredicate:      ownerPredicate,
 		Name:                name,
 		URI:                 uri,
 		Data:                data,

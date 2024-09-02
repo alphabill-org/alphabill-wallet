@@ -60,7 +60,6 @@ type (
 		TypeID         TokenTypeID
 		TypeName       string
 		OwnerPredicate []byte // TODO: could use sdktypes.Predicate?
-		Nonce          []byte // TODO: could be uint64? it is elsewhere
 		Counter        uint64
 		LockStatus     uint64
 		Amount         uint64
@@ -75,7 +74,6 @@ type (
 		TypeID              TokenTypeID
 		TypeName            string
 		OwnerPredicate      []byte // TODO: could use sdktypes.Predicate?
-		Nonce               []byte // TODO: could be uint64? it is elsewhere
 		Counter             uint64
 		LockStatus          uint64
 		Name                string
@@ -160,7 +158,6 @@ func (t *FungibleToken) Transfer(ownerPredicate []byte, txOptions ...Option) (*t
 	attr := &tokens.TransferFungibleTokenAttributes{
 		NewOwnerPredicate: ownerPredicate,
 		Value:             t.Amount,
-		Nonce:             t.Nonce,
 		Counter:           t.Counter,
 		TypeID:            t.TypeID,
 	}
@@ -176,10 +173,8 @@ func (t *FungibleToken) Split(amount uint64, ownerPredicate []byte, txOptions ..
 	attr := &tokens.SplitFungibleTokenAttributes{
 		NewOwnerPredicate: ownerPredicate,
 		TargetValue:       amount,
-		Nonce:             nil,
 		Counter:           t.Counter,
 		TypeID:            t.TypeID,
-		RemainingValue:    t.Amount - amount,
 	}
 	txPayload, err := NewPayload(t.SystemID, t.ID, tokens.PayloadTypeSplitFT, attr, txOptions...)
 	if err != nil {
@@ -269,7 +264,6 @@ func (t *NonFungibleToken) Mint(txOptions ...Option) (*types.TransactionOrder, e
 func (t *NonFungibleToken) Transfer(ownerPredicate []byte, txOptions ...Option) (*types.TransactionOrder, error) {
 	attr := &tokens.TransferNonFungibleTokenAttributes{
 		NewOwnerPredicate: ownerPredicate,
-		Nonce:             t.Nonce,
 		Counter:           t.Counter,
 		TypeID:            t.TypeID,
 	}

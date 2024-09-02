@@ -78,7 +78,6 @@ func TestSplitTransactionAmount(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, amount, attr.TargetUnits[0].Amount)
 	require.EqualValues(t, templates.NewP2pkh256BytesFromKeyHash(receiverPubKeyHash), attr.TargetUnits[0].OwnerPredicate)
-	require.EqualValues(t, 350, attr.RemainingValue)
 	require.EqualValues(t, b.Counter, attr.Counter)
 }
 
