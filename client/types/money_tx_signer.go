@@ -41,7 +41,7 @@ func (s *MoneyTxSigner) SignTx(tx *types.TransactionOrder) error {
 }
 
 func (s *MoneyTxSigner) AddAuthProof(tx *types.TransactionOrder) error {
-	ownerProof, err := NewPp2khSignature(tx, s.signer)
+	ownerProof, err := NewP2pkhSignature(tx, s.signer)
 	if err != nil {
 		return fmt.Errorf("failed to create owner proof: %w", err)
 	}

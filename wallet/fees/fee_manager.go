@@ -738,7 +738,7 @@ func (w *FeeManager) sendAddFCTx(ctx context.Context, accountKey *account.Accoun
 		SystemID: feeCtx.TargetPartitionID,
 		ID:       feeCtx.FeeCreditRecordID,
 	}
-	ownerPredicate := templates.NewP2pkh256BytesFromKeyHash(accountKey.PubKeyHash.Sha256)
+	ownerPredicate := templates.NewP2pkh256FeeAuthBytesFromKeyHash(accountKey.PubKeyHash.Sha256)
 	addFCTx, err := fcr.AddFeeCredit(ownerPredicate, feeCtx.TransferFCProof,
 		sdktypes.WithTimeout(timeout),
 		sdktypes.WithMaxFee(w.maxFee),
@@ -1157,7 +1157,7 @@ func (w *FeeManager) unlockFeeCreditRecord(ctx context.Context, accountKey *acco
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tx signer: %w", err)
 	}
-	ownerProof, err := sdktypes.NewPp2khSignature(tx, signer)
+	ownerProof, err := sdktypes.NewP2pkhSignature(tx, signer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create owner predicate signature: %w", err)
 	}

@@ -81,8 +81,8 @@ func OptionsWithDefaults(txOptions []Option) *Options {
 	return opts
 }
 
-// NewPp2khSignature creates a standard P2PKH predicate signature aka the "OwnerProof"
-func NewPp2khSignature(txo *types.TransactionOrder, signer crypto.Signer) ([]byte, error) {
+// NewP2pkhSignature creates a standard P2PKH predicate signature aka the "OwnerProof"
+func NewP2pkhSignature(txo *types.TransactionOrder, signer crypto.Signer) ([]byte, error) {
 	sigBytes, err := txo.PayloadBytes()
 	if err != nil {
 		return nil, err
@@ -108,7 +108,7 @@ func NewP2pkhSignatureFromKey(txo *types.TransactionOrder, privKey []byte) ([]by
 	if err != nil {
 		return nil, fmt.Errorf("failed to create signer from private key: %w", err)
 	}
-	return NewPp2khSignature(txo, signer)
+	return NewP2pkhSignature(txo, signer)
 }
 
 // NewP2pkhFeeSignature creates a standard P2PKH fee predicate signature aka the "FeeProof"

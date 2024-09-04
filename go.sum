@@ -57,8 +57,8 @@ github.com/VictoriaMetrics/fastcache v1.12.1/go.mod h1:tX04vaqcNoQeGLD+ra5pU5sWk
 github.com/aead/siphash v1.0.1/go.mod h1:Nywa3cDsYNNK3gaciGTWPwHt0wlpNV15vwmswBAUSII=
 github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156 h1:eMwmnE/GDgah4HI848JfFxHt+iPb26b4zyfspmqY0/8=
 github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156/go.mod h1:Cb/ax3seSYIx7SuZdm2G2xzfwmv3TPSk2ucNfQESPXM=
-github.com/alphabill-org/alphabill-go-base v0.0.0-20240902065432-9f46293a96c6 h1:4FXtfWN6Wc/l6qqAZvEr0Yhvuf+OaqxDKzXjCt9uOGU=
-github.com/alphabill-org/alphabill-go-base v0.0.0-20240902065432-9f46293a96c6/go.mod h1:5y8Rsc6aJ+dThkA1wK4cfQaqTTttgSD8HIT1x207SC8=
+github.com/alphabill-org/alphabill-go-base v0.0.0-20240904204810-b5ecd34dd128 h1:VXfg8Jy4uK41BxyRBJHnkJlnagTbZVs/1lMPTqINrfM=
+github.com/alphabill-org/alphabill-go-base v0.0.0-20240904204810-b5ecd34dd128/go.mod h1:5y8Rsc6aJ+dThkA1wK4cfQaqTTttgSD8HIT1x207SC8=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/bits-and-blooms/bitset v1.13.0 h1:bAQ9OPNFYbGHV6Nez0tmNI0RiEu7/hxlYJRUA0wFAVE=

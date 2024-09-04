@@ -31,7 +31,7 @@ func NewAddVarTx(varData orchestration.ValidatorAssignmentRecord, systemID types
 		if err != nil {
 			return nil, err
 		}
-		ownerProof, err := sdktypes.NewPp2khSignature(txo, signer)
+		ownerProof, err := sdktypes.NewP2pkhSignature(txo, signer)
 		if err != nil {
 			return nil, fmt.Errorf("failed to sign tx: %w", err)
 		}
