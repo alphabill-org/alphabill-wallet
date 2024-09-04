@@ -533,7 +533,7 @@ func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID 
 		return nil, err
 	}
 
-	tx, err := token.Transfer(BearerPredicateFromPubKey(receiverPubKey),
+	tx, err := token.Transfer(OwnerPredicateFromPubKey(receiverPubKey),
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
 		sdktypes.WithMaxFee(w.maxFee),
