@@ -9,32 +9,34 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/types"
 
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
-	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 )
 
 // CreateTransactions creates 1 to N P2PKH transactions from given bills until target amount is reached.
 // If there exists a bill with value equal to the given amount then transfer transaction is created using that bill,
 // otherwise bills are selected in the given order.
-func CreateTransactions(pubKey []byte, amount uint64, systemID types.SystemID, bills []*sdktypes.Bill, k *account.AccountKey, timeout uint64, fcrID, refNo []byte, maxFee uint64) ([]*types.TransactionOrder, error) {
+func CreateTransactions(pubKey []byte, amount uint64, bills []*sdktypes.Bill, txSigner *sdktypes.MoneyTxSigner, timeout uint64, fcrID, refNo []byte, maxFee uint64) ([]*types.TransactionOrder, error) {
 	billIndex := slices.IndexFunc(bills, func(b *sdktypes.Bill) bool { return b.Value == amount })
 	if billIndex >= 0 {
 		ownerPredicate := templates.NewP2pkh256BytesFromKey(pubKey)
-		tx, err := bills[billIndex].Transfer(ownerPredicate,
+		txo, err := bills[billIndex].Transfer(ownerPredicate,
 			sdktypes.WithTimeout(timeout),
 			sdktypes.WithFeeCreditRecordID(fcrID),
 			sdktypes.WithMaxFee(maxFee),
 			sdktypes.WithReferenceNumber(refNo),
-			sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
+		)
 		if err != nil {
 			return nil, err
 		}
-		return []*types.TransactionOrder{tx}, nil
+		if err = txSigner.SignTx(txo); err != nil {
+			return nil, fmt.Errorf("failed to sign tx: %w", err)
+		}
+		return []*types.TransactionOrder{txo}, nil
 	}
 	var txs []*types.TransactionOrder
 	var accumulatedSum uint64
 	for _, b := range bills {
 		remainingAmount := amount - accumulatedSum
-		tx, err := createTransaction(pubKey, k, remainingAmount, b, timeout, fcrID, refNo, maxFee)
+		tx, err := createTransaction(pubKey, txSigner, remainingAmount, b, timeout, fcrID, refNo, maxFee)
 		if err != nil {
 			return nil, err
 		}
@@ -48,23 +50,40 @@ func CreateTransactions(pubKey []byte, amount uint64, systemID types.SystemID, b
 }
 
 // createTransaction creates a P2PKH transfer or split transaction using the given bill.
-func createTransaction(receiverPubKey []byte, k *account.AccountKey, amount uint64, bill *sdktypes.Bill, timeout uint64, fcrID, refNo []byte, maxFee uint64) (*types.TransactionOrder, error) {
+func createTransaction(receiverPubKey []byte, txSigner *sdktypes.MoneyTxSigner, amount uint64, bill *sdktypes.Bill, timeout uint64, fcrID, refNo []byte, maxFee uint64) (*types.TransactionOrder, error) {
 	if bill.Value <= amount {
 		ownerPredicate := templates.NewP2pkh256BytesFromKey(receiverPubKey)
-		return bill.Transfer(ownerPredicate,
+		txo, err := bill.Transfer(ownerPredicate,
 			sdktypes.WithTimeout(timeout),
 			sdktypes.WithFeeCreditRecordID(fcrID),
 			sdktypes.WithMaxFee(maxFee),
 			sdktypes.WithReferenceNumber(refNo),
-			sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
+		)
+		if err != nil {
+			return nil, err
+		}
+		if err = txSigner.SignTx(txo); err != nil {
+			return nil, fmt.Errorf("failed to sign tx: %w", err)
+		}
+		return txo, nil
 	}
 	targetUnits := []*money.TargetUnit{
-		{Amount: amount, OwnerCondition: templates.NewP2pkh256BytesFromKey(receiverPubKey)},
+		{
+			Amount:         amount,
+			OwnerPredicate: templates.NewP2pkh256BytesFromKey(receiverPubKey),
+		},
 	}
-	return bill.Split(targetUnits,
+	txo, err := bill.Split(targetUnits,
 		sdktypes.WithTimeout(timeout),
 		sdktypes.WithFeeCreditRecordID(fcrID),
 		sdktypes.WithMaxFee(maxFee),
 		sdktypes.WithReferenceNumber(refNo),
-		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
+	)
+	if err != nil {
+		return nil, err
+	}
+	if err = txSigner.SignTx(txo); err != nil {
+		return nil, fmt.Errorf("failed to sign tx: %w", err)
+	}
+	return txo, nil
 }

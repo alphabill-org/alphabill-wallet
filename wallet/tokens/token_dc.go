@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-go-base/util"
 
@@ -15,7 +16,7 @@ import (
 
 const maxBurnBatchSize = 100
 
-func (w *Wallet) CollectDust(ctx context.Context, accountNumber uint64, allowedTokenTypes []sdktypes.TokenTypeID, invariantPredicateArgs []*PredicateInput, ownerProof *PredicateInput) (map[uint64][]*SubmissionResult, error) {
+func (w *Wallet) CollectDust(ctx context.Context, accountNumber uint64, allowedTokenTypes []sdktypes.TokenTypeID, ownerPredicateInput *PredicateInput, typeOwnerPredicateInputs []*PredicateInput) (map[uint64][]*SubmissionResult, error) {
 	keys, err := w.getAccounts(accountNumber)
 	if err != nil {
 		return nil, err
@@ -29,7 +30,7 @@ func (w *Wallet) CollectDust(ctx context.Context, accountNumber uint64, allowedT
 		}
 		var subResults []*SubmissionResult
 		for _, tokenz := range tokensByTypes {
-			subResult, err := w.collectDust(ctx, key, tokenz, invariantPredicateArgs)
+			subResult, err := w.collectDust(ctx, key, tokenz, ownerPredicateInput, typeOwnerPredicateInputs)
 			if err != nil {
 				return results, err
 			}
@@ -42,7 +43,7 @@ func (w *Wallet) CollectDust(ctx context.Context, accountNumber uint64, allowedT
 	return results, nil
 }
 
-func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, tokens []*sdktypes.FungibleToken, invariantPredicateArgs []*PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, tokens []*sdktypes.FungibleToken, ownerPredicateInput *PredicateInput, typeOwnerPredicateInputs []*PredicateInput) (*SubmissionResult, error) {
 	batchCount := ((len(tokens) - 1) / maxBurnBatchSize) + 1
 	txCount := len(tokens) + batchCount*2 // +lock fee and join fee for every batch
 	fcrID, err := w.ensureFeeCredit(ctx, acc.AccountKey, txCount)
@@ -78,20 +79,20 @@ func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, tokens []*sdk
 		}
 
 		var lockFee uint64
-		lockFee, err = w.lockTokenForDC(ctx, acc, fcrID, targetToken, invariantPredicateArgs)
+		lockFee, err = w.lockTokenForDC(ctx, acc, fcrID, targetToken, ownerPredicateInput)
 		if err != nil {
 			return nil, fmt.Errorf("failed to lock target token: %w", err)
 		}
 
 		targetToken.Counter += 1
-		burnBatchAmount, burnFee, proofs, err := w.burnTokensForDC(ctx, acc, burnBatch, targetToken, fcrID, invariantPredicateArgs)
+		burnBatchAmount, burnFee, proofs, err := w.burnTokensForDC(ctx, acc, burnBatch, targetToken, fcrID, ownerPredicateInput, typeOwnerPredicateInputs)
 		if err != nil {
 			return nil, err
 		}
 
 		// if there's more to burn, update counter to continue
 		var joinFee uint64
-		joinFee, err = w.joinTokenForDC(ctx, acc, proofs, targetToken, fcrID, invariantPredicateArgs)
+		joinFee, err = w.joinTokenForDC(ctx, acc, proofs, targetToken, fcrID, ownerPredicateInput, typeOwnerPredicateInputs)
 		if err != nil {
 			return nil, err
 		}
@@ -103,7 +104,7 @@ func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, tokens []*sdk
 	return &SubmissionResult{FeeSum: totalFees}, nil
 }
 
-func (w *Wallet) joinTokenForDC(ctx context.Context, acc *accountKey, burnProofs []*sdktypes.Proof, targetToken *sdktypes.FungibleToken, fcrID types.UnitID, invariantProofs []*PredicateInput) (uint64, error) {
+func (w *Wallet) joinTokenForDC(ctx context.Context, acc *accountKey, burnProofs []*sdktypes.Proof, targetToken *sdktypes.FungibleToken, fcrID types.UnitID, ownerPredicateInput *PredicateInput, typeOwnerPredicateInputs []*PredicateInput) (uint64, error) {
 	// explicitly sort proofs by unit ids in increasing order
 	sort.Slice(burnProofs, func(i, j int) bool {
 		a := burnProofs[i].TxRecord.TransactionOrder.UnitID()
@@ -125,11 +126,33 @@ func (w *Wallet) joinTokenForDC(ctx context.Context, acc *accountKey, burnProofs
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
 		sdktypes.WithMaxFee(w.maxFee),
-		sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		sdktypes.WithExtraProofs(newProofGenerators(invariantProofs)))
+	)
 	if err != nil {
 		return 0, err
+	}
+
+	payloadBytes, err := tx.PayloadBytes()
+	if err != nil {
+		return 0, err
+	}
+	typeOwnerProofs, err := newProofs(payloadBytes, typeOwnerPredicateInputs)
+	if err != nil {
+		return 0, err
+	}
+	ownerProof, err := ownerPredicateInput.Proof(payloadBytes)
+	if err != nil {
+		return 0, err
+	}
+	err = tx.SetAuthProof(tokens.JoinFungibleTokenAuthProof{
+		OwnerProof:           ownerProof,
+		TokenTypeOwnerProofs: typeOwnerProofs,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to set auth proof: %w", err)
+	}
+	tx.FeeProof, err = sdktypes.NewP2pkhFeeSignatureFromKey(tx, acc.PrivKey)
+	if err != nil {
+		return 0, fmt.Errorf("failed to sign tx fee proof: %w", err)
 	}
 
 	sub := txsubmitter.New(tx)
@@ -139,7 +162,7 @@ func (w *Wallet) joinTokenForDC(ctx context.Context, acc *accountKey, burnProofs
 	return sub.Proof.TxRecord.ServerMetadata.ActualFee, nil
 }
 
-func (w *Wallet) burnTokensForDC(ctx context.Context, acc *accountKey, tokensToBurn []*sdktypes.FungibleToken, targetToken *sdktypes.FungibleToken, fcrID types.UnitID, invariantProofs []*PredicateInput) (uint64, uint64, []*sdktypes.Proof, error) {
+func (w *Wallet) burnTokensForDC(ctx context.Context, acc *accountKey, tokensToBurn []*sdktypes.FungibleToken, targetToken *sdktypes.FungibleToken, fcrID types.UnitID, ownerPredicateInput *PredicateInput, typeOwnerPredicateInputs []*PredicateInput) (uint64, uint64, []*sdktypes.Proof, error) {
 	burnBatch := txsubmitter.NewBatch(w.tokensClient, w.log)
 	burnBatchAmount := uint64(0)
 
@@ -153,12 +176,35 @@ func (w *Wallet) burnTokensForDC(ctx context.Context, acc *accountKey, tokensToB
 			sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 			sdktypes.WithFeeCreditRecordID(fcrID),
 			sdktypes.WithMaxFee(w.maxFee),
-			sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
-			sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
-			sdktypes.WithExtraProofs(newProofGenerators(invariantProofs)))
+		)
 		if err != nil {
 			return 0, 0, nil, fmt.Errorf("failed to prepare burn tx: %w", err)
 		}
+
+		payloadBytes, err := tx.PayloadBytes()
+		if err != nil {
+			return 0, 0, nil, err
+		}
+		typeOwnerProofs, err := newProofs(payloadBytes, typeOwnerPredicateInputs)
+		if err != nil {
+			return 0, 0, nil, err
+		}
+		ownerProof, err := ownerPredicateInput.Proof(payloadBytes)
+		if err != nil {
+			return 0, 0, nil, err
+		}
+		err = tx.SetAuthProof(tokens.BurnFungibleTokenAuthProof{
+			OwnerProof:           ownerProof,
+			TokenTypeOwnerProofs: typeOwnerProofs,
+		})
+		if err != nil {
+			return 0, 0, nil, fmt.Errorf("failed to set auth proof: %w", err)
+		}
+		tx.FeeProof, err = sdktypes.NewP2pkhFeeSignatureFromKey(tx, acc.PrivKey)
+		if err != nil {
+			return 0, 0, nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
+		}
+
 		burnBatch.Add(txsubmitter.New(tx))
 	}
 
@@ -206,7 +252,7 @@ func (w *Wallet) getTokensForDC(ctx context.Context, key sdktypes.PubKey, allowe
 	return tokensByTypes, nil
 }
 
-func (w *Wallet) lockTokenForDC(ctx context.Context, acc *accountKey, fcrID types.UnitID, targetToken Token, invariantProofs []*PredicateInput) (uint64, error) {
+func (w *Wallet) lockTokenForDC(ctx context.Context, acc *accountKey, fcrID types.UnitID, targetToken Token, ownerPredicateInput *PredicateInput) (uint64, error) {
 	roundNumber, err := w.GetRoundNumber(ctx)
 	if err != nil {
 		return 0, err
@@ -215,11 +261,28 @@ func (w *Wallet) lockTokenForDC(ctx context.Context, acc *accountKey, fcrID type
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
 		sdktypes.WithMaxFee(w.maxFee),
-		sdktypes.WithOwnerProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
-		sdktypes.WithExtraProofs(newProofGenerators(invariantProofs)))
+	)
 	if err != nil {
 		return 0, err
+	}
+
+	payloadBytes, err := tx.PayloadBytes()
+	if err != nil {
+		return 0, err
+	}
+	ownerProof, err := ownerPredicateInput.Proof(payloadBytes)
+	if err != nil {
+		return 0, err
+	}
+	err = tx.SetAuthProof(tokens.LockTokenAuthProof{
+		OwnerProof: ownerProof,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to set auth proof: %w", err)
+	}
+	tx.FeeProof, err = sdktypes.NewP2pkhFeeSignatureFromKey(tx, acc.PrivKey)
+	if err != nil {
+		return 0, fmt.Errorf("failed to sign tx fee proof: %w", err)
 	}
 
 	sub := txsubmitter.New(tx)

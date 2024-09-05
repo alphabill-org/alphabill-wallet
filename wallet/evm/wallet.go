@@ -228,8 +228,9 @@ func signPayload(payload *types.Payload, ac *account.AccountKey) (*types.Transac
 	if err != nil {
 		return nil, err
 	}
-	return &types.TransactionOrder{
-		Payload:    payload,
-		OwnerProof: templates.NewP2pkh256SignatureBytes(sig, ac.PubKey),
-	}, nil
+	txo := &types.TransactionOrder{Payload: payload}
+	if err = txo.SetAuthProof(evm.TxAuthProof{OwnerProof: templates.NewP2pkh256SignatureBytes(sig, ac.PubKey)}); err != nil {
+		return nil, fmt.Errorf("failed to set auth proof: %w", err)
+	}
+	return txo, nil
 }

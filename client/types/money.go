@@ -30,23 +30,17 @@ type (
 	}
 )
 
-func (b *Bill) Transfer(ownerPredicate []byte, txOptions ...Option) (*types.TransactionOrder, error) {
+func (b *Bill) Transfer(newOwnerPredicate []byte, txOptions ...Option) (*types.TransactionOrder, error) {
 	attr := &money.TransferAttributes{
-		NewBearer:   ownerPredicate,
-		TargetValue: b.Value,
-		Counter:     b.Counter,
+		NewOwnerPredicate: newOwnerPredicate,
+		TargetValue:       b.Value,
+		Counter:           b.Counter,
 	}
 	txPayload, err := NewPayload(b.SystemID, b.ID, money.PayloadTypeTransfer, attr, txOptions...)
 	if err != nil {
 		return nil, err
 	}
-
-	tx := NewTransactionOrder(txPayload)
-	err = GenerateAndSetProofs(tx, nil, nil, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-	return tx, nil
+	return NewTransactionOrder(txPayload), nil
 }
 
 func (b *Bill) Split(targetUnits []*money.TargetUnit, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -54,23 +48,16 @@ func (b *Bill) Split(targetUnits []*money.TargetUnit, txOptions ...Option) (*typ
 	for _, tu := range targetUnits {
 		totalAmount += tu.Amount
 	}
-	remainingValue := b.Value - totalAmount
 	attr := &money.SplitAttributes{
-		TargetUnits:    targetUnits,
-		RemainingValue: remainingValue,
-		Counter:        b.Counter,
+		TargetUnits: targetUnits,
+		Counter:     b.Counter,
 	}
 	txPayload, err := NewPayload(b.SystemID, b.ID, money.PayloadTypeSplit, attr, txOptions...)
 	if err != nil {
 		return nil, err
 	}
 
-	tx := NewTransactionOrder(txPayload)
-	err = GenerateAndSetProofs(tx, nil, nil, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-	return tx, nil
+	return NewTransactionOrder(txPayload), nil
 }
 
 func (b *Bill) TransferToDustCollector(targetBill *Bill, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -85,13 +72,7 @@ func (b *Bill) TransferToDustCollector(targetBill *Bill, txOptions ...Option) (*
 		return nil, err
 	}
 
-	tx := NewTransactionOrder(txPayload)
-	err = GenerateAndSetProofs(tx, nil, nil, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-
-	return tx, nil
+	return NewTransactionOrder(txPayload), nil
 }
 
 func (b *Bill) SwapWithDustCollector(transDCProofs []*Proof, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -124,12 +105,7 @@ func (b *Bill) SwapWithDustCollector(transDCProofs []*Proof, txOptions ...Option
 		return nil, fmt.Errorf("failed to build swap transaction: %w", err)
 	}
 
-	tx := NewTransactionOrder(txPayload)
-	err = GenerateAndSetProofs(tx, nil, nil, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-	return tx, nil
+	return NewTransactionOrder(txPayload), nil
 }
 
 func (b *Bill) TransferToFeeCredit(fcr *FeeCreditRecord, amount uint64, latestAdditionTime uint64, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -146,12 +122,7 @@ func (b *Bill) TransferToFeeCredit(fcr *FeeCreditRecord, amount uint64, latestAd
 		return nil, err
 	}
 
-	tx := NewTransactionOrder(txPayload)
-	err = GenerateAndSetProofs(tx, nil, nil, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-	return tx, nil
+	return NewTransactionOrder(txPayload), nil
 }
 
 func (b *Bill) ReclaimFromFeeCredit(closeFCProof *Proof, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -165,12 +136,7 @@ func (b *Bill) ReclaimFromFeeCredit(closeFCProof *Proof, txOptions ...Option) (*
 		return nil, err
 	}
 
-	tx := NewTransactionOrder(txPayload)
-	err = GenerateAndSetProofs(tx, nil, nil, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-	return tx, nil
+	return NewTransactionOrder(txPayload), nil
 }
 
 func (b *Bill) Lock(lockStatus uint64, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -183,12 +149,7 @@ func (b *Bill) Lock(lockStatus uint64, txOptions ...Option) (*types.TransactionO
 		return nil, err
 	}
 
-	tx := NewTransactionOrder(txPayload)
-	err = GenerateAndSetProofs(tx, nil, nil, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-	return tx, nil
+	return NewTransactionOrder(txPayload), nil
 }
 
 func (b *Bill) Unlock(txOptions ...Option) (*types.TransactionOrder, error) {
@@ -200,10 +161,5 @@ func (b *Bill) Unlock(txOptions ...Option) (*types.TransactionOrder, error) {
 		return nil, err
 	}
 
-	tx := NewTransactionOrder(txPayload)
-	err = GenerateAndSetProofs(tx, nil, nil, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-	return tx, nil
+	return NewTransactionOrder(txPayload), nil
 }

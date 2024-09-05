@@ -101,9 +101,12 @@ func TestCreateTransactions(t *testing.T) {
 
 	systemID := money.DefaultSystemID
 
+	txSigner, err := sdktypes.NewMoneyTxSignerFromKey(accountKey.AccountKey.PrivKey)
+	require.NoError(t, err)
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			txs, err := CreateTransactions(receiverPubKey, tt.amount, systemID, tt.bills, accountKey.AccountKey, 100, nil, nil, 10)
+			txs, err := CreateTransactions(receiverPubKey, tt.amount, tt.bills, txSigner, 100, nil, nil, 10)
 			if tt.expectedErr != "" {
 				require.ErrorContains(t, err, tt.expectedErr)
 			} else {

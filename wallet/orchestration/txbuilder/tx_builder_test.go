@@ -31,7 +31,7 @@ func TestNewAddVarTx_OK(t *testing.T) {
 	require.EqualValues(t, 3, tx.GetClientMaxTxFee())
 	require.Nil(t, tx.GetClientFeeCreditRecordID())
 	require.Nil(t, tx.FeeProof)
-	require.NotNil(t, tx.OwnerProof)
+	require.NotNil(t, tx.AuthProof)
 
 	require.EqualValues(t, orchestration.PayloadTypeAddVAR, tx.PayloadType())
 	var attr *orchestration.AddVarAttributes
@@ -55,7 +55,7 @@ func TestNewAddVarTxUnsigned_OK(t *testing.T) {
 	require.EqualValues(t, 5, tx.GetClientMaxTxFee())
 	require.Nil(t, tx.GetClientFeeCreditRecordID())
 	require.Nil(t, tx.FeeProof)
-	require.Nil(t, tx.OwnerProof)
+	require.Nil(t, tx.AuthProof)
 
 	require.EqualValues(t, orchestration.PayloadTypeAddVAR, tx.PayloadType())
 	var attr *orchestration.AddVarAttributes

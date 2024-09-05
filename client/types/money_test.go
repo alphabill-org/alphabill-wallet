@@ -24,15 +24,12 @@ func TestBillTransfer(t *testing.T) {
 	newOwnerPredicate := []byte{5}
 	fcrID := money.NewFeeCreditRecordID(nil, []byte{6})
 	maxFee := uint64(7)
-	privKey := hash.Sum256([]byte{8})
-	pubKey := hash.Sum256([]byte{9})
 	tx, err := b.Transfer(newOwnerPredicate,
 		WithFeeCreditRecordID(fcrID),
 		WithTimeout(timeout),
 		WithReferenceNumber(refNo),
 		WithMaxFee(maxFee),
-		WithOwnerProof(NewP2pkhProofGenerator(privKey, pubKey)),
-		WithFeeProof(NewP2pkhProofGenerator(privKey, pubKey)))
+	)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 	require.Equal(t, tx.PayloadType(), money.PayloadTypeTransfer)
@@ -41,13 +38,13 @@ func TestBillTransfer(t *testing.T) {
 	require.Equal(t, timeout, tx.Timeout())
 	require.EqualValues(t, refNo, tx.Payload.ClientMetadata.ReferenceNumber)
 	require.Equal(t, maxFee, tx.GetClientMaxTxFee())
-	require.NotNil(t, tx.OwnerProof)
-	require.NotNil(t, tx.FeeProof)
+	require.Nil(t, tx.AuthProof)
+	require.Nil(t, tx.FeeProof)
 
 	attr := &money.TransferAttributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))
 	require.Equal(t, b.Value, attr.TargetValue)
-	require.EqualValues(t, newOwnerPredicate, attr.NewBearer)
+	require.EqualValues(t, newOwnerPredicate, attr.NewOwnerPredicate)
 	require.EqualValues(t, b.Counter, attr.Counter)
 }
 
@@ -64,8 +61,8 @@ func TestSplitTransactionAmount(t *testing.T) {
 
 	targetUnits := []*money.TargetUnit{
 		{
-			OwnerCondition: templates.NewP2pkh256BytesFromKeyHash(receiverPubKeyHash),
-			Amount: amount,
+			OwnerPredicate: templates.NewP2pkh256BytesFromKeyHash(receiverPubKeyHash),
+			Amount:         amount,
 		},
 	}
 	tx, err := b.Split(targetUnits)
@@ -74,14 +71,13 @@ func TestSplitTransactionAmount(t *testing.T) {
 	require.Equal(t, tx.PayloadType(), money.PayloadTypeSplit)
 	require.EqualValues(t, b.SystemID, tx.SystemID())
 	require.EqualValues(t, billID, tx.UnitID())
-	require.Nil(t, tx.OwnerProof)
+	require.Nil(t, tx.AuthProof)
 
 	attr := &money.SplitAttributes{}
 	err = tx.UnmarshalAttributes(attr)
 	require.NoError(t, err)
 	require.Equal(t, amount, attr.TargetUnits[0].Amount)
-	require.EqualValues(t, templates.NewP2pkh256BytesFromKeyHash(receiverPubKeyHash), attr.TargetUnits[0].OwnerCondition)
-	require.EqualValues(t, 350, attr.RemainingValue)
+	require.EqualValues(t, templates.NewP2pkh256BytesFromKeyHash(receiverPubKeyHash), attr.TargetUnits[0].OwnerPredicate)
 	require.EqualValues(t, b.Counter, attr.Counter)
 }
 
@@ -93,8 +89,8 @@ func TestBillTransferToDustCollector(t *testing.T) {
 		Counter:  3,
 	}
 	targetBill := &Bill{
-		ID:       money.NewBillID(nil, []byte{4}),
-		Counter:  5,
+		ID:      money.NewBillID(nil, []byte{4}),
+		Counter: 5,
 	}
 	tx, err := b.TransferToDustCollector(targetBill)
 	require.NoError(t, err)
@@ -102,7 +98,7 @@ func TestBillTransferToDustCollector(t *testing.T) {
 	require.Equal(t, tx.PayloadType(), money.PayloadTypeTransDC)
 	require.Equal(t, b.SystemID, tx.SystemID())
 	require.Equal(t, b.ID, tx.UnitID())
-	require.Nil(t, tx.OwnerProof)
+	require.Nil(t, tx.StateUnlock)
 	require.Nil(t, tx.FeeProof)
 
 	attr := &money.TransferDCAttributes{}
@@ -137,11 +133,11 @@ func TestBillSwapWithDustCollector(t *testing.T) {
 	proofs := []*Proof{
 		{
 			TxRecord: &types.TransactionRecord{TransactionOrder: tx1},
-			TxProof: &types.TxProof{},
+			TxProof:  &types.TxProof{},
 		},
 		{
 			TxRecord: &types.TransactionRecord{TransactionOrder: tx2},
-			TxProof: &types.TxProof{},
+			TxProof:  &types.TxProof{},
 		},
 	}
 	tx3, err := targetBill.SwapWithDustCollector(proofs)
@@ -150,12 +146,12 @@ func TestBillSwapWithDustCollector(t *testing.T) {
 	require.Equal(t, tx3.PayloadType(), money.PayloadTypeSwapDC)
 	require.Equal(t, targetBill.SystemID, tx3.SystemID())
 	require.Equal(t, targetBill.ID, tx3.UnitID())
-	require.Nil(t, tx3.OwnerProof)
+	require.Nil(t, tx3.AuthProof)
 	require.Nil(t, tx3.FeeProof)
 
 	attr := &money.SwapDCAttributes{}
 	require.NoError(t, tx3.UnmarshalAttributes(attr))
-	require.Equal(t, db1.Value + db2.Value, attr.TargetValue)
+	require.Equal(t, db1.Value+db2.Value, attr.TargetValue)
 	require.Len(t, attr.DcTransfers, 2)
 	require.Len(t, attr.DcTransferProofs, 2)
 }
@@ -201,7 +197,7 @@ func TestBillReclaimFromFeeCredit(t *testing.T) {
 	}
 	closeFCProof := &Proof{
 		TxRecord: &types.TransactionRecord{},
-		TxProof: &types.TxProof{},
+		TxProof:  &types.TxProof{},
 	}
 	tx, err := b.ReclaimFromFeeCredit(closeFCProof)
 	require.NoError(t, err)

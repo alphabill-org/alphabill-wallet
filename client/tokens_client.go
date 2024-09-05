@@ -355,8 +355,8 @@ func (c *tokensPartitionClient) getFungibleTokenType(ctx context.Context, typeID
 		Name:                     ftType.Data.Name,
 		Icon:                     ftType.Data.Icon,
 		SubTypeCreationPredicate: ftType.Data.SubTypeCreationPredicate,
-		TokenCreationPredicate:   ftType.Data.TokenCreationPredicate,
-		InvariantPredicate:       ftType.Data.InvariantPredicate,
+		TokenMintingPredicate:    ftType.Data.TokenMintingPredicate,
+		TokenTypeOwnerPredicate:  ftType.Data.TokenTypeOwnerPredicate,
 		DecimalPlaces:            ftType.Data.DecimalPlaces,
 	}, nil
 }
@@ -380,8 +380,8 @@ func (c *tokensPartitionClient) getNonFungibleTokenType(ctx context.Context, typ
 		Name:                     nftType.Data.Name,
 		Icon:                     nftType.Data.Icon,
 		SubTypeCreationPredicate: nftType.Data.SubTypeCreationPredicate,
-		TokenCreationPredicate:   nftType.Data.TokenCreationPredicate,
-		InvariantPredicate:       nftType.Data.InvariantPredicate,
+		TokenMintingPredicate:    nftType.Data.TokenMintingPredicate,
+		TokenTypeOwnerPredicate:  nftType.Data.TokenTypeOwnerPredicate,
 		DataUpdatePredicate:      nftType.Data.DataUpdatePredicate,
 	}, nil
 }

@@ -22,15 +22,14 @@ type MockClient struct {
 func createTxOrder() *types.TransactionOrder {
 	return &types.TransactionOrder{
 		Payload: &types.Payload{
-			SystemID:       3,
-			UnitID:         []byte{0, 0, 0, 1},
-			Type:           "test",
-			Attributes:     []byte{0, 0, 0, 0, 0, 0, 0},
+			SystemID:   3,
+			UnitID:     []byte{0, 0, 0, 1},
+			Type:       "test",
+			Attributes: []byte{0, 0, 0, 0, 0, 0, 0},
 			ClientMetadata: &types.ClientMetadata{
 				Timeout: 3,
 			},
 		},
-		OwnerProof: []byte{0, 0, 0, 2},
 	}
 }
 
