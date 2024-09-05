@@ -156,7 +156,7 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	}
 	fcr, err := moneyClient.GetFeeCreditRecordByOwnerID(cmd.Context(), accountKey.PubKeyHash.Sha256)
 	if err != nil {
-		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
+		return fmt.Errorf("failed to fetch fee credit record: %w", err)
 	}
 	if fcr == nil || fcr.Balance < maxFee {
 		return errors.New("not enough fee credit in wallet")
@@ -164,6 +164,9 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	bill, err := moneyClient.GetBill(cmd.Context(), types.UnitID(config.BillID))
 	if err != nil {
 		return fmt.Errorf("failed to fetch bill: %w", err)
+	}
+	if bill == nil {
+		return fmt.Errorf("bill not found")
 	}
 	if bill.LockStatus != 0 {
 		return errors.New("bill is already locked")
@@ -239,7 +242,7 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 
 	fcr, err := moneyClient.GetFeeCreditRecordByOwnerID(cmd.Context(), accountKey.PubKeyHash.Sha256)
 	if err != nil {
-		return fmt.Errorf("failed to fetch fee credit bill: %w", err)
+		return fmt.Errorf("failed to fetch fee credit record: %w", err)
 	}
 	if fcr == nil || fcr.Balance < maxFee {
 		return errors.New("not enough fee credit in wallet")
@@ -248,6 +251,9 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	bill, err := moneyClient.GetBill(cmd.Context(), types.UnitID(config.BillID))
 	if err != nil {
 		return fmt.Errorf("failed to fetch bill: %w", err)
+	}
+	if bill == nil {
+		return fmt.Errorf("bill not found")
 	}
 	if bill.LockStatus == 0 {
 		return errors.New("bill is already unlocked")
