@@ -498,6 +498,9 @@ func (w *Wallet) GetFungibleToken(ctx context.Context, tokenID sdktypes.TokenID)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching token %s: %w", tokenID, err)
 	}
+	if token == nil {
+		return nil, fmt.Errorf("token not found: %s", tokenID)
+	}
 	return token, nil
 }
 
@@ -505,6 +508,9 @@ func (w *Wallet) GetNonFungibleToken(ctx context.Context, tokenID sdktypes.Token
 	token, err := w.tokensClient.GetNonFungibleToken(ctx, tokenID)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching token %s: %w", tokenID, err)
+	}
+	if token == nil {
+		return nil, fmt.Errorf("token not found: %s", tokenID)
 	}
 	return token, nil
 }
@@ -652,9 +658,6 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 	t, err := w.GetNonFungibleToken(ctx, tokenID)
 	if err != nil {
 		return nil, err
-	}
-	if t == nil {
-		return nil, fmt.Errorf("token with id=%s not found under account #%v", tokenID, accountNumber)
 	}
 	if t.GetLockStatus() != 0 {
 		return nil, errors.New("token is locked")
