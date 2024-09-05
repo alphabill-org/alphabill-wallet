@@ -45,6 +45,26 @@ func Test_GetRoundNumber_OK(t *testing.T) {
 	require.EqualValues(t, 42, roundNumber)
 }
 
+func TestGetToken_NotFound(t *testing.T) {
+	rpcClient := &mockTokensPartitionClient{
+		getFungibleToken: func(ctx context.Context, id sdktypes.TokenID) (*sdktypes.FungibleToken, error) {
+			return nil, nil
+		},
+		getNonFungibleToken: func(ctx context.Context, id sdktypes.TokenID) (*sdktypes.NonFungibleToken, error) {
+			return nil, nil
+		},
+	}
+
+	tw := initTestWallet(t, rpcClient)
+
+	ft, err := tw.GetFungibleToken(context.Background(), []byte{1})
+	require.ErrorContains(t, err, "token not found:")
+	require.Nil(t, ft)
+	nft, err := tw.GetNonFungibleToken(context.Background(), []byte{2})
+	require.ErrorContains(t, err, "token not found:")
+	require.Nil(t, nft)
+}
+
 func Test_ListTokenTypes(t *testing.T) {
 	var firstPubKey *sdktypes.PubKey
 	rpcClient := &mockTokensPartitionClient{
