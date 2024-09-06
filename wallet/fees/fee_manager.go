@@ -9,10 +9,10 @@ import (
 	"sort"
 	"time"
 
+	abcrypto "github.com/alphabill-org/alphabill-go-base/crypto"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/types"
-
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
@@ -323,9 +323,17 @@ func (w *FeeManager) LockFeeCredit(ctx context.Context, cmd LockFeeCreditCmd) (*
 	tx, err := fcr.Lock(cmd.LockStatus,
 		sdktypes.WithTimeout(timeout),
 		sdktypes.WithMaxFee(w.maxFee),
-		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create lockFC transaction: %w", err)
+	}
+	ownerProof, err := sdktypes.NewP2pkhSignatureFromKey(tx, accountKey.PrivKey)
+	if err != nil {
+		return nil, err
+	}
+	err = tx.SetAuthProof(fc.LockFeeCreditAuthProof{OwnerProof: ownerProof})
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign tx auth proof: %w", err)
 	}
 
 	proof, err := w.targetPartitionClient.ConfirmTransaction(ctx, tx, w.log)
@@ -359,10 +367,19 @@ func (w *FeeManager) UnlockFeeCredit(ctx context.Context, cmd UnlockFeeCreditCmd
 	tx, err := fcr.Unlock(
 		sdktypes.WithTimeout(timeout),
 		sdktypes.WithMaxFee(w.maxFee),
-		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create unlockFC transaction: %w", err)
 	}
+	ownerProof, err := sdktypes.NewP2pkhSignatureFromKey(tx, accountKey.PrivKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create owner predicate signature: %w", err)
+	}
+	err = tx.SetAuthProof(fc.UnlockFeeCreditAuthProof{OwnerProof: ownerProof})
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign tx auth proof: %w", err)
+	}
+
 	proof, err := w.targetPartitionClient.ConfirmTransaction(ctx, tx, w.log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send unlockFC transaction: %w", err)
@@ -519,9 +536,17 @@ func (w *FeeManager) sendLockFCTx(ctx context.Context, accountKey *account.Accou
 	tx, err := fcr.Lock(wallet.LockReasonAddFees,
 		sdktypes.WithTimeout(targetPartitionTimeout),
 		sdktypes.WithMaxFee(w.maxFee),
-		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create lockFC transaction: %w", err)
+	}
+	ownerProof, err := sdktypes.NewP2pkhSignatureFromKey(tx, accountKey.PrivKey)
+	if err != nil {
+		return fmt.Errorf("failed to create owner predicate signature: %w", err)
+	}
+	err = tx.SetAuthProof(fc.LockFeeCreditAuthProof{OwnerProof: ownerProof})
+	if err != nil {
+		return fmt.Errorf("failed to sign tx auth proof: %w", err)
 	}
 
 	// store lockFC write-ahead log
@@ -621,9 +646,17 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 	tx, err := sourceBill.TransferToFeeCredit(fcr, feeCtx.TargetAmount, latestAdditionTime,
 		sdktypes.WithTimeout(moneyTimeout),
 		sdktypes.WithMaxFee(w.maxFee),
-		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create transferFC transaction: %w", err)
+	}
+	ownerProof, err := sdktypes.NewP2pkhSignatureFromKey(tx, accountKey.PrivKey)
+	if err != nil {
+		return fmt.Errorf("failed to create owner predicate signature: %w", err)
+	}
+	err = tx.SetAuthProof(fc.TransferFeeCreditAuthProof{OwnerProof: ownerProof})
+	if err != nil {
+		return fmt.Errorf("failed to sign tx auth proof: %w", err)
 	}
 
 	// store transferFC transaction write-ahead log
@@ -702,13 +735,21 @@ func (w *FeeManager) sendAddFCTx(ctx context.Context, accountKey *account.Accoun
 		SystemID: feeCtx.TargetPartitionID,
 		ID:       feeCtx.FeeCreditRecordID,
 	}
-	ownerPredicate := templates.NewP2pkh256BytesFromKeyHash(accountKey.PubKeyHash.Sha256)
+	ownerPredicate := templates.NewP2pkh256FeeAuthBytesFromKeyHash(accountKey.PubKeyHash.Sha256)
 	addFCTx, err := fcr.AddFeeCredit(ownerPredicate, feeCtx.TransferFCProof,
 		sdktypes.WithTimeout(timeout),
 		sdktypes.WithMaxFee(w.maxFee),
-		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create addFC transaction: %w", err)
+	}
+	ownerProof, err := sdktypes.NewP2pkhSignatureFromKey(addFCTx, accountKey.PrivKey)
+	if err != nil {
+		return fmt.Errorf("failed to create owner predicate signature: %w", err)
+	}
+	err = addFCTx.SetAuthProof(fc.AddFeeCreditAuthProof{OwnerProof: ownerProof})
+	if err != nil {
+		return fmt.Errorf("failed to sign tx auth proof: %w", err)
 	}
 
 	// store addFC write-ahead log
@@ -852,9 +893,16 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 		sdktypes.WithTimeout(timeout),
 		sdktypes.WithMaxFee(w.maxFee),
 		sdktypes.WithFeeCreditRecordID(moneyFCR.ID),
-		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create lock transaction: %w", err)
+	}
+	txSigner, err := sdktypes.NewMoneyTxSignerFromKey(accountKey.PrivKey)
+	if err != nil {
+		return fmt.Errorf("failed to money tx signer: %w", err)
+	}
+	if err = txSigner.SignTx(tx); err != nil {
+		return fmt.Errorf("failed to sign tx: %w", err)
 	}
 
 	// store lock transaction write-ahead log
@@ -920,9 +968,19 @@ func (w *FeeManager) sendCloseFCTx(ctx context.Context, accountKey *account.Acco
 	tx, err := fcr.CloseFeeCredit(feeCtx.TargetBillID, feeCtx.TargetBillCounter,
 		sdktypes.WithTimeout(targetPartitionTimeout),
 		sdktypes.WithMaxFee(w.maxFee),
-		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create closeFC transaction: %w", err)
+	}
+
+	// sign closeFC transaction
+	ownerProof, err := sdktypes.NewP2pkhSignatureFromKey(tx, accountKey.PrivKey)
+	if err != nil {
+		return fmt.Errorf("failed to create owner predicate signature: %w", err)
+	}
+	err = tx.SetAuthProof(fc.CloseFeeCreditAuthProof{OwnerProof: ownerProof})
+	if err != nil {
+		return fmt.Errorf("failed to sign tx auth proof: %w", err)
 	}
 
 	// store closeFC write-ahead log
@@ -1001,9 +1059,17 @@ func (w *FeeManager) sendReclaimFCTx(ctx context.Context, accountKey *account.Ac
 	reclaimFC, err := targetBill.ReclaimFromFeeCredit(feeCtx.CloseFCProof,
 		sdktypes.WithTimeout(moneyTimeout),
 		sdktypes.WithMaxFee(w.maxFee),
-		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create reclaimFC transaction: %w", err)
+	}
+	ownerProof, err := sdktypes.NewP2pkhSignatureFromKey(reclaimFC, accountKey.PrivKey)
+	if err != nil {
+		return fmt.Errorf("failed to create owner predicate signature: %w", err)
+	}
+	err = reclaimFC.SetAuthProof(fc.ReclaimFeeCreditAuthProof{OwnerProof: ownerProof})
+	if err != nil {
+		return fmt.Errorf("failed to sign tx auth proof: %w", err)
 	}
 
 	// store reclaimFC write-ahead log
@@ -1086,10 +1152,27 @@ func (w *FeeManager) unlockFeeCreditRecord(ctx context.Context, accountKey *acco
 	tx, err := fcr.Unlock(
 		sdktypes.WithTimeout(timeout),
 		sdktypes.WithMaxFee(w.maxFee),
-		sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create unlockFC transaction: %w", err)
 	}
+	signer, err := abcrypto.NewInMemorySecp256K1SignerFromKey(accountKey.PrivKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create tx signer: %w", err)
+	}
+	ownerProof, err := sdktypes.NewP2pkhSignature(tx, signer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create owner predicate signature: %w", err)
+	}
+	err = tx.SetAuthProof(fc.UnlockFeeCreditAuthProof{OwnerProof: ownerProof})
+	if err != nil {
+		return nil, fmt.Errorf("failed to set auth proof: %w", err)
+	}
+	tx.FeeProof, err = sdktypes.NewP2pkhFeeSignature(tx, signer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
+	}
+
 	proof, err := w.targetPartitionClient.ConfirmTransaction(ctx, tx, w.log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send unlockFC tx: %w", err)
@@ -1117,10 +1200,18 @@ func (w *FeeManager) unlockBill(ctx context.Context, accountKey *account.Account
 			sdktypes.WithTimeout(timeout),
 			sdktypes.WithFeeCreditRecordID(fcr.ID),
 			sdktypes.WithMaxFee(w.maxFee),
-			sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(accountKey.PrivKey, accountKey.PubKey)))
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create unlock tx: %w", err)
 		}
+		txSigner, err := sdktypes.NewMoneyTxSignerFromKey(accountKey.PrivKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to money tx signer: %w", err)
+		}
+		if err = txSigner.SignTx(unlockTx); err != nil {
+			return nil, fmt.Errorf("failed to sign tx: %w", err)
+		}
+
 		proof, err := w.moneyClient.ConfirmTransaction(ctx, unlockTx, w.log)
 		if err != nil {
 			return nil, fmt.Errorf("failed to send unlock tx: %w", err)

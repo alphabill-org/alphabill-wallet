@@ -2,10 +2,12 @@ package tokens
 
 import (
 	"context"
+	"fmt"
 	"sort"
 
 	"github.com/alphabill-org/alphabill-go-base/hash"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
@@ -15,7 +17,7 @@ const (
 	txTimeoutRoundCount = 10
 )
 
-func bearerPredicateFromHash(receiverPubKeyHash []byte) sdktypes.Predicate {
+func ownerPredicateFromHash(receiverPubKeyHash []byte) sdktypes.Predicate {
 	var bytes []byte
 	if receiverPubKeyHash != nil {
 		bytes = templates.NewP2pkh256BytesFromKeyHash(receiverPubKeyHash)
@@ -25,16 +27,16 @@ func bearerPredicateFromHash(receiverPubKeyHash []byte) sdktypes.Predicate {
 	return bytes
 }
 
-func BearerPredicateFromPubKey(receiverPubKey sdktypes.PubKey) sdktypes.Predicate {
+func OwnerPredicateFromPubKey(receiverPubKey sdktypes.PubKey) sdktypes.Predicate {
 	var h []byte
 	if receiverPubKey != nil {
 		h = hash.Sum256(receiverPubKey)
 	}
-	return bearerPredicateFromHash(h)
+	return ownerPredicateFromHash(h)
 }
 
 // assumes there's sufficient balance for the given amount, sends transactions immediately
-func (w *Wallet) doSendMultiple(ctx context.Context, amount uint64, tokens []*sdktypes.FungibleToken, acc *accountKey, fcrID, receiverPubKey []byte, invariantPredicateArgs []*PredicateInput, ownerProof *PredicateInput) (*SubmissionResult, error) {
+func (w *Wallet) doSendMultiple(ctx context.Context, amount uint64, tokens []*sdktypes.FungibleToken, acc *accountKey, fcrID, receiverPubKey []byte, ownerProof *PredicateInput, typeOwnerPredicateInputs []*PredicateInput) (*SubmissionResult, error) {
 	var accumulatedSum uint64
 	sort.Slice(tokens, func(i, j int) bool {
 		return tokens[i].Amount > tokens[j].Amount
@@ -48,7 +50,7 @@ func (w *Wallet) doSendMultiple(ctx context.Context, amount uint64, tokens []*sd
 
 	for _, t := range tokens {
 		remainingAmount := amount - accumulatedSum
-		sub, err := w.prepareSplitOrTransferTx(ctx, acc, remainingAmount, t, fcrID, receiverPubKey, invariantPredicateArgs, roundNumber+txTimeoutRoundCount, ownerProof)
+		sub, err := w.prepareSplitOrTransferTx(acc, remainingAmount, t, fcrID, receiverPubKey, roundNumber+txTimeoutRoundCount, ownerProof, typeOwnerPredicateInputs)
 		if err != nil {
 			return nil, err
 		}
@@ -68,30 +70,73 @@ func (w *Wallet) doSendMultiple(ctx context.Context, amount uint64, tokens []*sd
 	return &SubmissionResult{Submissions: batch.Submissions(), FeeSum: feeSum, AccountNumber: acc.AccountNumber()}, err
 }
 
-func (w *Wallet) prepareSplitOrTransferTx(ctx context.Context, acc *accountKey, amount uint64, ft *sdktypes.FungibleToken, fcrID, receiverPubKey []byte, invariantPredicateArgs []*PredicateInput, timeout uint64, ownerProof *PredicateInput) (*txsubmitter.TxSubmission, error) {
+func (w *Wallet) prepareSplitOrTransferTx(acc *accountKey, amount uint64, ft *sdktypes.FungibleToken, fcrID, receiverPubKey []byte, timeout uint64, ownerPredicateInput *PredicateInput, typeOwnerPredicateInputs []*PredicateInput) (*txsubmitter.TxSubmission, error) {
 	if amount >= ft.Amount {
-		tx, err := ft.Transfer(BearerPredicateFromPubKey(receiverPubKey),
+		tx, err := ft.Transfer(OwnerPredicateFromPubKey(receiverPubKey),
 			sdktypes.WithTimeout(timeout),
 			sdktypes.WithFeeCreditRecordID(fcrID),
 			sdktypes.WithMaxFee(w.maxFee),
-			sdktypes.WithOwnerProof(newProofGenerator(ownerProof)),
-			sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
-			sdktypes.WithExtraProofs(newProofGenerators(invariantPredicateArgs)))
+		)
 		if err != nil {
 			return nil, err
 		}
-		return 	txsubmitter.New(tx), nil
+
+		payloadBytes, err := tx.PayloadBytes()
+		if err != nil {
+			return nil, err
+		}
+		typeOwnerProofs, err := newProofs(payloadBytes, typeOwnerPredicateInputs)
+		if err != nil {
+			return nil, err
+		}
+		ownerProof, err := ownerPredicateInput.Proof(payloadBytes)
+		if err != nil {
+			return nil, err
+		}
+		err = tx.SetAuthProof(tokens.TransferFungibleTokenAuthProof{
+			OwnerProof:           ownerProof,
+			TokenTypeOwnerProofs: typeOwnerProofs,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to set auth proof: %w", err)
+		}
+		tx.FeeProof, err = sdktypes.NewP2pkhFeeSignatureFromKey(tx, acc.PrivKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
+		}
+		return txsubmitter.New(tx), nil
 	} else {
-		tx, err := ft.Split(amount, BearerPredicateFromPubKey(receiverPubKey),
+		tx, err := ft.Split(amount, OwnerPredicateFromPubKey(receiverPubKey),
 			sdktypes.WithTimeout(timeout),
 			sdktypes.WithFeeCreditRecordID(fcrID),
 			sdktypes.WithMaxFee(w.maxFee),
-			sdktypes.WithOwnerProof(newProofGenerator(ownerProof)),
-			sdktypes.WithFeeProof(newProofGenerator(defaultProof(acc.AccountKey))),
-			sdktypes.WithExtraProofs(newProofGenerators(invariantPredicateArgs)))
+		)
 		if err != nil {
 			return nil, err
 		}
-		return 	txsubmitter.New(tx), nil
+		payloadBytes, err := tx.PayloadBytes()
+		if err != nil {
+			return nil, err
+		}
+		typeOwnerProofs, err := newProofs(payloadBytes, typeOwnerPredicateInputs)
+		if err != nil {
+			return nil, err
+		}
+		ownerProof, err := ownerPredicateInput.Proof(payloadBytes)
+		if err != nil {
+			return nil, err
+		}
+		err = tx.SetAuthProof(tokens.SplitFungibleTokenAuthProof{
+			OwnerProof:           ownerProof,
+			TokenTypeOwnerProofs: typeOwnerProofs,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to set auth proof: %w", err)
+		}
+		tx.FeeProof, err = sdktypes.NewP2pkhFeeSignatureFromKey(tx, acc.PrivKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
+		}
+		return txsubmitter.New(tx), nil
 	}
 }

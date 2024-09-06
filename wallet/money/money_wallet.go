@@ -77,7 +77,8 @@ func NewWallet(am account.Manager, feeManagerDB fees.FeeManagerDB, moneyClient s
 	feeManager := fees.NewFeeManager(am, feeManagerDB,
 		moneySystemID, moneyClient, money.NewFeeCreditRecordIDFromPublicKey,
 		moneySystemID, moneyClient, money.NewFeeCreditRecordIDFromPublicKey,
-		maxFee,	log)
+		maxFee, log,
+	)
 	dustCollector := dc.NewDustCollector(moneySystemID, maxBillsForDustCollection, txTimeoutBlockCount, moneyClient, maxFee, log)
 	return &Wallet{
 		am:            am,
@@ -199,6 +200,11 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*sdktypes.Proof, erro
 	timeout := roundNumber + txTimeoutBlockCount
 	batch := txsubmitter.NewBatch(w.moneyClient, w.log)
 
+	txSigner, err := sdktypes.NewMoneyTxSignerFromKey(k.PrivKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create money tx signer: %w", err)
+	}
+
 	var txs []*types.TransactionOrder
 	if len(cmd.Receivers) > 1 {
 		// if more than one receiver then perform transaction as N-way split and require sufficiently large bill
@@ -220,7 +226,7 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*sdktypes.Proof, erro
 		for _, r := range cmd.Receivers {
 			targetUnits = append(targetUnits, &money.TargetUnit{
 				Amount:         r.Amount,
-				OwnerCondition: templates.NewP2pkh256BytesFromKeyHash(hash.Sum256(r.PubKey)),
+				OwnerPredicate: templates.NewP2pkh256BytesFromKeyHash(hash.Sum256(r.PubKey)),
 			})
 		}
 		tx, err := largestBill.Split(targetUnits,
@@ -228,14 +234,17 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*sdktypes.Proof, erro
 			sdktypes.WithFeeCreditRecordID(fcr.ID),
 			sdktypes.WithMaxFee(cmd.MaxFee),
 			sdktypes.WithReferenceNumber(cmd.ReferenceNumber),
-			sdktypes.WithOwnerProof(sdktypes.NewP2pkhProofGenerator(k.PrivKey, k.PubKey)))
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create N-way split tx: %w", err)
+		}
+		if err = txSigner.SignTx(tx); err != nil {
+			return nil, fmt.Errorf("failed to sign tx: %w", err)
 		}
 		txs = append(txs, tx)
 	} else {
 		// if single receiver then perform up to N transfers (until target amount is reached)
-		txs, err = txbuilder.CreateTransactions(cmd.Receivers[0].PubKey, cmd.Receivers[0].Amount, w.SystemID(), bills, k, timeout, fcr.ID, cmd.ReferenceNumber, cmd.MaxFee)
+		txs, err = txbuilder.CreateTransactions(cmd.Receivers[0].PubKey, cmd.Receivers[0].Amount, bills, txSigner, timeout, fcr.ID, cmd.ReferenceNumber, cmd.MaxFee)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create transactions: %w", err)
 		}

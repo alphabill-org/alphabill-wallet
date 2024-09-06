@@ -79,7 +79,7 @@ func TestParsePredicateArgument(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
-			argument, err := parsePredicateArgument(tt.input, 1, mock)
+			argument, err := ParsePredicateArgument(tt.input, 1, mock)
 			if tt.err != "" {
 				require.ErrorContains(t, err, tt.err)
 			} else {
@@ -101,13 +101,13 @@ func Test_parsePredicateArgument_file(t *testing.T) {
 
 	t.Run("empty argument", func(t *testing.T) {
 		// provide file prefix but no name - this resolves to current working DIR!
-		buf, err := parsePredicateArgument(filePrefix, 0, nil)
+		buf, err := ParsePredicateArgument(filePrefix, 0, nil)
 		require.ErrorIs(t, err, syscall.EISDIR)
 		require.Empty(t, buf)
 	})
 
 	t.Run("nonexisting file", func(t *testing.T) {
-		buf, err := parsePredicateArgument(filePrefix+filepath.Join(tmpDir, "doesnt.exist"), 0, nil)
+		buf, err := ParsePredicateArgument(filePrefix+filepath.Join(tmpDir, "doesnt.exist"), 0, nil)
 		require.ErrorIs(t, err, fs.ErrNotExist)
 		require.Empty(t, buf)
 	})
@@ -120,7 +120,7 @@ func Test_parsePredicateArgument_file(t *testing.T) {
 		filename := filepath.Join(tmpDir, "predicate.cbor")
 		require.NoError(t, os.WriteFile(filename, data, 0666))
 
-		buf, err := parsePredicateArgument(filePrefix+filename, 0, nil)
+		buf, err := ParsePredicateArgument(filePrefix+filename, 0, nil)
 		require.NoError(t, err)
 		require.Equal(t, &PredicateInput{Argument: data}, buf)
 	})
