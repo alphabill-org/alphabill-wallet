@@ -310,10 +310,7 @@ func (w *FeeManager) LockFeeCredit(ctx context.Context, cmd LockFeeCreditCmd) (*
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch fee credit record: %w", err)
 	}
-	if fcr == nil {
-		return nil, errors.New("fee credit record does not exist")
-	}
-	if fcr.Balance < 2*w.maxFee {
+	if fcr == nil || fcr.Balance < 2*w.maxFee {
 		return nil, errors.New("not enough fee credit in wallet")
 	}
 	if fcr.LockStatus != 0 {
@@ -349,8 +346,8 @@ func (w *FeeManager) UnlockFeeCredit(ctx context.Context, cmd UnlockFeeCreditCmd
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch fee credit record: %w", err)
 	}
-	if fcr == nil || fcr.Balance == 0 {
-		return nil, errors.New("no fee credit in wallet")
+	if fcr == nil || fcr.Balance < w.maxFee {
+		return nil, errors.New("not enough fee credit in wallet")
 	}
 	if fcr.LockStatus == 0 {
 		return nil, fmt.Errorf("fee credit record is already unlocked")
@@ -837,7 +834,7 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 	}
 	// do not lock target bill if there's not enough fee credit on money partition
 	if moneyFCR == nil || moneyFCR.Balance == 0 {
-		w.log.Info("skipping lock transaction, not enough fee credit in money partition")
+		w.log.Info("skipping lock transaction, money partition fee credit record does not exist or has zero value")
 		return nil
 	}
 

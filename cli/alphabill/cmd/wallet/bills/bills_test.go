@@ -3,6 +3,7 @@ package bills
 import (
 	"testing"
 
+	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
 
@@ -122,13 +123,21 @@ func TestWalletBillsListCmd_ShowLockedBills(t *testing.T) {
 }
 
 func TestWalletBillsLockUnlockCmd_Nok(t *testing.T) {
+	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic(), testutils.WithNumberOfAccounts(2))
+
 	rpcUrl := mocksrv.StartServer(t, map[string]interface{}{
-		"state": mocksrv.NewStateServiceMock(),
+		"state": mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(&types.Unit[any]{
+			UnitID: money.NewFeeCreditRecordID(nil, []byte{1}),
+			OwnerPredicate: testutils.TestPubKey0Hash(t),
+			Data: fc.FeeCreditRecord{Balance: 100}})),
 		"admin": mocksrv.NewAdminServiceMock(),
 	})
-	homedir := testutils.CreateNewTestWallet(t)
+
 	billsCmd := testutils.NewSubCmdExecutor(NewBillsCmd, "--rpc-url", rpcUrl).WithHome(homedir)
 
-	billsCmd.ExecWithError(t, "not enough fee credit in wallet", "lock", "--bill-id", testutils.DefaultInitialBillID.String())
-	billsCmd.ExecWithError(t, "not enough fee credit in wallet", "unlock", "--bill-id", testutils.DefaultInitialBillID.String())
+	billsCmd.ExecWithError(t, "bill not found", "lock", "--bill-id", money.NewBillID(nil, []byte{1}).String())
+	billsCmd.ExecWithError(t, "bill not found", "unlock", "--bill-id", money.NewBillID(nil, []byte{1}).String())
+
+	billsCmd.ExecWithError(t, "not enough fee credit in wallet", "lock", "--key", "2", "--bill-id", testutils.DefaultInitialBillID.String())
+	billsCmd.ExecWithError(t, "not enough fee credit in wallet", "unlock", "--key", "2", "--bill-id", testutils.DefaultInitialBillID.String())
 }
