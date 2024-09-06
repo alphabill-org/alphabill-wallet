@@ -21,7 +21,7 @@ func TestFeeCreditRecordAddFeeCredit(t *testing.T) {
 	ownerPredicate := []byte{4}
 	transFCProof := &Proof{
 		TxRecord: &types.TransactionRecord{},
-		TxProof: &types.TxProof{},
+		TxProof:  &types.TxProof{},
 	}
 
 	tx, err := fcr.AddFeeCredit(ownerPredicate, transFCProof)
@@ -35,7 +35,7 @@ func TestFeeCreditRecordAddFeeCredit(t *testing.T) {
 	require.NoError(t, tx.UnmarshalAttributes(attr))
 	require.Equal(t, transFCProof.TxRecord, attr.FeeCreditTransfer)
 	require.Equal(t, transFCProof.TxProof, attr.FeeCreditTransferProof)
-	require.Equal(t, ownerPredicate, attr.FeeCreditOwnerCondition)
+	require.Equal(t, ownerPredicate, attr.FeeCreditOwnerPredicate)
 }
 
 func TestFeeCreditRecordCloseFeeCredit(t *testing.T) {
@@ -83,7 +83,7 @@ func TestFeeCreditRecordLock(t *testing.T) {
 	attr := &fc.LockFeeCreditAttributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))
 	require.Equal(t, lockStatus, attr.LockStatus)
-	require.Equal(t, *fcr.Counter, attr.Counter)	
+	require.Equal(t, *fcr.Counter, attr.Counter)
 }
 
 func TestFeeCreditRecordUnlock(t *testing.T) {
@@ -102,5 +102,5 @@ func TestFeeCreditRecordUnlock(t *testing.T) {
 
 	attr := &fc.UnlockFeeCreditAttributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))
-	require.Equal(t, *fcr.Counter, attr.Counter)	
+	require.Equal(t, *fcr.Counter, attr.Counter)
 }

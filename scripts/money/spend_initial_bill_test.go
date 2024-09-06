@@ -17,7 +17,7 @@ var (
 	unitID             = test.RandomBytes(33)
 	targetUnitID       = test.RandomBytes(33)
 	fcrID              = test.RandomBytes(33)
-	ownerCondition     = test.RandomBytes(33)
+	ownerPredicate     = test.RandomBytes(33)
 	counter            = uint64(0)
 	maxFee             = uint64(10)
 	billValue          = uint64(100)
@@ -31,14 +31,16 @@ func TestCreateTransferFC(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 	require.EqualValues(t, unitID, tx.Payload.UnitID)
+	require.NotNil(t, tx.AuthProof)
 }
 
 func TestCreateAddFC(t *testing.T) {
-	tx, err := createAddFC(unitID, ownerCondition, &types.TransactionRecord{}, &types.TxProof{}, timeout, maxFee)
+	tx, err := createAddFC(unitID, ownerPredicate, &types.TransactionRecord{}, &types.TxProof{}, timeout, maxFee)
 
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 	require.EqualValues(t, unitID, tx.Payload.UnitID)
+	require.NotNil(t, tx.AuthProof)
 }
 
 func TestCreateTransferTx(t *testing.T) {
@@ -47,17 +49,18 @@ func TestCreateTransferTx(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 	require.EqualValues(t, unitID, tx.Payload.UnitID)
+	require.NotNil(t, tx.AuthProof)
 }
 
 func TestExecBill_OK(t *testing.T) {
 	rpcClientMock := testutil.NewRpcClientMock()
-	require.NoError(t, execInitialBill(context.Background(), rpcClientMock, unitID, fcrID, billValue, latestAdditionTime, ownerCondition, counter))
+	require.NoError(t, execInitialBill(context.Background(), rpcClientMock, unitID, fcrID, billValue, latestAdditionTime, ownerPredicate, counter))
 }
 
 func TestExecBill_NOK(t *testing.T) {
 	rpcClientMock := testutil.NewRpcClientMock(
 		testutil.WithError(errors.New("some error")),
 	)
-	require.ErrorContains(t, execInitialBill(context.Background(), rpcClientMock, unitID, fcrID, billValue, latestAdditionTime, ownerCondition, counter), "some error")
+	require.ErrorContains(t, execInitialBill(context.Background(), rpcClientMock, unitID, fcrID, billValue, latestAdditionTime, ownerPredicate, counter), "some error")
 
 }
