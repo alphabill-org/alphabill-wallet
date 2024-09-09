@@ -179,10 +179,10 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*sdktypes.Proof, erro
 
 	fcr, err := w.moneyClient.GetFeeCreditRecordByOwnerID(ctx, k.PubKeyHash.Sha256)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch fee credit record: %w", err)
 	}
 	if fcr == nil {
-		return nil, errors.New("no fee credit in money wallet")
+		return nil, errors.New("fee credit record not found")
 	}
 
 	bills, err := w.getUnlockedBills(ctx, hash.Sum256(pubKey))

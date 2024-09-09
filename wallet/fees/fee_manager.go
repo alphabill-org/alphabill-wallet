@@ -308,12 +308,9 @@ func (w *FeeManager) LockFeeCredit(ctx context.Context, cmd LockFeeCreditCmd) (*
 	}
 	fcr, err := w.fetchTargetPartitionFCR(ctx, accountKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch fee credit: %w", err)
+		return nil, fmt.Errorf("failed to fetch fee credit record: %w", err)
 	}
-	if fcr == nil {
-		return nil, errors.New("fee credit record does not exist")
-	}
-	if fcr.Balance < 2*w.maxFee {
+	if fcr == nil || fcr.Balance < 2*w.maxFee {
 		return nil, errors.New("not enough fee credit in wallet")
 	}
 	if fcr.LockStatus != 0 {
@@ -355,10 +352,10 @@ func (w *FeeManager) UnlockFeeCredit(ctx context.Context, cmd UnlockFeeCreditCmd
 	}
 	fcr, err := w.fetchTargetPartitionFCR(ctx, accountKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch fee credit: %w", err)
+		return nil, fmt.Errorf("failed to fetch fee credit record: %w", err)
 	}
-	if fcr.Balance == 0 {
-		return nil, errors.New("no fee credit in wallet")
+	if fcr == nil || fcr.Balance < w.maxFee {
+		return nil, errors.New("not enough fee credit in wallet")
 	}
 	if fcr.LockStatus == 0 {
 		return nil, fmt.Errorf("fee credit record is already unlocked")
@@ -401,7 +398,7 @@ func (w *FeeManager) Close() {
 func (w *FeeManager) addFees(ctx context.Context, accountKey *account.AccountKey, cmd AddFeeCmd) (*AddFeeCmdResponse, error) {
 	fcr, err := w.fetchTargetPartitionFCR(ctx, accountKey)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch fee credit record: %w", err)
 	}
 	// verify fee credit record is not locked
 	if fcr != nil && fcr.LockStatus != 0 {
@@ -785,6 +782,9 @@ func (w *FeeManager) reclaimFees(ctx context.Context, accountKey *account.Accoun
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch fee credit record: %w", err)
 	}
+	if fcr == nil {
+		return nil, errors.New("fee credit record not found")
+	}
 	if fcr.LockStatus != 0 {
 		return nil, errors.New("fee credit record is locked")
 	}
@@ -875,7 +875,7 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 	}
 	// do not lock target bill if there's not enough fee credit on money partition
 	if moneyFCR == nil || moneyFCR.Balance == 0 {
-		w.log.Info("skipping lock transaction, not enough fee credit in money partition")
+		w.log.Info("skipping lock transaction, money partition fee credit record does not exist or has zero value")
 		return nil
 	}
 
@@ -953,6 +953,9 @@ func (w *FeeManager) sendCloseFCTx(ctx context.Context, accountKey *account.Acco
 	fcr, err := w.fetchTargetPartitionFCR(ctx, accountKey)
 	if err != nil {
 		return fmt.Errorf("failed to fetch fee credit record: %w", err)
+	}
+	if fcr == nil {
+		return errors.New("fee credit record not found")
 	}
 
 	// fetch target partition timeout
@@ -1188,7 +1191,7 @@ func (w *FeeManager) unlockBill(ctx context.Context, accountKey *account.Account
 		}
 		fcr, err := w.moneyClient.GetFeeCreditRecordByOwnerID(ctx, accountKey.PubKeyHash.Sha256)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch fee credit record")
+			return nil, fmt.Errorf("failed to fetch fee credit record: %w", err)
 		}
 		if fcr == nil {
 			return nil, fmt.Errorf("fee credit record not found")

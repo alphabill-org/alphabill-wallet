@@ -1229,7 +1229,7 @@ func TestLockFeeCredit(t *testing.T) {
 
 		// when fees are added
 		res, err := feeManager.LockFeeCredit(context.Background(), LockFeeCreditCmd{LockStatus: wallet.LockReasonManual})
-		require.ErrorContains(t, err, "fee credit record does not exist")
+		require.ErrorContains(t, err, "not enough fee credit in wallet")
 		require.Nil(t, res)
 	})
 
@@ -1257,7 +1257,7 @@ func TestUnlockFeeCredit(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		// locked fcb exists
 		moneyClient := testutil.NewRpcClientMock(
-			testutil.WithOwnerFeeCreditRecord(newMoneyFCR(accountKey, &fc.FeeCreditRecord{Balance: 1, Counter: 100, Locked: wallet.LockReasonManual})),
+			testutil.WithOwnerFeeCreditRecord(newMoneyFCR(accountKey, &fc.FeeCreditRecord{Balance: 3, Counter: 100, Locked: wallet.LockReasonManual})),
 		)
 		feeManager := newMoneyPartitionFeeManager(am, feeManagerDB, moneyClient, logger.New(t))
 
@@ -1271,7 +1271,7 @@ func TestUnlockFeeCredit(t *testing.T) {
 	t.Run("fcb already unlocked", func(t *testing.T) {
 		// mock fcb already unlocked
 		moneyClient := testutil.NewRpcClientMock(
-			testutil.WithOwnerFeeCreditRecord(newMoneyFCR(accountKey, &fc.FeeCreditRecord{Balance: 1, Counter: 100})),
+			testutil.WithOwnerFeeCreditRecord(newMoneyFCR(accountKey, &fc.FeeCreditRecord{Balance: 3, Counter: 100})),
 		)
 		feeManager := newMoneyPartitionFeeManager(am, feeManagerDB, moneyClient, logger.New(t))
 
@@ -1290,9 +1290,41 @@ func TestUnlockFeeCredit(t *testing.T) {
 
 		// when fees are added
 		res, err := feeManager.UnlockFeeCredit(context.Background(), UnlockFeeCreditCmd{})
-		require.ErrorContains(t, err, "no fee credit in wallet")
+		require.ErrorContains(t, err, "not enough fee credit in wallet")
 		require.Nil(t, res)
 	})
+}
+
+/*
+Wallet has a single bill but no fee credit record
+*/
+func TestNonExistingFeeCreditRecord(t *testing.T) {
+	// create fee manager
+	am := newAccountManager(t)
+	moneyClient := testutil.NewRpcClientMock(
+		testutil.WithOwnerBill(testutil.NewBill(100000000, 1)),
+	)
+	feeManagerDB := createFeeManagerDB(t)
+	feeManager := newMoneyPartitionFeeManager(am, feeManagerDB, moneyClient, logger.New(t))
+
+	res, err := feeManager.AddFeeCredit(context.Background(), AddFeeCmd{Amount: 100000000})
+	require.NoError(t, err)
+	require.NotNil(t, res)
+	require.Len(t, res.Proofs, 1)
+	proofs := res.Proofs[0]
+	// no lockFC because fcr does not exist
+	require.Nil(t, proofs.LockFC)
+	require.NotNil(t, proofs.TransferFC)
+	require.NotNil(t, proofs.AddFC)
+
+	_, err = feeManager.ReclaimFeeCredit(context.Background(), ReclaimFeeCmd{})
+	require.ErrorContains(t, err, "fee credit record not found")
+
+	_, err = feeManager.LockFeeCredit(context.Background(), LockFeeCreditCmd{})
+	require.ErrorContains(t, err, "not enough fee credit in wallet")
+
+	_, err = feeManager.UnlockFeeCredit(context.Background(), UnlockFeeCreditCmd{})
+	require.ErrorContains(t, err, "not enough fee credit in wallet")
 }
 
 func newMoneyPartitionFeeManager(am account.Manager, db FeeManagerDB, moneyClient sdktypes.MoneyPartitionClient, log *slog.Logger) *FeeManager {

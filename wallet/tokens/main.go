@@ -762,7 +762,7 @@ func (w *Wallet) ReclaimFeeCredit(ctx context.Context, cmd fees.ReclaimFeeCmd) (
 func (w *Wallet) ensureFeeCredit(ctx context.Context, accountKey *account.AccountKey, txCount int) ([]byte, error) {
 	fcr, err := w.tokensClient.GetFeeCreditRecordByOwnerID(ctx, accountKey.PubKeyHash.Sha256)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch fee credit bill: %w", err)
+		return nil, fmt.Errorf("failed to fetch fee credit record: %w", err)
 	}
 	if fcr == nil {
 		return nil, ErrNoFeeCredit
