@@ -30,6 +30,19 @@ func TestWalletSendFunction_Ok(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestWalletSendFunction_NoFCR(t *testing.T) {
+	w := createTestWallet(t, testutil.NewRpcClientMock(
+		testutil.WithOwnerBill(testutil.NewBill(50, 1)),
+	))
+	validPubKey := make([]byte, 33)
+	amount := uint64(50)
+	ctx := context.Background()
+
+	// test ok response
+	_, err := w.Send(ctx, SendCmd{Receivers: []ReceiverData{{PubKey: validPubKey, Amount: amount}}})
+	require.ErrorContains(t, err, "fee credit record not found")
+}
+
 func TestWalletSendFunction_InvalidPubKey(t *testing.T) {
 	w := createTestWallet(t, testutil.NewRpcClientMock())
 	invalidPubKey := make([]byte, 32)

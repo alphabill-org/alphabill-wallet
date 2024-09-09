@@ -76,7 +76,10 @@ func (w *DustCollector) runDustCollection(ctx context.Context, accountKey *accou
 	// fetch fee credit bill
 	fcr, err := w.moneyClient.GetFeeCreditRecordByOwnerID(ctx, accountKey.PubKeyHash.Sha256)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch fee credit bill: %w", err)
+		return nil, fmt.Errorf("failed to fetch fee credit record: %w", err)
+	}
+	if fcr == nil {
+		return nil, fmt.Errorf("fee credit record not found")
 	}
 
 	// use the largest bill as target
