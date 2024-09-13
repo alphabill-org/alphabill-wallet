@@ -178,10 +178,11 @@ func TestBlockProcessor_EachTxTypeCanBeProcessed(t *testing.T) {
 	// verify txHash
 	require.Equal(t, addFC.Hash(gocrypto.SHA256), fcb.TxHash)
 
-	// verify tx1 unit is deleted (whole bill transferred to fee credit)
+	// verify tx1 unit is not deleted (whole bill transferred to fee credit)
 	unit1, err := store.Do().GetBill(tx1.TransactionOrder.UnitID())
 	require.NoError(t, err)
-	require.Nil(t, unit1)
+	require.NotNil(t, unit1)
+	require.EqualValues(t, 0, unit1.Value)
 
 	// process closeFC + reclaimFC (reclaim all credits to bill no 4)
 	closeFCAttr := testutils.NewCloseFCAttr(
@@ -226,7 +227,8 @@ func TestBlockProcessor_EachTxTypeCanBeProcessed(t *testing.T) {
 	require.NoError(t, err)
 	require.EqualValues(t, 292, unit.Value)
 
-	// verify zero value bill is deleted at first block after blocknumber+DustBillDeletionTimeout
+	// verify zero value bill is NOT deleted at first block after blocknumber+DustBillDeletionTimeout
+	// (deleting of bills is currently not implemented on validator)
 	b = &types.Block{
 		UnicityCertificate: &types.UnicityCertificate{InputRecord: &types.InputRecord{RoundNumber: ExpiredBillDeletionTimeout + b.GetRoundNumber()}},
 		Transactions:       []*types.TransactionRecord{},
@@ -236,7 +238,8 @@ func TestBlockProcessor_EachTxTypeCanBeProcessed(t *testing.T) {
 
 	unit1, err = store.Do().GetBill(tx1.TransactionOrder.UnitID())
 	require.NoError(t, err)
-	require.Nil(t, unit1)
+	require.NotNil(t, unit1)
+	require.EqualValues(t, 0, unit1.Value)
 }
 
 // start state

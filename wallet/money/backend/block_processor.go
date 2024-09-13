@@ -247,20 +247,12 @@ func (p *BlockProcessor) processTx(txr *types.TransactionRecord, b *types.Block,
 		if err != nil {
 			return fmt.Errorf("failed to unmarshal transferFC attributes: %w", err)
 		}
-		if attr.Amount < bill.Value {
-			bill.Value -= attr.Amount
-			bill.TxHash = txHash
-			if err := dbTx.SetBill(bill, proof); err != nil {
-				return fmt.Errorf("failed to save transferFC bill with proof: %w", err)
-			}
-		} else {
-			if err := dbTx.StoreTxProof(txo.UnitID(), txHash, proof); err != nil {
-				return fmt.Errorf("failed to store tx proof zero value bill: %w", err)
-			}
-			if err := dbTx.RemoveBill(bill.Id); err != nil {
-				return fmt.Errorf("failed to remove zero value bill: %w", err)
-			}
+		bill.Value -= attr.Amount
+		bill.TxHash = txHash
+		if err := dbTx.SetBill(bill, proof); err != nil {
+			return fmt.Errorf("failed to save transferFC bill with proof: %w", err)
 		}
+
 		err = p.addTransferredCreditToPartitionFeeBill(dbTx, attr, proof, txr.ServerMetadata.ActualFee)
 		if err != nil {
 			return fmt.Errorf("failed to add transferred fee credit to partition fee bill: %w", err)
