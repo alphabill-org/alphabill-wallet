@@ -156,8 +156,7 @@ func (n *AlphabillNetwork) createGenesis(t *testing.T, ownerPredicate []byte) {
 				FileMode:          0o755,
 			},
 			{
-				HostFilePath: "./testdata/pdr-1.json",
-				//ContainerFilePath: "/home/nonroot/genesis/pdr-1.json",
+				HostFilePath:      "./testdata/pdr-1.json",
 				ContainerFilePath: "/home/nonroot/pdr-1.json",
 				FileMode:          0o444,
 			},
