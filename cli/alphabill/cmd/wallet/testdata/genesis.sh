@@ -2,20 +2,24 @@
 
 /app/alphabill money-genesis \
                --home /home/nonroot/genesis/money1 \
+               --partition-description /home/nonroot/pdr-1.json \
                --gen-keys \
                --dc-money-supply-value "10000" \
                --initial-bill-owner-predicate $1
 
 /app/alphabill tokens-genesis \
                --home /home/nonroot/genesis/tokens1 \
+               --partition-description /home/nonroot/pdr-2.json \
                --gen-keys
 
 /app/alphabill evm-genesis \
                --home /home/nonroot/genesis/evm1 \
+               --partition-description /home/nonroot/pdr-3.json \
                --gen-keys
 
 /app/alphabill orchestration-genesis \
                --home /home/nonroot/genesis/orchestration1 \
+               --partition-description /home/nonroot/pdr-4.json \
                --gen-keys \
                --owner-predicate $1
 
