@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	defaultDockerImage   = "ghcr.io/alphabill-org/alphabill:06fe93a726c6661c2e46cf3b0d415be16d40e544"
+	defaultDockerImage   = "ghcr.io/alphabill-org/alphabill:b115c4e0e9ffa9b65ad2a68b705a295755d82ad0"
 	containerGenesisPath = "/home/nonroot/genesis.tar"
 	containerP2pPort     = "8000"
 	containerRpcPort     = "8001"
@@ -149,11 +149,33 @@ func (n *AlphabillNetwork) createGenesis(t *testing.T, ownerPredicate []byte) {
 		LogConsumerCfg: &tc.LogConsumerConfig{
 			Consumers: []tc.LogConsumer{&StdoutLogConsumer{}},
 		},
-		Files: []tc.ContainerFile{{
-			HostFilePath:      "./testdata/genesis.sh",
-			ContainerFilePath: "/home/nonroot/genesis.sh",
-			FileMode:          0o755,
-		}},
+		Files: []tc.ContainerFile{
+			{
+				HostFilePath:      "./testdata/genesis.sh",
+				ContainerFilePath: "/home/nonroot/genesis.sh",
+				FileMode:          0o755,
+			},
+			{
+				HostFilePath:      "./testdata/pdr-1.json",
+				ContainerFilePath: "/home/nonroot/pdr-1.json",
+				FileMode:          0o444,
+			},
+			{
+				HostFilePath:      "./testdata/pdr-2.json",
+				ContainerFilePath: "/home/nonroot/pdr-2.json",
+				FileMode:          0o444,
+			},
+			{
+				HostFilePath:      "./testdata/pdr-3.json",
+				ContainerFilePath: "/home/nonroot/pdr-3.json",
+				FileMode:          0o444,
+			},
+			{
+				HostFilePath:      "./testdata/pdr-4.json",
+				ContainerFilePath: "/home/nonroot/pdr-4.json",
+				FileMode:          0o444,
+			},
+		},
 		Entrypoint: []string{"/home/nonroot/genesis.sh"},
 		Cmd: []string{
 			fmt.Sprintf("%X", ownerPredicate),
