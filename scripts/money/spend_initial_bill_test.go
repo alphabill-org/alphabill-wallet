@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/stretchr/testify/require"
 
@@ -26,7 +27,7 @@ var (
 )
 
 func TestCreateTransferFC(t *testing.T) {
-	tx, err := createTransferFC(maxFee, unitID, targetUnitID, 200, 0)
+	tx, err := createTransferFC(types.NetworkLocal, money.DefaultSystemID, maxFee, unitID, targetUnitID, 200, 0)
 
 	require.NoError(t, err)
 	require.NotNil(t, tx)
@@ -35,7 +36,7 @@ func TestCreateTransferFC(t *testing.T) {
 }
 
 func TestCreateAddFC(t *testing.T) {
-	tx, err := createAddFC(unitID, ownerPredicate, &types.TransactionRecord{}, &types.TxProof{}, timeout, maxFee)
+	tx, err := createAddFC(types.NetworkLocal, money.DefaultSystemID, unitID, ownerPredicate, &types.TxRecordProof{}, timeout, maxFee)
 
 	require.NoError(t, err)
 	require.NotNil(t, tx)
@@ -44,7 +45,7 @@ func TestCreateAddFC(t *testing.T) {
 }
 
 func TestCreateTransferTx(t *testing.T) {
-	tx, err := createTransferTx(pubKey, unitID, billValue, fcrID, timeout, counter)
+	tx, err := createTransferTx(types.NetworkLocal, money.DefaultSystemID, pubKey, unitID, billValue, fcrID, timeout, counter)
 
 	require.NoError(t, err)
 	require.NotNil(t, tx)
@@ -54,13 +55,13 @@ func TestCreateTransferTx(t *testing.T) {
 
 func TestExecBill_OK(t *testing.T) {
 	rpcClientMock := testutil.NewRpcClientMock()
-	require.NoError(t, execInitialBill(context.Background(), rpcClientMock, unitID, fcrID, billValue, latestAdditionTime, ownerPredicate, counter))
+	require.NoError(t, execInitialBill(context.Background(), rpcClientMock, types.NetworkLocal, money.DefaultSystemID, unitID, fcrID, billValue, latestAdditionTime, ownerPredicate, counter))
 }
 
 func TestExecBill_NOK(t *testing.T) {
 	rpcClientMock := testutil.NewRpcClientMock(
 		testutil.WithError(errors.New("some error")),
 	)
-	require.ErrorContains(t, execInitialBill(context.Background(), rpcClientMock, unitID, fcrID, billValue, latestAdditionTime, ownerPredicate, counter), "some error")
+	require.ErrorContains(t, execInitialBill(context.Background(), rpcClientMock, types.NetworkLocal, money.DefaultSystemID, unitID, fcrID, billValue, latestAdditionTime, ownerPredicate, counter), "some error")
 
 }

@@ -21,6 +21,7 @@ type (
 	}
 
 	Bill struct {
+		NetworkID  types.NetworkID
 		SystemID   types.SystemID
 		ID         types.UnitID
 		Value      uint64
@@ -36,11 +37,7 @@ func (b *Bill) Transfer(newOwnerPredicate []byte, txOptions ...Option) (*types.T
 		TargetValue:       b.Value,
 		Counter:           b.Counter,
 	}
-	txPayload, err := NewPayload(b.SystemID, b.ID, money.PayloadTypeTransfer, attr, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-	return NewTransactionOrder(txPayload), nil
+	return NewTransactionOrder(b.NetworkID, b.SystemID, b.ID, money.TransactionTypeTransfer, attr, txOptions...)
 }
 
 func (b *Bill) Split(targetUnits []*money.TargetUnit, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -52,12 +49,7 @@ func (b *Bill) Split(targetUnits []*money.TargetUnit, txOptions ...Option) (*typ
 		TargetUnits: targetUnits,
 		Counter:     b.Counter,
 	}
-	txPayload, err := NewPayload(b.SystemID, b.ID, money.PayloadTypeSplit, attr, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewTransactionOrder(txPayload), nil
+	return NewTransactionOrder(b.NetworkID, b.SystemID, b.ID, money.TransactionTypeSplit, attr, txOptions...)
 }
 
 func (b *Bill) TransferToDustCollector(targetBill *Bill, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -67,45 +59,23 @@ func (b *Bill) TransferToDustCollector(targetBill *Bill, txOptions ...Option) (*
 		Value:             b.Value,
 		Counter:           b.Counter,
 	}
-	txPayload, err := NewPayload(b.SystemID, b.ID, money.PayloadTypeTransDC, attr, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewTransactionOrder(txPayload), nil
+	return NewTransactionOrder(b.NetworkID, b.SystemID, b.ID, money.TransactionTypeTransDC, attr, txOptions...)
 }
 
-func (b *Bill) SwapWithDustCollector(transDCProofs []*Proof, txOptions ...Option) (*types.TransactionOrder, error) {
+func (b *Bill) SwapWithDustCollector(transDCProofs []*types.TxRecordProof, txOptions ...Option) (*types.TransactionOrder, error) {
 	if len(transDCProofs) == 0 {
 		return nil, errors.New("cannot create swap transaction as no dust transfer proofs exist")
 	}
 	// sort proofs by ids smallest first
 	sort.Slice(transDCProofs, func(i, j int) bool {
-		return bytes.Compare(transDCProofs[i].TxRecord.TransactionOrder.UnitID(), transDCProofs[j].TxRecord.TransactionOrder.UnitID()) < 0
+		return bytes.Compare(transDCProofs[i].TxRecord.TransactionOrder.GetUnitID(), transDCProofs[j].TxRecord.TransactionOrder.GetUnitID()) < 0
 	})
-	var dustTransferProofs []*types.TxProof
-	var dustTransferRecords []*types.TransactionRecord
-	var billValueSum uint64
-	for _, p := range transDCProofs {
-		dustTransferRecords = append(dustTransferRecords, p.TxRecord)
-		dustTransferProofs = append(dustTransferProofs, p.TxProof)
-		var attr *money.TransferDCAttributes
-		if err := p.TxRecord.TransactionOrder.UnmarshalAttributes(&attr); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal dust transfer tx: %w", err)
-		}
-		billValueSum += attr.Value
-	}
-	attr := &money.SwapDCAttributes{
-		DcTransfers:      dustTransferRecords,
-		DcTransferProofs: dustTransferProofs,
-		TargetValue:      billValueSum,
-	}
-	txPayload, err := NewPayload(b.SystemID, b.ID, money.PayloadTypeSwapDC, attr, txOptions...)
+	attr := &money.SwapDCAttributes{DustTransferProofs: transDCProofs}
+	txo, err := NewTransactionOrder(b.NetworkID, b.SystemID, b.ID, money.TransactionTypeSwapDC, attr, txOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build swap transaction: %w", err)
 	}
-
-	return NewTransactionOrder(txPayload), nil
+	return txo, nil
 }
 
 func (b *Bill) TransferToFeeCredit(fcr *FeeCreditRecord, amount uint64, latestAdditionTime uint64, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -117,26 +87,12 @@ func (b *Bill) TransferToFeeCredit(fcr *FeeCreditRecord, amount uint64, latestAd
 		TargetUnitCounter:      fcr.Counter,
 		Counter:                b.Counter,
 	}
-	txPayload, err := NewPayload(b.SystemID, b.ID, fc.PayloadTypeTransferFeeCredit, attr, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewTransactionOrder(txPayload), nil
+	return NewTransactionOrder(b.NetworkID, b.SystemID, b.ID, fc.TransactionTypeTransferFeeCredit, attr, txOptions...)
 }
 
-func (b *Bill) ReclaimFromFeeCredit(closeFCProof *Proof, txOptions ...Option) (*types.TransactionOrder, error) {
-	attr := &fc.ReclaimFeeCreditAttributes{
-		CloseFeeCreditTransfer: closeFCProof.TxRecord,
-		CloseFeeCreditProof:    closeFCProof.TxProof,
-		Counter:                b.Counter,
-	}
-	txPayload, err := NewPayload(b.SystemID, b.ID, fc.PayloadTypeReclaimFeeCredit, attr, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewTransactionOrder(txPayload), nil
+func (b *Bill) ReclaimFromFeeCredit(closeFCProof *types.TxRecordProof, txOptions ...Option) (*types.TransactionOrder, error) {
+	attr := &fc.ReclaimFeeCreditAttributes{CloseFeeCreditProof: closeFCProof}
+	return NewTransactionOrder(b.NetworkID, b.SystemID, b.ID, fc.TransactionTypeReclaimFeeCredit, attr, txOptions...)
 }
 
 func (b *Bill) Lock(lockStatus uint64, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -144,22 +100,12 @@ func (b *Bill) Lock(lockStatus uint64, txOptions ...Option) (*types.TransactionO
 		LockStatus: lockStatus,
 		Counter:    b.Counter,
 	}
-	txPayload, err := NewPayload(b.SystemID, b.ID, money.PayloadTypeLock, attr, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewTransactionOrder(txPayload), nil
+	return NewTransactionOrder(b.NetworkID, b.SystemID, b.ID, money.TransactionTypeLock, attr, txOptions...)
 }
 
 func (b *Bill) Unlock(txOptions ...Option) (*types.TransactionOrder, error) {
 	attr := &money.UnlockAttributes{
 		Counter: b.Counter,
 	}
-	txPayload, err := NewPayload(b.SystemID, b.ID, money.PayloadTypeUnlock, attr, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewTransactionOrder(txPayload), nil
+	return NewTransactionOrder(b.NetworkID, b.SystemID, b.ID, money.TransactionTypeUnlock, attr, txOptions...)
 }

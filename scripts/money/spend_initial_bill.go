@@ -35,6 +35,8 @@ func main() {
 	timeout := flag.Uint64("timeout", 0, "transaction timeout (block number)")
 	counter := flag.Uint64("counter", 0, "bill counter")
 	rpcServerAddr := flag.String("rpc-server-address", "", "money rpc node url")
+	systemID := flag.Uint("system-id", uint(money.DefaultSystemID), "the system identifier (default=1)")
+	networkID := flag.Uint("network-id", uint(types.NetworkLocal), "the network identifier (default=3)")
 	flag.Parse()
 
 	// verify command line parameters
@@ -78,17 +80,17 @@ func main() {
 	latestAdditionTime := roundNumber + *timeout
 	fcrID := money.NewFeeCreditRecordIDFromOwnerPredicate(nil, templates.AlwaysTrueBytes(), latestAdditionTime)
 
-	if err = execInitialBill(ctx, moneyClient, billID, fcrID, *billValue, latestAdditionTime, pubKey, *counter); err != nil {
+	if err = execInitialBill(ctx, moneyClient, types.NetworkID(*networkID), types.SystemID(*systemID), billID, fcrID, *billValue, latestAdditionTime, pubKey, *counter); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func execInitialBill(ctx context.Context, moneyClient sdktypes.PartitionClient, billID, fcrID types.UnitID, billValue, latestAdditionTime uint64, pubKey []byte, counter uint64) error {
+func execInitialBill(ctx context.Context, moneyClient sdktypes.PartitionClient, networkID types.NetworkID, systemID types.SystemID, billID, fcrID types.UnitID, billValue, latestAdditionTime uint64, pubKey []byte, counter uint64) error {
 	txFee := uint64(1)
 	feeAmount := uint64(2)
 
 	// create transferFC
-	transferFC, err := createTransferFC(feeAmount+txFee, billID, fcrID, latestAdditionTime, counter)
+	transferFC, err := createTransferFC(networkID, systemID, feeAmount+txFee, billID, fcrID, latestAdditionTime, counter)
 	if err != nil {
 		return fmt.Errorf("creating transfer FC transaction: %w", err)
 	}
@@ -108,7 +110,7 @@ func execInitialBill(ctx context.Context, moneyClient sdktypes.PartitionClient, 
 	}
 
 	// create addFC
-	addFC, err := createAddFC(fcrID, templates.AlwaysTrueBytes(), transferFCProof.TxRecord, transferFCProof.TxProof, latestAdditionTime, feeAmount)
+	addFC, err := createAddFC(networkID, systemID, fcrID, templates.AlwaysTrueBytes(), transferFCProof, latestAdditionTime, feeAmount)
 	if err != nil {
 		return fmt.Errorf("creating add FC transaction: %w", err)
 	}
@@ -127,7 +129,7 @@ func execInitialBill(ctx context.Context, moneyClient sdktypes.PartitionClient, 
 	}
 
 	// create transfer tx
-	transferTx, err := createTransferTx(pubKey, billID, billValue-feeAmount-txFee, fcrID, latestAdditionTime, counter+1)
+	transferTx, err := createTransferTx(networkID, systemID, pubKey, billID, billValue-feeAmount-txFee, fcrID, latestAdditionTime, counter+1)
 	if err != nil {
 		return fmt.Errorf("creating transfer transaction: %w", err)
 	}
@@ -147,7 +149,7 @@ func execInitialBill(ctx context.Context, moneyClient sdktypes.PartitionClient, 
 	return nil
 }
 
-func createTransferFC(feeAmount uint64, unitID []byte, targetUnitID []byte, latestAdditionTime, counter uint64) (*types.TransactionOrder, error) {
+func createTransferFC(networkID types.NetworkID, systemID types.SystemID, feeAmount uint64, unitID []byte, targetUnitID []byte, latestAdditionTime, counter uint64) (*types.TransactionOrder, error) {
 	attr, err := cbor.Marshal(
 		&fc.TransferFeeCreditAttributes{
 			Amount:                 feeAmount,
@@ -161,9 +163,10 @@ func createTransferFC(feeAmount uint64, unitID []byte, targetUnitID []byte, late
 		return nil, fmt.Errorf("failed to marshal transferFC attributes: %w", err)
 	}
 	tx := &types.TransactionOrder{
-		Payload: &types.Payload{
-			SystemID:       1,
-			Type:           fc.PayloadTypeTransferFeeCredit,
+		Payload: types.Payload{
+			NetworkID:      networkID,
+			SystemID:       systemID,
+			Type:           fc.TransactionTypeTransferFeeCredit,
 			UnitID:         unitID,
 			Attributes:     attr,
 			ClientMetadata: &types.ClientMetadata{Timeout: latestAdditionTime, MaxTransactionFee: 1},
@@ -175,10 +178,9 @@ func createTransferFC(feeAmount uint64, unitID []byte, targetUnitID []byte, late
 	return tx, nil
 }
 
-func createAddFC(unitID []byte, ownerPredicate []byte, transferFC *types.TransactionRecord, transferFCProof *types.TxProof, latestAdditionTime uint64, maxFee uint64) (*types.TransactionOrder, error) {
+func createAddFC(networkID types.NetworkID, systemID types.SystemID, unitID []byte, ownerPredicate []byte, transferFCProof *types.TxRecordProof, latestAdditionTime uint64, maxFee uint64) (*types.TransactionOrder, error) {
 	attr, err := cbor.Marshal(
 		&fc.AddFeeCreditAttributes{
-			FeeCreditTransfer:       transferFC,
 			FeeCreditTransferProof:  transferFCProof,
 			FeeCreditOwnerPredicate: ownerPredicate,
 		},
@@ -187,9 +189,10 @@ func createAddFC(unitID []byte, ownerPredicate []byte, transferFC *types.Transac
 		return nil, fmt.Errorf("failed to marshal transferFC attributes: %w", err)
 	}
 	tx := &types.TransactionOrder{
-		Payload: &types.Payload{
-			SystemID:       1,
-			Type:           fc.PayloadTypeAddFeeCredit,
+		Payload: types.Payload{
+			NetworkID:      networkID,
+			SystemID:       systemID,
+			Type:           fc.TransactionTypeAddFeeCredit,
 			UnitID:         unitID,
 			Attributes:     attr,
 			ClientMetadata: &types.ClientMetadata{Timeout: latestAdditionTime, MaxTransactionFee: maxFee},
@@ -201,7 +204,7 @@ func createAddFC(unitID []byte, ownerPredicate []byte, transferFC *types.Transac
 	return tx, nil
 }
 
-func createTransferTx(pubKey []byte, unitID []byte, billValue uint64, fcrID []byte, timeout uint64, counter uint64) (*types.TransactionOrder, error) {
+func createTransferTx(networkID types.NetworkID, systemID types.SystemID, pubKey []byte, unitID []byte, billValue uint64, fcrID []byte, timeout uint64, counter uint64) (*types.TransactionOrder, error) {
 	attr, err := cbor.Marshal(
 		&money.TransferAttributes{
 			NewOwnerPredicate: templates.NewP2pkh256BytesFromKeyHash(hash.Sum256(pubKey)),
@@ -213,9 +216,10 @@ func createTransferTx(pubKey []byte, unitID []byte, billValue uint64, fcrID []by
 		return nil, fmt.Errorf("failed to marshal transfer attributes: %w", err)
 	}
 	tx := &types.TransactionOrder{
-		Payload: &types.Payload{
-			SystemID:   1,
-			Type:       money.PayloadTypeTransfer,
+		Payload: types.Payload{
+			NetworkID:  networkID,
+			SystemID:   systemID,
+			Type:       money.TransactionTypeTransfer,
 			UnitID:     unitID,
 			Attributes: attr,
 			ClientMetadata: &types.ClientMetadata{
@@ -231,7 +235,7 @@ func createTransferTx(pubKey []byte, unitID []byte, billValue uint64, fcrID []by
 	return tx, nil
 }
 
-func waitForConf(ctx context.Context, c sdktypes.PartitionClient, tx *types.TransactionOrder) (*sdktypes.Proof, error) {
+func waitForConf(ctx context.Context, c sdktypes.PartitionClient, tx *types.TransactionOrder) (*types.TxRecordProof, error) {
 	txHash := tx.Hash(crypto.SHA256)
 	for {
 		// fetch round number before proof to ensure that we cannot miss the proof

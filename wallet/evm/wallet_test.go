@@ -51,7 +51,7 @@ func (e *evmClientMock) PostTransaction(ctx context.Context, tx *types.Transacti
 	return nil
 }
 
-func (e *evmClientMock) GetTxProof(ctx context.Context, unitID types.UnitID, txHash sdktypes.TxHash) (*sdktypes.Proof, error) {
+func (e *evmClientMock) GetTxProof(ctx context.Context, unitID types.UnitID, txHash sdktypes.TxHash) (*types.TxRecordProof, error) {
 	if e.SimulateErr != nil {
 		return nil, e.SimulateErr
 	}
@@ -59,7 +59,7 @@ func (e *evmClientMock) GetTxProof(ctx context.Context, unitID types.UnitID, txH
 		ErrorDetails: "some error string",
 	}
 	encoded, _ := types.Cbor.Marshal(details)
-	return &sdktypes.Proof{
+	return &types.TxRecordProof{
 		TxRecord: &types.TransactionRecord{
 			TransactionOrder: &types.TransactionOrder{},
 			ServerMetadata: &types.ServerMetadata{

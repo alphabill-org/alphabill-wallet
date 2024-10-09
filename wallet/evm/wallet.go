@@ -9,10 +9,10 @@ import (
 	"strings"
 
 	"github.com/alphabill-org/alphabill-go-base/crypto"
-	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/evm"
 	"github.com/alphabill-org/alphabill-go-base/types"
 
+	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	evmclient "github.com/alphabill-org/alphabill-wallet/wallet/evm/client"
 )
@@ -28,10 +28,12 @@ type (
 		GetFeeCreditBill(ctx context.Context, unitID types.UnitID) (*evmclient.Bill, error)
 		GetGasPrice(ctx context.Context) (string, error)
 	}
+
 	Wallet struct {
-		systemID types.SystemID
-		am       account.Manager
-		restCli  evmClient
+		networkID types.NetworkID
+		systemID  types.SystemID
+		am        account.Manager
+		restCli   evmClient
 	}
 )
 
@@ -96,13 +98,12 @@ func (w *Wallet) SendEvmTx(ctx context.Context, accountNumber uint64, attrs *evm
 	if attrs.Value == nil {
 		attrs.Value = big.NewInt(0)
 	}
-	payload, err := newTxPayload(w.systemID, "evm", from.Bytes(), rnr.RoundNumber+txTimeoutBlockCount, attrs)
+	txo, err := sdktypes.NewTransactionOrder(w.networkID, w.systemID, from.Bytes(), evm.TransactionTypeEVMCall, attrs, sdktypes.WithTimeout(rnr.RoundNumber+txTimeoutBlockCount))
 	if err != nil {
-		return nil, fmt.Errorf("evm transaction payload error: %w", err)
+		return nil, fmt.Errorf("failed to create evm transaction order: %w", err)
 	}
-	txo, err := signPayload(payload, acc)
-	if err != nil {
-		return nil, fmt.Errorf("transaction sign failed: %w", err)
+	if err = signTx(txo, acc); err != nil {
+		return nil, fmt.Errorf("failed to sign transaction: %w", err)
 	}
 	// send transaction and wait for response or timeout
 	txPub := NewTxPublisher(w.restCli)
@@ -199,38 +200,17 @@ func (w *Wallet) verifyFeeCreditBalance(ctx context.Context, acc *account.Accoun
 	return nil
 }
 
-func newTxPayload(systemID types.SystemID, txType string, unitID []byte, timeout uint64, attr interface{}) (*types.Payload, error) {
-	attrBytes, err := types.Cbor.Marshal(attr)
-	if err != nil {
-		return nil, err
-	}
-	return &types.Payload{
-		SystemID:   systemID,
-		Type:       txType,
-		UnitID:     unitID,
-		Attributes: attrBytes,
-		ClientMetadata: &types.ClientMetadata{
-			Timeout: timeout,
-		},
-	}, nil
-}
-
-func signPayload(payload *types.Payload, ac *account.AccountKey) (*types.TransactionOrder, error) {
+func signTx(tx *types.TransactionOrder, ac *account.AccountKey) error {
 	signer, err := crypto.NewInMemorySecp256K1SignerFromKey(ac.PrivKey)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	payloadBytes, err := payload.Bytes()
+	ownerProof, err := sdktypes.NewP2pkhAuthProofSignature(tx, signer)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	sig, err := signer.SignBytes(payloadBytes)
-	if err != nil {
-		return nil, err
+	if err = tx.SetAuthProof(evm.TxAuthProof{OwnerProof: ownerProof}); err != nil {
+		return fmt.Errorf("failed to set auth proof: %w", err)
 	}
-	txo := &types.TransactionOrder{Payload: payload}
-	if err = txo.SetAuthProof(evm.TxAuthProof{OwnerProof: templates.NewP2pkh256SignatureBytes(sig, ac.PubKey)}); err != nil {
-		return nil, fmt.Errorf("failed to set auth proof: %w", err)
-	}
-	return txo, nil
+	return nil
 }

@@ -60,7 +60,8 @@ type (
 		targetPartitionClient   sdktypes.PartitionClient
 		targetPartitionFcrIDFn  GenerateFcrID
 
-		maxFee uint64
+		maxFee    uint64
+		networkID types.NetworkID
 	}
 
 	GetFeeCreditCmd struct {
@@ -96,15 +97,15 @@ type (
 	}
 
 	AddFeeTxProofs struct {
-		LockFC     *sdktypes.Proof
-		TransferFC *sdktypes.Proof
-		AddFC      *sdktypes.Proof
+		LockFC     *types.TxRecordProof
+		TransferFC *types.TxRecordProof
+		AddFC      *types.TxRecordProof
 	}
 
 	ReclaimFeeTxProofs struct {
-		Lock      *sdktypes.Proof
-		CloseFC   *sdktypes.Proof
-		ReclaimFC *sdktypes.Proof
+		Lock      *types.TxRecordProof
+		CloseFC   *types.TxRecordProof
+		ReclaimFC *types.TxRecordProof
 	}
 
 	AddFeeCreditCtx struct {
@@ -115,11 +116,11 @@ type (
 		LockingDisabled   bool                    `json:"lockingDisabled,omitempty"`   // user defined flag if we should lock fee credit record when adding fees
 		FeeCreditRecordID types.UnitID            `json:"feeCreditRecordId,omitempty"` // the fee credit record id used in current fee credit process
 		LockFCTx          *types.TransactionOrder `json:"lockFCTx,omitempty"`
-		LockFCProof       *sdktypes.Proof         `json:"lockFCProof,omitempty"`
+		LockFCProof       *types.TxRecordProof    `json:"lockFCProof,omitempty"`
 		TransferFCTx      *types.TransactionOrder `json:"transferFCTx,omitempty"`
-		TransferFCProof   *sdktypes.Proof         `json:"transferFCProof,omitempty"`
+		TransferFCProof   *types.TxRecordProof    `json:"transferFCProof,omitempty"`
 		AddFCTx           *types.TransactionOrder `json:"addFCTx,omitempty"`
-		AddFCProof        *sdktypes.Proof         `json:"addFCProof,omitempty"`
+		AddFCProof        *types.TxRecordProof    `json:"addFCProof,omitempty"`
 	}
 
 	ReclaimFeeCreditCtx struct {
@@ -128,11 +129,11 @@ type (
 		TargetBillCounter uint64                  `json:"targetBillCounter"` // closeFC target bill counter
 		LockingDisabled   bool                    `json:"lockingDisabled,omitempty"`
 		LockTx            *types.TransactionOrder `json:"lockTx,omitempty"`
-		LockTxProof       *sdktypes.Proof         `json:"lockTxProof,omitempty"`
+		LockTxProof       *types.TxRecordProof    `json:"lockTxProof,omitempty"`
 		CloseFCTx         *types.TransactionOrder `json:"closeFCTx,omitempty"`
-		CloseFCProof      *sdktypes.Proof         `json:"closeFCProof,omitempty"`
+		CloseFCProof      *types.TxRecordProof    `json:"closeFCProof,omitempty"`
 		ReclaimFCTx       *types.TransactionOrder `json:"reclaimFCTx,omitempty"`
-		ReclaimFCProof    *sdktypes.Proof         `json:"reclaimFCProof,omitempty"`
+		ReclaimFCProof    *types.TxRecordProof    `json:"reclaimFCProof,omitempty"`
 	}
 )
 
@@ -153,6 +154,7 @@ type (
 //   - fee credit record id generation function
 //   - fee credit record unit type part
 func NewFeeManager(
+	networkID types.NetworkID,
 	am account.Manager,
 	db FeeManagerDB,
 	moneySystemID types.SystemID,
@@ -165,6 +167,7 @@ func NewFeeManager(
 	log *slog.Logger,
 ) *FeeManager {
 	return &FeeManager{
+		networkID:               networkID,
 		am:                      am,
 		db:                      db,
 		moneySystemID:           moneySystemID,
@@ -301,7 +304,7 @@ func (w *FeeManager) GetFeeCredit(ctx context.Context, cmd GetFeeCreditCmd) (*sd
 
 // LockFeeCredit locks fee credit record for given account, returns error if fee credit record has not been created yet
 // or is already locked.
-func (w *FeeManager) LockFeeCredit(ctx context.Context, cmd LockFeeCreditCmd) (*sdktypes.Proof, error) {
+func (w *FeeManager) LockFeeCredit(ctx context.Context, cmd LockFeeCreditCmd) (*types.TxRecordProof, error) {
 	accountKey, err := w.am.GetAccountKey(cmd.AccountIndex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load account key: %w", err)
@@ -327,7 +330,7 @@ func (w *FeeManager) LockFeeCredit(ctx context.Context, cmd LockFeeCreditCmd) (*
 	if err != nil {
 		return nil, fmt.Errorf("failed to create lockFC transaction: %w", err)
 	}
-	ownerProof, err := sdktypes.NewP2pkhSignatureFromKey(tx, accountKey.PrivKey)
+	ownerProof, err := sdktypes.NewP2pkhAuthProofSignatureFromKey(tx, accountKey.PrivKey)
 	if err != nil {
 		return nil, err
 	}
@@ -345,7 +348,7 @@ func (w *FeeManager) LockFeeCredit(ctx context.Context, cmd LockFeeCreditCmd) (*
 
 // UnlockFeeCredit unlocks fee credit record for given account, returns error if fee credit record has not been created yet
 // or is already unlocked.
-func (w *FeeManager) UnlockFeeCredit(ctx context.Context, cmd UnlockFeeCreditCmd) (*sdktypes.Proof, error) {
+func (w *FeeManager) UnlockFeeCredit(ctx context.Context, cmd UnlockFeeCreditCmd) (*types.TxRecordProof, error) {
 	accountKey, err := w.am.GetAccountKey(cmd.AccountIndex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load account key: %w", err)
@@ -371,7 +374,7 @@ func (w *FeeManager) UnlockFeeCredit(ctx context.Context, cmd UnlockFeeCreditCmd
 	if err != nil {
 		return nil, fmt.Errorf("failed to create unlockFC transaction: %w", err)
 	}
-	ownerProof, err := sdktypes.NewP2pkhSignatureFromKey(tx, accountKey.PrivKey)
+	ownerProof, err := sdktypes.NewP2pkhAuthProofSignatureFromKey(tx, accountKey.PrivKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create owner predicate signature: %w", err)
 	}
@@ -540,7 +543,7 @@ func (w *FeeManager) sendLockFCTx(ctx context.Context, accountKey *account.Accou
 	if err != nil {
 		return fmt.Errorf("failed to create lockFC transaction: %w", err)
 	}
-	ownerProof, err := sdktypes.NewP2pkhSignatureFromKey(tx, accountKey.PrivKey)
+	ownerProof, err := sdktypes.NewP2pkhAuthProofSignatureFromKey(tx, accountKey.PrivKey)
 	if err != nil {
 		return fmt.Errorf("failed to create owner predicate signature: %w", err)
 	}
@@ -639,9 +642,10 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 		}
 	}
 	sourceBill := &sdktypes.Bill{
-		SystemID: w.moneySystemID,
-		ID:       feeCtx.TargetBillID,
-		Counter:  feeCtx.TargetBillCounter,
+		NetworkID: w.networkID,
+		SystemID:  w.moneySystemID,
+		ID:        feeCtx.TargetBillID,
+		Counter:   feeCtx.TargetBillCounter,
 	}
 	tx, err := sourceBill.TransferToFeeCredit(fcr, feeCtx.TargetAmount, latestAdditionTime,
 		sdktypes.WithTimeout(moneyTimeout),
@@ -650,7 +654,7 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 	if err != nil {
 		return fmt.Errorf("failed to create transferFC transaction: %w", err)
 	}
-	ownerProof, err := sdktypes.NewP2pkhSignatureFromKey(tx, accountKey.PrivKey)
+	ownerProof, err := sdktypes.NewP2pkhAuthProofSignatureFromKey(tx, accountKey.PrivKey)
 	if err != nil {
 		return fmt.Errorf("failed to create owner predicate signature: %w", err)
 	}
@@ -730,12 +734,13 @@ func (w *FeeManager) sendAddFCTx(ctx context.Context, accountKey *account.Accoun
 		return err
 	}
 
-	// need to use same FCR that was calculated form transferFC timeout, best to store it in WAL
+	// need to use the same FCR that was calculated from transferFC timeout, best to store it in WAL
 	fcr := &sdktypes.FeeCreditRecord{
-		SystemID: feeCtx.TargetPartitionID,
-		ID:       feeCtx.FeeCreditRecordID,
+		NetworkID: w.networkID,
+		SystemID:  feeCtx.TargetPartitionID,
+		ID:        feeCtx.FeeCreditRecordID,
 	}
-	ownerPredicate := templates.NewP2pkh256FeeAuthBytesFromKeyHash(accountKey.PubKeyHash.Sha256)
+	ownerPredicate := templates.NewP2pkh256BytesFromKeyHash(accountKey.PubKeyHash.Sha256)
 	addFCTx, err := fcr.AddFeeCredit(ownerPredicate, feeCtx.TransferFCProof,
 		sdktypes.WithTimeout(timeout),
 		sdktypes.WithMaxFee(w.maxFee),
@@ -743,7 +748,7 @@ func (w *FeeManager) sendAddFCTx(ctx context.Context, accountKey *account.Accoun
 	if err != nil {
 		return fmt.Errorf("failed to create addFC transaction: %w", err)
 	}
-	ownerProof, err := sdktypes.NewP2pkhSignatureFromKey(addFCTx, accountKey.PrivKey)
+	ownerProof, err := sdktypes.NewP2pkhAuthProofSignatureFromKey(addFCTx, accountKey.PrivKey)
 	if err != nil {
 		return fmt.Errorf("failed to create owner predicate signature: %w", err)
 	}
@@ -885,9 +890,10 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 		return err
 	}
 	targetBill := &sdktypes.Bill{
-		SystemID: w.moneySystemID,
-		ID:       feeCtx.TargetBillID,
-		Counter:  feeCtx.TargetBillCounter,
+		NetworkID: w.networkID,
+		SystemID:  w.moneySystemID,
+		ID:        feeCtx.TargetBillID,
+		Counter:   feeCtx.TargetBillCounter,
 	}
 	tx, err := targetBill.Lock(wallet.LockReasonReclaimFees,
 		sdktypes.WithTimeout(timeout),
@@ -974,7 +980,7 @@ func (w *FeeManager) sendCloseFCTx(ctx context.Context, accountKey *account.Acco
 	}
 
 	// sign closeFC transaction
-	ownerProof, err := sdktypes.NewP2pkhSignatureFromKey(tx, accountKey.PrivKey)
+	ownerProof, err := sdktypes.NewP2pkhAuthProofSignatureFromKey(tx, accountKey.PrivKey)
 	if err != nil {
 		return fmt.Errorf("failed to create owner predicate signature: %w", err)
 	}
@@ -1052,9 +1058,10 @@ func (w *FeeManager) sendReclaimFCTx(ctx context.Context, accountKey *account.Ac
 	}
 
 	targetBill := &sdktypes.Bill{
-		SystemID: w.moneySystemID,
-		ID:       feeCtx.TargetBillID,
-		Counter:  feeCtx.TargetBillCounter,
+		NetworkID: w.networkID,
+		SystemID:  w.moneySystemID,
+		ID:        feeCtx.TargetBillID,
+		Counter:   feeCtx.TargetBillCounter,
 	}
 	reclaimFC, err := targetBill.ReclaimFromFeeCredit(feeCtx.CloseFCProof,
 		sdktypes.WithTimeout(moneyTimeout),
@@ -1063,7 +1070,7 @@ func (w *FeeManager) sendReclaimFCTx(ctx context.Context, accountKey *account.Ac
 	if err != nil {
 		return fmt.Errorf("failed to create reclaimFC transaction: %w", err)
 	}
-	ownerProof, err := sdktypes.NewP2pkhSignatureFromKey(reclaimFC, accountKey.PrivKey)
+	ownerProof, err := sdktypes.NewP2pkhAuthProofSignatureFromKey(reclaimFC, accountKey.PrivKey)
 	if err != nil {
 		return fmt.Errorf("failed to create owner predicate signature: %w", err)
 	}
@@ -1137,7 +1144,7 @@ func (w *FeeManager) fetchMoneyPartitionFCR(ctx context.Context, accountKey *acc
 	return w.moneyClient.GetFeeCreditRecordByOwnerID(ctx, accountKey.PubKeyHash.Sha256)
 }
 
-func (w *FeeManager) unlockFeeCreditRecord(ctx context.Context, accountKey *account.AccountKey) (*sdktypes.Proof, error) {
+func (w *FeeManager) unlockFeeCreditRecord(ctx context.Context, accountKey *account.AccountKey) (*types.TxRecordProof, error) {
 	fcr, err := w.fetchTargetPartitionFCR(ctx, accountKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch fee credit record: %w", err)
@@ -1160,7 +1167,7 @@ func (w *FeeManager) unlockFeeCreditRecord(ctx context.Context, accountKey *acco
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tx signer: %w", err)
 	}
-	ownerProof, err := sdktypes.NewP2pkhSignature(tx, signer)
+	ownerProof, err := sdktypes.NewP2pkhAuthProofSignature(tx, signer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create owner predicate signature: %w", err)
 	}
@@ -1168,7 +1175,7 @@ func (w *FeeManager) unlockFeeCreditRecord(ctx context.Context, accountKey *acco
 	if err != nil {
 		return nil, fmt.Errorf("failed to set auth proof: %w", err)
 	}
-	tx.FeeProof, err = sdktypes.NewP2pkhFeeSignature(tx, signer)
+	tx.FeeProof, err = sdktypes.NewP2pkhFeeProofSignature(tx, signer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
 	}
@@ -1180,7 +1187,7 @@ func (w *FeeManager) unlockFeeCreditRecord(ctx context.Context, accountKey *acco
 	return proof, nil
 }
 
-func (w *FeeManager) unlockBill(ctx context.Context, accountKey *account.AccountKey, bill *sdktypes.Bill) (*sdktypes.Proof, error) {
+func (w *FeeManager) unlockBill(ctx context.Context, accountKey *account.AccountKey, bill *sdktypes.Bill) (*types.TxRecordProof, error) {
 	if bill == nil {
 		return nil, nil
 	}
@@ -1225,17 +1232,17 @@ func (p *AddFeeTxProofs) GetFees() uint64 {
 	if p == nil {
 		return 0
 	}
-	return p.LockFC.GetActualFee() + p.TransferFC.GetActualFee() + p.AddFC.GetActualFee()
+	return p.LockFC.ActualFee() + p.TransferFC.ActualFee() + p.AddFC.ActualFee()
 }
 
 func (p *ReclaimFeeTxProofs) GetFees() uint64 {
 	if p == nil {
 		return 0
 	}
-	return p.Lock.GetActualFee() + p.CloseFC.GetActualFee() + p.ReclaimFC.GetActualFee()
+	return p.Lock.ActualFee() + p.CloseFC.ActualFee() + p.ReclaimFC.ActualFee()
 }
 
-func waitForConf(ctx context.Context, partitionClient sdktypes.PartitionClient, tx *types.TransactionOrder) (*sdktypes.Proof, error) {
+func waitForConf(ctx context.Context, partitionClient sdktypes.PartitionClient, tx *types.TransactionOrder) (*types.TxRecordProof, error) {
 	txHash := tx.Hash(crypto.SHA256)
 	for {
 		// fetch round number before proof to ensure that we cannot miss the proof

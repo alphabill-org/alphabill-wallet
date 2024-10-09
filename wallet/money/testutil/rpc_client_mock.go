@@ -23,7 +23,7 @@ type (
 		FeeCreditRecords      map[string]*sdktypes.FeeCreditRecord
 		OwnerFeeCreditRecords []*sdktypes.FeeCreditRecord
 		RoundNumber           uint64
-		TxProofs              map[string]*sdktypes.Proof
+		TxProofs              map[string]*types.TxRecordProof
 
 		RecordedTxs []*types.TransactionOrder
 	}
@@ -31,7 +31,7 @@ type (
 	Options struct {
 		Err                   error
 		RoundNumber           uint64
-		TxProofs              map[string]*sdktypes.Proof
+		TxProofs              map[string]*types.TxRecordProof
 		Bills                 map[string]*sdktypes.Bill
 		OwnerBills            []*sdktypes.Bill
 		FeeCreditRecords      map[string]*sdktypes.FeeCreditRecord
@@ -45,7 +45,7 @@ func NewRpcClientMock(opts ...Option) *RpcClientMock {
 	options := &Options{
 		Bills:            map[string]*sdktypes.Bill{},
 		FeeCreditRecords: map[string]*sdktypes.FeeCreditRecord{},
-		TxProofs:         map[string]*sdktypes.Proof{},
+		TxProofs:         map[string]*types.TxRecordProof{},
 	}
 	for _, option := range opts {
 		option(options)
@@ -75,7 +75,7 @@ func WithOwnerFeeCreditRecord(fcr *sdktypes.FeeCreditRecord) Option {
 	}
 }
 
-func WithTxProof(txHash []byte, txProof *sdktypes.Proof) Option {
+func WithTxProof(txHash []byte, txProof *types.TxRecordProof) Option {
 	return func(o *Options) {
 		o.TxProofs[string(txHash)] = txProof
 	}
@@ -147,7 +147,7 @@ func (c *RpcClientMock) SendTransaction(ctx context.Context, tx *types.Transacti
 	return tx.Hash(crypto.SHA256), nil
 }
 
-func (c *RpcClientMock) ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*sdktypes.Proof, error) {
+func (c *RpcClientMock) ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*types.TxRecordProof, error) {
 	if c.Err != nil {
 		return nil, c.Err
 	}
@@ -155,16 +155,13 @@ func (c *RpcClientMock) ConfirmTransaction(ctx context.Context, tx *types.Transa
 	return c.GetTransactionProof(ctx, tx.Hash(crypto.SHA256))
 }
 
-func (c *RpcClientMock) GetTransactionProof(ctx context.Context, txHash types.Bytes) (*sdktypes.Proof, error) {
+func (c *RpcClientMock) GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TxRecordProof, error) {
 	if c.Err != nil {
 		return nil, c.Err
 	}
-	txProofs, ok := c.TxProofs[string(txHash)]
+	txProof, ok := c.TxProofs[string(txHash)]
 	if ok {
-		return &sdktypes.Proof{
-			TxRecord: txProofs.TxRecord,
-			TxProof:  txProofs.TxProof,
-		}, nil
+		return txProof, nil
 	}
 	// return proof for sent tx if one exists
 	if len(c.RecordedTxs) > 0 {
@@ -174,7 +171,7 @@ func (c *RpcClientMock) GetTransactionProof(ctx context.Context, txHash types.By
 					TransactionOrder: tx,
 					ServerMetadata:   &types.ServerMetadata{ActualFee: 1, SuccessIndicator: types.TxStatusSuccessful},
 				}
-				return &sdktypes.Proof{
+				return &types.TxRecordProof{
 					TxRecord: txr,
 					TxProof:  &types.TxProof{},
 				}, nil
@@ -193,15 +190,6 @@ func (c *RpcClientMock) GetBlock(ctx context.Context, blockNumber uint64) (*type
 
 func (c *RpcClientMock) Close() {
 	// Nothing to close
-}
-
-func newMockTx(id types.UnitID, payloadType string) *types.TransactionOrder {
-	return &types.TransactionOrder{
-		Payload: &types.Payload{
-			Type:   payloadType,
-			UnitID: id,
-		},
-	}
 }
 
 func NewBill(value, counter uint64) *sdktypes.Bill {

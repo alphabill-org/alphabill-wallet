@@ -73,7 +73,7 @@ func Test_evmCmdDeploy_ok(t *testing.T) {
 		"Evm transaction failed: something went wrong",
 		"Evm transaction processing fee: 0.000'210'00")
 	// verify tx order
-	require.Equal(t, "evm", mockConf.receivedTx.PayloadType())
+	require.Equal(t, evm.TransactionTypeEVMCall, mockConf.receivedTx.Type)
 	evmAttributes := &evm.TxAttributes{}
 	require.NoError(t, mockConf.receivedTx.UnmarshalAttributes(evmAttributes))
 	// verify attributes set by cli cmd
@@ -137,7 +137,7 @@ func Test_evmCmdExecute_ok(t *testing.T) {
 		"Evm transaction processing fee: 0.000'210'00",
 		"Evm execution returned: DEAD00BEEF")
 	// verify tx order
-	require.Equal(t, "evm", mockConf.receivedTx.PayloadType())
+	require.Equal(t, evm.TransactionTypeEVMCall, mockConf.receivedTx.Type)
 	evmAttributes := &evm.TxAttributes{}
 	require.NoError(t, mockConf.receivedTx.UnmarshalAttributes(evmAttributes))
 	// verify attributes set by cli cmd

@@ -13,13 +13,14 @@ import (
 func TestFeeCreditRecordAddFeeCredit(t *testing.T) {
 	fcrCounter := uint64(1)
 	fcr := &FeeCreditRecord{
-		SystemID: 2,
-		ID:       money.NewFeeCreditRecordID(nil, []byte{3}),
-		Counter:  &fcrCounter,
+		NetworkID: types.NetworkLocal,
+		SystemID:  2,
+		ID:        money.NewFeeCreditRecordID(nil, []byte{3}),
+		Counter:   &fcrCounter,
 	}
 
 	ownerPredicate := []byte{4}
-	transFCProof := &Proof{
+	transFCProof := &types.TxRecordProof{
 		TxRecord: &types.TransactionRecord{},
 		TxProof:  &types.TxProof{},
 	}
@@ -27,24 +28,24 @@ func TestFeeCreditRecordAddFeeCredit(t *testing.T) {
 	tx, err := fcr.AddFeeCredit(ownerPredicate, transFCProof)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.PayloadType(), fc.PayloadTypeAddFeeCredit)
-	require.Equal(t, fcr.SystemID, tx.SystemID())
-	require.Equal(t, fcr.ID, tx.UnitID())
+	require.Equal(t, tx.Type, fc.TransactionTypeAddFeeCredit)
+	require.Equal(t, fcr.SystemID, tx.GetSystemID())
+	require.Equal(t, fcr.ID, tx.GetUnitID())
 
 	attr := &fc.AddFeeCreditAttributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))
-	require.Equal(t, transFCProof.TxRecord, attr.FeeCreditTransfer)
-	require.Equal(t, transFCProof.TxProof, attr.FeeCreditTransferProof)
+	require.Equal(t, transFCProof, attr.FeeCreditTransferProof)
 	require.Equal(t, ownerPredicate, attr.FeeCreditOwnerPredicate)
 }
 
 func TestFeeCreditRecordCloseFeeCredit(t *testing.T) {
 	fcrCounter := uint64(1)
 	fcr := &FeeCreditRecord{
-		SystemID: 1,
-		ID:       money.NewFeeCreditRecordID(nil, []byte{2}),
-		Balance:  3,
-		Counter:  &fcrCounter,
+		NetworkID: types.NetworkLocal,
+		SystemID:  1,
+		ID:        money.NewFeeCreditRecordID(nil, []byte{2}),
+		Balance:   3,
+		Counter:   &fcrCounter,
 	}
 
 	targetBillID := money.NewBillID(nil, []byte{4})
@@ -53,9 +54,9 @@ func TestFeeCreditRecordCloseFeeCredit(t *testing.T) {
 	tx, err := fcr.CloseFeeCredit(targetBillID, targetBillCounter)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.PayloadType(), fc.PayloadTypeCloseFeeCredit)
-	require.Equal(t, fcr.SystemID, tx.SystemID())
-	require.Equal(t, fcr.ID, tx.UnitID())
+	require.Equal(t, tx.Type, fc.TransactionTypeCloseFeeCredit)
+	require.Equal(t, fcr.SystemID, tx.GetSystemID())
+	require.Equal(t, fcr.ID, tx.GetUnitID())
 
 	attr := &fc.CloseFeeCreditAttributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))
@@ -68,17 +69,18 @@ func TestFeeCreditRecordCloseFeeCredit(t *testing.T) {
 func TestFeeCreditRecordLock(t *testing.T) {
 	fcrCounter := uint64(1)
 	fcr := &FeeCreditRecord{
-		SystemID: 2,
-		ID:       money.NewFeeCreditRecordID(nil, []byte{3}),
-		Counter:  &fcrCounter,
+		NetworkID: types.NetworkLocal,
+		SystemID:  2,
+		ID:        money.NewFeeCreditRecordID(nil, []byte{3}),
+		Counter:   &fcrCounter,
 	}
 	lockStatus := uint64(4)
 	tx, err := fcr.Lock(lockStatus)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.PayloadType(), fc.PayloadTypeLockFeeCredit)
-	require.Equal(t, fcr.SystemID, tx.SystemID())
-	require.Equal(t, fcr.ID, tx.UnitID())
+	require.Equal(t, tx.Type, fc.TransactionTypeLockFeeCredit)
+	require.Equal(t, fcr.SystemID, tx.GetSystemID())
+	require.Equal(t, fcr.ID, tx.GetUnitID())
 
 	attr := &fc.LockFeeCreditAttributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))
@@ -89,16 +91,17 @@ func TestFeeCreditRecordLock(t *testing.T) {
 func TestFeeCreditRecordUnlock(t *testing.T) {
 	fcrCounter := uint64(1)
 	fcr := &FeeCreditRecord{
-		SystemID: 2,
-		ID:       money.NewFeeCreditRecordID(nil, []byte{3}),
-		Counter:  &fcrCounter,
+		NetworkID: types.NetworkLocal,
+		SystemID:  2,
+		ID:        money.NewFeeCreditRecordID(nil, []byte{3}),
+		Counter:   &fcrCounter,
 	}
 	tx, err := fcr.Unlock()
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.PayloadType(), fc.PayloadTypeUnlockFeeCredit)
-	require.Equal(t, fcr.SystemID, tx.SystemID())
-	require.Equal(t, fcr.ID, tx.UnitID())
+	require.Equal(t, tx.Type, fc.TransactionTypeUnlockFeeCredit)
+	require.Equal(t, fcr.SystemID, tx.GetSystemID())
+	require.Equal(t, fcr.ID, tx.GetUnitID())
 
 	attr := &fc.UnlockFeeCreditAttributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))

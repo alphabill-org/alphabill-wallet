@@ -41,7 +41,7 @@ func (s *MoneyTxSigner) SignTx(tx *types.TransactionOrder) error {
 }
 
 func (s *MoneyTxSigner) AddAuthProof(tx *types.TransactionOrder) error {
-	ownerProof, err := NewP2pkhSignature(tx, s.signer)
+	ownerProof, err := NewP2pkhAuthProofSignature(tx, s.signer)
 	if err != nil {
 		return fmt.Errorf("failed to create owner proof: %w", err)
 	}
@@ -56,7 +56,7 @@ func (s *MoneyTxSigner) AddAuthProof(tx *types.TransactionOrder) error {
 }
 
 func (s *MoneyTxSigner) AddFeeProof(tx *types.TransactionOrder) error {
-	feeProof, err := NewP2pkhFeeSignature(tx, s.signer)
+	feeProof, err := NewP2pkhFeeProofSignature(tx, s.signer)
 	if err != nil {
 		return fmt.Errorf("failed to create fee proof: %w", err)
 	}
@@ -65,20 +65,20 @@ func (s *MoneyTxSigner) AddFeeProof(tx *types.TransactionOrder) error {
 }
 
 func (s *MoneyTxSigner) newAuthProof(tx *types.TransactionOrder, ownerProof []byte) (any, error) {
-	switch tx.PayloadType() {
-	case money.PayloadTypeTransfer:
+	switch tx.Type {
+	case money.TransactionTypeTransfer:
 		return money.TransferAuthProof{OwnerProof: ownerProof}, nil
-	case money.PayloadTypeSplit:
+	case money.TransactionTypeSplit:
 		return money.SplitAuthProof{OwnerProof: ownerProof}, nil
-	case money.PayloadTypeTransDC:
+	case money.TransactionTypeTransDC:
 		return money.TransferDCAuthProof{OwnerProof: ownerProof}, nil
-	case money.PayloadTypeSwapDC:
+	case money.TransactionTypeSwapDC:
 		return money.SwapDCAuthProof{OwnerProof: ownerProof}, nil
-	case money.PayloadTypeLock:
+	case money.TransactionTypeLock:
 		return money.LockAuthProof{OwnerProof: ownerProof}, nil
-	case money.PayloadTypeUnlock:
+	case money.TransactionTypeUnlock:
 		return money.UnlockAuthProof{OwnerProof: ownerProof}, nil
 	default:
-		return nil, fmt.Errorf("unsupported payload type: %s", tx.PayloadType())
+		return nil, fmt.Errorf("unsupported transaction type: %d", tx.Type)
 	}
 }

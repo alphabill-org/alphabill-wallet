@@ -84,6 +84,7 @@ func (c *partitionClient) getFeeCreditRecord(ctx context.Context, unitID types.U
 
 	counterCopy := u.Data.Counter
 	return &sdktypes.FeeCreditRecord{
+		NetworkID:  u.NetworkID,
 		SystemID:   u.SystemID,
 		ID:         u.UnitID,
 		Balance:    u.Data.Balance,
@@ -96,7 +97,7 @@ func (c *partitionClient) getFeeCreditRecord(ctx context.Context, unitID types.U
 func (c *partitionClient) batchCallWithLimit(ctx context.Context, batch []ethrpc.BatchElem) error {
 	start, end := 0, 0
 	for len(batch) > end {
-		end = min(len(batch), start + c.batchItemLimit)
+		end = min(len(batch), start+c.batchItemLimit)
 		if err := c.RpcClient.BatchCallContext(ctx, batch[start:end]); err != nil {
 			return fmt.Errorf("failed to send batch request: %w", err)
 		}

@@ -34,7 +34,7 @@ func (c *orchestrationPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.C
 	return nil, nil
 }
 
-func (c *orchestrationPartitionClient) ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*sdktypes.Proof, error) {
+func (c *orchestrationPartitionClient) ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*types.TxRecordProof, error) {
 	txBatch := txsubmitter.New(tx).ToBatch(c, log)
 	err := txBatch.SendTx(ctx, true)
 	if err != nil {

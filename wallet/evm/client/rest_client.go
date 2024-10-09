@@ -108,7 +108,7 @@ func (e *EvmClient) GetRoundNumber(ctx context.Context) (*RoundNumber, error) {
 }
 
 // GetTxProof - get transaction proof for tx hash. NB! node must be configured to run with indexer.
-func (e *EvmClient) GetTxProof(ctx context.Context, _ types.UnitID, txHash sdktypes.TxHash) (*sdktypes.Proof, error) {
+func (e *EvmClient) GetTxProof(ctx context.Context, _ types.UnitID, txHash sdktypes.TxHash) (*types.TxRecordProof, error) {
 	proof := struct {
 		_        struct{} `cbor:",toarray"`
 		TxRecord *types.TransactionRecord
@@ -121,7 +121,7 @@ func (e *EvmClient) GetTxProof(ctx context.Context, _ types.UnitID, txHash sdkty
 		}
 		return nil, fmt.Errorf("get tx proof request failed: %w", err)
 	}
-	return &sdktypes.Proof{
+	return &types.TxRecordProof{
 		TxRecord: proof.TxRecord,
 		TxProof:  proof.TxProof,
 	}, nil

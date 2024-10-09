@@ -137,7 +137,7 @@ func TestWholeBalanceIsSentUsingBillTransferOrder(t *testing.T) {
 
 	// then a single transfer order should be sent
 	require.Len(t, moneyClient.RecordedTxs, 1)
-	require.Equal(t, moneyClient.RecordedTxs[0].PayloadType(), money.PayloadTypeTransfer)
+	require.Equal(t, moneyClient.RecordedTxs[0].Type, money.TransactionTypeTransfer)
 }
 
 func TestWalletSendFunction_LockedBillIsNotUsed(t *testing.T) {
@@ -174,8 +174,8 @@ func TestWalletSendFunction_BillWithExactAmount(t *testing.T) {
 	// verify that the send command creates a single transfer for the bill with the exact value requested
 	require.NoError(t, err)
 	require.Len(t, txProofs, 1)
-	require.Equal(t, money.PayloadTypeTransfer, txProofs[0].TxRecord.TransactionOrder.PayloadType())
-	require.EqualValues(t, exactBill.ID, txProofs[0].TxRecord.TransactionOrder.UnitID())
+	require.Equal(t, money.TransactionTypeTransfer, txProofs[0].TxRecord.TransactionOrder.Type)
+	require.EqualValues(t, exactBill.ID, txProofs[0].TxRecord.TransactionOrder.GetUnitID())
 }
 
 func TestWalletSendFunction_NWaySplit(t *testing.T) {
@@ -204,8 +204,8 @@ func TestWalletSendFunction_NWaySplit(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, txProofs, 1)
 	txProof := txProofs[0]
-	require.Equal(t, money.PayloadTypeSplit, txProof.TxRecord.TransactionOrder.PayloadType())
-	require.EqualValues(t, bill.ID, txProof.TxRecord.TransactionOrder.UnitID())
+	require.Equal(t, money.TransactionTypeSplit, txProof.TxRecord.TransactionOrder.Type)
+	require.EqualValues(t, bill.ID, txProof.TxRecord.TransactionOrder.GetUnitID())
 	attr := &money.SplitAttributes{}
 	err = txProof.TxRecord.TransactionOrder.UnmarshalAttributes(attr)
 	require.NoError(t, err)
