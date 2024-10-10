@@ -39,8 +39,8 @@ func (c *moneyPartitionClient) GetBill(ctx context.Context, unitID types.UnitID)
 	if u == nil {
 		return nil, nil
 	}
-
 	return &sdktypes.Bill{
+		NetworkID:  u.NetworkID,
 		SystemID:   u.SystemID,
 		ID:         u.UnitID,
 		Value:      u.Data.V,
@@ -81,6 +81,7 @@ func (c *moneyPartitionClient) GetBills(ctx context.Context, ownerID []byte) ([]
 		}
 		u := batchElem.Result.(*sdktypes.Unit[money.BillData])
 		bills = append(bills, &sdktypes.Bill{
+			NetworkID:  u.NetworkID,
 			SystemID:   u.SystemID,
 			ID:         u.UnitID,
 			Value:      u.Data.V,
@@ -99,7 +100,7 @@ func (c *moneyPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, 
 	return c.getFeeCreditRecordByOwnerID(ctx, ownerID, money.FeeCreditRecordUnitType)
 }
 
-func (c *moneyPartitionClient) ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*sdktypes.Proof, error) {
+func (c *moneyPartitionClient) ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*types.TxRecordProof, error) {
 	txBatch := txsubmitter.New(tx).ToBatch(c, log)
 	err := txBatch.SendTx(ctx, true)
 	if err != nil {

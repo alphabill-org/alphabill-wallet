@@ -45,22 +45,22 @@ func (c *StateAPIClient) GetUnitsByOwnerID(ctx context.Context, ownerID types.By
 	return res, err
 }
 
-// SendTransaction sends the given transaction to the connected node.
-// Returns the submitted transaction hash.
-func (c *StateAPIClient) SendTransaction(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
-	txCbor, err := encodeCbor(tx)
+// SendTransaction sends the given transaction order to the connected node.
+// Returns the submitted transaction order hash.
+func (c *StateAPIClient) SendTransaction(ctx context.Context, txo *types.TransactionOrder) ([]byte, error) {
+	txoCBOR, err := encodeCbor(txo)
 	if err != nil {
-		return nil, fmt.Errorf("failed to encode transaction to cbor: %w", err)
+		return nil, fmt.Errorf("failed to encode transaction order to cbor: %w", err)
 	}
 	var res types.Bytes
-	err = c.RpcClient.CallContext(ctx, &res, "state_sendTransaction", txCbor)
+	err = c.RpcClient.CallContext(ctx, &res, "state_sendTransaction", txoCBOR)
 
 	return res, err
 }
 
 // GetTransactionProof returns transaction record and proof for the given transaction hash.
 // Returns ErrNotFound if proof was not found.
-func (c *StateAPIClient) GetTransactionProof(ctx context.Context, txHash types.Bytes) (*sdktypes.Proof, error) {
+func (c *StateAPIClient) GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TxRecordProof, error) {
 	var res *sdktypes.TransactionRecordAndProof
 	err := c.RpcClient.CallContext(ctx, &res, "state_getTransactionProof", txHash)
 	if err != nil {
@@ -69,18 +69,7 @@ func (c *StateAPIClient) GetTransactionProof(ctx context.Context, txHash types.B
 	if res == nil {
 		return nil, nil
 	}
-	var txRecord *types.TransactionRecord
-	if err = types.Cbor.Unmarshal(res.TxRecord, &txRecord); err != nil {
-		return nil, fmt.Errorf("failed to decode tx record: %w", err)
-	}
-	var txProof *types.TxProof
-	if err = types.Cbor.Unmarshal(res.TxProof, &txProof); err != nil {
-		return nil, fmt.Errorf("failed to decode tx proof: %w", err)
-	}
-	return &sdktypes.Proof{
-		TxRecord: txRecord,
-		TxProof: txProof,
-	}, nil
+	return res.ToBaseType()
 }
 
 // GetBlock returns block for the given round number.

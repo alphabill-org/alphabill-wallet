@@ -142,17 +142,18 @@ func (s *StateServiceMock) GetTransactionProof(ctx context.Context, txHash types
 
 	sentTxo, ok := s.SentTxs[string(txHash)]
 	if ok {
-		txrBytes, err := types.Cbor.Marshal(&types.TransactionRecord{TransactionOrder: sentTxo, ServerMetadata: &types.ServerMetadata{ActualFee: 1}})
-		if err != nil {
-			return nil, err
+		txr := &types.TransactionRecord{TransactionOrder: sentTxo, ServerMetadata: &types.ServerMetadata{ActualFee: 1}}
+		txp := &types.TxProof{}
+		txRecordProof := &types.TxRecordProof{
+			TxRecord: txr,
+			TxProof:  txp,
 		}
-		txProofBytes, err := types.Cbor.Marshal(&types.TxProof{})
+		txRecordProofCBOR, err := types.Cbor.Marshal(txRecordProof)
 		if err != nil {
 			return nil, err
 		}
 		return &sdktypes.TransactionRecordAndProof{
-			TxRecord: txrBytes,
-			TxProof:  txProofBytes,
+			TxRecordProof: txRecordProofCBOR,
 		}, nil
 	}
 	return nil, nil

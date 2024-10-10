@@ -192,7 +192,7 @@ func TestWalletBillsLockUnlockCmd_Ok(t *testing.T) {
 
 	// verify bill locked
 	stdout = walletCmd.Exec(t, "bills", "list")
-	testutils.VerifyStdout(t, stdout, "#1 0x000000000000000000000000000000000000000000000000000000000000000100 9'999'999'999.000'000'00 (manually locked by user)")
+	testutils.VerifyStdout(t, stdout, "#1 0x000000000000000000000000000000000000000000000000000000000000000101 9'999'999'999.000'000'00 (manually locked by user)")
 
 	// unlock bill
 	stdout = walletCmd.Exec(t, "bills", "unlock", "--bill-id", money.NewBillID(nil, []byte{1}).String())
@@ -200,7 +200,7 @@ func TestWalletBillsLockUnlockCmd_Ok(t *testing.T) {
 
 	// verify bill unlocked
 	stdout = walletCmd.Exec(t, "bills", "list")
-	testutils.VerifyStdout(t, stdout, "#1 0x000000000000000000000000000000000000000000000000000000000000000100 9'999'999'999.000'000'00")
+	testutils.VerifyStdout(t, stdout, "#1 0x000000000000000000000000000000000000000000000000000000000000000101 9'999'999'999.000'000'00")
 }
 
 func TestOrchestration_AddVarOK(t *testing.T) {

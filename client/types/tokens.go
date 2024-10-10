@@ -3,7 +3,6 @@ package types
 import (
 	"context"
 	"crypto"
-	"fmt"
 
 	"github.com/alphabill-org/alphabill-go-base/hash"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
@@ -28,6 +27,7 @@ type (
 	}
 
 	FungibleTokenType struct {
+		NetworkID                types.NetworkID
 		SystemID                 types.SystemID
 		ID                       TokenTypeID
 		ParentTypeID             TokenTypeID
@@ -41,6 +41,7 @@ type (
 	}
 
 	NonFungibleTokenType struct {
+		NetworkID                types.NetworkID
 		SystemID                 types.SystemID
 		ID                       TokenTypeID
 		ParentTypeID             TokenTypeID
@@ -54,6 +55,7 @@ type (
 	}
 
 	FungibleToken struct {
+		NetworkID      types.NetworkID
 		SystemID       types.SystemID
 		ID             TokenID
 		Symbol         string
@@ -68,6 +70,7 @@ type (
 	}
 
 	NonFungibleToken struct {
+		NetworkID           types.NetworkID
 		SystemID            types.SystemID
 		ID                  TokenID
 		Symbol              string
@@ -103,12 +106,7 @@ func (tt *FungibleTokenType) Define(txOptions ...Option) (*types.TransactionOrde
 		TokenTypeOwnerPredicate:  tt.TokenTypeOwnerPredicate,
 	}
 
-	txPayload, err := NewPayload(tt.SystemID, tt.ID, tokens.PayloadTypeDefineFT, attr, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewTransactionOrder(txPayload), nil
+	return NewTransactionOrder(tt.NetworkID, tt.SystemID, tt.ID, tokens.TransactionTypeDefineFT, attr, txOptions...)
 }
 
 func (tt *NonFungibleTokenType) Define(txOptions ...Option) (*types.TransactionOrder, error) {
@@ -122,12 +120,7 @@ func (tt *NonFungibleTokenType) Define(txOptions ...Option) (*types.TransactionO
 		TokenMintingPredicate:    tt.TokenMintingPredicate,
 		TokenTypeOwnerPredicate:  tt.TokenTypeOwnerPredicate,
 	}
-	txPayload, err := NewPayload(tt.SystemID, tt.ID, tokens.PayloadTypeDefineNFT, attr, txOptions...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create tx payload: %w", err)
-	}
-
-	return NewTransactionOrder(txPayload), nil
+	return NewTransactionOrder(tt.NetworkID, tt.SystemID, tt.ID, tokens.TransactionTypeDefineNFT, attr, txOptions...)
 }
 
 func (t *FungibleToken) Mint(txOptions ...Option) (*types.TransactionOrder, error) {
@@ -137,19 +130,19 @@ func (t *FungibleToken) Mint(txOptions ...Option) (*types.TransactionOrder, erro
 		Value:          t.Amount,
 		Nonce:          0,
 	}
-	txPayload, err := NewPayload(t.SystemID, nil, tokens.PayloadTypeMintFT, attr, txOptions...)
+	tx, err := NewTransactionOrder(t.NetworkID, t.SystemID, nil, tokens.TransactionTypeMintFT, attr, txOptions...)
 	if err != nil {
 		return nil, err
 	}
-	tx := NewTransactionOrder(txPayload)
 
 	// generate tokenID
 	unitPart, err := tokens.HashForNewTokenID(tx, crypto.SHA256)
 	if err != nil {
 		return nil, err
 	}
-	txPayload.UnitID = tokens.NewFungibleTokenID(t.ID, unitPart)
-	t.ID = txPayload.UnitID
+	unitID := tokens.NewFungibleTokenID(t.ID, unitPart)
+	tx.UnitID = unitID
+	t.ID = unitID
 
 	return tx, nil
 }
@@ -161,12 +154,7 @@ func (t *FungibleToken) Transfer(ownerPredicate []byte, txOptions ...Option) (*t
 		Counter:           t.Counter,
 		TypeID:            t.TypeID,
 	}
-	txPayload, err := NewPayload(t.SystemID, t.ID, tokens.PayloadTypeTransferFT, attr, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewTransactionOrder(txPayload), nil
+	return NewTransactionOrder(t.NetworkID, t.SystemID, t.ID, tokens.TransactionTypeTransferFT, attr, txOptions...)
 }
 
 func (t *FungibleToken) Split(amount uint64, ownerPredicate []byte, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -176,12 +164,7 @@ func (t *FungibleToken) Split(amount uint64, ownerPredicate []byte, txOptions ..
 		Counter:           t.Counter,
 		TypeID:            t.TypeID,
 	}
-	txPayload, err := NewPayload(t.SystemID, t.ID, tokens.PayloadTypeSplitFT, attr, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewTransactionOrder(txPayload), nil
+	return NewTransactionOrder(t.NetworkID, t.SystemID, t.ID, tokens.TransactionTypeSplitFT, attr, txOptions...)
 }
 
 func (t *FungibleToken) Burn(targetTokenID types.UnitID, targetTokenCounter uint64, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -192,34 +175,20 @@ func (t *FungibleToken) Burn(targetTokenID types.UnitID, targetTokenCounter uint
 		TargetTokenCounter: targetTokenCounter,
 		Counter:            t.Counter,
 	}
-	txPayload, err := NewPayload(t.SystemID, t.ID, tokens.PayloadTypeBurnFT, attr, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewTransactionOrder(txPayload), nil
+	return NewTransactionOrder(t.NetworkID, t.SystemID, t.ID, tokens.TransactionTypeBurnFT, attr, txOptions...)
 }
 
-func (t *FungibleToken) Join(burnTxs []*types.TransactionRecord, burnProofs []*types.TxProof, txOptions ...Option) (*types.TransactionOrder, error) {
-	attr := &tokens.JoinFungibleTokenAttributes{
-		BurnTransactions: burnTxs,
-		Proofs:           burnProofs,
-		Counter:          t.Counter,
-	}
-	txPayload, err := NewPayload(t.SystemID, t.ID, tokens.PayloadTypeJoinFT, attr, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewTransactionOrder(txPayload), nil
+func (t *FungibleToken) Join(burnTxProofs []*types.TxRecordProof, txOptions ...Option) (*types.TransactionOrder, error) {
+	attr := &tokens.JoinFungibleTokenAttributes{BurnTokenProofs: burnTxProofs}
+	return NewTransactionOrder(t.NetworkID, t.SystemID, t.ID, tokens.TransactionTypeJoinFT, attr, txOptions...)
 }
 
 func (t *FungibleToken) Lock(lockStatus uint64, txOptions ...Option) (*types.TransactionOrder, error) {
-	return lockToken(t.SystemID, t.ID, t.Counter, lockStatus, txOptions...)
+	return lockToken(t.NetworkID, t.SystemID, t.ID, t.Counter, lockStatus, txOptions...)
 }
 
 func (t *FungibleToken) Unlock(txOptions ...Option) (*types.TransactionOrder, error) {
-	return unlockToken(t.SystemID, t.ID, t.Counter, txOptions...)
+	return unlockToken(t.NetworkID, t.SystemID, t.ID, t.Counter, txOptions...)
 }
 
 func (t *FungibleToken) GetID() TokenID {
@@ -244,19 +213,19 @@ func (t *NonFungibleToken) Mint(txOptions ...Option) (*types.TransactionOrder, e
 		DataUpdatePredicate: t.DataUpdatePredicate,
 		Nonce:               0,
 	}
-	txPayload, err := NewPayload(t.SystemID, nil, tokens.PayloadTypeMintNFT, attr, txOptions...)
+	tx, err := NewTransactionOrder(t.NetworkID, t.SystemID, nil, tokens.TransactionTypeMintNFT, attr, txOptions...)
 	if err != nil {
 		return nil, err
 	}
-	tx := NewTransactionOrder(txPayload)
 
 	// generate tokenID
 	unitPart, err := tokens.HashForNewTokenID(tx, crypto.SHA256)
 	if err != nil {
 		return nil, err
 	}
-	txPayload.UnitID = tokens.NewNonFungibleTokenID(t.ID, unitPart)
-	t.ID = txPayload.UnitID
+	unitID := tokens.NewNonFungibleTokenID(t.ID, unitPart)
+	tx.UnitID = unitID
+	t.ID = tx.UnitID
 
 	return tx, nil
 }
@@ -267,12 +236,7 @@ func (t *NonFungibleToken) Transfer(ownerPredicate []byte, txOptions ...Option) 
 		Counter:           t.Counter,
 		TypeID:            t.TypeID,
 	}
-	txPayload, err := NewPayload(t.SystemID, t.ID, tokens.PayloadTypeTransferNFT, attr, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewTransactionOrder(txPayload), nil
+	return NewTransactionOrder(t.NetworkID, t.SystemID, t.ID, tokens.TransactionTypeTransferNFT, attr, txOptions...)
 }
 
 func (t *NonFungibleToken) Update(data []byte, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -280,20 +244,15 @@ func (t *NonFungibleToken) Update(data []byte, txOptions ...Option) (*types.Tran
 		Data:    data,
 		Counter: t.Counter,
 	}
-	txPayload, err := NewPayload(t.SystemID, t.ID, tokens.PayloadTypeUpdateNFT, attr, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewTransactionOrder(txPayload), nil
+	return NewTransactionOrder(t.NetworkID, t.SystemID, t.ID, tokens.TransactionTypeUpdateNFT, attr, txOptions...)
 }
 
 func (t *NonFungibleToken) Lock(lockStatus uint64, txOptions ...Option) (*types.TransactionOrder, error) {
-	return lockToken(t.SystemID, t.ID, t.Counter, lockStatus, txOptions...)
+	return lockToken(t.NetworkID, t.SystemID, t.ID, t.Counter, lockStatus, txOptions...)
 }
 
 func (t *NonFungibleToken) Unlock(txOptions ...Option) (*types.TransactionOrder, error) {
-	return unlockToken(t.SystemID, t.ID, t.Counter, txOptions...)
+	return unlockToken(t.NetworkID, t.SystemID, t.ID, t.Counter, txOptions...)
 }
 
 func (t *NonFungibleToken) GetID() TokenID {
@@ -312,27 +271,17 @@ func (pk PubKey) Hash() PubKeyHash {
 	return hash.Sum256(pk)
 }
 
-func lockToken(systemID types.SystemID, id types.UnitID, counter uint64, lockStatus uint64, txOptions ...Option) (*types.TransactionOrder, error) {
+func lockToken(networkID types.NetworkID, systemID types.SystemID, id types.UnitID, counter uint64, lockStatus uint64, txOptions ...Option) (*types.TransactionOrder, error) {
 	attr := &tokens.LockTokenAttributes{
 		LockStatus: lockStatus,
 		Counter:    counter,
 	}
-	txPayload, err := NewPayload(systemID, id, tokens.PayloadTypeLockToken, attr, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewTransactionOrder(txPayload), nil
+	return NewTransactionOrder(networkID, systemID, id, tokens.TransactionTypeLockToken, attr, txOptions...)
 }
 
-func unlockToken(systemID types.SystemID, id types.UnitID, counter uint64, txOptions ...Option) (*types.TransactionOrder, error) {
+func unlockToken(networkID types.NetworkID, systemID types.SystemID, id types.UnitID, counter uint64, txOptions ...Option) (*types.TransactionOrder, error) {
 	attr := &tokens.UnlockTokenAttributes{
 		Counter: counter,
 	}
-	txPayload, err := NewPayload(systemID, id, tokens.PayloadTypeUnlockToken, attr, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewTransactionOrder(txPayload), nil
+	return NewTransactionOrder(networkID, systemID, id, tokens.TransactionTypeUnlockToken, attr, txOptions...)
 }

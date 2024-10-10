@@ -58,7 +58,7 @@ func TestRpcClient(t *testing.T) {
 	t.Run("SendTransaction_OK", func(t *testing.T) {
 		service.Reset()
 		unitID := []byte{1}
-		tx := &types.TransactionOrder{Payload: &types.Payload{UnitID: unitID}}
+		tx := &types.TransactionOrder{Payload: types.Payload{UnitID: unitID}}
 
 		txHash, err := client.SendTransaction(context.Background(), tx)
 		require.NoError(t, err)
@@ -68,7 +68,7 @@ func TestRpcClient(t *testing.T) {
 		service.Reset()
 		service.Err = errors.New("some error")
 		unitID := []byte{1}
-		tx := &types.TransactionOrder{Payload: &types.Payload{UnitID: unitID}}
+		tx := &types.TransactionOrder{Payload: types.Payload{UnitID: unitID}}
 
 		txHash, err := client.SendTransaction(context.Background(), tx)
 		require.ErrorContains(t, err, "some error")
@@ -79,20 +79,21 @@ func TestRpcClient(t *testing.T) {
 		service.Reset()
 		txHash := []byte{1}
 		unitID := []byte{1}
-		txRecord := &types.TransactionRecord{TransactionOrder: &types.TransactionOrder{Payload: &types.Payload{UnitID: unitID}}}
-		txProof := &types.TxProof{}
-		txRecordCbor, err := encodeCbor(txRecord)
-		require.NoError(t, err)
-		txProofCbor, err := encodeCbor(txProof)
+		txRecordProof := &types.TxRecordProof{
+			TxRecord: &types.TransactionRecord{TransactionOrder: &types.TransactionOrder{Payload: types.Payload{UnitID: unitID}}},
+			TxProof:  &types.TxProof{},
+		}
+		txRecordProofCBOR, err := encodeCbor(txRecordProof)
 		require.NoError(t, err)
 		service.TxProofs = map[string]*sdktypes.TransactionRecordAndProof{
-			string(txHash): {TxRecord: txRecordCbor, TxProof: txProofCbor},
+			string(txHash): {TxRecordProof: txRecordProofCBOR},
 		}
 
 		proof, err := client.GetTransactionProof(context.Background(), txHash)
 		require.NoError(t, err)
-		require.Equal(t, txRecord, proof.TxRecord)
-		require.Equal(t, txProof, proof.TxProof)
+		require.NotNil(t, proof)
+		require.Equal(t, txRecordProof.TxRecord, proof.TxRecord)
+		require.Equal(t, txRecordProof.TxProof, proof.TxProof)
 	})
 	t.Run("GetTransactionProof_NOK", func(t *testing.T) {
 		service.Reset()
@@ -114,7 +115,7 @@ func TestRpcClient(t *testing.T) {
 	t.Run("GetBlock_OK", func(t *testing.T) {
 		service.Reset()
 		unitID := []byte{1}
-		txRecord := &types.TransactionRecord{TransactionOrder: &types.TransactionOrder{Payload: &types.Payload{UnitID: unitID}}}
+		txRecord := &types.TransactionRecord{TransactionOrder: &types.TransactionOrder{Payload: types.Payload{UnitID: unitID}}}
 		block := &types.Block{Transactions: []*types.TransactionRecord{txRecord}}
 		blockCbor, err := encodeCbor(block)
 		require.NoError(t, err)

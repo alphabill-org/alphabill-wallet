@@ -5,7 +5,6 @@ type (
 		WalletConfig *WalletConfig
 		RpcUrl       string
 		Key          uint64
-		SystemID     uint32
 	}
 
 	AddVarCmdConfig struct {

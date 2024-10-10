@@ -37,7 +37,7 @@ func Test_GetRoundNumber_OK(t *testing.T) {
 			return 42, nil
 		},
 	}
-	w, err := New(tokens.DefaultSystemID, rpcClient, nil, false, nil, 0, logger.New(t))
+	w, err := New(types.NetworkLocal, tokens.DefaultSystemID, rpcClient, nil, false, nil, 0, logger.New(t))
 	require.NoError(t, err)
 
 	roundNumber, err := w.GetRoundNumber(context.Background())
@@ -116,7 +116,7 @@ func TestNewTypes(t *testing.T) {
 				attrs := &tokens.DefineFungibleTokenAttributes{}
 				require.NoError(t, tx.UnmarshalAttributes(attrs))
 				tokenType := &sdktypes.FungibleTokenType{
-					ID:            tx.UnitID(),
+					ID:            tx.GetUnitID(),
 					ParentTypeID:  attrs.ParentTypeID,
 					DecimalPlaces: attrs.DecimalPlaces,
 				}
@@ -130,7 +130,7 @@ func TestNewTypes(t *testing.T) {
 				attrs := &tokens.DefineNonFungibleTokenAttributes{}
 				require.NoError(t, tx.UnmarshalAttributes(attrs))
 				tokenType := &sdktypes.NonFungibleTokenType{
-					ID:           tx.UnitID(),
+					ID:           tx.GetUnitID(),
 					ParentTypeID: attrs.ParentTypeID,
 				}
 				return []*sdktypes.NonFungibleTokenType{tokenType}, nil
@@ -138,7 +138,7 @@ func TestNewTypes(t *testing.T) {
 			return nil, fmt.Errorf("not found")
 		},
 		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
-			recTxs[string(tx.UnitID())] = tx
+			recTxs[string(tx.GetUnitID())] = tx
 			return tx.Hash(crypto.SHA256), nil
 		},
 		getUnitsByOwnerID: func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
@@ -170,7 +170,7 @@ func TestNewTypes(t *testing.T) {
 		require.True(t, found)
 		newFungibleTx := &tokens.DefineFungibleTokenAttributes{}
 		require.NoError(t, tx.UnmarshalAttributes(newFungibleTx))
-		require.Equal(t, typeID, tx.UnitID())
+		require.Equal(t, typeID, tx.GetUnitID())
 		require.Equal(t, tt1.Symbol, newFungibleTx.Symbol)
 		require.Equal(t, tt1.Name, newFungibleTx.Name)
 		require.Equal(t, tt1.Icon.Type, newFungibleTx.Icon.Type)
@@ -202,7 +202,7 @@ func TestNewTypes(t *testing.T) {
 		//check typeId unit type validation
 		tt2.ID = make([]byte, tokens.UnitIDLength)
 		_, err = tw.NewFungibleType(context.Background(), 1, tt2, nil)
-		require.ErrorContains(t, err, "invalid token type ID: expected unit type is 0x20")
+		require.ErrorContains(t, err, "invalid token type ID: expected unit type is 0x01")
 
 		//check typeId generation if typeId parameter is nil
 		tt2.ID = nil
@@ -238,7 +238,7 @@ func TestNewTypes(t *testing.T) {
 		require.True(t, found)
 		newNFTTx := &tokens.DefineNonFungibleTokenAttributes{}
 		require.NoError(t, tx.UnmarshalAttributes(newNFTTx))
-		require.Equal(t, typeID, tx.UnitID())
+		require.Equal(t, typeID, tx.GetUnitID())
 		require.Equal(t, tt.Symbol, newNFTTx.Symbol)
 		require.Equal(t, tt.Icon.Type, newNFTTx.Icon.Type)
 		require.Equal(t, tt.Icon.Data, newNFTTx.Icon.Data)
@@ -252,7 +252,7 @@ func TestNewTypes(t *testing.T) {
 		//check typeId unit type validation
 		tt.ID = make([]byte, tokens.UnitIDLength)
 		_, err = tw.NewNonFungibleType(context.Background(), 1, tt, nil)
-		require.ErrorContains(t, err, "invalid token type ID: expected unit type is 0x22")
+		require.ErrorContains(t, err, "invalid token type ID: expected unit type is 0x02")
 
 		//check typeId generation if typeId parameter is nil
 		tt.ID = nil
@@ -316,10 +316,10 @@ func TestNewFungibleToken(t *testing.T) {
 			tx := recTxs[len(recTxs)-1]
 			attr := &tokens.MintFungibleTokenAttributes{}
 			require.NotNil(t, result)
-			require.Len(t, tx.UnitID(), 33)
-			require.True(t, tx.UnitID().HasType(tokens.FungibleTokenUnitType))
-			require.EqualValues(t, tx.UnitID(), result.GetUnit())
-			require.EqualValues(t, tx.UnitID(), ft.ID)
+			require.Len(t, tx.GetUnitID(), 33)
+			require.True(t, tx.GetUnitID().HasType(tokens.FungibleTokenUnitType))
+			require.EqualValues(t, tx.GetUnitID(), result.GetUnit())
+			require.EqualValues(t, tx.GetUnitID(), ft.ID)
 
 			require.NoError(t, tx.UnmarshalAttributes(attr))
 			require.Equal(t, ft.TypeID, attr.TypeID)
@@ -425,17 +425,17 @@ func TestSendFungible(t *testing.T) {
 			verifyTransactions: func(t *testing.T) {
 				var total = uint64(0)
 				for _, tx := range recTxs {
-					switch tx.PayloadType() {
-					case tokens.PayloadTypeTransferFT:
+					switch tx.Type {
+					case tokens.TransactionTypeTransferFT:
 						attrs := &tokens.TransferFungibleTokenAttributes{}
 						require.NoError(t, tx.UnmarshalAttributes(attrs))
 						total += attrs.Value
-					case tokens.PayloadTypeSplitFT:
+					case tokens.TransactionTypeSplitFT:
 						attrs := &tokens.SplitFungibleTokenAttributes{}
 						require.NoError(t, tx.UnmarshalAttributes(attrs))
 						total += attrs.TargetValue
 					default:
-						t.Errorf("unexpected tx type: %s", tx.PayloadType())
+						t.Errorf("unexpected tx type: %d", tx.Type)
 					}
 				}
 				require.Equal(t, uint64(26), total)
@@ -628,10 +628,10 @@ func TestNewNFT(t *testing.T) {
 			require.NoError(t, err)
 			tx := recTxs[len(recTxs)-1]
 			require.NotNil(t, result)
-			require.Len(t, tx.UnitID(), 33)
-			require.EqualValues(t, tx.UnitID(), result.GetUnit())
-			require.EqualValues(t, tx.UnitID(), nft.ID)
-			require.True(t, tx.UnitID().HasType(tokens.NonFungibleTokenUnitType))
+			require.Len(t, tx.GetUnitID(), 33)
+			require.EqualValues(t, tx.GetUnitID(), result.GetUnit())
+			require.EqualValues(t, tx.GetUnitID(), nft.ID)
+			require.True(t, tx.GetUnitID().HasType(tokens.NonFungibleTokenUnitType))
 
 			attr := &tokens.MintNonFungibleTokenAttributes{}
 			require.NoError(t, tx.UnmarshalAttributes(attr))
@@ -654,7 +654,7 @@ func TestTransferNFT(t *testing.T) {
 			return tokenz[string(id)], nil
 		},
 		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
-			recTxs[string(tx.UnitID())] = tx
+			recTxs[string(tx.GetUnitID())] = tx
 			return tx.Hash(crypto.SHA256), nil
 		},
 		getUnitsByOwnerID: func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
@@ -724,7 +724,7 @@ func TestUpdateNFTData(t *testing.T) {
 			return tokenz[string(id)], nil
 		},
 		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
-			recTxs[string(tx.UnitID())] = tx
+			recTxs[string(tx.GetUnitID())] = tx
 			return tx.Hash(crypto.SHA256), nil
 		},
 		getUnitsByOwnerID: func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
@@ -747,8 +747,8 @@ func TestUpdateNFTData(t *testing.T) {
 	require.NotNil(t, result)
 	tx, found := recTxs[string(tok.ID)]
 	require.True(t, found)
-	require.EqualValues(t, tok.ID, tx.UnitID())
-	require.Equal(t, tokens.PayloadTypeUpdateNFT, tx.PayloadType())
+	require.EqualValues(t, tok.ID, tx.GetUnitID())
+	require.Equal(t, tokens.TransactionTypeUpdateNFT, tx.Type)
 
 	// test that locked token tx is not sent
 	lockedToken := newNonFungibleToken(t, "AB", nil, 1, 0)
@@ -766,7 +766,7 @@ func TestLockToken(t *testing.T) {
 			return token, nil
 		},
 		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
-			recTxs[string(tx.UnitID())] = tx
+			recTxs[string(tx.GetUnitID())] = tx
 			return tx.Hash(crypto.SHA256), nil
 		},
 		getUnitsByOwnerID: func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
@@ -792,8 +792,8 @@ func TestLockToken(t *testing.T) {
 	require.NotNil(t, result)
 	tx, found := recTxs[string(token.ID)]
 	require.True(t, found)
-	require.EqualValues(t, token.ID, tx.UnitID())
-	require.Equal(t, tokens.PayloadTypeLockToken, tx.PayloadType())
+	require.EqualValues(t, token.ID, tx.GetUnitID())
+	require.Equal(t, tokens.TransactionTypeLockToken, tx.Type)
 }
 
 func TestUnlockToken(t *testing.T) {
@@ -804,7 +804,7 @@ func TestUnlockToken(t *testing.T) {
 			return token, nil
 		},
 		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
-			recTxs[string(tx.UnitID())] = tx
+			recTxs[string(tx.GetUnitID())] = tx
 			return tx.Hash(crypto.SHA256), nil
 		},
 		getUnitsByOwnerID: func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
@@ -830,8 +830,8 @@ func TestUnlockToken(t *testing.T) {
 	require.NotNil(t, result)
 	tx, found := recTxs[string(token.ID)]
 	require.True(t, found)
-	require.EqualValues(t, token.ID, tx.UnitID())
-	require.Equal(t, tokens.PayloadTypeUnlockToken, tx.PayloadType())
+	require.EqualValues(t, token.ID, tx.GetUnitID())
+	require.Equal(t, tokens.TransactionTypeUnlockToken, tx.Type)
 }
 
 func TestSendFungibleByID(t *testing.T) {
@@ -866,12 +866,12 @@ func TestSendFungibleByID(t *testing.T) {
 	sub, err := w.SendFungibleByID(context.Background(), 1, token.ID, 50, nil, nil)
 	require.NoError(t, err)
 	// ensure it's a split
-	require.Equal(t, tokens.PayloadTypeSplitFT, sub.Submissions[0].Transaction.PayloadType())
+	require.Equal(t, tokens.TransactionTypeSplitFT, sub.Submissions[0].Transaction.Type)
 
 	sub, err = w.SendFungibleByID(context.Background(), 1, token.ID, 100, nil, nil)
 	require.NoError(t, err)
 	// ensure it's a transfer
-	require.Equal(t, tokens.PayloadTypeTransferFT, sub.Submissions[0].Transaction.PayloadType())
+	require.Equal(t, tokens.TransactionTypeTransferFT, sub.Submissions[0].Transaction.Type)
 
 	// Test sending fungible token by ID with insufficient balance
 	_, err = w.SendFungibleByID(context.Background(), 1, token.ID, 200, nil, nil)
@@ -914,8 +914,8 @@ type mockTokensPartitionClient struct {
 
 	getRoundNumber              func(ctx context.Context) (uint64, error)
 	sendTransaction             func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
-	confirmTransaction          func(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*sdktypes.Proof, error)
-	getTransactionProof         func(ctx context.Context, txHash types.Bytes) (*sdktypes.Proof, error)
+	confirmTransaction          func(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*types.TxRecordProof, error)
+	getTransactionProof         func(ctx context.Context, txHash types.Bytes) (*types.TxRecordProof, error)
 	getFeeCreditRecordByOwnerID func(ctx context.Context, ownerID []byte) (*sdktypes.FeeCreditRecord, error)
 	getBlock                    func(ctx context.Context, roundNumber uint64) (*types.Block, error)
 	getUnitsByOwnerID           func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error)
@@ -998,14 +998,14 @@ func (m *mockTokensPartitionClient) SendTransaction(ctx context.Context, tx *typ
 	return nil, fmt.Errorf("SendTransaction not implemented")
 }
 
-func (m *mockTokensPartitionClient) ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*sdktypes.Proof, error) {
+func (m *mockTokensPartitionClient) ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*types.TxRecordProof, error) {
 	if m.confirmTransaction != nil {
 		return m.confirmTransaction(ctx, tx, log)
 	}
 	return nil, fmt.Errorf("ConfirmTransaction not implemented")
 }
 
-func (m *mockTokensPartitionClient) GetTransactionProof(ctx context.Context, txHash types.Bytes) (*sdktypes.Proof, error) {
+func (m *mockTokensPartitionClient) GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TxRecordProof, error) {
 	if m.getTransactionProof != nil {
 		return m.getTransactionProof(ctx, txHash)
 	}

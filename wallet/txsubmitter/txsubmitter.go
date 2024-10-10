@@ -18,7 +18,7 @@ type (
 		UnitID      types.UnitID
 		TxHash      types.Bytes
 		Transaction *types.TransactionOrder
-		Proof       *sdktypes.Proof
+		Proof       *types.TxRecordProof
 	}
 
 	TxSubmissionBatch struct {
@@ -31,7 +31,7 @@ type (
 
 func New(tx *types.TransactionOrder) *TxSubmission {
 	return &TxSubmission{
-		UnitID:      tx.UnitID(),
+		UnitID:      tx.GetUnitID(),
 		TxHash:      tx.Hash(crypto.SHA256),
 		Transaction: tx,
 	}

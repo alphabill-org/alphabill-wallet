@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
 
@@ -30,7 +32,7 @@ func TestExistingWalletCanBeLoaded(t *testing.T) {
 	rpcClient := testutil.NewRpcClientMock()
 	feeManagerDB, err := fees.NewFeeManagerDB(homedir)
 	require.NoError(t, err)
-	_, err = NewWallet(am, feeManagerDB, rpcClient, maxFee, logger.New(t))
+	_, err = NewWallet(types.NetworkLocal, money.DefaultSystemID, am, feeManagerDB, rpcClient, maxFee, logger.New(t))
 	require.NoError(t, err)
 }
 
@@ -106,7 +108,7 @@ func createTestWallet(t *testing.T, moneyClient sdktypes.MoneyPartitionClient) *
 	feeManagerDB, err := fees.NewFeeManagerDB(dir)
 	require.NoError(t, err)
 
-	w, err := NewWallet(am, feeManagerDB, moneyClient, maxFee, logger.New(t))
+	w, err := NewWallet(types.NetworkLocal, money.DefaultSystemID, am, feeManagerDB, moneyClient, maxFee, logger.New(t))
 	require.NoError(t, err)
 
 	return w

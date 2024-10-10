@@ -53,6 +53,7 @@ func (c *tokensPartitionClient) GetFungibleToken(ctx context.Context, tokenID sd
 	}
 
 	return &sdktypes.FungibleToken{
+		NetworkID:      ft.NetworkID,
 		SystemID:       ft.SystemID,
 		ID:             ft.UnitID,
 		Symbol:         ftType.Data.Symbol,
@@ -90,6 +91,7 @@ func (c *tokensPartitionClient) GetNonFungibleToken(ctx context.Context, tokenID
 	}
 
 	return &sdktypes.NonFungibleToken{
+		NetworkID:           nft.NetworkID,
 		SystemID:            nft.SystemID,
 		ID:                  nft.UnitID,
 		Symbol:              nftType.Data.Symbol,
@@ -172,6 +174,7 @@ func (c *tokensPartitionClient) GetFungibleTokens(ctx context.Context, ownerID [
 		ftType := types[string(typeID)]
 
 		fts = append(fts, &sdktypes.FungibleToken{
+			NetworkID:      u.NetworkID,
 			SystemID:       u.SystemID,
 			ID:             u.UnitID,
 			Symbol:         ftType.Data.Symbol,
@@ -254,6 +257,7 @@ func (c *tokensPartitionClient) GetNonFungibleTokens(ctx context.Context, ownerI
 		nftType := types[string(typeID)]
 
 		nfts = append(nfts, &sdktypes.NonFungibleToken{
+			NetworkID:           u.NetworkID,
 			SystemID:            u.SystemID,
 			ID:                  u.UnitID,
 			Symbol:              nftType.Data.Symbol,
@@ -322,7 +326,7 @@ func (c *tokensPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context,
 	return c.getFeeCreditRecordByOwnerID(ctx, ownerID, tokens.FeeCreditRecordUnitType)
 }
 
-func (c *tokensPartitionClient) ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*sdktypes.Proof, error) {
+func (c *tokensPartitionClient) ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*types.TxRecordProof, error) {
 	txBatch := txsubmitter.New(tx).ToBatch(c, log)
 	err := txBatch.SendTx(ctx, true)
 	if err != nil {
@@ -348,6 +352,7 @@ func (c *tokensPartitionClient) getFungibleTokenType(ctx context.Context, typeID
 		return nil, nil
 	}
 	return &sdktypes.FungibleTokenType{
+		NetworkID:                ftType.NetworkID,
 		SystemID:                 ftType.SystemID,
 		ID:                       ftType.UnitID,
 		ParentTypeID:             ftType.Data.ParentTypeID,

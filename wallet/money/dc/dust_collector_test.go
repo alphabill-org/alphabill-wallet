@@ -26,7 +26,7 @@ func TestDC_OK(t *testing.T) {
 		testutil.WithOwnerFeeCreditRecord(
 			testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, 100, maxFee, 100)),
 	)
-	dc := NewDustCollector(money.DefaultSystemID, 10, 10, moneyClient, 10, logger.New(t))
+	dc := NewDustCollector(10, 10, moneyClient, 10, logger.New(t))
 
 	// when dc runs
 	dcResult, err := dc.CollectDust(context.Background(), accountKeys.AccountKey)
@@ -38,9 +38,8 @@ func TestDC_OK(t *testing.T) {
 	txo := dcResult.SwapProof.TxRecord.TransactionOrder
 	err = txo.UnmarshalAttributes(&attr)
 	require.NoError(t, err)
-	require.Len(t, attr.DcTransfers, 2)
-	require.Len(t, attr.DcTransferProofs, 2)
-	require.EqualValues(t, targetBill.ID, txo.UnitID())
+	require.Len(t, attr.DustTransferProofs, 2)
+	require.EqualValues(t, targetBill.ID, txo.GetUnitID())
 }
 
 func TestDCWontRunForSingleBill(t *testing.T) {
@@ -52,7 +51,7 @@ func TestDCWontRunForSingleBill(t *testing.T) {
 		testutil.WithOwnerFeeCreditRecord(
 			testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, 100, 0, 100)),
 	)
-	dc := NewDustCollector(money.DefaultSystemID, 10, 10, moneyClient, maxFee, logger.New(t))
+	dc := NewDustCollector(10, 10, moneyClient, maxFee, logger.New(t))
 
 	// when dc runs
 	dcResult, err := dc.CollectDust(context.Background(), accountKeys.AccountKey)
@@ -74,7 +73,7 @@ func TestAllBillsAreSwapped_WhenWalletBillCountEqualToMaxBillCount(t *testing.T)
 		testutil.WithOwnerBill(targetBill),
 		testutil.WithOwnerFeeCreditRecord(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, 100, 0, 100)),
 	)
-	w := NewDustCollector(money.DefaultSystemID, maxBillsPerDC, 10, moneyClient, maxFee, logger.New(t))
+	w := NewDustCollector(maxBillsPerDC, 10, moneyClient, maxFee, logger.New(t))
 
 	// when dc runs
 	dcResult, err := w.CollectDust(context.Background(), accountKeys.AccountKey)
@@ -82,16 +81,15 @@ func TestAllBillsAreSwapped_WhenWalletBillCountEqualToMaxBillCount(t *testing.T)
 
 	// then swap tx should be returned
 	require.NotNil(t, dcResult.SwapProof)
-	require.EqualValues(t, targetBill.ID, dcResult.SwapProof.TxRecord.TransactionOrder.UnitID())
+	require.EqualValues(t, targetBill.ID, dcResult.SwapProof.TxRecord.TransactionOrder.GetUnitID())
 
 	// and swap contains correct dc transfers
 	swapAttr := &money.SwapDCAttributes{}
 	swapTxo := dcResult.SwapProof.TxRecord.TransactionOrder
 	err = swapTxo.UnmarshalAttributes(swapAttr)
 	require.NoError(t, err)
-	require.Len(t, swapAttr.DcTransfers, maxBillsPerDC-1)
-	require.Len(t, swapAttr.DcTransferProofs, maxBillsPerDC-1)
-	require.EqualValues(t, targetBill.ID, swapTxo.UnitID())
+	require.Len(t, swapAttr.DustTransferProofs, maxBillsPerDC-1)
+	require.EqualValues(t, targetBill.ID, swapTxo.GetUnitID())
 }
 
 func TestOnlyFirstNBillsAreSwapped_WhenBillCountOverLimit(t *testing.T) {
@@ -107,7 +105,7 @@ func TestOnlyFirstNBillsAreSwapped_WhenBillCountOverLimit(t *testing.T) {
 		testutil.WithOwnerBill(targetBill),
 		testutil.WithOwnerFeeCreditRecord(testutil.NewMoneyFCR(accountKeys.AccountKey.PubKeyHash.Sha256, 100, 0, 100)),
 	)
-	w := NewDustCollector(money.DefaultSystemID, maxBillsPerDC, 10, moneyClient, maxFee, logger.New(t))
+	w := NewDustCollector(maxBillsPerDC, 10, moneyClient, maxFee, logger.New(t))
 
 	// when dc runs
 	dcResult, err := w.CollectDust(context.Background(), accountKeys.AccountKey)
@@ -118,9 +116,8 @@ func TestOnlyFirstNBillsAreSwapped_WhenBillCountOverLimit(t *testing.T) {
 	swapTxo := dcResult.SwapProof.TxRecord.TransactionOrder
 	swapAttr := &money.SwapDCAttributes{}
 	err = swapTxo.UnmarshalAttributes(swapAttr)
-	require.EqualValues(t, targetBill.ID, swapTxo.UnitID())
+	require.EqualValues(t, targetBill.ID, swapTxo.GetUnitID())
 	require.NoError(t, err)
-	require.Len(t, swapAttr.DcTransfers, maxBillsPerDC)
-	require.Len(t, swapAttr.DcTransferProofs, maxBillsPerDC)
-	require.EqualValues(t, targetBill.ID, swapTxo.UnitID())
+	require.Len(t, swapAttr.DustTransferProofs, maxBillsPerDC)
+	require.EqualValues(t, targetBill.ID, swapTxo.GetUnitID())
 }

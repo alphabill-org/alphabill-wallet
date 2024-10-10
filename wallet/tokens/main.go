@@ -37,6 +37,7 @@ var (
 
 type (
 	Wallet struct {
+		networkID    types.NetworkID
 		systemID     types.SystemID
 		am           account.Manager
 		tokensClient sdktypes.TokensPartitionClient
@@ -62,8 +63,9 @@ type (
 	}
 )
 
-func New(systemID types.SystemID, tokensClient sdktypes.TokensPartitionClient, am account.Manager, confirmTx bool, feeManager *fees.FeeManager, maxFee uint64, log *slog.Logger) (*Wallet, error) {
+func New(networkID types.NetworkID, systemID types.SystemID, tokensClient sdktypes.TokensPartitionClient, am account.Manager, confirmTx bool, feeManager *fees.FeeManager, maxFee uint64, log *slog.Logger) (*Wallet, error) {
 	return &Wallet{
+		networkID:    networkID,
 		systemID:     systemID,
 		am:           am,
 		tokensClient: tokensClient,
@@ -96,8 +98,8 @@ func newSingleResult(sub *txsubmitter.TxSubmission, accNr uint64) *SubmissionRes
 	return res
 }
 
-func (r *SubmissionResult) GetProofs() []*sdktypes.Proof {
-	proofs := make([]*sdktypes.Proof, len(r.Submissions))
+func (r *SubmissionResult) GetProofs() []*types.TxRecordProof {
+	proofs := make([]*types.TxRecordProof, len(r.Submissions))
 	for i, sub := range r.Submissions {
 		proofs[i] = sub.Proof
 	}
@@ -113,6 +115,10 @@ func (r *SubmissionResult) GetUnit() types.UnitID {
 
 func (w *Wallet) GetAccountManager() account.Manager {
 	return w.am
+}
+
+func (w *Wallet) NetworkID() types.NetworkID {
+	return w.networkID
 }
 
 func (w *Wallet) SystemID() types.SystemID {
@@ -170,11 +176,11 @@ func (w *Wallet) NewFungibleType(ctx context.Context, accountNumber uint64, ft *
 		return nil, err
 	}
 
-	payloadBytes, err := tx.PayloadBytes()
+	sigBytes, err := tx.AuthProofSigBytes()
 	if err != nil {
 		return nil, err
 	}
-	subTypeCreationProofs, err := newProofs(payloadBytes, subtypePredicateInputs)
+	subTypeCreationProofs, err := newProofs(sigBytes, subtypePredicateInputs)
 	if err != nil {
 		return nil, err
 	}
@@ -233,11 +239,11 @@ func (w *Wallet) NewNonFungibleType(ctx context.Context, accountNumber uint64, n
 		return nil, err
 	}
 
-	payloadBytes, err := tx.PayloadBytes()
+	sigBytes, err := tx.AuthProofSigBytes()
 	if err != nil {
 		return nil, err
 	}
-	subTypeProofs, err := newProofs(payloadBytes, subtypePredicateInputs)
+	subTypeProofs, err := newProofs(sigBytes, subtypePredicateInputs)
 	if err != nil {
 		return nil, err
 	}
@@ -280,11 +286,11 @@ func (w *Wallet) NewFungibleToken(ctx context.Context, accountNumber uint64, ft 
 		return nil, err
 	}
 
-	payloadBytes, err := tx.PayloadBytes()
+	sigBytes, err := tx.AuthProofSigBytes()
 	if err != nil {
 		return nil, err
 	}
-	tokenMintingProof, err := mintPredicateInput.Proof(payloadBytes)
+	tokenMintingProof, err := mintPredicateInput.Proof(sigBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -338,11 +344,11 @@ func (w *Wallet) NewNFT(ctx context.Context, accountNumber uint64, nft *sdktypes
 		return nil, err
 	}
 
-	payloadBytes, err := tx.PayloadBytes()
+	sigBytes, err := tx.AuthProofSigBytes()
 	if err != nil {
 		return nil, err
 	}
-	tokenMintingProof, err := mintPredicateInput.Proof(payloadBytes)
+	tokenMintingProof, err := mintPredicateInput.Proof(sigBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -548,15 +554,15 @@ func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID 
 		return nil, err
 	}
 
-	payloadBytes, err := tx.PayloadBytes()
+	sigBytes, err := tx.AuthProofSigBytes()
 	if err != nil {
 		return nil, err
 	}
-	typeOwnerProofs, err := newProofs(payloadBytes, typeOwnerPredicateInputs)
+	typeOwnerProofs, err := newProofs(sigBytes, typeOwnerPredicateInputs)
 	if err != nil {
 		return nil, err
 	}
-	ownerProof, err := ownerPredicateInput.Proof(payloadBytes)
+	ownerProof, err := ownerPredicateInput.Proof(sigBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -676,15 +682,15 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 		return nil, err
 	}
 
-	payloadBytes, err := tx.PayloadBytes()
+	sigBytes, err := tx.AuthProofSigBytes()
 	if err != nil {
 		return nil, err
 	}
-	tokenDataUpdateProof, err := tokenDataUpdatePredicateInput.Proof(payloadBytes)
+	tokenDataUpdateProof, err := tokenDataUpdatePredicateInput.Proof(sigBytes)
 	if err != nil {
 		return nil, err
 	}
-	tokenTypeDataUpdateProofs, err := newProofs(payloadBytes, tokenTypeDataUpdatePredicateInputs)
+	tokenTypeDataUpdateProofs, err := newProofs(sigBytes, tokenTypeDataUpdatePredicateInputs)
 	if err != nil {
 		return nil, err
 	}
@@ -820,11 +826,11 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID ty
 		return nil, err
 	}
 
-	payloadBytes, err := tx.PayloadBytes()
+	sigBytes, err := tx.AuthProofSigBytes()
 	if err != nil {
 		return nil, err
 	}
-	ownerProof, err := ownerPredicateInput.Proof(payloadBytes)
+	ownerProof, err := ownerPredicateInput.Proof(sigBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -888,11 +894,11 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 		return nil, err
 	}
 
-	payloadBytes, err := tx.PayloadBytes()
+	sigBytes, err := tx.AuthProofSigBytes()
 	if err != nil {
 		return nil, err
 	}
-	ownerProof, err := ownerPredicateInput.Proof(payloadBytes)
+	ownerProof, err := ownerPredicateInput.Proof(sigBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -926,7 +932,8 @@ func ensureTokenOwnership(acc *accountKey, token Token, ownerProof *PredicateInp
 	if err != nil {
 		return err
 	}
-	if !templates.IsP2pkhTemplate(predicate) && ownerProof != nil && ownerProof.AccountKey == nil && ownerProof.Argument != nil {
+	isP2pkhPredicate := templates.VerifyP2pkhPredicate(predicate) == nil
+	if !isP2pkhPredicate && ownerProof != nil && ownerProof.AccountKey == nil && ownerProof.Argument != nil {
 		// this must be a "custom predicate" with provided owner proof
 		return nil
 	}
@@ -945,10 +952,10 @@ func extractPredicate(predicateBytes []byte) (*predicates.Predicate, error) {
 	return predicate, nil
 }
 
-func newProofs(payloadBytes []byte, predicateInputs []*PredicateInput) ([][]byte, error) {
+func newProofs(sigBytes []byte, predicateInputs []*PredicateInput) ([][]byte, error) {
 	var predicateSigs [][]byte
 	for _, predicateInput := range predicateInputs {
-		predicateSig, err := predicateInput.Proof(payloadBytes)
+		predicateSig, err := predicateInput.Proof(sigBytes)
 		if err != nil {
 			return nil, err
 		}

@@ -39,7 +39,7 @@ func TestCreateTransactions(t *testing.T) {
 
 				// verify first tx is transfer order of bill no1
 				tx := txs[0]
-				require.Equal(t, money.PayloadTypeTransfer, tx.PayloadType())
+				require.Equal(t, money.TransactionTypeTransfer, tx.Type)
 				transferAttr := &money.TransferAttributes{}
 				err := tx.UnmarshalAttributes(transferAttr)
 				require.NoError(t, err)
@@ -47,7 +47,7 @@ func TestCreateTransactions(t *testing.T) {
 
 				// verify second tx is split order of bill no2
 				tx = txs[1]
-				require.Equal(t, money.PayloadTypeSplit, tx.PayloadType())
+				require.Equal(t, money.TransactionTypeSplit, tx.Type)
 				splitAttr := &money.SplitAttributes{}
 				err = tx.UnmarshalAttributes(splitAttr)
 				require.NoError(t, err)
@@ -73,7 +73,7 @@ func TestCreateTransactions(t *testing.T) {
 
 				// verify both bills are transfer orders
 				for _, tx := range txs {
-					require.Equal(t, money.PayloadTypeTransfer, tx.PayloadType())
+					require.Equal(t, money.TransactionTypeTransfer, tx.Type)
 					transferAttr := &money.TransferAttributes{}
 					err := tx.UnmarshalAttributes(transferAttr)
 					require.NoError(t, err)
@@ -90,7 +90,7 @@ func TestCreateTransactions(t *testing.T) {
 				require.Len(t, txs, 1)
 
 				// verify transfer tx
-				require.Equal(t, money.PayloadTypeTransfer, txs[0].PayloadType())
+				require.Equal(t, money.TransactionTypeTransfer, txs[0].Type)
 				transferAttr := &money.TransferAttributes{}
 				err := txs[0].UnmarshalAttributes(transferAttr)
 				require.NoError(t, err)

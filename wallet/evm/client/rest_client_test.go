@@ -45,12 +45,13 @@ func writeCBORError(t *testing.T, w http.ResponseWriter, e error, code int) {
 }
 
 func createTxOrder() *types.TransactionOrder {
+	attrCBOR, _ := types.Cbor.Marshal(evm.TxAttributes{})
 	return &types.TransactionOrder{
-		Payload: &types.Payload{
+		Payload: types.Payload{
 			SystemID:   1,
 			UnitID:     []byte{0, 0, 0, 1},
-			Type:       "test",
-			Attributes: []byte{0, 0, 0, 0, 0, 0, 0},
+			Type:       22,
+			Attributes: attrCBOR,
 			ClientMetadata: &types.ClientMetadata{
 				Timeout: 100,
 			},

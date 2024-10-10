@@ -81,7 +81,7 @@ func (w *Wallet) prepareSplitOrTransferTx(acc *accountKey, amount uint64, ft *sd
 			return nil, err
 		}
 
-		payloadBytes, err := tx.PayloadBytes()
+		payloadBytes, err := tx.AuthProofSigBytes()
 		if err != nil {
 			return nil, err
 		}
@@ -114,7 +114,7 @@ func (w *Wallet) prepareSplitOrTransferTx(acc *accountKey, amount uint64, ft *sd
 		if err != nil {
 			return nil, err
 		}
-		payloadBytes, err := tx.PayloadBytes()
+		payloadBytes, err := tx.AuthProofSigBytes()
 		if err != nil {
 			return nil, err
 		}

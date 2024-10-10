@@ -5,11 +5,11 @@ go 1.22
 replace github.com/multiformats/go-multistream v0.5.0 => github.com/multiformats/go-multistream v0.4.1
 
 require (
-	github.com/alphabill-org/alphabill-go-base v0.0.0-20241004091816-c4c3d0cc7964
+	github.com/alphabill-org/alphabill-go-base v0.0.0-20241008083421-8624d98c0d83
 	github.com/btcsuite/btcd v0.23.2
 	github.com/btcsuite/btcd/btcutil v1.1.2
 	github.com/ethereum/go-ethereum v1.14.0
-	github.com/fxamacker/cbor/v2 v2.6.0
+	github.com/fxamacker/cbor/v2 v2.7.0
 	github.com/holiman/uint256 v1.2.4
 	github.com/lmittmann/tint v1.0.2
 	github.com/mattn/go-isatty v0.0.20

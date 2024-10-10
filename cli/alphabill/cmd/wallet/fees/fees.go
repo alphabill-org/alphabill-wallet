@@ -9,6 +9,7 @@ import (
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
+	basetypes "github.com/alphabill-org/alphabill-go-base/types"
 	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
@@ -41,9 +42,8 @@ func NewFeesCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 	cmd.AddCommand(lockFeeCreditCmd(config))
 	cmd.AddCommand(unlockFeeCreditCmd(config))
 
-	cmd.PersistentFlags().VarP(&config.targetPartitionType, args.PartitionCmdName, "n", "partition name for which to manage fees [money|tokens|evm]")
 	cmd.PersistentFlags().StringVarP(&config.moneyPartitionNodeUrl, args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "money rpc node url")
-
+	cmd.PersistentFlags().VarP(&config.targetPartitionType, args.PartitionCmdName, "n", "partition name for which to manage fees [money|tokens|evm]")
 	usage := fmt.Sprintf("partition rpc node url for which to manage fees (default: [%s|%s|%s] based on --partition flag)", args.DefaultMoneyRpcUrl, args.DefaultTokensRpcUrl, args.DefaultEvmRpcUrl)
 	cmd.PersistentFlags().StringVarP(&config.targetPartitionNodeUrl, args.PartitionRpcUrlCmdName, "m", "", usage)
 	return cmd
@@ -300,8 +300,8 @@ type FeeCreditManager interface {
 	GetFeeCredit(ctx context.Context, cmd fees.GetFeeCreditCmd) (*types.FeeCreditRecord, error)
 	AddFeeCredit(ctx context.Context, cmd fees.AddFeeCmd) (*fees.AddFeeCmdResponse, error)
 	ReclaimFeeCredit(ctx context.Context, cmd fees.ReclaimFeeCmd) (*fees.ReclaimFeeCmdResponse, error)
-	LockFeeCredit(ctx context.Context, cmd fees.LockFeeCreditCmd) (*types.Proof, error)
-	UnlockFeeCredit(ctx context.Context, cmd fees.UnlockFeeCreditCmd) (*types.Proof, error)
+	LockFeeCredit(ctx context.Context, cmd fees.LockFeeCreditCmd) (*basetypes.TxRecordProof, error)
+	UnlockFeeCredit(ctx context.Context, cmd fees.UnlockFeeCreditCmd) (*basetypes.TxRecordProof, error)
 	MinAddFeeAmount() uint64
 	MinReclaimFeeAmount() uint64
 	Close()
@@ -431,6 +431,7 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 	switch c.targetPartitionType {
 	case clitypes.MoneyType:
 		return fees.NewFeeManager(
+			moneyInfo.NetworkID,
 			am,
 			feeManagerDB,
 			moneyInfo.SystemID,
@@ -456,7 +457,11 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 		if !strings.HasPrefix(tokenInfo.Name, tokenTypeVar.String()) {
 			return nil, errors.New("invalid rpc url provided for tokens partition")
 		}
+		if moneyInfo.NetworkID != tokenInfo.NetworkID {
+			return nil, errors.New("money and tokens rpc clients must be in the same network")
+		}
 		return fees.NewFeeManager(
+			moneyInfo.NetworkID,
 			am,
 			feeManagerDB,
 			moneyInfo.SystemID,
@@ -482,7 +487,11 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 		if !strings.HasPrefix(evmInfo.Name, evmTypeVar.String()) {
 			return nil, errors.New("invalid validator node URL provided for evm partition")
 		}
+		if moneyInfo.NetworkID != evmInfo.NetworkID {
+			return nil, errors.New("money and evm rpc clients must be in the same network")
+		}
 		return fees.NewFeeManager(
+			moneyInfo.NetworkID,
 			am,
 			feeManagerDB,
 			moneyInfo.SystemID,

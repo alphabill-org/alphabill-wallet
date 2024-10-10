@@ -175,7 +175,7 @@ func ExecSendCmd(ctx context.Context, cmd *cobra.Command, config *types.WalletCo
 		return err
 	}
 
-	w, err := money.NewWallet(am, feeManagerDB, moneyClient, maxFee, config.Base.Logger)
+	w, err := money.NewWallet(0, 0, am, feeManagerDB, moneyClient, maxFee, config.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -279,7 +279,7 @@ func ExecGetBalanceCmd(cmd *cobra.Command, config *types.WalletConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	w, err := money.NewWallet(am, feeManagerDB, moneyClient, 0, config.Base.Logger)
+	w, err := money.NewWallet(0, 0, am, feeManagerDB, moneyClient, 0, config.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -416,7 +416,12 @@ func ExecCollectDust(cmd *cobra.Command, config *types.WalletConfig) error {
 		return err
 	}
 
-	w, err := money.NewWallet(am, feeManagerDB, moneyClient, maxFee, config.Base.Logger)
+	nodeInfo, err := moneyClient.GetNodeInfo(cmd.Context())
+	if err != nil {
+		return fmt.Errorf("failed to get node info: %w", err)
+	}
+
+	w, err := money.NewWallet(nodeInfo.NetworkID, nodeInfo.SystemID, am, feeManagerDB, moneyClient, maxFee, config.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -431,11 +436,11 @@ func ExecCollectDust(cmd *cobra.Command, config *types.WalletConfig) error {
 	for _, dcResult := range dcResults {
 		if dcResult.DustCollectionResult != nil {
 			attr := &sdkmoney.SwapDCAttributes{}
-			err := dcResult.DustCollectionResult.SwapProof.TxRecord.TransactionOrder.UnmarshalAttributes(attr)
+			err := dcResult.DustCollectionResult.SwapProof.TransactionOrder().UnmarshalAttributes(attr)
 			if err != nil {
 				return fmt.Errorf("failed to unmarshal swap tx proof: %w", err)
 			}
-			feeSum, err := dcResult.DustCollectionResult.GetFeeSum()
+			feeSum, swapAmount, err := dcResult.DustCollectionResult.GetFeeSumAndSwapAmount()
 			if err != nil {
 				return fmt.Errorf("failed to calculate fee sum: %w", err)
 			}
@@ -443,9 +448,9 @@ func ExecCollectDust(cmd *cobra.Command, config *types.WalletConfig) error {
 				"Dust collection finished successfully on account #%d. Joined %d bills with total value of %s "+
 					"ALPHA into an existing target bill with unit identifier 0x%s. Paid %s fees for transaction(s).",
 				dcResult.AccountIndex+1,
-				len(attr.DcTransfers),
-				util.AmountToString(attr.TargetValue, 8),
-				dcResult.DustCollectionResult.SwapProof.TxRecord.TransactionOrder.UnitID(),
+				len(attr.DustTransferProofs),
+				util.AmountToString(swapAmount, 8),
+				dcResult.DustCollectionResult.SwapProof.TxRecord.TransactionOrder.GetUnitID(),
 				util.AmountToString(feeSum, 8),
 			))
 		} else {

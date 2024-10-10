@@ -1,4 +1,5 @@
 {
+  "network_identifier": 3,
   "system_identifier": 4,
   "type_id_length": 8,
   "unit_id_length": 256,

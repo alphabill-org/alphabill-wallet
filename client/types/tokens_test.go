@@ -4,11 +4,13 @@ import (
 	"testing"
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
+	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/stretchr/testify/require"
 )
 
 func TestFungibleTokenTypeCreate(t *testing.T) {
 	tt := &FungibleTokenType{
+		NetworkID:    types.NetworkLocal,
 		SystemID:     tokens.DefaultSystemID,
 		ID:           tokens.NewFungibleTokenTypeID(nil, []byte{2}),
 		ParentTypeID: tokens.NewFungibleTokenTypeID(nil, []byte{1}),
@@ -30,11 +32,11 @@ func TestFungibleTokenTypeCreate(t *testing.T) {
 		WithReferenceNumber([]byte(refNo)))
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.PayloadType(), tokens.PayloadTypeDefineFT)
-	require.EqualValues(t, tt.SystemID, tx.SystemID())
+	require.Equal(t, tx.Type, tokens.TransactionTypeDefineFT)
+	require.EqualValues(t, tt.SystemID, tx.GetSystemID())
 	require.NotNil(t, tt.ID)
 	require.True(t, tt.ID.HasType(tokens.FungibleTokenTypeUnitType))
-	require.EqualValues(t, tt.ID, tx.UnitID())
+	require.EqualValues(t, tt.ID, tx.GetUnitID())
 	require.EqualValues(t, timeout, tx.Timeout())
 	require.EqualValues(t, refNo, tx.Payload.ClientMetadata.ReferenceNumber)
 	require.Nil(t, tx.AuthProof)
@@ -53,6 +55,7 @@ func TestFungibleTokenTypeCreate(t *testing.T) {
 
 func TestNonFungibleTokenTypeCreate(t *testing.T) {
 	tt := &NonFungibleTokenType{
+		NetworkID:    types.NetworkLocal,
 		SystemID:     tokens.DefaultSystemID,
 		ID:           tokens.NewFungibleTokenTypeID(nil, []byte{2}),
 		ParentTypeID: tokens.NewFungibleTokenTypeID(nil, []byte{1}),
@@ -70,11 +73,11 @@ func TestNonFungibleTokenTypeCreate(t *testing.T) {
 	tx, err := tt.Define()
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.PayloadType(), tokens.PayloadTypeDefineNFT)
-	require.EqualValues(t, tt.SystemID, tx.SystemID())
+	require.Equal(t, tx.Type, tokens.TransactionTypeDefineNFT)
+	require.EqualValues(t, tt.SystemID, tx.GetSystemID())
 	require.NotNil(t, tt.ID)
 	require.True(t, tt.ID.HasType(tokens.FungibleTokenTypeUnitType))
-	require.EqualValues(t, tt.ID, tx.UnitID())
+	require.EqualValues(t, tt.ID, tx.GetUnitID())
 	require.Nil(t, tx.AuthProof)
 
 	attr := &tokens.DefineNonFungibleTokenAttributes{}
@@ -91,6 +94,7 @@ func TestNonFungibleTokenTypeCreate(t *testing.T) {
 
 func TestFungibleTokenCreate(t *testing.T) {
 	ft := &FungibleToken{
+		NetworkID:      types.NetworkLocal,
 		SystemID:       tokens.DefaultSystemID,
 		OwnerPredicate: []byte{99},
 		TypeID:         tokens.NewFungibleTokenTypeID(nil, []byte{1}),
@@ -99,11 +103,11 @@ func TestFungibleTokenCreate(t *testing.T) {
 	tx, err := ft.Mint()
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.PayloadType(), tokens.PayloadTypeMintFT)
-	require.EqualValues(t, ft.SystemID, tx.SystemID())
+	require.Equal(t, tx.Type, tokens.TransactionTypeMintFT)
+	require.EqualValues(t, ft.SystemID, tx.GetSystemID())
 	require.NotNil(t, ft.ID)
 	require.True(t, ft.ID.HasType(tokens.FungibleTokenUnitType))
-	require.EqualValues(t, ft.ID, tx.UnitID())
+	require.EqualValues(t, ft.ID, tx.GetUnitID())
 	require.Nil(t, tx.AuthProof)
 
 	attr := &tokens.MintFungibleTokenAttributes{}
@@ -115,6 +119,7 @@ func TestFungibleTokenCreate(t *testing.T) {
 
 func TestFungibleTokenTransfer(t *testing.T) {
 	ft := &FungibleToken{
+		NetworkID:      types.NetworkLocal,
 		SystemID:       tokens.DefaultSystemID,
 		ID:             tokens.NewFungibleTokenID(nil, []byte{1}),
 		OwnerPredicate: []byte{2},
@@ -125,9 +130,9 @@ func TestFungibleTokenTransfer(t *testing.T) {
 	tx, err := ft.Transfer(newOwnerPredicate)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.PayloadType(), tokens.PayloadTypeTransferFT)
-	require.EqualValues(t, ft.SystemID, tx.SystemID())
-	require.EqualValues(t, ft.ID, tx.UnitID())
+	require.Equal(t, tx.Type, tokens.TransactionTypeTransferFT)
+	require.EqualValues(t, ft.SystemID, tx.GetSystemID())
+	require.EqualValues(t, ft.ID, tx.GetUnitID())
 
 	attr := &tokens.TransferFungibleTokenAttributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))
@@ -138,6 +143,7 @@ func TestFungibleTokenTransfer(t *testing.T) {
 
 func TestFungibleTokenSplit(t *testing.T) {
 	ft := &FungibleToken{
+		NetworkID:      types.NetworkLocal,
 		SystemID:       tokens.DefaultSystemID,
 		ID:             tokens.NewFungibleTokenID(nil, []byte{1}),
 		OwnerPredicate: []byte{2},
@@ -148,9 +154,9 @@ func TestFungibleTokenSplit(t *testing.T) {
 	tx, err := ft.Split(3, newOwnerPredicate)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.PayloadType(), tokens.PayloadTypeSplitFT)
-	require.Equal(t, ft.SystemID, tx.SystemID())
-	require.Equal(t, ft.ID, tx.UnitID())
+	require.Equal(t, tx.Type, tokens.TransactionTypeSplitFT)
+	require.Equal(t, ft.SystemID, tx.GetSystemID())
+	require.Equal(t, ft.ID, tx.GetUnitID())
 
 	attr := &tokens.SplitFungibleTokenAttributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))
@@ -161,6 +167,7 @@ func TestFungibleTokenSplit(t *testing.T) {
 
 func TestFungibleTokenBurn(t *testing.T) {
 	ft := &FungibleToken{
+		NetworkID:      types.NetworkLocal,
 		SystemID:       tokens.DefaultSystemID,
 		ID:             tokens.NewFungibleTokenID(nil, []byte{1}),
 		OwnerPredicate: []byte{2},
@@ -173,9 +180,9 @@ func TestFungibleTokenBurn(t *testing.T) {
 	tx, err := ft.Burn(targetTokenID, targetTokenCounter)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.PayloadType(), tokens.PayloadTypeBurnFT)
-	require.Equal(t, ft.SystemID, tx.SystemID())
-	require.Equal(t, ft.ID, tx.UnitID())
+	require.Equal(t, tx.Type, tokens.TransactionTypeBurnFT)
+	require.Equal(t, ft.SystemID, tx.GetSystemID())
+	require.Equal(t, ft.ID, tx.GetUnitID())
 
 	attr := &tokens.BurnFungibleTokenAttributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))
@@ -187,6 +194,7 @@ func TestFungibleTokenBurn(t *testing.T) {
 
 func TestFungibleTokenJoin(t *testing.T) {
 	ft := &FungibleToken{
+		NetworkID:      types.NetworkLocal,
 		SystemID:       tokens.DefaultSystemID,
 		ID:             tokens.NewFungibleTokenID(nil, []byte{1}),
 		OwnerPredicate: []byte{2},
@@ -194,21 +202,21 @@ func TestFungibleTokenJoin(t *testing.T) {
 		Amount:         uint64(4),
 	}
 
-	tx, err := ft.Join(nil, nil)
+	tx, err := ft.Join(nil)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.PayloadType(), tokens.PayloadTypeJoinFT)
-	require.Equal(t, ft.SystemID, tx.SystemID())
-	require.Equal(t, ft.ID, tx.UnitID())
+	require.Equal(t, tx.Type, tokens.TransactionTypeJoinFT)
+	require.Equal(t, ft.SystemID, tx.GetSystemID())
+	require.Equal(t, ft.ID, tx.GetUnitID())
 
 	attr := &tokens.JoinFungibleTokenAttributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))
-	require.Nil(t, attr.BurnTransactions)
-	require.Nil(t, attr.Proofs)
+	require.Nil(t, attr.BurnTokenProofs)
 }
 
 func TestFungibleTokenLock(t *testing.T) {
 	ft := &FungibleToken{
+		NetworkID:      types.NetworkLocal,
 		SystemID:       tokens.DefaultSystemID,
 		ID:             tokens.NewFungibleTokenID(nil, []byte{1}),
 		OwnerPredicate: []byte{2},
@@ -219,9 +227,9 @@ func TestFungibleTokenLock(t *testing.T) {
 	tx, err := ft.Lock(5)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.PayloadType(), tokens.PayloadTypeLockToken)
-	require.Equal(t, ft.SystemID, tx.SystemID())
-	require.Equal(t, ft.ID, tx.UnitID())
+	require.Equal(t, tx.Type, tokens.TransactionTypeLockToken)
+	require.Equal(t, ft.SystemID, tx.GetSystemID())
+	require.Equal(t, ft.ID, tx.GetUnitID())
 
 	attr := &tokens.LockTokenAttributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))
@@ -230,6 +238,7 @@ func TestFungibleTokenLock(t *testing.T) {
 
 func TestNonFungibleTokenUnlock(t *testing.T) {
 	ft := &FungibleToken{
+		NetworkID:      types.NetworkLocal,
 		SystemID:       tokens.DefaultSystemID,
 		ID:             tokens.NewFungibleTokenID(nil, []byte{1}),
 		OwnerPredicate: []byte{2},
@@ -240,9 +249,9 @@ func TestNonFungibleTokenUnlock(t *testing.T) {
 	tx, err := ft.Unlock()
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.PayloadType(), tokens.PayloadTypeUnlockToken)
-	require.Equal(t, ft.SystemID, tx.SystemID())
-	require.Equal(t, ft.ID, tx.UnitID())
+	require.Equal(t, tx.Type, tokens.TransactionTypeUnlockToken)
+	require.Equal(t, ft.SystemID, tx.GetSystemID())
+	require.Equal(t, ft.ID, tx.GetUnitID())
 
 	attr := &tokens.UnlockTokenAttributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))
@@ -250,6 +259,7 @@ func TestNonFungibleTokenUnlock(t *testing.T) {
 
 func TestNonFungibleTokenCreate(t *testing.T) {
 	nft := &NonFungibleToken{
+		NetworkID:           types.NetworkLocal,
 		SystemID:            tokens.DefaultSystemID,
 		OwnerPredicate:      []byte{1},
 		TypeID:              tokens.NewFungibleTokenTypeID(nil, []byte{2}),
@@ -261,11 +271,11 @@ func TestNonFungibleTokenCreate(t *testing.T) {
 	tx, err := nft.Mint()
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.PayloadType(), tokens.PayloadTypeMintNFT)
-	require.EqualValues(t, nft.SystemID, tx.SystemID())
+	require.Equal(t, tx.Type, tokens.TransactionTypeMintNFT)
+	require.EqualValues(t, nft.SystemID, tx.GetSystemID())
 	require.NotNil(t, nft.ID)
 	require.True(t, nft.ID.HasType(tokens.NonFungibleTokenUnitType))
-	require.EqualValues(t, nft.ID, tx.UnitID())
+	require.EqualValues(t, nft.ID, tx.GetUnitID())
 	require.Nil(t, tx.AuthProof)
 
 	attr := &tokens.MintNonFungibleTokenAttributes{}
@@ -280,6 +290,7 @@ func TestNonFungibleTokenCreate(t *testing.T) {
 
 func TestNonFungibleTokenTransfer(t *testing.T) {
 	nft := &NonFungibleToken{
+		NetworkID:      types.NetworkLocal,
 		SystemID:       tokens.DefaultSystemID,
 		ID:             tokens.NewNonFungibleTokenID(nil, []byte{1}),
 		OwnerPredicate: []byte{2},
@@ -289,9 +300,9 @@ func TestNonFungibleTokenTransfer(t *testing.T) {
 	tx, err := nft.Transfer(newOwnerPredicate)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.PayloadType(), tokens.PayloadTypeTransferNFT)
-	require.EqualValues(t, nft.SystemID, tx.SystemID())
-	require.EqualValues(t, nft.ID, tx.UnitID())
+	require.Equal(t, tx.Type, tokens.TransactionTypeTransferNFT)
+	require.EqualValues(t, nft.SystemID, tx.GetSystemID())
+	require.EqualValues(t, nft.ID, tx.GetUnitID())
 
 	attr := &tokens.TransferNonFungibleTokenAttributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))
@@ -301,6 +312,7 @@ func TestNonFungibleTokenTransfer(t *testing.T) {
 
 func TestNonFungibleTokenUpdate(t *testing.T) {
 	nft := &NonFungibleToken{
+		NetworkID:      types.NetworkLocal,
 		SystemID:       tokens.DefaultSystemID,
 		ID:             tokens.NewNonFungibleTokenID(nil, []byte{1}),
 		OwnerPredicate: []byte{2},
@@ -311,9 +323,9 @@ func TestNonFungibleTokenUpdate(t *testing.T) {
 	tx, err := nft.Update(newData)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.PayloadType(), tokens.PayloadTypeUpdateNFT)
-	require.EqualValues(t, nft.SystemID, tx.SystemID())
-	require.EqualValues(t, nft.ID, tx.UnitID())
+	require.Equal(t, tx.Type, tokens.TransactionTypeUpdateNFT)
+	require.EqualValues(t, nft.SystemID, tx.GetSystemID())
+	require.EqualValues(t, nft.ID, tx.GetUnitID())
 
 	attr := &tokens.UpdateNonFungibleTokenAttributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))

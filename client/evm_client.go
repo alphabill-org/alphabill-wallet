@@ -25,7 +25,7 @@ type (
 	}
 
 	account struct {
-		Balance  *uint256.Int
+		Balance *uint256.Int
 	}
 
 	alphaBillLink struct {
@@ -71,6 +71,7 @@ func (c *evmPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ow
 	}
 	counterCopy := fcr.Counter
 	return &sdktypes.FeeCreditRecord{
+		NetworkID:  u.NetworkID,
 		SystemID:   u.SystemID,
 		ID:         u.UnitID,
 		Balance:    fcr.Balance,
@@ -90,7 +91,7 @@ func weiToAlpha(wei *uint256.Int) uint64 {
 	return new(uint256.Int).Div(new(uint256.Int).Add(wei, alpha2WeiRoundCorrector), alpha2Wei).Uint64()
 }
 
-func (c *evmPartitionClient) ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*sdktypes.Proof, error) {
+func (c *evmPartitionClient) ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*types.TxRecordProof, error) {
 	txBatch := txsubmitter.New(tx).ToBatch(c, log)
 	err := txBatch.SendTx(ctx, true)
 	if err != nil {
