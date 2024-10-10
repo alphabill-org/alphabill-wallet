@@ -8,7 +8,6 @@ import (
 
 	"github.com/alphabill-org/alphabill-go-base/hash"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/orchestration"
-	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-go-base/util"
 
 	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
@@ -35,7 +34,6 @@ func NewCmd(config *clitypes.WalletConfig) *cobra.Command {
 	cmd.AddCommand(addVarCmd(orchestrationConfig))
 	cmd.PersistentFlags().StringVarP(&orchestrationConfig.RpcUrl, args.RpcUrl, "r", args.DefaultOrchestrationRpcUrl, "rpc node url")
 	cmd.PersistentFlags().Uint64VarP(&orchestrationConfig.Key, args.KeyCmdName, "k", 1, "account number of the proof-of-authority key")
-	cmd.PersistentFlags().Uint32VarP(&orchestrationConfig.SystemID, args.SystemIdentifierCmdName, "s", uint32(orchestration.DefaultSystemID), "system identifier of the orchestration partition")
 	return cmd
 }
 
@@ -62,7 +60,8 @@ func addVarCmd(orchestrationConfig *clitypes.OrchestrationConfig) *cobra.Command
 
 func execAddVarCmd(cmd *cobra.Command, config *clitypes.AddVarCmdConfig) error {
 	// load account manager (it is expected that accounts.db exists in wallet home dir)
-	am, err := cliaccount.LoadExistingAccountManager(config.OrchestrationConfig.WalletConfig)
+	walletConfig := config.OrchestrationConfig.WalletConfig
+	am, err := cliaccount.LoadExistingAccountManager(walletConfig)
 	if err != nil {
 		return fmt.Errorf("failed to load account manager: %w", err)
 	}
@@ -96,17 +95,21 @@ func execAddVarCmd(cmd *cobra.Command, config *clitypes.AddVarCmdConfig) error {
 	if err != nil {
 		return err
 	}
-	txo, err := txbuilder.NewAddVarTx(*varFile, types.SystemID(config.OrchestrationConfig.SystemID), unitID, timeout, ac, maxFee)
+	nodeInfo, err := orcClient.GetNodeInfo(cmd.Context())
+	if err != nil {
+		return fmt.Errorf("failed to get node info: %w", err)
+	}
+	txo, err := txbuilder.NewAddVarTx(*varFile, nodeInfo.NetworkID, nodeInfo.SystemID, unitID, timeout, maxFee, ac)
 	if err != nil {
 		return fmt.Errorf("failed to create 'addVar' tx: %w", err)
 	}
 
 	// send 'addVar' tx
-	_, err = orcClient.ConfirmTransaction(cmd.Context(), txo, config.OrchestrationConfig.WalletConfig.Base.Logger)
+	_, err = orcClient.ConfirmTransaction(cmd.Context(), txo, walletConfig.Base.Logger)
 	if err != nil {
 		return fmt.Errorf("failed to send tx: %w", err)
 	}
 
-	config.OrchestrationConfig.WalletConfig.Base.ConsoleWriter.Println("Validator Assignment Record added successfully.")
+	walletConfig.Base.ConsoleWriter.Println("Validator Assignment Record added successfully.")
 	return nil
 }

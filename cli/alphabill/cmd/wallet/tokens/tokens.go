@@ -209,6 +209,7 @@ func execTokenCmdNewTypeFungible(cmd *cobra.Command, config *types.WalletConfig)
 		return err
 	}
 	tt := &sdktypes.FungibleTokenType{
+		NetworkID:                tw.NetworkID(),
 		SystemID:                 tw.SystemID(),
 		ID:                       typeID,
 		ParentTypeID:             parentType,
@@ -300,6 +301,7 @@ func execTokenCmdNewTypeNonFungible(cmd *cobra.Command, config *types.WalletConf
 		return err
 	}
 	tt := &sdktypes.NonFungibleTokenType{
+		NetworkID:                tw.NetworkID(),
 		SystemID:                 tw.SystemID(),
 		ID:                       typeID,
 		ParentTypeID:             parentType,
@@ -400,6 +402,7 @@ func execTokenCmdNewTokenFungible(cmd *cobra.Command, config *types.WalletConfig
 	}
 
 	ft := &sdktypes.FungibleToken{
+		NetworkID:      tw.NetworkID(),
 		SystemID:       tw.SystemID(),
 		TypeID:         typeID,
 		OwnerPredicate: ownerPredicate,
@@ -491,6 +494,7 @@ func execTokenCmdNewTokenNonFungible(cmd *cobra.Command, config *types.WalletCon
 	}
 
 	nft := &sdktypes.NonFungibleToken{
+		NetworkID:           tw.NetworkID(),
 		SystemID:            tw.SystemID(),
 		TypeID:              typeID,
 		OwnerPredicate:      ownerPredicate,
@@ -1181,15 +1185,15 @@ func initTokensWallet(cmd *cobra.Command, config *types.WalletConfig) (*tokenswa
 		return nil, fmt.Errorf("failed to dial rpc client: %w", err)
 	}
 
-	infoResponse, err := tokensClient.GetNodeInfo(cmd.Context())
+	nodeInfo, err := tokensClient.GetNodeInfo(cmd.Context())
 	if err != nil {
 		return nil, err
 	}
 	tokensTypeVar := types.TokensType
-	if !strings.HasPrefix(infoResponse.Name, tokensTypeVar.String()) {
+	if !strings.HasPrefix(nodeInfo.Name, tokensTypeVar.String()) {
 		return nil, errors.New("invalid rpc url provided for tokens partition")
 	}
-	return tokenswallet.New(infoResponse.SystemID, tokensClient, am, confirmTx, nil, maxFee, config.Base.Logger)
+	return tokenswallet.New(nodeInfo.NetworkID, nodeInfo.SystemID, tokensClient, am, confirmTx, nil, maxFee, config.Base.Logger)
 }
 
 func readParentTypeInfo(cmd *cobra.Command, keyNr uint64, am account.Manager) (sdktypes.TokenTypeID, []*tokenswallet.PredicateInput, error) {
@@ -1356,7 +1360,7 @@ func getFileSize(filepath string) (int64, error) {
 /*
 saveTxProofs saves the tx proofs into file when the cmd has appropriate flag set.
 */
-func saveTxProofs(cmd *cobra.Command, proofs []*sdktypes.Proof, out types.ConsoleWrapper) error {
+func saveTxProofs(cmd *cobra.Command, proofs []*basetypes.TxRecordProof, out types.ConsoleWrapper) error {
 	_, proofFile, err := args.WaitForProofArg(cmd)
 	if err != nil {
 		return err

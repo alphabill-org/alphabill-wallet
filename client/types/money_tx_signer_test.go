@@ -22,27 +22,27 @@ func TestMoneyTxSigner_EachTxTypeCanBeSigned(t *testing.T) {
 	}{
 		{
 			name: "transfer",
-			txo:  &types.TransactionOrder{Payload: &types.Payload{Type: money.PayloadTypeTransfer}},
+			txo:  &types.TransactionOrder{Payload: types.Payload{Type: money.TransactionTypeTransfer}},
 		},
 		{
 			name: "split",
-			txo:  &types.TransactionOrder{Payload: &types.Payload{Type: money.PayloadTypeSplit}},
+			txo:  &types.TransactionOrder{Payload: types.Payload{Type: money.TransactionTypeSplit}},
 		},
 		{
 			name: "dust transfer",
-			txo:  &types.TransactionOrder{Payload: &types.Payload{Type: money.PayloadTypeTransDC}},
+			txo:  &types.TransactionOrder{Payload: types.Payload{Type: money.TransactionTypeTransDC}},
 		},
 		{
 			name: "swap",
-			txo:  &types.TransactionOrder{Payload: &types.Payload{Type: money.PayloadTypeSwapDC}},
+			txo:  &types.TransactionOrder{Payload: types.Payload{Type: money.TransactionTypeSwapDC}},
 		},
 		{
 			name: "lock",
-			txo:  &types.TransactionOrder{Payload: &types.Payload{Type: money.PayloadTypeLock}},
+			txo:  &types.TransactionOrder{Payload: types.Payload{Type: money.TransactionTypeLock}},
 		},
 		{
 			name: "unlock",
-			txo:  &types.TransactionOrder{Payload: &types.Payload{Type: money.PayloadTypeUnlock}},
+			txo:  &types.TransactionOrder{Payload: types.Payload{Type: money.TransactionTypeUnlock}},
 		},
 	}
 

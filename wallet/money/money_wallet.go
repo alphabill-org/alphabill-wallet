@@ -29,6 +29,8 @@ const (
 
 type (
 	Wallet struct {
+		systemID      types.SystemID
+		networkID     types.NetworkID
 		am            account.Manager
 		moneyClient   sdktypes.MoneyPartitionClient
 		feeManager    *fees.FeeManager
@@ -72,15 +74,16 @@ func GenerateKeys(am account.Manager, mnemonic string) error {
 }
 
 // NewWallet creates a new money wallet from specified parameters. The account manager must contain pre-generated keys.
-func NewWallet(am account.Manager, feeManagerDB fees.FeeManagerDB, moneyClient sdktypes.MoneyPartitionClient, maxFee uint64, log *slog.Logger) (*Wallet, error) {
-	moneySystemID := money.DefaultSystemID
-	feeManager := fees.NewFeeManager(am, feeManagerDB,
-		moneySystemID, moneyClient, money.NewFeeCreditRecordIDFromPublicKey,
-		moneySystemID, moneyClient, money.NewFeeCreditRecordIDFromPublicKey,
+func NewWallet(networkID types.NetworkID, systemID types.SystemID, am account.Manager, feeManagerDB fees.FeeManagerDB, moneyClient sdktypes.MoneyPartitionClient, maxFee uint64, log *slog.Logger) (*Wallet, error) {
+	feeManager := fees.NewFeeManager(networkID, am, feeManagerDB,
+		systemID, moneyClient, money.NewFeeCreditRecordIDFromPublicKey,
+		systemID, moneyClient, money.NewFeeCreditRecordIDFromPublicKey,
 		maxFee, log,
 	)
-	dustCollector := dc.NewDustCollector(moneySystemID, maxBillsForDustCollection, txTimeoutBlockCount, moneyClient, maxFee, log)
+	dustCollector := dc.NewDustCollector(maxBillsForDustCollection, txTimeoutBlockCount, moneyClient, maxFee, log)
 	return &Wallet{
+		networkID:     networkID,
+		systemID:      systemID,
 		am:            am,
 		moneyClient:   moneyClient,
 		feeManager:    feeManager,
@@ -94,10 +97,12 @@ func (w *Wallet) GetAccountManager() account.Manager {
 	return w.am
 }
 
+func (w *Wallet) NetworkID() types.NetworkID {
+	return w.networkID
+}
+
 func (w *Wallet) SystemID() types.SystemID {
-	// TODO: return the default "AlphaBill Money System ID" for now
-	// but this should come from config (base wallet? AB client?)
-	return money.DefaultSystemID
+	return w.systemID
 }
 
 // Close terminates connection to alphabill node, closes account manager and cancels any background goroutines.
@@ -157,7 +162,7 @@ func (w *Wallet) GetRoundNumber(ctx context.Context) (uint64, error) {
 // Sends one transaction per bill, prioritizing larger bills.
 // Waits for initial response from the node, returns error if any transaction was not accepted to the mempool.
 // Returns list of tx proofs, if waitForConfirmation=true, otherwise nil.
-func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*sdktypes.Proof, error) {
+func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*types.TxRecordProof, error) {
 	if err := cmd.isValid(); err != nil {
 		return nil, err
 	}
@@ -263,7 +268,7 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*sdktypes.Proof, erro
 		return nil, err
 	}
 
-	var proofs []*sdktypes.Proof
+	var proofs []*types.TxRecordProof
 	for _, txSub := range batch.Submissions() {
 		proofs = append(proofs, txSub.Proof)
 	}

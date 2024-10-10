@@ -30,7 +30,7 @@ func TestWalletBillsListCmd_Single(t *testing.T) {
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
 	billsCmd := testutils.NewSubCmdExecutor(NewBillsCmd, "--rpc-url", rpcUrl).WithHome(homedir)
 
-	testutils.VerifyStdout(t, billsCmd.Exec(t, "list"), "#1 0x000000000000000000000000000000000000000000000000000000000000000100 1.000'000'00")
+	testutils.VerifyStdout(t, billsCmd.Exec(t, "list"), "#1 0x000000000000000000000000000000000000000000000000000000000000000101 1.000'000'00")
 }
 
 func TestWalletBillsListCmd_Multiple(t *testing.T) {
@@ -46,10 +46,10 @@ func TestWalletBillsListCmd_Multiple(t *testing.T) {
 	stdout := billsCmd.Exec(t, "list")
 	require.Len(t, stdout.Lines, 5)
 	require.Equal(t, stdout.Lines[0], "Account #1")
-	require.Equal(t, stdout.Lines[1], "#1 0x000000000000000000000000000000000000000000000000000000000000000100 0.000'000'01")
-	require.Equal(t, stdout.Lines[2], "#2 0x000000000000000000000000000000000000000000000000000000000000000200 0.000'000'02")
-	require.Equal(t, stdout.Lines[3], "#3 0x000000000000000000000000000000000000000000000000000000000000000300 0.000'000'03")
-	require.Equal(t, stdout.Lines[4], "#4 0x000000000000000000000000000000000000000000000000000000000000000400 0.000'000'04")
+	require.Equal(t, stdout.Lines[1], "#1 0x000000000000000000000000000000000000000000000000000000000000000101 0.000'000'01")
+	require.Equal(t, stdout.Lines[2], "#2 0x000000000000000000000000000000000000000000000000000000000000000201 0.000'000'02")
+	require.Equal(t, stdout.Lines[3], "#3 0x000000000000000000000000000000000000000000000000000000000000000301 0.000'000'03")
+	require.Equal(t, stdout.Lines[4], "#4 0x000000000000000000000000000000000000000000000000000000000000000401 0.000'000'04")
 }
 
 func TestWalletBillsListCmd_ExtraAccount(t *testing.T) {
@@ -77,7 +77,7 @@ func TestWalletBillsListCmd_ExtraAccountTotal(t *testing.T) {
 	// verify both accounts are listed
 	stdout := billsCmd.Exec(t, "list")
 	testutils.VerifyStdout(t, stdout, "Account #1")
-	testutils.VerifyStdout(t, stdout, "#1 0x000000000000000000000000000000000000000000000000000000000000000100 10")
+	testutils.VerifyStdout(t, stdout, "#1 0x000000000000000000000000000000000000000000000000000000000000000101 10")
 	testutils.VerifyStdout(t, stdout, "Account #2 - empty")
 }
 
@@ -117,9 +117,9 @@ func TestWalletBillsListCmd_ShowLockedBills(t *testing.T) {
 
 	stdout := billsCmd.Exec(t, "list")
 	require.Len(t, stdout.Lines, 4)
-	require.Equal(t, stdout.Lines[1], "#1 0x000000000000000000000000000000000000000000000000000000000000000100 1.000'000'00 (locked for adding fees)")
-	require.Equal(t, stdout.Lines[2], "#2 0x000000000000000000000000000000000000000000000000000000000000000200 1.000'000'00 (locked for reclaiming fees)")
-	require.Equal(t, stdout.Lines[3], "#3 0x000000000000000000000000000000000000000000000000000000000000000300 1.000'000'00 (locked for dust collection)")
+	require.Equal(t, stdout.Lines[1], "#1 0x000000000000000000000000000000000000000000000000000000000000000101 1.000'000'00 (locked for adding fees)")
+	require.Equal(t, stdout.Lines[2], "#2 0x000000000000000000000000000000000000000000000000000000000000000201 1.000'000'00 (locked for reclaiming fees)")
+	require.Equal(t, stdout.Lines[3], "#3 0x000000000000000000000000000000000000000000000000000000000000000301 1.000'000'00 (locked for dust collection)")
 }
 
 func TestWalletBillsLockUnlockCmd_Nok(t *testing.T) {
@@ -127,9 +127,9 @@ func TestWalletBillsLockUnlockCmd_Nok(t *testing.T) {
 
 	rpcUrl := mocksrv.StartServer(t, map[string]interface{}{
 		"state": mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(&types.Unit[any]{
-			UnitID: money.NewFeeCreditRecordID(nil, []byte{1}),
+			UnitID:         money.NewFeeCreditRecordID(nil, []byte{1}),
 			OwnerPredicate: testutils.TestPubKey0Hash(t),
-			Data: fc.FeeCreditRecord{Balance: 100}})),
+			Data:           fc.FeeCreditRecord{Balance: 100}})),
 		"admin": mocksrv.NewAdminServiceMock(),
 	})
 

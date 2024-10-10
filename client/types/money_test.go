@@ -14,10 +14,11 @@ import (
 
 func TestBillTransfer(t *testing.T) {
 	b := &Bill{
-		SystemID: money.DefaultSystemID,
-		ID:       money.NewBillID(nil, []byte{1}),
-		Value:    2,
-		Counter:  3,
+		NetworkID: types.NetworkLocal,
+		SystemID:  money.DefaultSystemID,
+		ID:        money.NewBillID(nil, []byte{1}),
+		Value:     2,
+		Counter:   3,
 	}
 	refNo := []byte("refNo")
 	timeout := uint64(4)
@@ -32,12 +33,12 @@ func TestBillTransfer(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.PayloadType(), money.PayloadTypeTransfer)
-	require.Equal(t, b.SystemID, tx.SystemID())
-	require.Equal(t, b.ID, tx.UnitID())
+	require.Equal(t, tx.Type, money.TransactionTypeTransfer)
+	require.Equal(t, b.SystemID, tx.GetSystemID())
+	require.Equal(t, b.ID, tx.GetUnitID())
 	require.Equal(t, timeout, tx.Timeout())
 	require.EqualValues(t, refNo, tx.Payload.ClientMetadata.ReferenceNumber)
-	require.Equal(t, maxFee, tx.GetClientMaxTxFee())
+	require.Equal(t, maxFee, tx.MaxFee())
 	require.Nil(t, tx.AuthProof)
 	require.Nil(t, tx.FeeProof)
 
@@ -68,9 +69,9 @@ func TestSplitTransactionAmount(t *testing.T) {
 	tx, err := b.Split(targetUnits)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.PayloadType(), money.PayloadTypeSplit)
-	require.EqualValues(t, b.SystemID, tx.SystemID())
-	require.EqualValues(t, billID, tx.UnitID())
+	require.Equal(t, tx.Type, money.TransactionTypeSplit)
+	require.EqualValues(t, b.SystemID, tx.GetSystemID())
+	require.EqualValues(t, billID, tx.GetUnitID())
 	require.Nil(t, tx.AuthProof)
 
 	attr := &money.SplitAttributes{}
@@ -83,10 +84,11 @@ func TestSplitTransactionAmount(t *testing.T) {
 
 func TestBillTransferToDustCollector(t *testing.T) {
 	b := &Bill{
-		SystemID: money.DefaultSystemID,
-		ID:       money.NewBillID(nil, []byte{1}),
-		Value:    2,
-		Counter:  3,
+		NetworkID: types.NetworkLocal,
+		SystemID:  money.DefaultSystemID,
+		ID:        money.NewBillID(nil, []byte{1}),
+		Value:     2,
+		Counter:   3,
 	}
 	targetBill := &Bill{
 		ID:      money.NewBillID(nil, []byte{4}),
@@ -95,9 +97,9 @@ func TestBillTransferToDustCollector(t *testing.T) {
 	tx, err := b.TransferToDustCollector(targetBill)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.PayloadType(), money.PayloadTypeTransDC)
-	require.Equal(t, b.SystemID, tx.SystemID())
-	require.Equal(t, b.ID, tx.UnitID())
+	require.Equal(t, tx.Type, money.TransactionTypeTransDC)
+	require.Equal(t, b.SystemID, tx.GetSystemID())
+	require.Equal(t, b.ID, tx.GetUnitID())
 	require.Nil(t, tx.StateUnlock)
 	require.Nil(t, tx.FeeProof)
 
@@ -111,26 +113,29 @@ func TestBillTransferToDustCollector(t *testing.T) {
 
 func TestBillSwapWithDustCollector(t *testing.T) {
 	db1 := &Bill{
-		SystemID: money.DefaultSystemID,
-		ID:       money.NewBillID(nil, []byte{1}),
-		Value:    2,
-		Counter:  3,
+		NetworkID: types.NetworkLocal,
+		SystemID:  money.DefaultSystemID,
+		ID:        money.NewBillID(nil, []byte{1}),
+		Value:     2,
+		Counter:   3,
 	}
 	db2 := &Bill{
-		SystemID: money.DefaultSystemID,
-		ID:       money.NewBillID(nil, []byte{2}),
-		Value:    3,
-		Counter:  3,
+		NetworkID: types.NetworkLocal,
+		SystemID:  money.DefaultSystemID,
+		ID:        money.NewBillID(nil, []byte{2}),
+		Value:     3,
+		Counter:   3,
 	}
 	targetBill := &Bill{
-		SystemID: money.DefaultSystemID,
-		ID:       money.NewBillID(nil, []byte{3}),
-		Counter:  4,
+		NetworkID: types.NetworkLocal,
+		SystemID:  money.DefaultSystemID,
+		ID:        money.NewBillID(nil, []byte{3}),
+		Counter:   4,
 	}
 	tx1, err := db1.TransferToDustCollector(targetBill)
 	tx2, err := db2.TransferToDustCollector(targetBill)
 
-	proofs := []*Proof{
+	proofs := []*types.TxRecordProof{
 		{
 			TxRecord: &types.TransactionRecord{TransactionOrder: tx1},
 			TxProof:  &types.TxProof{},
@@ -143,40 +148,40 @@ func TestBillSwapWithDustCollector(t *testing.T) {
 	tx3, err := targetBill.SwapWithDustCollector(proofs)
 	require.NoError(t, err)
 	require.NotNil(t, tx3)
-	require.Equal(t, tx3.PayloadType(), money.PayloadTypeSwapDC)
-	require.Equal(t, targetBill.SystemID, tx3.SystemID())
-	require.Equal(t, targetBill.ID, tx3.UnitID())
+	require.Equal(t, tx3.Type, money.TransactionTypeSwapDC)
+	require.Equal(t, targetBill.SystemID, tx3.GetSystemID())
+	require.Equal(t, targetBill.ID, tx3.GetUnitID())
 	require.Nil(t, tx3.AuthProof)
 	require.Nil(t, tx3.FeeProof)
 
 	attr := &money.SwapDCAttributes{}
 	require.NoError(t, tx3.UnmarshalAttributes(attr))
-	require.Equal(t, db1.Value+db2.Value, attr.TargetValue)
-	require.Len(t, attr.DcTransfers, 2)
-	require.Len(t, attr.DcTransferProofs, 2)
+	require.Len(t, attr.DustTransferProofs, 2)
 }
 
 func TestBillTransferToFeeCredit(t *testing.T) {
 	b := &Bill{
-		SystemID: money.DefaultSystemID,
-		ID:       money.NewBillID(nil, []byte{1}),
-		Value:    2,
-		Counter:  3,
+		NetworkID: types.NetworkLocal,
+		SystemID:  money.DefaultSystemID,
+		ID:        money.NewBillID(nil, []byte{1}),
+		Value:     2,
+		Counter:   3,
 	}
 	fcrCounter := uint64(4)
 	fcr := &FeeCreditRecord{
-		SystemID: 5,
-		ID:       money.NewFeeCreditRecordID(nil, []byte{6}),
-		Counter:  &fcrCounter,
+		NetworkID: types.NetworkLocal,
+		SystemID:  5,
+		ID:        money.NewFeeCreditRecordID(nil, []byte{6}),
+		Counter:   &fcrCounter,
 	}
 	amount := uint64(1)
 	latestAdditionTime := uint64(7)
 	tx, err := b.TransferToFeeCredit(fcr, amount, latestAdditionTime)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.PayloadType(), fc.PayloadTypeTransferFeeCredit)
-	require.Equal(t, b.SystemID, tx.SystemID())
-	require.Equal(t, b.ID, tx.UnitID())
+	require.Equal(t, tx.Type, fc.TransactionTypeTransferFeeCredit)
+	require.Equal(t, b.SystemID, tx.GetSystemID())
+	require.Equal(t, b.ID, tx.GetUnitID())
 
 	attr := &fc.TransferFeeCreditAttributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))
@@ -190,43 +195,43 @@ func TestBillTransferToFeeCredit(t *testing.T) {
 
 func TestBillReclaimFromFeeCredit(t *testing.T) {
 	b := &Bill{
-		SystemID: money.DefaultSystemID,
-		ID:       money.NewBillID(nil, []byte{1}),
-		Value:    2,
-		Counter:  3,
+		NetworkID: types.NetworkLocal,
+		SystemID:  money.DefaultSystemID,
+		ID:        money.NewBillID(nil, []byte{1}),
+		Value:     2,
+		Counter:   3,
 	}
-	closeFCProof := &Proof{
+	closeFCProof := &types.TxRecordProof{
 		TxRecord: &types.TransactionRecord{},
 		TxProof:  &types.TxProof{},
 	}
 	tx, err := b.ReclaimFromFeeCredit(closeFCProof)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.PayloadType(), fc.PayloadTypeReclaimFeeCredit)
-	require.Equal(t, b.SystemID, tx.SystemID())
-	require.Equal(t, b.ID, tx.UnitID())
+	require.Equal(t, tx.Type, fc.TransactionTypeReclaimFeeCredit)
+	require.Equal(t, b.SystemID, tx.GetSystemID())
+	require.Equal(t, b.ID, tx.GetUnitID())
 
 	attr := &fc.ReclaimFeeCreditAttributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))
-	require.Equal(t, closeFCProof.TxRecord, attr.CloseFeeCreditTransfer)
-	require.Equal(t, closeFCProof.TxProof, attr.CloseFeeCreditProof)
-	require.Equal(t, b.Counter, attr.Counter)
+	require.Equal(t, closeFCProof, attr.CloseFeeCreditProof)
 }
 
 func TestBillLock(t *testing.T) {
 	b := &Bill{
-		SystemID: money.DefaultSystemID,
-		ID:       money.NewBillID(nil, []byte{1}),
-		Value:    2,
-		Counter:  3,
+		NetworkID: types.NetworkLocal,
+		SystemID:  money.DefaultSystemID,
+		ID:        money.NewBillID(nil, []byte{1}),
+		Value:     2,
+		Counter:   3,
 	}
 	lockStatus := uint64(4)
 	tx, err := b.Lock(lockStatus)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.PayloadType(), money.PayloadTypeLock)
-	require.Equal(t, b.SystemID, tx.SystemID())
-	require.Equal(t, b.ID, tx.UnitID())
+	require.Equal(t, tx.Type, money.TransactionTypeLock)
+	require.Equal(t, b.SystemID, tx.GetSystemID())
+	require.Equal(t, b.ID, tx.GetUnitID())
 
 	attr := &money.LockAttributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))
@@ -236,17 +241,18 @@ func TestBillLock(t *testing.T) {
 
 func TestBillUnlock(t *testing.T) {
 	b := &Bill{
-		SystemID: money.DefaultSystemID,
-		ID:       money.NewBillID(nil, []byte{1}),
-		Value:    2,
-		Counter:  3,
+		NetworkID: types.NetworkLocal,
+		SystemID:  money.DefaultSystemID,
+		ID:        money.NewBillID(nil, []byte{1}),
+		Value:     2,
+		Counter:   3,
 	}
 	tx, err := b.Unlock()
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.PayloadType(), money.PayloadTypeUnlock)
-	require.Equal(t, b.SystemID, tx.SystemID())
-	require.Equal(t, b.ID, tx.UnitID())
+	require.Equal(t, tx.Type, money.TransactionTypeUnlock)
+	require.Equal(t, b.SystemID, tx.GetSystemID())
+	require.Equal(t, b.ID, tx.GetUnitID())
 
 	attr := &money.UnlockAttributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))

@@ -104,25 +104,19 @@ func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, tokens []*sdk
 	return &SubmissionResult{FeeSum: totalFees}, nil
 }
 
-func (w *Wallet) joinTokenForDC(ctx context.Context, acc *accountKey, burnProofs []*sdktypes.Proof, targetToken *sdktypes.FungibleToken, fcrID types.UnitID, ownerPredicateInput *PredicateInput, typeOwnerPredicateInputs []*PredicateInput) (uint64, error) {
+func (w *Wallet) joinTokenForDC(ctx context.Context, acc *accountKey, burnProofs []*types.TxRecordProof, targetToken *sdktypes.FungibleToken, fcrID types.UnitID, ownerPredicateInput *PredicateInput, typeOwnerPredicateInputs []*PredicateInput) (uint64, error) {
 	// explicitly sort proofs by unit ids in increasing order
 	sort.Slice(burnProofs, func(i, j int) bool {
-		a := burnProofs[i].TxRecord.TransactionOrder.UnitID()
-		b := burnProofs[j].TxRecord.TransactionOrder.UnitID()
+		a := burnProofs[i].TxRecord.TransactionOrder.GetUnitID()
+		b := burnProofs[j].TxRecord.TransactionOrder.GetUnitID()
 		return a.Compare(b) < 0
 	})
-	burnTxs := make([]*types.TransactionRecord, len(burnProofs))
-	burnTxProofs := make([]*types.TxProof, len(burnProofs))
-	for i, proof := range burnProofs {
-		burnTxs[i] = proof.TxRecord
-		burnTxProofs[i] = proof.TxProof
-	}
 	roundNumber, err := w.GetRoundNumber(ctx)
 	if err != nil {
 		return 0, err
 	}
 
-	tx, err := targetToken.Join(burnTxs, burnTxProofs,
+	tx, err := targetToken.Join(burnProofs,
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
 		sdktypes.WithMaxFee(w.maxFee),
@@ -131,15 +125,15 @@ func (w *Wallet) joinTokenForDC(ctx context.Context, acc *accountKey, burnProofs
 		return 0, err
 	}
 
-	payloadBytes, err := tx.PayloadBytes()
+	sigBytes, err := tx.AuthProofSigBytes()
 	if err != nil {
 		return 0, err
 	}
-	typeOwnerProofs, err := newProofs(payloadBytes, typeOwnerPredicateInputs)
+	typeOwnerProofs, err := newProofs(sigBytes, typeOwnerPredicateInputs)
 	if err != nil {
 		return 0, err
 	}
-	ownerProof, err := ownerPredicateInput.Proof(payloadBytes)
+	ownerProof, err := ownerPredicateInput.Proof(sigBytes)
 	if err != nil {
 		return 0, err
 	}
@@ -162,7 +156,7 @@ func (w *Wallet) joinTokenForDC(ctx context.Context, acc *accountKey, burnProofs
 	return sub.Proof.TxRecord.ServerMetadata.ActualFee, nil
 }
 
-func (w *Wallet) burnTokensForDC(ctx context.Context, acc *accountKey, tokensToBurn []*sdktypes.FungibleToken, targetToken *sdktypes.FungibleToken, fcrID types.UnitID, ownerPredicateInput *PredicateInput, typeOwnerPredicateInputs []*PredicateInput) (uint64, uint64, []*sdktypes.Proof, error) {
+func (w *Wallet) burnTokensForDC(ctx context.Context, acc *accountKey, tokensToBurn []*sdktypes.FungibleToken, targetToken *sdktypes.FungibleToken, fcrID types.UnitID, ownerPredicateInput *PredicateInput, typeOwnerPredicateInputs []*PredicateInput) (uint64, uint64, []*types.TxRecordProof, error) {
 	burnBatch := txsubmitter.NewBatch(w.tokensClient, w.log)
 	burnBatchAmount := uint64(0)
 
@@ -181,15 +175,15 @@ func (w *Wallet) burnTokensForDC(ctx context.Context, acc *accountKey, tokensToB
 			return 0, 0, nil, fmt.Errorf("failed to prepare burn tx: %w", err)
 		}
 
-		payloadBytes, err := tx.PayloadBytes()
+		sigBytes, err := tx.AuthProofSigBytes()
 		if err != nil {
 			return 0, 0, nil, err
 		}
-		typeOwnerProofs, err := newProofs(payloadBytes, typeOwnerPredicateInputs)
+		typeOwnerProofs, err := newProofs(sigBytes, typeOwnerPredicateInputs)
 		if err != nil {
 			return 0, 0, nil, err
 		}
-		ownerProof, err := ownerPredicateInput.Proof(payloadBytes)
+		ownerProof, err := ownerPredicateInput.Proof(sigBytes)
 		if err != nil {
 			return 0, 0, nil, err
 		}
@@ -212,7 +206,7 @@ func (w *Wallet) burnTokensForDC(ctx context.Context, acc *accountKey, tokensToB
 		return 0, 0, nil, fmt.Errorf("failed to send burn tx: %w", err)
 	}
 
-	proofs := make([]*sdktypes.Proof, 0, len(burnBatch.Submissions()))
+	proofs := make([]*types.TxRecordProof, 0, len(burnBatch.Submissions()))
 	feeSum := uint64(0)
 	for _, sub := range burnBatch.Submissions() {
 		proofs = append(proofs, sub.Proof)
@@ -266,7 +260,7 @@ func (w *Wallet) lockTokenForDC(ctx context.Context, acc *accountKey, fcrID type
 		return 0, err
 	}
 
-	payloadBytes, err := tx.PayloadBytes()
+	payloadBytes, err := tx.AuthProofSigBytes()
 	if err != nil {
 		return 0, err
 	}

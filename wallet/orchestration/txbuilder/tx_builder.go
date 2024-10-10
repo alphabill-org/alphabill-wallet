@@ -12,12 +12,12 @@ import (
 )
 
 // NewAddVarTx creates a 'addVar' transaction order.
-func NewAddVarTx(varData orchestration.ValidatorAssignmentRecord, systemID types.SystemID, unitID types.UnitID, timeout uint64, signingKey *account.AccountKey, maxFee uint64) (*types.TransactionOrder, error) {
+func NewAddVarTx(varData orchestration.ValidatorAssignmentRecord, networkID types.NetworkID, systemID types.SystemID, unitID types.UnitID, timeout uint64, maxFee uint64, signingKey *account.AccountKey) (*types.TransactionOrder, error) {
 	attr := &orchestration.AddVarAttributes{
 		Var: varData,
 	}
 
-	txPayload, err := sdktypes.NewPayload(systemID, unitID, orchestration.PayloadTypeAddVAR, attr,
+	txo, err := sdktypes.NewTransactionOrder(networkID, systemID, unitID, orchestration.TransactionTypeAddVAR, attr,
 		sdktypes.WithTimeout(timeout),
 		sdktypes.WithMaxFee(maxFee),
 	)
@@ -25,13 +25,12 @@ func NewAddVarTx(varData orchestration.ValidatorAssignmentRecord, systemID types
 		return nil, fmt.Errorf("failed to create tx: %w", err)
 	}
 
-	txo := &types.TransactionOrder{Payload: txPayload}
 	if signingKey != nil {
 		signer, err := crypto.NewInMemorySecp256K1SignerFromKey(signingKey.PrivKey)
 		if err != nil {
 			return nil, err
 		}
-		ownerProof, err := sdktypes.NewP2pkhSignature(txo, signer)
+		ownerProof, err := sdktypes.NewP2pkhAuthProofSignature(txo, signer)
 		if err != nil {
 			return nil, fmt.Errorf("failed to sign tx: %w", err)
 		}

@@ -18,7 +18,6 @@ import (
 
 type (
 	DustCollector struct {
-		systemID      types.SystemID
 		maxBillsPerDC int
 		txTimeout     uint64
 		moneyClient   sdktypes.MoneyPartitionClient
@@ -27,14 +26,13 @@ type (
 	}
 
 	DustCollectionResult struct {
-		SwapProof *sdktypes.Proof
-		LockProof *sdktypes.Proof
+		SwapProof *types.TxRecordProof
+		LockProof *types.TxRecordProof
 	}
 )
 
-func NewDustCollector(systemID types.SystemID, maxBillsPerDC int, txTimeout uint64, moneyClient sdktypes.MoneyPartitionClient, maxFee uint64, log *slog.Logger) *DustCollector {
+func NewDustCollector(maxBillsPerDC int, txTimeout uint64, moneyClient sdktypes.MoneyPartitionClient, maxFee uint64, log *slog.Logger) *DustCollector {
 	return &DustCollector{
-		systemID:      systemID,
 		maxBillsPerDC: maxBillsPerDC,
 		txTimeout:     txTimeout,
 		moneyClient:   moneyClient,
@@ -155,7 +153,7 @@ func (w *DustCollector) submitDCBatch(ctx context.Context, k *account.AccountKey
 
 // swapDCBills creates swap transfer from given dcProofs and target bill, joining the dcBills into the target bill,
 // the target bill is expected to be locked on server side.
-func (w *DustCollector) swapDCBills(ctx context.Context, txSigner *sdktypes.MoneyTxSigner, dcProofs []*sdktypes.Proof, targetBill *sdktypes.Bill, fcrID []byte) (*sdktypes.Proof, error) {
+func (w *DustCollector) swapDCBills(ctx context.Context, txSigner *sdktypes.MoneyTxSigner, dcProofs []*types.TxRecordProof, targetBill *sdktypes.Bill, fcrID []byte) (*types.TxRecordProof, error) {
 	timeout, err := w.getTxTimeout(ctx)
 	if err != nil {
 		return nil, err
@@ -193,8 +191,7 @@ func (w *DustCollector) lockTargetBill(ctx context.Context, k *account.AccountKe
 	if err != nil {
 		return nil, err
 	}
-	lockTx, err := targetBill.Lock(
-		wallet.LockReasonCollectDust,
+	lockTx, err := targetBill.Lock(wallet.LockReasonCollectDust,
 		sdktypes.WithTimeout(timeout),
 		sdktypes.WithFeeCreditRecordID(fcrID),
 		sdktypes.WithMaxFee(w.maxFee),
@@ -220,8 +217,8 @@ func (w *DustCollector) lockTargetBill(ctx context.Context, k *account.AccountKe
 	return lockTxBatch.Submissions()[0], nil
 }
 
-func (w *DustCollector) extractProofsFromBatch(dcBatch *txsubmitter.TxSubmissionBatch) ([]*sdktypes.Proof, error) {
-	var proofs []*sdktypes.Proof
+func (w *DustCollector) extractProofsFromBatch(dcBatch *txsubmitter.TxSubmissionBatch) ([]*types.TxRecordProof, error) {
+	var proofs []*types.TxRecordProof
 	for _, sub := range dcBatch.Submissions() {
 		proofs = append(proofs, sub.Proof)
 	}
@@ -240,24 +237,31 @@ func (w *DustCollector) Close() error {
 	return nil // do nothing
 }
 
-// GetFeeSum sums spent fees from the result
-func (d *DustCollectionResult) GetFeeSum() (uint64, error) {
+// GetFeeSumAndSwapAmount returns total fees spent and total swapped amount
+func (d *DustCollectionResult) GetFeeSumAndSwapAmount() (uint64, uint64, error) {
 	if d == nil {
-		return 0, nil
+		return 0, 0, nil
 	}
 	var feeSum uint64
+	var swapAmount uint64
 	if d.SwapProof != nil {
-		feeSum += d.SwapProof.TxRecord.GetActualFee()
+		feeSum += d.SwapProof.ActualFee()
 		var swapAttr *money.SwapDCAttributes
-		if err := d.SwapProof.TxRecord.TransactionOrder.UnmarshalAttributes(&swapAttr); err != nil {
-			return 0, fmt.Errorf("failed to unmarshal swap transaction to calculate fee sum: %w", err)
+		if err := d.SwapProof.TransactionOrder().UnmarshalAttributes(&swapAttr); err != nil {
+			return 0, 0, fmt.Errorf("failed to unmarshal swap transaction to calculate fee sum: %w", err)
 		}
-		for _, dcTx := range swapAttr.DcTransfers {
-			feeSum += dcTx.GetActualFee()
+		for _, dcTx := range swapAttr.DustTransferProofs {
+			feeSum += dcTx.ActualFee()
+
+			var dustAttr money.TransferDCAttributes
+			if err := dcTx.TransactionOrder().UnmarshalAttributes(&dustAttr); err != nil {
+				return 0, 0, fmt.Errorf("failed to unmarshal dust transfer transaction to calculate fee: %w", err)
+			}
+			swapAmount += dustAttr.Value
 		}
 	}
 	if d.LockProof != nil {
-		feeSum += d.LockProof.TxRecord.GetActualFee()
+		feeSum += d.LockProof.ActualFee()
 	}
-	return feeSum, nil
+	return feeSum, swapAmount, nil
 }

@@ -13,13 +13,14 @@ type (
 		GetNodeInfo(ctx context.Context) (*NodeInfoResponse, error)
 		GetRoundNumber(ctx context.Context) (uint64, error)
 		SendTransaction(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
-		ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*Proof, error)
-		GetTransactionProof(ctx context.Context, txHash types.Bytes) (*Proof, error)
+		ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*types.TxRecordProof, error)
+		GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TxRecordProof, error)
 		GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (*FeeCreditRecord, error)
 		Close()
 	}
 
 	FeeCreditRecord struct {
+		NetworkID  types.NetworkID
 		SystemID   types.SystemID
 		ID         types.UnitID
 		Balance    uint64
@@ -29,39 +30,28 @@ type (
 	}
 
 	NodeInfoResponse struct {
-		SystemID            types.SystemID `json:"systemId"` // hex encoded system identifier
-		Name                string         `json:"name"`     // one of [money node | tokens node | evm node]
-		Self                PeerInfo       `json:"self"`     // information about this peer
-		BootstrapNodes      []PeerInfo     `json:"bootstrapNodes"`
-		RootValidators      []PeerInfo     `json:"rootValidators"`
-		PartitionValidators []PeerInfo     `json:"partitionValidators"`
-		OpenConnections     []PeerInfo     `json:"openConnections"` // all libp2p connections to other peers in the network
+		NetworkID           types.NetworkID `json:"networkId"` // hex encoded network identifier
+		SystemID            types.SystemID  `json:"systemId"`  // hex encoded system identifier
+		Name                string          `json:"name"`      // one of [money node | tokens node | evm node]
+		Self                PeerInfo        `json:"self"`      // information about this peer
+		BootstrapNodes      []PeerInfo      `json:"bootstrapNodes"`
+		RootValidators      []PeerInfo      `json:"rootValidators"`
+		PartitionValidators []PeerInfo      `json:"partitionValidators"`
+		OpenConnections     []PeerInfo      `json:"openConnections"` // all libp2p connections to other peers in the network
 	}
 
 	PeerInfo struct {
 		Identifier string   `json:"identifier"`
 		Addresses  []string `json:"addresses"`
 	}
-
-	// Proof wrapper struct around TxRecord and TxProof
-	Proof struct {
-		_        struct{}                 `cbor:",toarray"`
-		TxRecord *types.TransactionRecord `json:"txRecord"`
-		TxProof  *types.TxProof           `json:"txProof"`
-	}
 )
 
-func (f *FeeCreditRecord) AddFeeCredit(ownerPredicate []byte, transFCProof *Proof, txOptions ...Option) (*types.TransactionOrder, error) {
+func (f *FeeCreditRecord) AddFeeCredit(ownerPredicate []byte, transFCProof *types.TxRecordProof, txOptions ...Option) (*types.TransactionOrder, error) {
 	attr := &fc.AddFeeCreditAttributes{
 		FeeCreditOwnerPredicate: ownerPredicate,
-		FeeCreditTransfer:       transFCProof.TxRecord,
-		FeeCreditTransferProof:  transFCProof.TxProof,
+		FeeCreditTransferProof:  transFCProof,
 	}
-	txPayload, err := NewPayload(f.SystemID, f.ID, fc.PayloadTypeAddFeeCredit, attr, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-	return NewTransactionOrder(txPayload), nil
+	return NewTransactionOrder(f.NetworkID, f.SystemID, f.ID, fc.TransactionTypeAddFeeCredit, attr, txOptions...)
 }
 
 func (f *FeeCreditRecord) CloseFeeCredit(targetBillID types.UnitID, targetBillCounter uint64, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -71,11 +61,7 @@ func (f *FeeCreditRecord) CloseFeeCredit(targetBillID types.UnitID, targetBillCo
 		TargetUnitCounter: targetBillCounter,
 		Counter:           *f.Counter,
 	}
-	txPayload, err := NewPayload(f.SystemID, f.ID, fc.PayloadTypeCloseFeeCredit, attr, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-	return NewTransactionOrder(txPayload), nil
+	return NewTransactionOrder(f.NetworkID, f.SystemID, f.ID, fc.TransactionTypeCloseFeeCredit, attr, txOptions...)
 }
 
 func (f *FeeCreditRecord) Lock(lockStatus uint64, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -83,27 +69,12 @@ func (f *FeeCreditRecord) Lock(lockStatus uint64, txOptions ...Option) (*types.T
 		LockStatus: lockStatus,
 		Counter:    *f.Counter,
 	}
-	txPayload, err := NewPayload(f.SystemID, f.ID, fc.PayloadTypeLockFeeCredit, attr, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-	return NewTransactionOrder(txPayload), nil
+	return NewTransactionOrder(f.NetworkID, f.SystemID, f.ID, fc.TransactionTypeLockFeeCredit, attr, txOptions...)
 }
 
 func (f *FeeCreditRecord) Unlock(txOptions ...Option) (*types.TransactionOrder, error) {
 	attr := &fc.UnlockFeeCreditAttributes{
 		Counter: *f.Counter,
 	}
-	txPayload, err := NewPayload(f.SystemID, f.ID, fc.PayloadTypeUnlockFeeCredit, attr, txOptions...)
-	if err != nil {
-		return nil, err
-	}
-	return NewTransactionOrder(txPayload), nil
-}
-
-func (p *Proof) GetActualFee() uint64 {
-	if p == nil {
-		return 0
-	}
-	return p.TxRecord.GetActualFee()
+	return NewTransactionOrder(f.NetworkID, f.SystemID, f.ID, fc.TransactionTypeUnlockFeeCredit, attr, txOptions...)
 }

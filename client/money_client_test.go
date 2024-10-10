@@ -19,6 +19,7 @@ func TestMoneyClient(t *testing.T) {
 	t.Run("GetBill_OK", func(t *testing.T) {
 		service.Reset()
 		bill := &sdktypes.Bill{
+			NetworkID:  50,
 			SystemID:   money.DefaultSystemID,
 			ID:         []byte{1},
 			Value:      192,
@@ -28,8 +29,9 @@ func TestMoneyClient(t *testing.T) {
 		}
 		service.Units = map[string]*sdktypes.Unit[any]{
 			string(bill.ID): {
-				SystemID: money.DefaultSystemID,
-				UnitID:   bill.ID,
+				NetworkID: bill.NetworkID,
+				SystemID:  bill.SystemID,
+				UnitID:    bill.ID,
 				Data: &money.BillData{
 					V:       bill.Value,
 					T:       bill.LastUpdate,
@@ -63,7 +65,7 @@ func TestMoneyClient(t *testing.T) {
 func startServerAndMoneyClient(t *testing.T, service *mocksrv.StateServiceMock) sdktypes.MoneyPartitionClient {
 	srv := mocksrv.StartStateApiServer(t, service)
 
-	moneyClient, err := NewMoneyPartitionClient(context.Background(), "http://" + srv)
+	moneyClient, err := NewMoneyPartitionClient(context.Background(), "http://"+srv)
 	t.Cleanup(moneyClient.Close)
 	require.NoError(t, err)
 
