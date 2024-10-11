@@ -81,7 +81,7 @@ func TestRpcClient(t *testing.T) {
 		unitID := []byte{1}
 		txRecordProof := &types.TxRecordProof{
 			TxRecord: &types.TransactionRecord{TransactionOrder: &types.TransactionOrder{Payload: types.Payload{UnitID: unitID}}},
-			TxProof:  &types.TxProof{},
+			TxProof:  &types.TxProof{Version: types.ABVersion(1)},
 		}
 		txRecordProofCBOR, err := encodeCbor(txRecordProof)
 		require.NoError(t, err)
