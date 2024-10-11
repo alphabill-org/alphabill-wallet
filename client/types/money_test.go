@@ -203,7 +203,7 @@ func TestBillReclaimFromFeeCredit(t *testing.T) {
 	}
 	closeFCProof := &types.TxRecordProof{
 		TxRecord: &types.TransactionRecord{},
-		TxProof:  &types.TxProof{},
+		TxProof:  &types.TxProof{Version: types.ABVersion(1)},
 	}
 	tx, err := b.ReclaimFromFeeCredit(closeFCProof)
 	require.NoError(t, err)
