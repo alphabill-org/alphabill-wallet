@@ -43,8 +43,8 @@ func NewFeesCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 	cmd.AddCommand(unlockFeeCreditCmd(config))
 
 	cmd.PersistentFlags().StringVarP(&config.moneyPartitionNodeUrl, args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "money rpc node url")
-	cmd.PersistentFlags().VarP(&config.targetPartitionType, args.PartitionCmdName, "n", "partition name for which to manage fees [money|tokens|evm]")
-	usage := fmt.Sprintf("partition rpc node url for which to manage fees (default: [%s|%s|%s] based on --partition flag)", args.DefaultMoneyRpcUrl, args.DefaultTokensRpcUrl, args.DefaultEvmRpcUrl)
+	cmd.PersistentFlags().VarP(&config.targetPartitionType, args.PartitionCmdName, "n", "partition name for which to manage fees [money|tokens|enterprise-tokens|evm]")
+	usage := fmt.Sprintf("partition rpc node url for which to manage fees (default: [%s|%s|%s|%s] based on --partition flag)", args.DefaultMoneyRpcUrl, args.DefaultTokensRpcUrl, args.DefaultEnterpriseTokensRpcUrl, args.DefaultEvmRpcUrl)
 	cmd.PersistentFlags().StringVarP(&config.targetPartitionNodeUrl, args.PartitionRpcUrlCmdName, "m", "", usage)
 	return cmd
 }
@@ -64,6 +64,10 @@ func addFeeCreditCmd(config *feesConfig) *cobra.Command {
 }
 
 func addFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
+	if config.targetPartitionType == clitypes.EnterpriseTokensType {
+		return fmt.Errorf("adding fee credit is not supported for %s partition", config.targetPartitionType.String())
+	}
+
 	accountNumber, err := cmd.Flags().GetUint64(args.KeyCmdName)
 	if err != nil {
 		return err
@@ -151,6 +155,9 @@ func reclaimFeeCreditCmd(config *feesConfig) *cobra.Command {
 }
 
 func reclaimFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
+	if config.targetPartitionType == clitypes.EnterpriseTokensType {
+		return fmt.Errorf("reclaiming fee credit is not supported for %s partition", config.targetPartitionType.String())
+	}
 	accountNumber, err := cmd.Flags().GetUint64(args.KeyCmdName)
 	if err != nil {
 		return err
@@ -197,9 +204,10 @@ func lockFeeCreditCmd(config *feesConfig) *cobra.Command {
 }
 
 func lockFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
-	if config.targetPartitionType == clitypes.EvmType {
-		return errors.New("locking fee credit is not supported for EVM partition")
+	if config.targetPartitionType == clitypes.EvmType || config.targetPartitionType == clitypes.EnterpriseTokensType {
+		return fmt.Errorf("locking fee credit is not supported for %s partition", config.targetPartitionType.String())
 	}
+
 	accountNumber, err := cmd.Flags().GetUint64(args.KeyCmdName)
 	if err != nil {
 		return err
@@ -254,8 +262,8 @@ func unlockFeeCreditCmd(config *feesConfig) *cobra.Command {
 }
 
 func unlockFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
-	if config.targetPartitionType == clitypes.EvmType {
-		return errors.New("locking fee credit is not supported for EVM partition")
+	if config.targetPartitionType == clitypes.EvmType || config.targetPartitionType == clitypes.EnterpriseTokensType {
+		return fmt.Errorf("locking fee credit is not supported for %s partition", config.targetPartitionType.String())
 	}
 	accountNumber, err := cmd.Flags().GetUint64(args.KeyCmdName)
 	if err != nil {
@@ -405,6 +413,8 @@ func (c *feesConfig) getTargetPartitionUrl() string {
 		return args.DefaultMoneyRpcUrl
 	case clitypes.TokensType:
 		return args.DefaultTokensRpcUrl
+	case clitypes.EnterpriseTokensType:
+		return args.DefaultEnterpriseTokensRpcUrl
 	case clitypes.EvmType:
 		return args.DefaultEvmRpcUrl
 	default:
@@ -412,24 +422,31 @@ func (c *feesConfig) getTargetPartitionUrl() string {
 	}
 }
 
-// Creates a fees.FeeManager that needs to be closed with the Close() method.
-// Does not close the account.Manager passed as an argument.
-func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager, feeManagerDB fees.FeeManagerDB, maxFee uint64, logger *slog.Logger) (*fees.FeeManager, error) {
-	moneyClient, err := client.NewMoneyPartitionClient(ctx, c.getMoneyRpcUrl())
+func newMoneyClient(ctx context.Context, rpcUrl string) (types.MoneyPartitionClient, *types.NodeInfoResponse, error) {
+	moneyClient, err := client.NewMoneyPartitionClient(ctx, rpcUrl)
 	if err != nil {
-		return nil, fmt.Errorf("failed to dial money rpc url: %w", err)
+		return nil, nil, fmt.Errorf("failed to dial money rpc url: %w", err)
 	}
 	moneyInfo, err := moneyClient.GetNodeInfo(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch money system info: %w", err)
+		return nil, nil, fmt.Errorf("failed to fetch money system info: %w", err)
 	}
 	moneyTypeVar := clitypes.MoneyType
 	if !strings.HasPrefix(moneyInfo.Name, moneyTypeVar.String()) {
-		return nil, errors.New("invalid rpc url provided for money partition")
+		return nil, nil, errors.New("invalid rpc url provided for money partition")
 	}
+	return moneyClient, moneyInfo, nil
+}
 
+// Creates a fees.FeeManager that needs to be closed with the Close() method.
+// Does not close the account.Manager passed as an argument.
+func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager, feeManagerDB fees.FeeManagerDB, maxFee uint64, logger *slog.Logger) (*fees.FeeManager, error) {
 	switch c.targetPartitionType {
 	case clitypes.MoneyType:
+		moneyClient, moneyInfo, err := newMoneyClient(ctx, c.getMoneyRpcUrl())
+		if err != nil {
+			return nil, err
+		}
 		return fees.NewFeeManager(
 			moneyInfo.NetworkID,
 			am,
@@ -457,6 +474,10 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 		if !strings.HasPrefix(tokenInfo.Name, tokenTypeVar.String()) {
 			return nil, errors.New("invalid rpc url provided for tokens partition")
 		}
+		moneyClient, moneyInfo, err := newMoneyClient(ctx, c.getMoneyRpcUrl())
+		if err != nil {
+			return nil, err
+		}
 		if moneyInfo.NetworkID != tokenInfo.NetworkID {
 			return nil, errors.New("money and tokens rpc clients must be in the same network")
 		}
@@ -473,7 +494,38 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 			maxFee,
 			logger,
 		), nil
+	case clitypes.EnterpriseTokensType:
+		tokensRpcUrl := c.getTargetPartitionRpcUrl()
+		tokensClient, err := client.NewTokensPartitionClient(ctx, tokensRpcUrl)
+		if err != nil {
+			return nil, fmt.Errorf("failed to dial tokens rpc url: %w", err)
+		}
+		tokenInfo, err := tokensClient.GetNodeInfo(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch tokens system info: %w", err)
+		}
+		tokenTypeVar := clitypes.TokensType
+		if !strings.HasPrefix(tokenInfo.Name, tokenTypeVar.String()) {
+			return nil, errors.New("invalid rpc url provided for tokens partition")
+		}
+		return fees.NewFeeManager(
+			tokenInfo.NetworkID,
+			am,
+			feeManagerDB,
+			0,
+			nil,
+			nil,
+			tokenInfo.SystemID,
+			tokensClient,
+			tokens.NewFeeCreditRecordIDFromPublicKey,
+			maxFee,
+			logger,
+		), nil
 	case clitypes.EvmType:
+		moneyClient, moneyInfo, err := newMoneyClient(ctx, c.getMoneyRpcUrl())
+		if err != nil {
+			return nil, err
+		}
 		evmRpcUrl := c.getTargetPartitionRpcUrl()
 		evmClient, err := client.NewEvmPartitionClient(ctx, evmRpcUrl)
 		if err != nil {
