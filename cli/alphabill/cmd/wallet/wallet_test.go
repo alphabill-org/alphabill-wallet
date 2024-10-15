@@ -75,11 +75,11 @@ func TestWalletCreateCmd_invalidSeed(t *testing.T) {
 func TestWalletGetBalanceCmd(t *testing.T) {
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
 	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(
-		mocksrv.WithOwnerUnit(&sdktypes.Unit[any]{
-			UnitID:         money.NewBillID(nil, []byte{1}),
-			Data:           money.BillData{V: 15 * 1e8},
-			OwnerPredicate: testutils.TestPubKey0Hash(t),
-		}),
+		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t),
+			&sdktypes.Unit[any]{
+				UnitID: money.NewBillID(nil, []byte{1}),
+				Data:   money.BillData{Value: 15 * 1e8},
+			}),
 	))
 
 	walletCmd := newWalletCmdExecutor("--rpc-url", rpcUrl).WithHome(homedir)
@@ -89,11 +89,11 @@ func TestWalletGetBalanceCmd(t *testing.T) {
 
 func TestWalletGetBalanceKeyCmdKeyFlag(t *testing.T) {
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic(), testutils.WithNumberOfAccounts(2))
-	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(&sdktypes.Unit[any]{
-		UnitID:         money.NewBillID(nil, []byte{1}),
-		Data:           money.BillData{V: 15 * 1e8},
-		OwnerPredicate: testutils.TestPubKey1Hash(t),
-	})))
+	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(testutils.TestPubKey1Hash(t),
+		&sdktypes.Unit[any]{
+			UnitID: money.NewBillID(nil, []byte{1}),
+			Data:   money.BillData{Value: 15 * 1e8},
+		})))
 
 	walletCmd := newWalletCmdExecutor("--rpc-url", rpcUrl).WithHome(homedir)
 	stdout := walletCmd.Exec(t, "get-balance", "--key", "2")
@@ -103,11 +103,12 @@ func TestWalletGetBalanceKeyCmdKeyFlag(t *testing.T) {
 
 func TestWalletGetBalanceCmdTotalFlag(t *testing.T) {
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
-	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(&sdktypes.Unit[any]{
-		UnitID:         money.NewBillID(nil, []byte{1}),
-		Data:           money.BillData{V: 15 * 1e8},
-		OwnerPredicate: testutils.TestPubKey0Hash(t),
-	})))
+	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t),
+		&sdktypes.Unit[any]{
+			UnitID: money.NewBillID(nil, []byte{1}),
+			Data:   money.BillData{Value: 15 * 1e8},
+		},
+	)))
 
 	walletCmd := newWalletCmdExecutor("--rpc-url", rpcUrl).WithHome(homedir)
 	stdout := walletCmd.Exec(t, "get-balance", "--total")
@@ -117,11 +118,11 @@ func TestWalletGetBalanceCmdTotalFlag(t *testing.T) {
 
 func TestWalletGetBalanceCmdTotalWithKeyFlag(t *testing.T) {
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
-	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(&sdktypes.Unit[any]{
-		UnitID:         money.NewBillID(nil, []byte{1}),
-		Data:           money.BillData{V: 15 * 1e8},
-		OwnerPredicate: testutils.TestPubKey0Hash(t),
-	})))
+	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t),
+		&sdktypes.Unit[any]{
+			UnitID: money.NewBillID(nil, []byte{1}),
+			Data:   money.BillData{Value: 15 * 1e8},
+		})))
 
 	walletCmd := newWalletCmdExecutor("--rpc-url", rpcUrl).WithHome(homedir)
 	stdout := walletCmd.Exec(t, "get-balance", "--key", "1", "--total")
@@ -131,11 +132,11 @@ func TestWalletGetBalanceCmdTotalWithKeyFlag(t *testing.T) {
 
 func TestWalletGetBalanceCmdQuietFlag(t *testing.T) {
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
-	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(&sdktypes.Unit[any]{
-		UnitID:         money.NewBillID(nil, []byte{1}),
-		Data:           money.BillData{V: 15 * 1e8},
-		OwnerPredicate: testutils.TestPubKey0Hash(t),
-	})))
+	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t),
+		&sdktypes.Unit[any]{
+			UnitID: money.NewBillID(nil, []byte{1}),
+			Data:   money.BillData{Value: 15 * 1e8},
+		})))
 
 	walletCmd := newWalletCmdExecutor("--rpc-url", rpcUrl).WithHome(homedir)
 
@@ -175,16 +176,16 @@ func TestPubKeysCmd(t *testing.T) {
 func TestSendingFailsWithInsufficientBalance(t *testing.T) {
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
 	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(
-		mocksrv.WithOwnerUnit(&sdktypes.Unit[any]{
-			UnitID:         money.NewBillID(nil, []byte{8}),
-			Data:           money.BillData{V: 5 * 1e8},
-			OwnerPredicate: testutils.TestPubKey0Hash(t),
-		}),
-		mocksrv.WithOwnerUnit(&sdktypes.Unit[any]{
-			UnitID:         money.NewFeeCreditRecordIDFromPublicKeyHash(nil, testutils.TestPubKey0Hash(t), 1000),
-			Data:           fc.FeeCreditRecord{Balance: 1e8},
-			OwnerPredicate: testutils.TestPubKey0Hash(t),
-		}),
+		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t),
+			&sdktypes.Unit[any]{
+				UnitID: money.NewBillID(nil, []byte{8}),
+				Data:   money.BillData{Value: 5 * 1e8},
+			}),
+		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t),
+			&sdktypes.Unit[any]{
+				UnitID: money.NewFeeCreditRecordIDFromPublicKeyHash(nil, testutils.TestPubKey0Hash(t), 1000),
+				Data:   fc.FeeCreditRecord{Balance: 1e8},
+			}),
 	))
 
 	walletCmd := newWalletCmdExecutor("--rpc-url", rpcUrl).WithHome(homedir)
