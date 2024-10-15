@@ -25,7 +25,6 @@ type (
 		SystemID   types.SystemID
 		ID         types.UnitID
 		Value      uint64
-		LastUpdate uint64
 		LockStatus uint64
 		Counter    uint64
 	}

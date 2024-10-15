@@ -807,7 +807,7 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID ty
 	}
 
 	if err = ensureTokenOwnership(key, token, ownerPredicateInput); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to ensure token ownership: %w", err)
 	}
 	if token.GetLockStatus() != 0 {
 		return nil, errors.New("token is already locked")

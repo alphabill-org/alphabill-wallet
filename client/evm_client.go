@@ -29,8 +29,9 @@ type (
 	}
 
 	alphaBillLink struct {
-		Counter uint64
-		Timeout uint64
+		Counter        uint64
+		Timeout        uint64
+		OwnerPredicate []byte
 	}
 )
 

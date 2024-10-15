@@ -54,7 +54,6 @@ func TestTokensRpcClient(t *testing.T) {
 				Data: tokentxs.FungibleTokenData{
 					TokenType: tokenType.ID,
 					Value:     ft.Amount,
-					T:         168,
 					Counter:   ft.Counter,
 				},
 			}),
@@ -136,19 +135,17 @@ func TestTokensRpcClient(t *testing.T) {
 					Name:          ftTokenType.Name,
 					DecimalPlaces: ftTokenType.DecimalPlaces,
 				},
-				OwnerPredicate: ownerID,
 			}),
 			// fungible token unit
-			mocksrv.WithOwnerUnit(&types.Unit[any]{
+			mocksrv.WithOwnerUnit(ownerID, &types.Unit[any]{
 				SystemID: tokens.DefaultSystemID,
 				UnitID:   ftTokenID,
 				Data: tokentxs.FungibleTokenData{
-					TokenType: ftTokenTypeID,
-					Value:     ft.Amount,
-					T:         100,
-					Counter:   ft.Counter,
+					TokenType:      ftTokenTypeID,
+					Value:          ft.Amount,
+					Counter:        ft.Counter,
+					OwnerPredicate: ownerID,
 				},
-				OwnerPredicate: ownerID,
 			}),
 
 			// non-fungible token type
@@ -159,19 +156,17 @@ func TestTokensRpcClient(t *testing.T) {
 					Symbol: nftTokenType.Symbol,
 					Name:   nftTokenType.Name,
 				},
-				OwnerPredicate: ownerID,
 			}),
 			// non-fungible token unit
-			mocksrv.WithOwnerUnit(&types.Unit[any]{
+			mocksrv.WithOwnerUnit(ownerID, &types.Unit[any]{
 				SystemID: tokens.DefaultSystemID,
 				UnitID:   nftTokenID,
 				Data: tokentxs.NonFungibleTokenData{
-					TypeID:  nftTokenTypeID,
-					Name:    nft.Name,
-					T:       100,
-					Counter: nft.Counter,
+					TypeID:         nftTokenTypeID,
+					Name:           nft.Name,
+					Counter:        nft.Counter,
+					OwnerPredicate: ownerID,
 				},
-				OwnerPredicate: ownerID,
 			}),
 		)
 

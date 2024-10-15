@@ -23,7 +23,6 @@ func TestMoneyClient(t *testing.T) {
 			SystemID:   money.DefaultSystemID,
 			ID:         []byte{1},
 			Value:      192,
-			LastUpdate: 168,
 			Counter:    123,
 			LockStatus: 0,
 		}
@@ -33,8 +32,7 @@ func TestMoneyClient(t *testing.T) {
 				SystemID:  bill.SystemID,
 				UnitID:    bill.ID,
 				Data: &money.BillData{
-					V:       bill.Value,
-					T:       bill.LastUpdate,
+					Value:   bill.Value,
 					Counter: bill.Counter,
 					Locked:  bill.LockStatus,
 				},

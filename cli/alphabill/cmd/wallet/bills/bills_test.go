@@ -22,11 +22,13 @@ func TestWalletBillsListCmd_EmptyWallet(t *testing.T) {
 }
 
 func TestWalletBillsListCmd_Single(t *testing.T) {
-	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(&types.Unit[any]{
-		UnitID:         money.NewBillID(nil, []byte{1}),
-		Data:           money.BillData{V: 1e8},
-		OwnerPredicate: testutils.TestPubKey0Hash(t),
-	})))
+	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(
+		testutils.TestPubKey0Hash(t),
+		&types.Unit[any]{
+			UnitID: money.NewBillID(nil, []byte{1}),
+			Data:   money.BillData{Value: 1e8},
+		},
+	)))
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
 	billsCmd := testutils.NewSubCmdExecutor(NewBillsCmd, "--rpc-url", rpcUrl).WithHome(homedir)
 
@@ -35,10 +37,10 @@ func TestWalletBillsListCmd_Single(t *testing.T) {
 
 func TestWalletBillsListCmd_Multiple(t *testing.T) {
 	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(
-		mocksrv.WithOwnerUnit(&types.Unit[any]{UnitID: money.NewBillID(nil, []byte{1}), Data: money.BillData{V: 1}, OwnerPredicate: testutils.TestPubKey0Hash(t)}),
-		mocksrv.WithOwnerUnit(&types.Unit[any]{UnitID: money.NewBillID(nil, []byte{2}), Data: money.BillData{V: 2}, OwnerPredicate: testutils.TestPubKey0Hash(t)}),
-		mocksrv.WithOwnerUnit(&types.Unit[any]{UnitID: money.NewBillID(nil, []byte{3}), Data: money.BillData{V: 3}, OwnerPredicate: testutils.TestPubKey0Hash(t)}),
-		mocksrv.WithOwnerUnit(&types.Unit[any]{UnitID: money.NewBillID(nil, []byte{4}), Data: money.BillData{V: 4}, OwnerPredicate: testutils.TestPubKey0Hash(t)}),
+		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: money.NewBillID(nil, []byte{1}), Data: money.BillData{Value: 1}}),
+		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: money.NewBillID(nil, []byte{2}), Data: money.BillData{Value: 2}}),
+		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: money.NewBillID(nil, []byte{3}), Data: money.BillData{Value: 3}}),
+		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: money.NewBillID(nil, []byte{4}), Data: money.BillData{Value: 4}}),
 	))
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
 	billsCmd := testutils.NewSubCmdExecutor(NewBillsCmd, "--rpc-url", rpcUrl).WithHome(homedir)
@@ -54,7 +56,7 @@ func TestWalletBillsListCmd_Multiple(t *testing.T) {
 
 func TestWalletBillsListCmd_ExtraAccount(t *testing.T) {
 	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(
-		mocksrv.WithOwnerUnit(&types.Unit[any]{UnitID: money.NewBillID(nil, []byte{1}), Data: money.BillData{V: 1}, OwnerPredicate: testutils.TestPubKey1Hash(t)}),
+		mocksrv.WithOwnerUnit(testutils.TestPubKey1Hash(t), &types.Unit[any]{UnitID: money.NewBillID(nil, []byte{1}), Data: money.BillData{Value: 1}}),
 	))
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic(), testutils.WithNumberOfAccounts(2))
 	billsCmd := testutils.NewSubCmdExecutor(NewBillsCmd, "--rpc-url", rpcUrl).WithHome(homedir)
@@ -69,7 +71,7 @@ func TestWalletBillsListCmd_ExtraAccount(t *testing.T) {
 
 func TestWalletBillsListCmd_ExtraAccountTotal(t *testing.T) {
 	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(
-		mocksrv.WithOwnerUnit(&types.Unit[any]{UnitID: money.NewBillID(nil, []byte{1}), Data: money.BillData{V: 1e9}, OwnerPredicate: testutils.TestPubKey0Hash(t)}),
+		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: money.NewBillID(nil, []byte{1}), Data: money.BillData{Value: 1e9}}),
 	))
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic(), testutils.WithNumberOfAccounts(2))
 	billsCmd := testutils.NewSubCmdExecutor(NewBillsCmd, "--rpc-url", rpcUrl).WithHome(homedir)
@@ -109,9 +111,9 @@ func TestWalletBillsListCmd_ShowUnswappedFlag(t *testing.T) {
 func TestWalletBillsListCmd_ShowLockedBills(t *testing.T) {
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
 	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(
-		mocksrv.WithOwnerUnit(&types.Unit[any]{UnitID: money.NewBillID(nil, []byte{1}), Data: money.BillData{V: 1e8, Locked: wallet.LockReasonAddFees}, OwnerPredicate: testutils.TestPubKey0Hash(t)}),
-		mocksrv.WithOwnerUnit(&types.Unit[any]{UnitID: money.NewBillID(nil, []byte{2}), Data: money.BillData{V: 1e8, Locked: wallet.LockReasonReclaimFees}, OwnerPredicate: testutils.TestPubKey0Hash(t)}),
-		mocksrv.WithOwnerUnit(&types.Unit[any]{UnitID: money.NewBillID(nil, []byte{3}), Data: money.BillData{V: 1e8, Locked: wallet.LockReasonCollectDust}, OwnerPredicate: testutils.TestPubKey0Hash(t)}),
+		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: money.NewBillID(nil, []byte{1}), Data: money.BillData{Value: 1e8, Locked: wallet.LockReasonAddFees}}),
+		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: money.NewBillID(nil, []byte{2}), Data: money.BillData{Value: 1e8, Locked: wallet.LockReasonReclaimFees}}),
+		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: money.NewBillID(nil, []byte{3}), Data: money.BillData{Value: 1e8, Locked: wallet.LockReasonCollectDust}}),
 	))
 	billsCmd := testutils.NewSubCmdExecutor(NewBillsCmd, "--rpc-url", rpcUrl).WithHome(homedir)
 
@@ -126,10 +128,11 @@ func TestWalletBillsLockUnlockCmd_Nok(t *testing.T) {
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic(), testutils.WithNumberOfAccounts(2))
 
 	rpcUrl := mocksrv.StartServer(t, map[string]interface{}{
-		"state": mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(&types.Unit[any]{
-			UnitID:         money.NewFeeCreditRecordID(nil, []byte{1}),
-			OwnerPredicate: testutils.TestPubKey0Hash(t),
-			Data:           fc.FeeCreditRecord{Balance: 100}})),
+		"state": mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t),
+			&types.Unit[any]{
+				UnitID: money.NewFeeCreditRecordID(nil, []byte{1}),
+				Data:   fc.FeeCreditRecord{Balance: 100},
+			})),
 		"admin": mocksrv.NewAdminServiceMock(),
 	})
 

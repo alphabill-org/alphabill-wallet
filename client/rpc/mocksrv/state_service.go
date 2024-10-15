@@ -52,10 +52,10 @@ func NewStateServiceMock(opts ...Option) *StateServiceMock {
 	}
 }
 
-func WithOwnerUnit(unit *sdktypes.Unit[any]) Option {
+func WithOwnerUnit(ownerPredicate []byte, unit *sdktypes.Unit[any]) Option {
 	return func(o *Options) {
 		o.Units[string(unit.UnitID)] = unit
-		o.OwnerUnits[string(unit.OwnerPredicate)] = append(o.OwnerUnits[string(unit.OwnerPredicate)], unit.UnitID)
+		o.OwnerUnits[string(ownerPredicate)] = append(o.OwnerUnits[string(ownerPredicate)], unit.UnitID)
 	}
 }
 
