@@ -8,9 +8,10 @@ import (
 type PartitionType string
 
 const (
-	MoneyType  PartitionType = "money"
-	TokensType PartitionType = "tokens"
-	EvmType    PartitionType = "evm"
+	MoneyType            PartitionType = "money"
+	TokensType           PartitionType = "tokens"
+	EnterpriseTokensType PartitionType = "enterprise-tokens"
+	EvmType              PartitionType = "evm"
 )
 
 // String returns string value of given partitionType, used in Printf and help context
@@ -21,11 +22,11 @@ func (e *PartitionType) String() string {
 // Set sets the value of this partitionType string
 func (e *PartitionType) Set(v string) error {
 	switch v {
-	case "money", "tokens", "evm":
+	case "money", "tokens", "enterprise-tokens", "evm":
 		*e = PartitionType(v)
 		return nil
 	default:
-		return errors.New("must be one of [money|tokens|evm]")
+		return errors.New("must be one of [money|tokens|enterprise-tokens|evm]")
 	}
 }
 
