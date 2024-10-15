@@ -393,7 +393,9 @@ func (w *FeeManager) UnlockFeeCredit(ctx context.Context, cmd UnlockFeeCreditCmd
 // Close propagates call to all dependencies
 func (w *FeeManager) Close() {
 	_ = w.db.Close()
-	w.moneyClient.Close()
+	if w.moneyClient != nil {
+		w.moneyClient.Close()
+	}
 	w.targetPartitionClient.Close()
 }
 

@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/fc/permissioned"
 	"github.com/alphabill-org/alphabill-go-base/types"
 )
 
@@ -52,6 +53,24 @@ func (f *FeeCreditRecord) AddFeeCredit(ownerPredicate []byte, transFCProof *type
 		FeeCreditTransferProof:  transFCProof,
 	}
 	return NewTransactionOrder(f.NetworkID, f.SystemID, f.ID, fc.TransactionTypeAddFeeCredit, attr, txOptions...)
+}
+
+func (f *FeeCreditRecord) SetFeeCredit(ownerPredicate []byte, amount uint64, txOptions ...Option) (*types.TransactionOrder, error) {
+	attr := &permissioned.SetFeeCreditAttributes{
+		OwnerPredicate: ownerPredicate,
+		Amount:         amount,
+		Counter:        f.Counter,
+	}
+
+	return NewTransactionOrder(f.NetworkID, f.SystemID, f.ID, permissioned.TransactionTypeSetFeeCredit, attr, txOptions...)
+}
+
+func (f *FeeCreditRecord) DeleteFeeCredit(txOptions ...Option) (*types.TransactionOrder, error) {
+	attr := &permissioned.DeleteFeeCreditAttributes{
+		Counter:        *f.Counter,
+	}
+
+	return NewTransactionOrder(f.NetworkID, f.SystemID, f.ID, permissioned.TransactionTypeDeleteFeeCredit, attr, txOptions...)
 }
 
 func (f *FeeCreditRecord) CloseFeeCredit(targetBillID types.UnitID, targetBillCounter uint64, txOptions ...Option) (*types.TransactionOrder, error) {
