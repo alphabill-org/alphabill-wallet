@@ -1,4 +1,4 @@
-FROM golang:1.22-bullseye AS builder
+FROM golang:1.23-bookworm AS builder
 
 WORKDIR /usr/src/app
 COPY go.mod go.sum ./
@@ -10,7 +10,7 @@ RUN --mount=type=bind,source=ci/.gitconfig,target=/root/.gitconfig \
 COPY . .
 RUN make build
 
-FROM gcr.io/distroless/base-debian11:debug-nonroot
+FROM gcr.io/distroless/base-debian12:debug-nonroot
 SHELL [ "/busybox/sh", "-c" ]
 WORKDIR /app
 ENV PATH="/app:${PATH}"
