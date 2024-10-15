@@ -3,6 +3,7 @@ package permissioned
 import (
 	"fmt"
 
+	"github.com/alphabill-org/alphabill-go-base/hash"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc/permissioned"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
@@ -48,12 +49,12 @@ func addFeeCreditCmd(config *config) *cobra.Command {
 	}
 
 	var hexFlag types.BytesHex
-	cmd.Flags().VarP(&hexFlag, args.OwnerPredicateFlagName, "o", "owner predicate of the fee credit record")
-	cmd.Flags().Uint64P(args.KeyCmdName, "k", 1, "which key to use for sending the transaction")
-	err := cmd.MarkFlagRequired(args.OwnerPredicateFlagName)
+	cmd.Flags().VarP(&hexFlag, args.TargetPubkeyFlagName, "t", "pubkey of the fee credit record owner")
+	err := cmd.MarkFlagRequired(args.TargetPubkeyFlagName)
 	if err != nil {
 		return nil
 	}
+	cmd.Flags().Uint64P(args.KeyCmdName, "k", 1, "key used to sign the transaction")
 	cmd.Flags().StringP(args.AmountCmdName, "v", "1", "specifies how much fee credit to add in ALPHA")
 	return cmd
 }
@@ -69,7 +70,7 @@ func addFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 		return err
 	}
 
-	ownerPredicate := *cmd.Flag(args.OwnerPredicateFlagName).Value.(*types.BytesHex)
+	targetPubkey := *cmd.Flag(args.TargetPubkeyFlagName).Value.(*types.BytesHex)
 
 	rpcUrl, err := cmd.Flags().GetString(args.RpcUrl)
 	if err != nil {
@@ -99,11 +100,7 @@ func addFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 		return fmt.Errorf("failed to get account key for account %d", accountNumber)
 	}
 
-	ownerID, err := templates.ExtractPubKeyHashFromP2pkhPredicate(ownerPredicate)
-	if err != nil {
-		return fmt.Errorf("failed to extract owner ID from owner predicate: %w", err)
-	}
-
+	ownerID := hash.Sum256(targetPubkey)
 	fcr, err := tokensClient.GetFeeCreditRecordByOwnerID(cmd.Context(), ownerID)
 	if err != nil {
 		return fmt.Errorf("failed to fetch fee credit record: %w", err)
@@ -115,6 +112,7 @@ func addFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 	}
 	timeout := round + txTimeoutBlockCount
 
+	ownerPredicate := templates.NewP2pkh256BytesFromKeyHash(ownerID)
 	if fcr == nil {
 		nodeInfo, err := tokensClient.GetNodeInfo(cmd.Context())
 		if err != nil {
@@ -161,18 +159,18 @@ func deleteFeeCreditCmd(config *config) *cobra.Command {
 	}
 
 	var hexFlag types.BytesHex
-	cmd.Flags().VarP(&hexFlag, args.OwnerPredicateFlagName, "o", "owner predicate of the fee credit record")
-	err := cmd.MarkFlagRequired(args.OwnerPredicateFlagName)
+	cmd.Flags().VarP(&hexFlag, args.TargetPubkeyFlagName, "t", "pubkey of the fee credit record owner")
+	err := cmd.MarkFlagRequired(args.TargetPubkeyFlagName)
 	if err != nil {
 		return nil
 	}
-	cmd.Flags().Uint64P(args.KeyCmdName, "k", 1, "which key to use for sending the transaction")
+	cmd.Flags().Uint64P(args.KeyCmdName, "k", 1, "key used to sign the transaction")
 
 	return cmd
 }
 
 func deleteFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
-	ownerPredicate := *cmd.Flag(args.OwnerPredicateFlagName).Value.(*types.BytesHex)
+	ownerPubkey := *cmd.Flag(args.TargetPubkeyFlagName).Value.(*types.BytesHex)
 
 	rpcUrl, err := cmd.Flags().GetString(args.RpcUrl)
 	if err != nil {
@@ -202,11 +200,7 @@ func deleteFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 		return fmt.Errorf("failed to get account key for account %d", accountNumber)
 	}
 
-	ownerID, err := templates.ExtractPubKeyHashFromP2pkhPredicate(ownerPredicate)
-	if err != nil {
-		return fmt.Errorf("failed to extract owner ID from owner predicate: %w", err)
-	}
-
+	ownerID := hash.Sum256(ownerPubkey)
 	fcr, err := tokensClient.GetFeeCreditRecordByOwnerID(cmd.Context(), ownerID)
 	if err != nil {
 		return fmt.Errorf("failed to fetch fee credit record: %w", err)

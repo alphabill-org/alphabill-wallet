@@ -38,7 +38,7 @@ const (
 	ReferenceNumber         = "reference-number"
 	proofOutputFlagName     = "proof-output"
 	MaxFeeFlagName          = "max-fee"
-	OwnerPredicateFlagName  = "owner-predicate"
+	TargetPubkeyFlagName    = "target-pubkey"
 )
 
 func BuildRpcUrl(url string) string {
