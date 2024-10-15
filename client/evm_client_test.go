@@ -23,19 +23,19 @@ func TestGetFeeCreditRecordByOwnerID(t *testing.T) {
 			name:    "WithExistingOwnerID",
 			ownerID: []byte{1},
 			setupMock: func() *mocksrv.StateServiceMock {
-				service := mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(&sdktypes.Unit[any]{
+				service := mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit([]byte{1}, &sdktypes.Unit[any]{
 					UnitID: []byte{11},
 					Data: &stateObject{
 						Account: &account{
 							Balance: uint256.NewInt(100 * 1e8),
 						},
 						AlphaBill: &alphaBillLink{
-							Counter: 5,
-							Timeout: 42,
+							Counter:        5,
+							Timeout:        42,
+							OwnerPredicate: []byte{1},
 						},
 					},
-					OwnerPredicate: []byte{1},
-					StateProof:     nil,
+					StateProof: nil,
 				}))
 				return service
 			},
