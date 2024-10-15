@@ -64,6 +64,10 @@ func addFeeCreditCmd(config *feesConfig) *cobra.Command {
 }
 
 func addFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
+	if config.targetPartitionType == clitypes.EnterpriseTokensType {
+		return fmt.Errorf("adding fee credit is not supported for %s partition", config.targetPartitionType.String())
+	}
+
 	accountNumber, err := cmd.Flags().GetUint64(args.KeyCmdName)
 	if err != nil {
 		return err
@@ -151,6 +155,9 @@ func reclaimFeeCreditCmd(config *feesConfig) *cobra.Command {
 }
 
 func reclaimFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
+	if config.targetPartitionType == clitypes.EnterpriseTokensType {
+		return fmt.Errorf("reclaiming fee credit is not supported for %s partition", config.targetPartitionType.String())
+	}
 	accountNumber, err := cmd.Flags().GetUint64(args.KeyCmdName)
 	if err != nil {
 		return err
@@ -197,9 +204,10 @@ func lockFeeCreditCmd(config *feesConfig) *cobra.Command {
 }
 
 func lockFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
-	if config.targetPartitionType == clitypes.EvmType {
-		return errors.New("locking fee credit is not supported for EVM partition")
+	if config.targetPartitionType == clitypes.EvmType || config.targetPartitionType == clitypes.EnterpriseTokensType {
+		return fmt.Errorf("locking fee credit is not supported for %s partition", config.targetPartitionType.String())
 	}
+
 	accountNumber, err := cmd.Flags().GetUint64(args.KeyCmdName)
 	if err != nil {
 		return err
@@ -254,8 +262,8 @@ func unlockFeeCreditCmd(config *feesConfig) *cobra.Command {
 }
 
 func unlockFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
-	if config.targetPartitionType == clitypes.EvmType {
-		return errors.New("locking fee credit is not supported for EVM partition")
+	if config.targetPartitionType == clitypes.EvmType || config.targetPartitionType == clitypes.EnterpriseTokensType {
+		return fmt.Errorf("locking fee credit is not supported for %s partition", config.targetPartitionType.String())
 	}
 	accountNumber, err := cmd.Flags().GetUint64(args.KeyCmdName)
 	if err != nil {
