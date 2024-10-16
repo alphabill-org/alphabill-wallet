@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	defaultDockerImage   = "ghcr.io/alphabill-org/alphabill:e477eba5f865f2d5ade9d97ace2233e464edf8df"
+	defaultDockerImage   = "ghcr.io/alphabill-org/alphabill:7b44e2a6530098378c73a862bfd1b3473244047a"
 	containerGenesisPath = "/home/nonroot/genesis.tar"
 	containerP2pPort     = "8000"
 	containerRpcPort     = "8001"
@@ -32,10 +32,11 @@ var walletMnemonics = []string{
 
 type (
 	AlphabillNetwork struct {
-		MoneyRpcUrl         string
-		TokensRpcUrl        string
-		EvmRpcUrl           string
-		OrchestrationRpcUrl string
+		MoneyRpcUrl            string
+		TokensRpcUrl           string
+		EvmRpcUrl              string
+		OrchestrationRpcUrl    string
+		EnterpriseTokensRpcUrl string
 
 		ctx           context.Context
 		genesis       []byte
@@ -80,6 +81,12 @@ func WithOrchestrationNode(t *testing.T) AlphabillNetworkOption {
 func WithEvmNode(t *testing.T) AlphabillNetworkOption {
 	return func(n *AlphabillNetwork) {
 		n.startEvmNode(t)
+	}
+}
+
+func WithEnterpriseTokensNode(t *testing.T) AlphabillNetworkOption {
+	return func(n *AlphabillNetwork) {
+		n.startEnterpriseTokensNode(t)
 	}
 }
 
@@ -173,6 +180,11 @@ func (n *AlphabillNetwork) createGenesis(t *testing.T, ownerPredicate []byte) {
 			{
 				HostFilePath:      "./testdata/pdr-4.json",
 				ContainerFilePath: "/home/nonroot/pdr-4.json",
+				FileMode:          0o444,
+			},
+			{
+				HostFilePath:      "./testdata/pdr-5.json",
+				ContainerFilePath: "/home/nonroot/pdr-5.json",
 				FileMode:          0o444,
 			},
 		},
@@ -286,6 +298,25 @@ func (n *AlphabillNetwork) startOrchestrationNode(t *testing.T) {
 		"--bootnodes", n.bootstrapNode,
 		"--trust-base-file", "/home/nonroot/root-trust-base.json")
 	n.OrchestrationRpcUrl = rpcUrl(t, n.ctx, container)
+}
+
+func (n *AlphabillNetwork) startEnterpriseTokensNode(t *testing.T) {
+	container := n.startNode(t,
+		"tokens",
+		"--home", "/home/nonroot/enterprise-tokens1",
+		"--address", "/ip4/0.0.0.0/tcp/"+containerP2pPort,
+		"--rpc-server-address", "0.0.0.0:"+containerRpcPort,
+		"--log-file", "stdout",
+		"--log-level", "info",
+		"--log-format", "text",
+		"--genesis", "/home/nonroot/root1/rootchain/partition-genesis-5.json",
+		"--key-file", "/home/nonroot/enterprise-tokens1/tokens/keys.json",
+		"--state", "/home/nonroot/enterprise-tokens1/tokens/node-genesis-state.cbor",
+		"--db", "/home/nonroot/enterprise-tokens1/tokens/blocks.db",
+		"--tx-db", "/home/nonroot/enterprise-tokens1/tokens/tx.db",
+		"--bootnodes", n.bootstrapNode,
+		"--trust-base-file", "/home/nonroot/root-trust-base.json")
+	n.EnterpriseTokensRpcUrl = rpcUrl(t, n.ctx, container)
 }
 
 func (n *AlphabillNetwork) startNode(t *testing.T, args ...string) tc.Container {

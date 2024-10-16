@@ -1,0 +1,8 @@
+{
+  "network_identifier": 3,
+  "system_identifier": 5,
+  "type_id_length": 8,
+  "unit_id_length": 256,
+  "sharding_scheme": null,
+  "t2timeout": 2500000000
+}

@@ -42,7 +42,7 @@ func NewCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 func addFeeCreditCmd(config *config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add-credit",
-		Short: "adds fee credit to a fee credit record owned by the specified owner predicate",
+		Short: "adds fee credit to a fee credit record owned by the specified owner predicate (admin only command)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addFeeCreditCmdExec(cmd, config)
 		},
@@ -152,7 +152,7 @@ func addFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 func deleteFeeCreditCmd(config *config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete-credit",
-		Short: "deletes fee credit record owned by the specified owner predicate",
+		Short: "deletes fee credit record owned by the specified owner predicate (admin only command)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deleteFeeCreditCmdExec(cmd, config)
 		},
@@ -170,7 +170,7 @@ func deleteFeeCreditCmd(config *config) *cobra.Command {
 }
 
 func deleteFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
-	ownerPubkey := *cmd.Flag(args.TargetPubkeyFlagName).Value.(*types.BytesHex)
+	targetPubkey := *cmd.Flag(args.TargetPubkeyFlagName).Value.(*types.BytesHex)
 
 	rpcUrl, err := cmd.Flags().GetString(args.RpcUrl)
 	if err != nil {
@@ -200,7 +200,7 @@ func deleteFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 		return fmt.Errorf("failed to get account key for account %d", accountNumber)
 	}
 
-	ownerID := hash.Sum256(ownerPubkey)
+	ownerID := hash.Sum256(targetPubkey)
 	fcr, err := tokensClient.GetFeeCreditRecordByOwnerID(cmd.Context(), ownerID)
 	if err != nil {
 		return fmt.Errorf("failed to fetch fee credit record: %w", err)

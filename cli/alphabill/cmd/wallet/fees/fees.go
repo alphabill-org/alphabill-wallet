@@ -52,7 +52,7 @@ func NewFeesCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 func addFeeCreditCmd(config *feesConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add",
-		Short: "adds fee credit to the wallet",
+		Short: "adds fee credit to the wallet (permissionless partitions only)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addFeeCreditCmdExec(cmd, config)
 		},
@@ -144,7 +144,7 @@ func listFeesCmdExec(cmd *cobra.Command, config *feesConfig) error {
 func reclaimFeeCreditCmd(config *feesConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "reclaim",
-		Short: "reclaims fee credit of the wallet",
+		Short: "reclaims fee credit of the wallet (permissionless partitions only)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return reclaimFeeCreditCmdExec(cmd, config)
 		},
@@ -192,7 +192,7 @@ func reclaimFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
 func lockFeeCreditCmd(config *feesConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "lock",
-		Short: "locks fee credit of the wallet",
+		Short: "locks fee credit of the wallet (permissionless partitions only)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return lockFeeCreditCmdExec(cmd, config)
 		},
@@ -250,7 +250,7 @@ func lockFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
 func unlockFeeCreditCmd(config *feesConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "unlock",
-		Short: "unlocks fee credit of the wallet",
+		Short: "unlocks fee credit of the wallet (permissionless partitions only)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return unlockFeeCreditCmdExec(cmd, config)
 		},
