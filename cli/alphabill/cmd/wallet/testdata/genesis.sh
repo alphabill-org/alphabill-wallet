@@ -23,6 +23,12 @@
                --gen-keys \
                --owner-predicate $1
 
+/app/alphabill tokens-genesis \
+               --home /home/nonroot/genesis/enterprise-tokens1 \
+               --partition-description /home/nonroot/pdr-5.json \
+               --admin-owner-predicate $1 \
+               --gen-keys
+
 /app/alphabill root-genesis new \
                --home /home/nonroot/genesis/root1 \
                --gen-keys \
@@ -32,7 +38,8 @@
                -p /home/nonroot/genesis/money1/money/node-genesis.json \
                -p /home/nonroot/genesis/tokens1/tokens/node-genesis.json \
                -p /home/nonroot/genesis/evm1/evm/node-genesis.json \
-               -p /home/nonroot/genesis/orchestration1/orchestration/node-genesis.json
+               -p /home/nonroot/genesis/orchestration1/orchestration/node-genesis.json \
+               -p /home/nonroot/genesis/enterprise-tokens1/tokens/node-genesis.json
 
 /app/alphabill root-genesis combine \
                --home /home/nonroot/genesis/root1 \

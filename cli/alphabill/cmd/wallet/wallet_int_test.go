@@ -203,6 +203,41 @@ func TestWalletBillsLockUnlockCmd_Ok(t *testing.T) {
 	testutils.VerifyStdout(t, stdout, "#1 0x000000000000000000000000000000000000000000000000000000000000000101 9'999'999'999.000'000'00")
 }
 
+func TestWalletPermissionedAddCreditCmd_Ok(t *testing.T) {
+	// setup network
+	wallets, abNet := testutils.SetupNetworkWithWallets(t, testutils.WithEnterpriseTokensNode(t))
+
+	walletCmd := newWalletCmdExecutor("--rpc-url", abNet.EnterpriseTokensRpcUrl).WithHome(wallets[0].Homedir)
+	targetPubkey := wallets[0].PubKeys[1]
+
+	// add fee credit
+	testutils.VerifyStdout(t,
+		walletCmd.Exec(t, "permissioned", "add-credit", "--target-pubkey", fmt.Sprintf("0x%x", targetPubkey), "--amount", "9"),
+		"Fee credit added successfully")
+
+	testutils.VerifyStdout(t,
+		walletCmd.Exec(t, "fees", "list", "--partition", "enterprise-tokens", "--partition-rpc-url", abNet.EnterpriseTokensRpcUrl),
+		"Account #2 9.000'000'00")
+
+	// add more fee credit
+	testutils.VerifyStdout(t,
+		walletCmd.Exec(t, "permissioned", "add-credit", "--target-pubkey", fmt.Sprintf("0x%x", targetPubkey), "--amount", "7"),
+		"Fee credit added successfully")
+
+	testutils.VerifyStdout(t,
+		walletCmd.Exec(t, "fees", "list", "--partition", "enterprise-tokens", "--partition-rpc-url", abNet.EnterpriseTokensRpcUrl),
+		"Account #2 16.000'000'00")
+
+	// delete fee credit
+	testutils.VerifyStdout(t,
+		walletCmd.Exec(t, "permissioned", "delete-credit", "--target-pubkey", fmt.Sprintf("0x%x", targetPubkey)),
+		"Fee credit deleted successfully")
+
+	testutils.VerifyStdout(t,
+		walletCmd.Exec(t, "fees", "list", "--partition", "enterprise-tokens", "--partition-rpc-url", abNet.EnterpriseTokensRpcUrl),
+		"Account #2 0.000'000'00")
+}
+
 func TestOrchestration_AddVarOK(t *testing.T) {
 	wallets, net := testutils.SetupNetworkWithWallets(t, testutils.WithOrchestrationNode(t))
 
