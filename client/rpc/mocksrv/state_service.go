@@ -142,7 +142,13 @@ func (s *StateServiceMock) GetTransactionProof(ctx context.Context, txHash types
 
 	sentTxo, ok := s.SentTxs[string(txHash)]
 	if ok {
-		txr := &types.TransactionRecord{TransactionOrder: sentTxo, ServerMetadata: &types.ServerMetadata{ActualFee: 1}}
+		txr := &types.TransactionRecord{
+			TransactionOrder: sentTxo,
+			ServerMetadata: &types.ServerMetadata{
+				SuccessIndicator: 1,
+				ActualFee: 1,
+			},
+		}
 		txp := &types.TxProof{}
 		txRecordProof := &types.TxRecordProof{
 			TxRecord: txr,

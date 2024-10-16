@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/fc/permissioned"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
 
@@ -104,6 +105,51 @@ func TestFeeCreditRecordUnlock(t *testing.T) {
 	require.Equal(t, fcr.ID, tx.GetUnitID())
 
 	attr := &fc.UnlockFeeCreditAttributes{}
+	require.NoError(t, tx.UnmarshalAttributes(attr))
+	require.Equal(t, *fcr.Counter, attr.Counter)
+}
+
+func TestFeeCreditRecordSetFeeCredit(t *testing.T) {
+	fcrCounter := uint64(1)
+	fcr := &FeeCreditRecord{
+		NetworkID: types.NetworkLocal,
+		SystemID:  2,
+		ID:        money.NewFeeCreditRecordID(nil, []byte{3}),
+		Counter:   &fcrCounter,
+	}
+
+	ownerPredicate := []byte{4}
+	tx, err := fcr.SetFeeCredit(ownerPredicate, 5)
+	require.NoError(t, err)
+	require.NotNil(t, tx)
+	require.Equal(t, tx.Type, permissioned.TransactionTypeSetFeeCredit)
+	require.Equal(t, fcr.SystemID, tx.GetSystemID())
+	require.Equal(t, fcr.ID, tx.GetUnitID())
+
+	attr := &permissioned.SetFeeCreditAttributes{}
+	require.NoError(t, tx.UnmarshalAttributes(attr))
+	require.Equal(t, ownerPredicate, attr.OwnerPredicate)
+	require.EqualValues(t, 5, attr.Amount)
+	require.Equal(t, *fcr.Counter, *attr.Counter)
+}
+
+func TestFeeCreditRecordDeleteFeeCredit(t *testing.T) {
+	fcrCounter := uint64(1)
+	fcr := &FeeCreditRecord{
+		NetworkID: types.NetworkLocal,
+		SystemID:  2,
+		ID:        money.NewFeeCreditRecordID(nil, []byte{3}),
+		Counter:   &fcrCounter,
+	}
+
+	tx, err := fcr.DeleteFeeCredit()
+	require.NoError(t, err)
+	require.NotNil(t, tx)
+	require.Equal(t, tx.Type, permissioned.TransactionTypeDeleteFeeCredit)
+	require.Equal(t, fcr.SystemID, tx.GetSystemID())
+	require.Equal(t, fcr.ID, tx.GetUnitID())
+
+	attr := &permissioned.DeleteFeeCreditAttributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))
 	require.Equal(t, *fcr.Counter, attr.Counter)
 }
