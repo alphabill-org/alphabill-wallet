@@ -42,7 +42,7 @@ func NewCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 func addFeeCreditCmd(config *config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add-credit",
-		Short: "adds fee credit to a fee credit record owned by the specified owner predicate",
+		Short: "adds fee credit to a fee credit record owned by the specified owner predicate (admin only command)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return addFeeCreditCmdExec(cmd, config)
 		},
@@ -152,7 +152,7 @@ func addFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 func deleteFeeCreditCmd(config *config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete-credit",
-		Short: "deletes fee credit record owned by the specified owner predicate",
+		Short: "deletes fee credit record owned by the specified owner predicate (admin only command)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return deleteFeeCreditCmdExec(cmd, config)
 		},
