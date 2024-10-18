@@ -34,6 +34,8 @@ type (
 		NetworkID           types.NetworkID `json:"networkId"` // hex encoded network identifier
 		SystemID            types.SystemID  `json:"systemId"`  // hex encoded system identifier
 		Name                string          `json:"name"`      // one of [money node | tokens node | evm node]
+		PermissionedMode    bool            `json:"permissionedMode"`
+		FeelessMode         bool            `json:"feelessMode"`
 		Self                PeerInfo        `json:"self"`      // information about this peer
 		BootstrapNodes      []PeerInfo      `json:"bootstrapNodes"`
 		RootValidators      []PeerInfo      `json:"rootValidators"`

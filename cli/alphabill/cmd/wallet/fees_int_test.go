@@ -124,6 +124,14 @@ func TestWalletFeesCmds_TokenPartition(t *testing.T) {
 	stdout = feesCmd.Exec(t, "list")
 	require.Equal(t, "Partition: tokens", stdout.Lines[0])
 	require.Equal(t, fmt.Sprintf("Account #1 %s", util.AmountToString(expectedFees, 8)), stdout.Lines[1])
+
+	// manage fee credits as if it were a permissioned partition
+	permissionedCmd := newWalletCmdExecutor("permissioned",
+		"--rpc-url", abNet.TokensRpcUrl,
+		"--target-pubkey", "0x01").WithHome(wallets[0].Homedir)
+
+	permissionedCmd.ExecWithError(t, "cannot add fee credit, partition not in permissioned mode", "add-credit", "--amount", "10")
+	permissionedCmd.ExecWithError(t, "cannot delete fee credit, partition not in permissioned mode", "delete-credit")
 }
 
 func TestWalletFeesCmds_EvmPartition(t *testing.T) {
