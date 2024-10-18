@@ -82,6 +82,14 @@ func addFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 	}
 	defer tokensClient.Close()
 
+	nodeInfo, err := tokensClient.GetNodeInfo(cmd.Context())
+	if err != nil {
+		return fmt.Errorf("failed to get node info: %w", err)
+	}
+	if !nodeInfo.PermissionedMode {
+		return fmt.Errorf("cannot add fee credit, partition not in permissioned mode")
+	}
+
 	am, err := cliaccount.LoadExistingAccountManager(config.walletConfig)
 	if err != nil {
 		return fmt.Errorf("failed to load account manager: %w", err)
@@ -114,11 +122,6 @@ func addFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 
 	ownerPredicate := templates.NewP2pkh256BytesFromKeyHash(ownerID)
 	if fcr == nil {
-		nodeInfo, err := tokensClient.GetNodeInfo(cmd.Context())
-		if err != nil {
-			return fmt.Errorf("failed to get node info: %w", err)
-		}
-
 		fcrID := tokens.NewFeeCreditRecordIDFromOwnerPredicate(nil, ownerPredicate, timeout)
 		fcr = &sdktypes.FeeCreditRecord{
 			NetworkID: nodeInfo.NetworkID,
@@ -181,6 +184,14 @@ func deleteFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 		return fmt.Errorf("failed to dial rpc url: %w", err)
 	}
 	defer tokensClient.Close()
+
+	nodeInfo, err := tokensClient.GetNodeInfo(cmd.Context())
+	if err != nil {
+		return fmt.Errorf("failed to get node info: %w", err)
+	}
+	if !nodeInfo.PermissionedMode {
+		return fmt.Errorf("cannot delete fee credit, partition not in permissioned mode")
+	}
 
 	am, err := cliaccount.LoadExistingAccountManager(config.walletConfig)
 	if err != nil {
