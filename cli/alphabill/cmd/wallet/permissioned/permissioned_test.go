@@ -20,9 +20,10 @@ func TestAddFeeCreditCmd(t *testing.T) {
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
 	as := mocksrv.NewAdminServiceMock(mocksrv.WithInfoResponse(
 		&types.NodeInfoResponse{
-			NetworkID: 1,
-			SystemID:  50,
-			Name:      "tokens",
+			NetworkID:        1,
+			SystemID:         50,
+			Name:             "tokens",
+			PermissionedMode: true,
 		}))
 	ss := mocksrv.NewStateServiceMock(
 		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t),
@@ -57,6 +58,13 @@ func TestAddFeeCreditCmd(t *testing.T) {
 func TestDeleteFeeCreditCmd(t *testing.T) {
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
 	targetPubkey := []byte{1, 2, 3}
+	as := mocksrv.NewAdminServiceMock(mocksrv.WithInfoResponse(
+		&types.NodeInfoResponse{
+			NetworkID:        1,
+			SystemID:         50,
+			Name:             "tokens",
+			PermissionedMode: true,
+		}))
 	ss := mocksrv.NewStateServiceMock(
 		mocksrv.WithOwnerUnit(hash.Sum256(targetPubkey),
 			&sdktypes.Unit[any]{
@@ -64,6 +72,7 @@ func TestDeleteFeeCreditCmd(t *testing.T) {
 				Data:   fc.FeeCreditRecord{Balance: 3, OwnerPredicate: nil},
 			}))
 	rpcUrl := mocksrv.StartServer(t, map[string]interface{}{
+		"admin": as,
 		"state": ss,
 	})
 
