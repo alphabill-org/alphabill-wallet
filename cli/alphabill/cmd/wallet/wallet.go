@@ -423,7 +423,7 @@ func ExecCollectDust(cmd *cobra.Command, config *types.WalletConfig) error {
 		return fmt.Errorf("failed to get node info: %w", err)
 	}
 
-	w, err := money.NewWallet(nodeInfo.NetworkID, nodeInfo.SystemID, am, feeManagerDB, moneyClient, maxFee, config.Base.Logger)
+	w, err := money.NewWallet(nodeInfo.NetworkID, nodeInfo.PartitionID, am, feeManagerDB, moneyClient, maxFee, config.Base.Logger)
 	if err != nil {
 		return err
 	}

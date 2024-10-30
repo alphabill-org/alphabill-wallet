@@ -72,13 +72,13 @@ func (c *evmPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ow
 	}
 	counterCopy := fcr.Counter
 	return &sdktypes.FeeCreditRecord{
-		NetworkID:  u.NetworkID,
-		SystemID:   u.SystemID,
-		ID:         u.UnitID,
-		Balance:    fcr.Balance,
-		Counter:    &counterCopy,
-		Timeout:    fcr.Timeout,
-		LockStatus: 0,
+		NetworkID:   u.NetworkID,
+		PartitionID: u.PartitionID,
+		ID:          u.UnitID,
+		Balance:     fcr.Balance,
+		Counter:     &counterCopy,
+		Timeout:     fcr.Timeout,
+		LockStatus:  0,
 	}, nil
 }
 

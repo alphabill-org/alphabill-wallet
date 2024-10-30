@@ -13,6 +13,7 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill-go-base/types"
+	"github.com/alphabill-org/alphabill-go-base/types/hex"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
@@ -37,7 +38,7 @@ func Test_GetRoundNumber_OK(t *testing.T) {
 			return 42, nil
 		},
 	}
-	w, err := New(types.NetworkLocal, tokens.DefaultSystemID, rpcClient, nil, false, nil, 0, logger.New(t))
+	w, err := New(types.NetworkLocal, tokens.DefaultPartitionID, rpcClient, nil, false, nil, 0, logger.New(t))
 	require.NoError(t, err)
 
 	roundNumber, err := w.GetRoundNumber(context.Background())
@@ -141,7 +142,7 @@ func TestNewTypes(t *testing.T) {
 			recTxs[string(tx.GetUnitID())] = tx
 			return tx.Hash(crypto.SHA256), nil
 		},
-		getUnitsByOwnerID: func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
+		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
 			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
 			return []types.UnitID{fcrID}, nil
@@ -273,7 +274,7 @@ func TestNewFungibleToken(t *testing.T) {
 			recTxs = append(recTxs, tx)
 			return tx.Hash(crypto.SHA256), nil
 		},
-		getUnitsByOwnerID: func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
+		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
 			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
 			return []types.UnitID{fcrID}, nil
@@ -373,7 +374,7 @@ func TestSendFungible(t *testing.T) {
 				newFungibleToken(t, test.RandomBytes(32), typeId2, "AB3", 1, 1),
 			}, nil
 		},
-		getUnitsByOwnerID: func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
+		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
 			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
 			return []types.UnitID{fcrID}, nil
@@ -568,7 +569,7 @@ func TestNewNFT(t *testing.T) {
 			recTxs = append(recTxs, tx)
 			return tx.Hash(crypto.SHA256), nil
 		},
-		getUnitsByOwnerID: func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
+		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
 			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
 			return []types.UnitID{fcrID}, nil
@@ -617,7 +618,7 @@ func TestNewNFT(t *testing.T) {
 			key, err := tw.am.GetAccountKey(tt.accountNumber - 1)
 			require.NoError(t, err)
 			nft := &sdktypes.NonFungibleToken{
-				SystemID:            tokens.DefaultSystemID,
+				PartitionID:         tokens.DefaultPartitionID,
 				TypeID:              tokens.NewNonFungibleTokenTypeID(nil, test.RandomBytes(32)),
 				OwnerPredicate:      ownerPredicateFromHash(key.PubKeyHash.Sha256),
 				URI:                 "https://alphabill.org",
@@ -657,7 +658,7 @@ func TestTransferNFT(t *testing.T) {
 			recTxs[string(tx.GetUnitID())] = tx
 			return tx.Hash(crypto.SHA256), nil
 		},
-		getUnitsByOwnerID: func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
+		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
 			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
 			return []types.UnitID{fcrID}, nil
@@ -727,7 +728,7 @@ func TestUpdateNFTData(t *testing.T) {
 			recTxs[string(tx.GetUnitID())] = tx
 			return tx.Hash(crypto.SHA256), nil
 		},
-		getUnitsByOwnerID: func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
+		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
 			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
 			return []types.UnitID{fcrID}, nil
@@ -769,7 +770,7 @@ func TestLockToken(t *testing.T) {
 			recTxs[string(tx.GetUnitID())] = tx
 			return tx.Hash(crypto.SHA256), nil
 		},
-		getUnitsByOwnerID: func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
+		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
 			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
 			return []types.UnitID{fcrID}, nil
@@ -807,7 +808,7 @@ func TestUnlockToken(t *testing.T) {
 			recTxs[string(tx.GetUnitID())] = tx
 			return tx.Hash(crypto.SHA256), nil
 		},
-		getUnitsByOwnerID: func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
+		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
 			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
 			return []types.UnitID{fcrID}, nil
@@ -846,7 +847,7 @@ func TestSendFungibleByID(t *testing.T) {
 			}
 			return nil, fmt.Errorf("not found")
 		},
-		getUnitsByOwnerID: func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
+		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
 			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
 			return []types.UnitID{fcrID}, nil
@@ -915,16 +916,16 @@ type mockTokensPartitionClient struct {
 	getRoundNumber              func(ctx context.Context) (uint64, error)
 	sendTransaction             func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
 	confirmTransaction          func(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*types.TxRecordProof, error)
-	getTransactionProof         func(ctx context.Context, txHash types.Bytes) (*types.TxRecordProof, error)
+	getTransactionProof         func(ctx context.Context, txHash hex.Bytes) (*types.TxRecordProof, error)
 	getFeeCreditRecordByOwnerID func(ctx context.Context, ownerID []byte) (*sdktypes.FeeCreditRecord, error)
 	getBlock                    func(ctx context.Context, roundNumber uint64) (*types.Block, error)
-	getUnitsByOwnerID           func(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error)
+	getUnitsByOwnerID           func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error)
 }
 
 func (m *mockTokensPartitionClient) GetNodeInfo(ctx context.Context) (*sdktypes.NodeInfoResponse, error) {
 	return &sdktypes.NodeInfoResponse{
-		SystemID: 2,
-		Name:     "tokens node",
+		PartitionID: 2,
+		Name:        "tokens node",
 	}, nil
 }
 
@@ -1005,7 +1006,7 @@ func (m *mockTokensPartitionClient) ConfirmTransaction(ctx context.Context, tx *
 	return nil, fmt.Errorf("ConfirmTransaction not implemented")
 }
 
-func (m *mockTokensPartitionClient) GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TxRecordProof, error) {
+func (m *mockTokensPartitionClient) GetTransactionProof(ctx context.Context, txHash hex.Bytes) (*types.TxRecordProof, error) {
 	if m.getTransactionProof != nil {
 		return m.getTransactionProof(ctx, txHash)
 	}
@@ -1019,10 +1020,10 @@ func (m *mockTokensPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Cont
 	c := uint64(2)
 	id := tokens.NewFeeCreditRecordID(nil, []byte{1})
 	return &sdktypes.FeeCreditRecord{
-		SystemID: tokens.DefaultSystemID,
-		ID:       id,
-		Balance:  100000,
-		Counter:  &c,
+		PartitionID: tokens.DefaultPartitionID,
+		ID:          id,
+		Balance:     100000,
+		Counter:     &c,
 	}, nil
 }
 
@@ -1033,7 +1034,7 @@ func (m *mockTokensPartitionClient) GetBlock(ctx context.Context, roundNumber ui
 	return nil, fmt.Errorf("GetBlock not implemented")
 }
 
-func (m *mockTokensPartitionClient) GetUnitsByOwnerID(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
+func (m *mockTokensPartitionClient) GetUnitsByOwnerID(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 	if m.getUnitsByOwnerID != nil {
 		return m.getUnitsByOwnerID(ctx, ownerID)
 	}

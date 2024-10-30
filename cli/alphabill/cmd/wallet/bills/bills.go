@@ -119,7 +119,7 @@ func lockCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 	cmd.Flags().StringVarP(&config.RpcUrl, args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "rpc node url")
 	cmd.Flags().Uint64VarP(&config.Key, args.KeyCmdName, "k", 1, "account number of the bill to lock")
 	cmd.Flags().Var(&config.BillID, args.BillIdCmdName, "id of the bill to lock")
-	cmd.Flags().Uint32Var(&config.SystemID, args.SystemIdentifierCmdName, uint32(money.DefaultSystemID), "system identifier")
+	cmd.Flags().Uint32Var(&config.PartitionID, args.PartitionIdentifierCmdName, uint32(money.DefaultPartitionID), "partition identifier")
 	args.AddMaxFeeFlag(cmd, cmd.Flags())
 	return cmd
 }
@@ -211,7 +211,7 @@ func unlockCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 	cmd.Flags().StringVarP(&config.RpcUrl, args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "rpc node url")
 	cmd.Flags().Uint64VarP(&config.Key, args.KeyCmdName, "k", 1, "account number of the bill to unlock")
 	cmd.Flags().Var(&config.BillID, args.BillIdCmdName, "id of the bill to unlock")
-	cmd.Flags().Uint32Var(&config.SystemID, args.SystemIdentifierCmdName, uint32(money.DefaultSystemID), "system identifier")
+	cmd.Flags().Uint32Var(&config.PartitionID, args.PartitionIdentifierCmdName, uint32(money.DefaultPartitionID), "partition identifier")
 	args.AddMaxFeeFlag(cmd, cmd.Flags())
 	return cmd
 }

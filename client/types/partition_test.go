@@ -14,10 +14,10 @@ import (
 func TestFeeCreditRecordAddFeeCredit(t *testing.T) {
 	fcrCounter := uint64(1)
 	fcr := &FeeCreditRecord{
-		NetworkID: types.NetworkLocal,
-		SystemID:  2,
-		ID:        money.NewFeeCreditRecordID(nil, []byte{3}),
-		Counter:   &fcrCounter,
+		NetworkID:   types.NetworkLocal,
+		PartitionID: 2,
+		ID:          money.NewFeeCreditRecordID(nil, []byte{3}),
+		Counter:     &fcrCounter,
 	}
 
 	ownerPredicate := []byte{4}
@@ -30,7 +30,7 @@ func TestFeeCreditRecordAddFeeCredit(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 	require.Equal(t, tx.Type, fc.TransactionTypeAddFeeCredit)
-	require.Equal(t, fcr.SystemID, tx.GetSystemID())
+	require.Equal(t, fcr.PartitionID, tx.GetPartitionID())
 	require.Equal(t, fcr.ID, tx.GetUnitID())
 
 	attr := &fc.AddFeeCreditAttributes{}
@@ -42,11 +42,11 @@ func TestFeeCreditRecordAddFeeCredit(t *testing.T) {
 func TestFeeCreditRecordCloseFeeCredit(t *testing.T) {
 	fcrCounter := uint64(1)
 	fcr := &FeeCreditRecord{
-		NetworkID: types.NetworkLocal,
-		SystemID:  1,
-		ID:        money.NewFeeCreditRecordID(nil, []byte{2}),
-		Balance:   3,
-		Counter:   &fcrCounter,
+		NetworkID:   types.NetworkLocal,
+		PartitionID: 1,
+		ID:          money.NewFeeCreditRecordID(nil, []byte{2}),
+		Balance:     3,
+		Counter:     &fcrCounter,
 	}
 
 	targetBillID := money.NewBillID(nil, []byte{4})
@@ -56,7 +56,7 @@ func TestFeeCreditRecordCloseFeeCredit(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 	require.Equal(t, tx.Type, fc.TransactionTypeCloseFeeCredit)
-	require.Equal(t, fcr.SystemID, tx.GetSystemID())
+	require.Equal(t, fcr.PartitionID, tx.GetPartitionID())
 	require.Equal(t, fcr.ID, tx.GetUnitID())
 
 	attr := &fc.CloseFeeCreditAttributes{}
@@ -70,17 +70,17 @@ func TestFeeCreditRecordCloseFeeCredit(t *testing.T) {
 func TestFeeCreditRecordLock(t *testing.T) {
 	fcrCounter := uint64(1)
 	fcr := &FeeCreditRecord{
-		NetworkID: types.NetworkLocal,
-		SystemID:  2,
-		ID:        money.NewFeeCreditRecordID(nil, []byte{3}),
-		Counter:   &fcrCounter,
+		NetworkID:   types.NetworkLocal,
+		PartitionID: 2,
+		ID:          money.NewFeeCreditRecordID(nil, []byte{3}),
+		Counter:     &fcrCounter,
 	}
 	lockStatus := uint64(4)
 	tx, err := fcr.Lock(lockStatus)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 	require.Equal(t, tx.Type, fc.TransactionTypeLockFeeCredit)
-	require.Equal(t, fcr.SystemID, tx.GetSystemID())
+	require.Equal(t, fcr.PartitionID, tx.GetPartitionID())
 	require.Equal(t, fcr.ID, tx.GetUnitID())
 
 	attr := &fc.LockFeeCreditAttributes{}
@@ -92,16 +92,16 @@ func TestFeeCreditRecordLock(t *testing.T) {
 func TestFeeCreditRecordUnlock(t *testing.T) {
 	fcrCounter := uint64(1)
 	fcr := &FeeCreditRecord{
-		NetworkID: types.NetworkLocal,
-		SystemID:  2,
-		ID:        money.NewFeeCreditRecordID(nil, []byte{3}),
-		Counter:   &fcrCounter,
+		NetworkID:   types.NetworkLocal,
+		PartitionID: 2,
+		ID:          money.NewFeeCreditRecordID(nil, []byte{3}),
+		Counter:     &fcrCounter,
 	}
 	tx, err := fcr.Unlock()
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 	require.Equal(t, tx.Type, fc.TransactionTypeUnlockFeeCredit)
-	require.Equal(t, fcr.SystemID, tx.GetSystemID())
+	require.Equal(t, fcr.PartitionID, tx.GetPartitionID())
 	require.Equal(t, fcr.ID, tx.GetUnitID())
 
 	attr := &fc.UnlockFeeCreditAttributes{}
@@ -112,10 +112,10 @@ func TestFeeCreditRecordUnlock(t *testing.T) {
 func TestFeeCreditRecordSetFeeCredit(t *testing.T) {
 	fcrCounter := uint64(1)
 	fcr := &FeeCreditRecord{
-		NetworkID: types.NetworkLocal,
-		SystemID:  2,
-		ID:        money.NewFeeCreditRecordID(nil, []byte{3}),
-		Counter:   &fcrCounter,
+		NetworkID:   types.NetworkLocal,
+		PartitionID: 2,
+		ID:          money.NewFeeCreditRecordID(nil, []byte{3}),
+		Counter:     &fcrCounter,
 	}
 
 	ownerPredicate := []byte{4}
@@ -123,7 +123,7 @@ func TestFeeCreditRecordSetFeeCredit(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 	require.Equal(t, tx.Type, permissioned.TransactionTypeSetFeeCredit)
-	require.Equal(t, fcr.SystemID, tx.GetSystemID())
+	require.Equal(t, fcr.PartitionID, tx.GetPartitionID())
 	require.Equal(t, fcr.ID, tx.GetUnitID())
 
 	attr := &permissioned.SetFeeCreditAttributes{}
@@ -136,17 +136,17 @@ func TestFeeCreditRecordSetFeeCredit(t *testing.T) {
 func TestFeeCreditRecordDeleteFeeCredit(t *testing.T) {
 	fcrCounter := uint64(1)
 	fcr := &FeeCreditRecord{
-		NetworkID: types.NetworkLocal,
-		SystemID:  2,
-		ID:        money.NewFeeCreditRecordID(nil, []byte{3}),
-		Counter:   &fcrCounter,
+		NetworkID:   types.NetworkLocal,
+		PartitionID: 2,
+		ID:          money.NewFeeCreditRecordID(nil, []byte{3}),
+		Counter:     &fcrCounter,
 	}
 
 	tx, err := fcr.DeleteFeeCredit()
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 	require.Equal(t, tx.Type, permissioned.TransactionTypeDeleteFeeCredit)
-	require.Equal(t, fcr.SystemID, tx.GetSystemID())
+	require.Equal(t, fcr.PartitionID, tx.GetPartitionID())
 	require.Equal(t, fcr.ID, tx.GetUnitID())
 
 	attr := &permissioned.DeleteFeeCreditAttributes{}

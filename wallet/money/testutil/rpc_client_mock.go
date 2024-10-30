@@ -8,6 +8,7 @@ import (
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
+	"github.com/alphabill-org/alphabill-go-base/types/hex"
 
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
@@ -95,8 +96,8 @@ func WithError(err error) Option {
 
 func (c *RpcClientMock) GetNodeInfo(ctx context.Context) (*sdktypes.NodeInfoResponse, error) {
 	return &sdktypes.NodeInfoResponse{
-		SystemID: 0,
-		Name:     "mock",
+		PartitionID: 0,
+		Name:        "mock",
 	}, nil
 }
 
@@ -155,7 +156,7 @@ func (c *RpcClientMock) ConfirmTransaction(ctx context.Context, tx *types.Transa
 	return c.GetTransactionProof(ctx, tx.Hash(crypto.SHA256))
 }
 
-func (c *RpcClientMock) GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TxRecordProof, error) {
+func (c *RpcClientMock) GetTransactionProof(ctx context.Context, txHash hex.Bytes) (*types.TxRecordProof, error) {
 	if c.Err != nil {
 		return nil, c.Err
 	}
@@ -198,22 +199,22 @@ func NewBill(value, counter uint64) *sdktypes.Bill {
 
 func NewLockedBill(value uint64, counter, lockStatus uint64) *sdktypes.Bill {
 	return &sdktypes.Bill{
-		SystemID:   money.DefaultSystemID,
-		ID:         money.NewBillID(nil, testutils.RandomBytes(32)),
-		Value:      value,
-		LockStatus: lockStatus,
-		Counter:    counter,
+		PartitionID: money.DefaultPartitionID,
+		ID:          money.NewBillID(nil, testutils.RandomBytes(32)),
+		Value:       value,
+		LockStatus:  lockStatus,
+		Counter:     counter,
 	}
 }
 
 func NewMoneyFCR(pubKeyHash []byte, balance uint64, lockStatus uint64, counter uint64) *sdktypes.FeeCreditRecord {
 	id := money.NewFeeCreditRecordIDFromPublicKeyHash(nil, pubKeyHash, 1000+transferFCLatestAdditionTime)
 	return &sdktypes.FeeCreditRecord{
-		SystemID:   money.DefaultSystemID,
-		ID:         id,
-		Balance:    balance,
-		LockStatus: lockStatus,
-		Counter:    &counter,
+		PartitionID: money.DefaultPartitionID,
+		ID:          id,
+		Balance:     balance,
+		LockStatus:  lockStatus,
+		Counter:     &counter,
 	}
 
 }

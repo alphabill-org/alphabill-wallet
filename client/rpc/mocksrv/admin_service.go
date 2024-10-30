@@ -13,9 +13,9 @@ type (
 func NewAdminServiceMock(opts ...Option) *AdminServiceMock {
 	options := &Options{
 		InfoResponse: &types.NodeInfoResponse{
-			SystemID: 1,
-			Name:     "money node",
-			Self:     types.PeerInfo{Identifier: "1337", Addresses: make([]string, 0)},
+			PartitionID: 1,
+			Name:        "money node",
+			Self:        types.PeerInfo{Identifier: "1337", Addresses: make([]string, 0)},
 		},
 	}
 	for _, option := range opts {

@@ -128,9 +128,9 @@ func createTestWallet(t *testing.T) (*Wallet, *evmClientMock) {
 	require.NoError(t, err)
 	clientMock := newClientMock()
 	return &Wallet{
-		systemID: evm.DefaultSystemID,
-		am:       am,
-		restCli:  clientMock,
+		partitionID: evm.DefaultPartitionID,
+		am:          am,
+		restCli:     clientMock,
 	}, clientMock
 }
 
@@ -192,9 +192,9 @@ func TestNew(t *testing.T) {
 	dir := t.TempDir()
 	am, err := account.NewManager(dir, "", true)
 	require.NoError(t, err)
-	// no system id
+	// no partition id
 	w, err := New(0, ":23435", am)
-	require.ErrorContains(t, err, "system id is unassigned")
+	require.ErrorContains(t, err, "partition id is unassigned")
 	require.Nil(t, w)
 	// no URL
 	w, err = New(1, "", am)

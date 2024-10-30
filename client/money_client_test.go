@@ -19,18 +19,18 @@ func TestMoneyClient(t *testing.T) {
 	t.Run("GetBill_OK", func(t *testing.T) {
 		service.Reset()
 		bill := &sdktypes.Bill{
-			NetworkID:  50,
-			SystemID:   money.DefaultSystemID,
-			ID:         []byte{1},
-			Value:      192,
-			Counter:    123,
-			LockStatus: 0,
+			NetworkID:   50,
+			PartitionID: money.DefaultPartitionID,
+			ID:          []byte{1},
+			Value:       192,
+			Counter:     123,
+			LockStatus:  0,
 		}
 		service.Units = map[string]*sdktypes.Unit[any]{
 			string(bill.ID): {
-				NetworkID: bill.NetworkID,
-				SystemID:  bill.SystemID,
-				UnitID:    bill.ID,
+				NetworkID:   bill.NetworkID,
+				PartitionID: bill.PartitionID,
+				UnitID:      bill.ID,
 				Data: &money.BillData{
 					Value:   bill.Value,
 					Counter: bill.Counter,

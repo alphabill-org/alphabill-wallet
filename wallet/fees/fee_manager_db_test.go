@@ -39,7 +39,7 @@ func TestDB_GetSetDeleteAddFeeCtx(t *testing.T) {
 func TestDB_GetSetDeleteReclaimFeeCtx(t *testing.T) {
 	s := createFeeManagerDB(t)
 	accountID := []byte{4}
-	systemID := types.SystemID(1)
+	partitionID := types.PartitionID(1)
 
 	// verify missing account returns nil and no error
 	feeCtx, err := s.GetReclaimFeeContext(accountID)
@@ -47,7 +47,7 @@ func TestDB_GetSetDeleteReclaimFeeCtx(t *testing.T) {
 	require.Nil(t, feeCtx)
 
 	// store fee ctx
-	feeCtx = &ReclaimFeeCreditCtx{TargetPartitionID: systemID}
+	feeCtx = &ReclaimFeeCreditCtx{TargetPartitionID: partitionID}
 	err = s.SetReclaimFeeContext(accountID, feeCtx)
 	require.NoError(t, err)
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/alphabill-org/alphabill-go-base/types"
+	"github.com/alphabill-org/alphabill-go-base/types/hex"
 	"github.com/ethereum/go-ethereum/rpc"
 
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
@@ -33,13 +34,13 @@ func (c *StateAPIClient) Close() {
 
 // GetRoundNumber returns the latest round number seen by the rpc node.
 func (c *StateAPIClient) GetRoundNumber(ctx context.Context) (uint64, error) {
-	var num types.Uint64
+	var num hex.Uint64
 	err := c.RpcClient.CallContext(ctx, &num, "state_getRoundNumber")
 	return uint64(num), err
 }
 
 // GetUnitsByOwnerID returns list of unit identifiers that belong to the given owner.
-func (c *StateAPIClient) GetUnitsByOwnerID(ctx context.Context, ownerID types.Bytes) ([]types.UnitID, error) {
+func (c *StateAPIClient) GetUnitsByOwnerID(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 	var res []types.UnitID
 	err := c.RpcClient.CallContext(ctx, &res, "state_getUnitsByOwnerID", ownerID)
 	return res, err
@@ -52,7 +53,7 @@ func (c *StateAPIClient) SendTransaction(ctx context.Context, txo *types.Transac
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode transaction order to cbor: %w", err)
 	}
-	var res types.Bytes
+	var res hex.Bytes
 	err = c.RpcClient.CallContext(ctx, &res, "state_sendTransaction", txoCBOR)
 
 	return res, err
@@ -60,7 +61,7 @@ func (c *StateAPIClient) SendTransaction(ctx context.Context, txo *types.Transac
 
 // GetTransactionProof returns transaction record and proof for the given transaction hash.
 // Returns ErrNotFound if proof was not found.
-func (c *StateAPIClient) GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TxRecordProof, error) {
+func (c *StateAPIClient) GetTransactionProof(ctx context.Context, txHash hex.Bytes) (*types.TxRecordProof, error) {
 	var res *sdktypes.TransactionRecordAndProof
 	err := c.RpcClient.CallContext(ctx, &res, "state_getTransactionProof", txHash)
 	if err != nil {
@@ -75,8 +76,8 @@ func (c *StateAPIClient) GetTransactionProof(ctx context.Context, txHash types.B
 // GetBlock returns block for the given round number.
 // Returns ErrNotFound if the block does not exist.
 func (c *StateAPIClient) GetBlock(ctx context.Context, roundNumber uint64) (*types.Block, error) {
-	var res types.Bytes
-	if err := c.RpcClient.CallContext(ctx, &res, "state_getBlock", types.Uint64(roundNumber)); err != nil {
+	var res hex.Bytes
+	if err := c.RpcClient.CallContext(ctx, &res, "state_getBlock", hex.Uint64(roundNumber)); err != nil {
 		return nil, err
 	}
 	if res == nil {
@@ -89,7 +90,7 @@ func (c *StateAPIClient) GetBlock(ctx context.Context, roundNumber uint64) (*typ
 	return block, nil
 }
 
-func encodeCbor(v interface{}) (types.Bytes, error) {
+func encodeCbor(v interface{}) (hex.Bytes, error) {
 	data, err := types.Cbor.Marshal(v)
 	if err != nil {
 		return nil, err

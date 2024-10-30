@@ -29,7 +29,7 @@ const (
 
 type (
 	Wallet struct {
-		systemID      types.SystemID
+		partitionID   types.PartitionID
 		networkID     types.NetworkID
 		am            account.Manager
 		moneyClient   sdktypes.MoneyPartitionClient
@@ -74,16 +74,16 @@ func GenerateKeys(am account.Manager, mnemonic string) error {
 }
 
 // NewWallet creates a new money wallet from specified parameters. The account manager must contain pre-generated keys.
-func NewWallet(networkID types.NetworkID, systemID types.SystemID, am account.Manager, feeManagerDB fees.FeeManagerDB, moneyClient sdktypes.MoneyPartitionClient, maxFee uint64, log *slog.Logger) (*Wallet, error) {
+func NewWallet(networkID types.NetworkID, partitionID types.PartitionID, am account.Manager, feeManagerDB fees.FeeManagerDB, moneyClient sdktypes.MoneyPartitionClient, maxFee uint64, log *slog.Logger) (*Wallet, error) {
 	feeManager := fees.NewFeeManager(networkID, am, feeManagerDB,
-		systemID, moneyClient, money.NewFeeCreditRecordIDFromPublicKey,
-		systemID, moneyClient, money.NewFeeCreditRecordIDFromPublicKey,
+		partitionID, moneyClient, money.NewFeeCreditRecordIDFromPublicKey,
+		partitionID, moneyClient, money.NewFeeCreditRecordIDFromPublicKey,
 		maxFee, log,
 	)
 	dustCollector := dc.NewDustCollector(maxBillsForDustCollection, txTimeoutBlockCount, moneyClient, maxFee, log)
 	return &Wallet{
 		networkID:     networkID,
-		systemID:      systemID,
+		partitionID:   partitionID,
 		am:            am,
 		moneyClient:   moneyClient,
 		feeManager:    feeManager,
@@ -101,8 +101,8 @@ func (w *Wallet) NetworkID() types.NetworkID {
 	return w.networkID
 }
 
-func (w *Wallet) SystemID() types.SystemID {
-	return w.systemID
+func (w *Wallet) PartitionID() types.PartitionID {
+	return w.partitionID
 }
 
 // Close terminates connection to alphabill node, closes account manager and cancels any background goroutines.

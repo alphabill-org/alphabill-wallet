@@ -19,9 +19,9 @@ import (
 )
 
 const (
-	moneySystemID  types.SystemID = 1
-	tokensSystemID types.SystemID = 2
-	maxFee                        = 3
+	moneyPartitionID  types.PartitionID = 1
+	tokensPartitionID types.PartitionID = 2
+	maxFee                              = 3
 )
 
 /*
@@ -255,7 +255,7 @@ func TestAddFeeCreditForMoneyPartition_ExistingAddProcessForTokensPartition(t *t
 
 	// create fee context with token partition id
 	feeCtx := &AddFeeCreditCtx{
-		TargetPartitionID: tokensSystemID,
+		TargetPartitionID: tokensPartitionID,
 		FeeCreditRecordID: []byte{1},
 		TargetBillID:      bill.ID,
 		TargetBillCounter: bill.Counter,
@@ -288,7 +288,7 @@ func TestReclaimFeeCreditForMoneyPartition_ExistingReclaimProcessForTokensPartit
 
 	// create fee context with token partition id
 	feeCtx := &ReclaimFeeCreditCtx{
-		TargetPartitionID: tokensSystemID,
+		TargetPartitionID: tokensPartitionID,
 		TargetBillID:      []byte{2},
 		TargetBillCounter: 2,
 	}
@@ -502,10 +502,10 @@ func TestAddFeeCredit_ExistingLockFC(t *testing.T) {
 	feeManagerDB := createFeeManagerDB(t)
 	fcrCounter := uint64(1)
 	fcr := sdktypes.FeeCreditRecord{
-		NetworkID: types.NetworkLocal,
-		SystemID:  money.DefaultSystemID,
-		ID:        money.NewFeeCreditRecordID(nil, []byte{1}),
-		Counter:   &fcrCounter,
+		NetworkID:   types.NetworkLocal,
+		PartitionID: money.DefaultPartitionID,
+		ID:          money.NewFeeCreditRecordID(nil, []byte{1}),
+		Counter:     &fcrCounter,
 	}
 	lockFCTx, err := fcr.Lock(wallet.LockReasonManual)
 	require.NoError(t, err)
@@ -521,7 +521,7 @@ func TestAddFeeCredit_ExistingLockFC(t *testing.T) {
 	t.Run("lockFC confirmed => send follow-up transactions", func(t *testing.T) {
 		// create fee context
 		err = feeManagerDB.SetAddFeeContext(accountKey.PubKey, &AddFeeCreditCtx{
-			TargetPartitionID: targetBill.SystemID,
+			TargetPartitionID: targetBill.PartitionID,
 			FeeCreditRecordID: []byte{1},
 			TargetBillID:      targetBill.ID,
 			TargetBillCounter: targetBill.Counter,
@@ -558,7 +558,7 @@ func TestAddFeeCredit_ExistingLockFC(t *testing.T) {
 	t.Run("lockFC timed out => create new lockFC and send follow-up transactions", func(t *testing.T) {
 		// create fee context
 		err = feeManagerDB.SetAddFeeContext(accountKey.PubKey, &AddFeeCreditCtx{
-			TargetPartitionID: targetBill.SystemID,
+			TargetPartitionID: targetBill.PartitionID,
 			FeeCreditRecordID: []byte{1},
 			TargetBillID:      targetBill.ID,
 			TargetBillCounter: targetBill.Counter,
@@ -618,7 +618,7 @@ func TestAddFeeCredit_ExistingTransferFC(t *testing.T) {
 	t.Run("transferFC confirmed => send addFC using the confirmed transferFC", func(t *testing.T) {
 		// create fee context
 		err = feeManagerDB.SetAddFeeContext(accountKey.PubKey, &AddFeeCreditCtx{
-			TargetPartitionID: targetBill.SystemID,
+			TargetPartitionID: targetBill.PartitionID,
 			FeeCreditRecordID: []byte{1},
 			TargetBillID:      targetBill.ID,
 			TargetBillCounter: targetBill.Counter,
@@ -657,7 +657,7 @@ func TestAddFeeCredit_ExistingTransferFC(t *testing.T) {
 	t.Run("transferFC timed out => create new transferFC", func(t *testing.T) {
 		// create fee context
 		err = feeManagerDB.SetAddFeeContext(accountKey.PubKey, &AddFeeCreditCtx{
-			TargetPartitionID: moneySystemID,
+			TargetPartitionID: moneyPartitionID,
 			FeeCreditRecordID: []byte{1},
 			TargetBillID:      targetBill.ID,
 			TargetBillCounter: targetBill.Counter,
@@ -694,7 +694,7 @@ func TestAddFeeCredit_ExistingTransferFC(t *testing.T) {
 	t.Run("transferFC timed out and target unit no longer valid => return error", func(t *testing.T) {
 		// create fee context
 		err = feeManagerDB.SetAddFeeContext(accountKey.PubKey, &AddFeeCreditCtx{
-			TargetPartitionID: targetBill.SystemID,
+			TargetPartitionID: targetBill.PartitionID,
 			FeeCreditRecordID: []byte{1},
 			TargetBillID:      targetBill.ID,
 			TargetBillCounter: targetBill.Counter,
@@ -738,10 +738,10 @@ func TestAddFeeCredit_ExistingAddFC(t *testing.T) {
 
 	fcrCounter := uint64(1)
 	fcr := &sdktypes.FeeCreditRecord{
-		NetworkID: types.NetworkLocal,
-		SystemID:  money.DefaultSystemID,
-		ID:        money.NewFeeCreditRecordID(nil, []byte{1}),
-		Counter:   &fcrCounter,
+		NetworkID:   types.NetworkLocal,
+		PartitionID: money.DefaultPartitionID,
+		ID:          money.NewFeeCreditRecordID(nil, []byte{1}),
+		Counter:     &fcrCounter,
 	}
 
 	transFCTx, err := targetBill.TransferToFeeCredit(fcr, 5, 10)
@@ -770,7 +770,7 @@ func TestAddFeeCredit_ExistingAddFC(t *testing.T) {
 	t.Run("addFC confirmed => return no error (and optionally the fee txs)", func(t *testing.T) {
 		// create fee context
 		err := feeManagerDB.SetAddFeeContext(accountKey.PubKey, &AddFeeCreditCtx{
-			TargetPartitionID: moneySystemID,
+			TargetPartitionID: moneyPartitionID,
 			TargetBillID:      targetBill.ID,
 			TargetBillCounter: targetBill.Counter,
 			TransferFCTx:      addFCAttr.FeeCreditTransferProof.TransactionOrder(),
@@ -800,7 +800,7 @@ func TestAddFeeCredit_ExistingAddFC(t *testing.T) {
 	t.Run("addFC timed out => create new addFC", func(t *testing.T) {
 		// create fee context
 		err := feeManagerDB.SetAddFeeContext(accountKey.PubKey, &AddFeeCreditCtx{
-			TargetPartitionID: moneySystemID,
+			TargetPartitionID: moneyPartitionID,
 			TargetBillID:      targetBill.ID,
 			TargetBillCounter: targetBill.Counter,
 			TransferFCTx:      addFCAttr.FeeCreditTransferProof.TransactionOrder(),
@@ -830,7 +830,7 @@ func TestAddFeeCredit_ExistingAddFC(t *testing.T) {
 	t.Run("addFC timed out and transferFC no longer usable => return money lost error", func(t *testing.T) {
 		// create fee context
 		err := feeManagerDB.SetAddFeeContext(accountKey.PubKey, &AddFeeCreditCtx{
-			TargetPartitionID: moneySystemID,
+			TargetPartitionID: moneyPartitionID,
 			TargetBillID:      targetBill.ID,
 			TargetBillCounter: targetBill.Counter,
 			TransferFCTx:      addFCAttr.FeeCreditTransferProof.TransactionOrder(),
@@ -878,7 +878,7 @@ func TestReclaimFeeCredit_ExistingLock(t *testing.T) {
 	t.Run("lock tx confirmed => update target bill counter and send follow-up transactions", func(t *testing.T) {
 		// create fee context
 		err = feeManagerDB.SetReclaimFeeContext(accountKey.PubKey, &ReclaimFeeCreditCtx{
-			TargetPartitionID: moneySystemID,
+			TargetPartitionID: moneyPartitionID,
 			TargetBillID:      targetBill.ID,
 			TargetBillCounter: targetBill.Counter,
 			LockTx:            lockTxRecord.TransactionOrder,
@@ -919,7 +919,7 @@ func TestReclaimFeeCredit_ExistingLock(t *testing.T) {
 	t.Run("lock tx timed out => create new lock tx and send follow-up transactions", func(t *testing.T) {
 		// create fee context
 		err = feeManagerDB.SetReclaimFeeContext(accountKey.PubKey, &ReclaimFeeCreditCtx{
-			TargetPartitionID: moneySystemID,
+			TargetPartitionID: moneyPartitionID,
 			TargetBillID:      targetBill.ID,
 			TargetBillCounter: targetBill.Counter,
 			LockTx:            lockTxRecord.TransactionOrder,
@@ -965,9 +965,9 @@ func TestReclaimFeeCredit_ExistingCloseFC(t *testing.T) {
 
 	fcrCounter := uint64(1)
 	fcr := sdktypes.FeeCreditRecord{
-		SystemID: money.DefaultSystemID,
-		ID:       money.NewFeeCreditRecordID(nil, []byte{1}),
-		Counter:  &fcrCounter,
+		PartitionID: money.DefaultPartitionID,
+		ID:          money.NewFeeCreditRecordID(nil, []byte{1}),
+		Counter:     &fcrCounter,
 	}
 	targetBill := testutil.NewBill(50, 200)
 
@@ -987,7 +987,7 @@ func TestReclaimFeeCredit_ExistingCloseFC(t *testing.T) {
 	t.Run("closeFC confirmed => send reclaimFC using the confirmed closeFC", func(t *testing.T) {
 		// create fee context
 		err := feeManagerDB.SetReclaimFeeContext(accountKey.PubKey, &ReclaimFeeCreditCtx{
-			TargetPartitionID: moneySystemID,
+			TargetPartitionID: moneyPartitionID,
 			TargetBillID:      targetBill.ID,
 			TargetBillCounter: targetBill.Counter,
 			CloseFCTx:         closeFCRecord.TransactionOrder,
@@ -1025,7 +1025,7 @@ func TestReclaimFeeCredit_ExistingCloseFC(t *testing.T) {
 	t.Run("closeFC timed out => create new closeFC", func(t *testing.T) {
 		// create fee context
 		err := feeManagerDB.SetReclaimFeeContext(accountKey.PubKey, &ReclaimFeeCreditCtx{
-			TargetPartitionID: moneySystemID,
+			TargetPartitionID: moneyPartitionID,
 			TargetBillID:      targetBill.ID,
 			TargetBillCounter: targetBill.Counter,
 			CloseFCTx:         closeFCRecord.TransactionOrder,
@@ -1091,7 +1091,7 @@ func TestReclaimFeeCredit_ExistingReclaimFC(t *testing.T) {
 	t.Run("reclaimFC confirmed => return proofs", func(t *testing.T) {
 		// create fee context
 		err := feeManagerDB.SetReclaimFeeContext(accountKey.PubKey, &ReclaimFeeCreditCtx{
-			TargetPartitionID: moneySystemID,
+			TargetPartitionID: moneyPartitionID,
 			TargetBillID:      reclaimFCTx.GetUnitID(),
 			TargetBillCounter: 200,
 
@@ -1125,7 +1125,7 @@ func TestReclaimFeeCredit_ExistingReclaimFC(t *testing.T) {
 	t.Run("reclaimFC timed out => create new reclaimFC", func(t *testing.T) {
 		// create fee context
 		err := feeManagerDB.SetReclaimFeeContext(accountKey.PubKey, &ReclaimFeeCreditCtx{
-			TargetPartitionID: moneySystemID,
+			TargetPartitionID: moneyPartitionID,
 			TargetBillID:      reclaimFCTx.GetUnitID(),
 			TargetBillCounter: 200,
 
@@ -1161,7 +1161,7 @@ func TestReclaimFeeCredit_ExistingReclaimFC(t *testing.T) {
 	t.Run("reclaimFC timed out and closeFC no longer usable => return money lost error", func(t *testing.T) {
 		// create fee context
 		err := feeManagerDB.SetReclaimFeeContext(accountKey.PubKey, &ReclaimFeeCreditCtx{
-			TargetPartitionID: moneySystemID,
+			TargetPartitionID: moneyPartitionID,
 			TargetBillID:      reclaimFCTx.GetUnitID(),
 			TargetBillCounter: 200,
 
@@ -1330,11 +1330,11 @@ func TestNonExistingFeeCreditRecord(t *testing.T) {
 }
 
 func newMoneyPartitionFeeManager(am account.Manager, db FeeManagerDB, moneyClient sdktypes.MoneyPartitionClient, log *slog.Logger) *FeeManager {
-	return NewFeeManager(types.NetworkLocal, am, db, moneySystemID, moneyClient, testFeeCreditRecordIDFromPublicKey, moneySystemID, moneyClient, testFeeCreditRecordIDFromPublicKey, maxFee, log)
+	return NewFeeManager(types.NetworkLocal, am, db, moneyPartitionID, moneyClient, testFeeCreditRecordIDFromPublicKey, moneyPartitionID, moneyClient, testFeeCreditRecordIDFromPublicKey, maxFee, log)
 }
 
 func newTokensPartitionFeeManager(am account.Manager, db FeeManagerDB, moneyClient sdktypes.MoneyPartitionClient, tokensClient sdktypes.PartitionClient, log *slog.Logger) *FeeManager {
-	return NewFeeManager(types.NetworkLocal, am, db, moneySystemID, moneyClient, testFeeCreditRecordIDFromPublicKey, tokensSystemID, tokensClient, testFeeCreditRecordIDFromPublicKey, maxFee, log)
+	return NewFeeManager(types.NetworkLocal, am, db, moneyPartitionID, moneyClient, testFeeCreditRecordIDFromPublicKey, tokensPartitionID, tokensClient, testFeeCreditRecordIDFromPublicKey, maxFee, log)
 }
 
 func newAccountManager(t *testing.T) account.Manager {

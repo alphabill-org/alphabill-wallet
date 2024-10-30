@@ -46,7 +46,7 @@ func addVarCmd(orchestrationConfig *clitypes.OrchestrationConfig) *cobra.Command
 			return execAddVarCmd(cmd, config)
 		},
 	}
-	cmd.Flags().Uint32Var(&config.PartitionID, cmdFlagPartitionID, 0, "partition id (system identifier) of the managed partition")
+	cmd.Flags().Uint32Var(&config.PartitionID, cmdFlagPartitionID, 0, "partition identifier of the managed partition")
 	_ = cmd.MarkFlagRequired(cmdFlagPartitionID)
 
 	cmd.Flags().Var(&config.ShardID, cmdFlagShardID, "shard id (nil if only one shard) of the managed shard")
@@ -99,7 +99,7 @@ func execAddVarCmd(cmd *cobra.Command, config *clitypes.AddVarCmdConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to get node info: %w", err)
 	}
-	txo, err := txbuilder.NewAddVarTx(*varFile, nodeInfo.NetworkID, nodeInfo.SystemID, unitID, timeout, maxFee, ac)
+	txo, err := txbuilder.NewAddVarTx(*varFile, nodeInfo.NetworkID, nodeInfo.PartitionID, unitID, timeout, maxFee, ac)
 	if err != nil {
 		return fmt.Errorf("failed to create 'addVar' tx: %w", err)
 	}

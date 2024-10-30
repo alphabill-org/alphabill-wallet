@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/alphabill-org/alphabill-go-base/types"
+	"github.com/alphabill-org/alphabill-go-base/types/hex"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
@@ -37,7 +38,7 @@ func TestConfirmUnitsTx_ok(t *testing.T) {
 			getRoundNumberCalled = true
 			return 100, nil
 		},
-		getTransactionProof: func(ctx context.Context, txHash types.Bytes) (*types.TxRecordProof, error) {
+		getTransactionProof: func(ctx context.Context, txHash hex.Bytes) (*types.TxRecordProof, error) {
 			getTxProofCalled = true
 			return &types.TxRecordProof{TxRecord: &types.TransactionRecord{ServerMetadata: &types.ServerMetadata{SuccessIndicator: types.TxStatusSuccessful}}}, nil
 		},
@@ -65,7 +66,7 @@ func TestConfirmUnitsTx_timeout(t *testing.T) {
 			}
 			return 103, nil
 		},
-		getTransactionProof: func(ctx context.Context, txHash types.Bytes) (*types.TxRecordProof, error) {
+		getTransactionProof: func(ctx context.Context, txHash hex.Bytes) (*types.TxRecordProof, error) {
 			getTxProofCalled++
 			if bytes.Equal(txHash, randomTxHash1) {
 				return &types.TxRecordProof{}, nil

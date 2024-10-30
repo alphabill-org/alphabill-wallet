@@ -9,7 +9,6 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/spf13/cobra"
 
-	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
@@ -23,7 +22,7 @@ const txTimeoutBlockCount = 10
 // NewCmd creates a new cobra command for managing permissioned partitions.
 func NewCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 	var config = &config{
-		walletConfig:        walletConfig,
+		walletConfig: walletConfig,
 	}
 	var cmd = &cobra.Command{
 		Use:   "permissioned",
@@ -48,7 +47,7 @@ func addFeeCreditCmd(config *config) *cobra.Command {
 		},
 	}
 
-	var hexFlag types.BytesHex
+	var hexFlag clitypes.BytesHex
 	cmd.Flags().VarP(&hexFlag, args.TargetPubkeyFlagName, "t", "pubkey of the fee credit record owner")
 	err := cmd.MarkFlagRequired(args.TargetPubkeyFlagName)
 	if err != nil {
@@ -70,7 +69,7 @@ func addFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 		return err
 	}
 
-	targetPubkey := *cmd.Flag(args.TargetPubkeyFlagName).Value.(*types.BytesHex)
+	targetPubkey := *cmd.Flag(args.TargetPubkeyFlagName).Value.(*clitypes.BytesHex)
 
 	rpcUrl, err := cmd.Flags().GetString(args.RpcUrl)
 	if err != nil {
@@ -103,7 +102,7 @@ func addFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 	if accountNumber == 0 {
 		return fmt.Errorf("invalid parameter for flag %q: 0 is not a valid account key", args.KeyCmdName)
 	}
-	accountKey, err := am.GetAccountKey(accountNumber-1)
+	accountKey, err := am.GetAccountKey(accountNumber - 1)
 	if err != nil {
 		return fmt.Errorf("failed to get account key for account %d", accountNumber)
 	}
@@ -124,9 +123,9 @@ func addFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 	if fcr == nil {
 		fcrID := tokens.NewFeeCreditRecordIDFromOwnerPredicate(nil, ownerPredicate, timeout)
 		fcr = &sdktypes.FeeCreditRecord{
-			NetworkID: nodeInfo.NetworkID,
-			SystemID:  nodeInfo.SystemID,
-			ID:        fcrID,
+			NetworkID:   nodeInfo.NetworkID,
+			PartitionID: nodeInfo.PartitionID,
+			ID:          fcrID,
 		}
 	}
 
@@ -161,7 +160,7 @@ func deleteFeeCreditCmd(config *config) *cobra.Command {
 		},
 	}
 
-	var hexFlag types.BytesHex
+	var hexFlag clitypes.BytesHex
 	cmd.Flags().VarP(&hexFlag, args.TargetPubkeyFlagName, "t", "pubkey of the fee credit record owner")
 	err := cmd.MarkFlagRequired(args.TargetPubkeyFlagName)
 	if err != nil {
@@ -173,7 +172,7 @@ func deleteFeeCreditCmd(config *config) *cobra.Command {
 }
 
 func deleteFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
-	targetPubkey := *cmd.Flag(args.TargetPubkeyFlagName).Value.(*types.BytesHex)
+	targetPubkey := *cmd.Flag(args.TargetPubkeyFlagName).Value.(*clitypes.BytesHex)
 
 	rpcUrl, err := cmd.Flags().GetString(args.RpcUrl)
 	if err != nil {
@@ -206,7 +205,7 @@ func deleteFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 	if accountNumber == 0 {
 		return fmt.Errorf("invalid parameter for flag %q: 0 is not a valid account key", args.KeyCmdName)
 	}
-	accountKey, err := am.GetAccountKey(accountNumber-1)
+	accountKey, err := am.GetAccountKey(accountNumber - 1)
 	if err != nil {
 		return fmt.Errorf("failed to get account key for account %d", accountNumber)
 	}
@@ -225,7 +224,7 @@ func deleteFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 		return fmt.Errorf("failed to get current round number: %w", err)
 	}
 
-	setFCTx, err := fcr.DeleteFeeCredit(sdktypes.WithTimeout(round+txTimeoutBlockCount))
+	setFCTx, err := fcr.DeleteFeeCredit(sdktypes.WithTimeout(round + txTimeoutBlockCount))
 	if err != nil {
 		return fmt.Errorf("failed to create deleteFC transaction: %w", err)
 	}

@@ -38,7 +38,7 @@ var (
 type (
 	Wallet struct {
 		networkID    types.NetworkID
-		systemID     types.SystemID
+		partitionID  types.PartitionID
 		am           account.Manager
 		tokensClient sdktypes.TokensPartitionClient
 		confirmTx    bool
@@ -63,10 +63,10 @@ type (
 	}
 )
 
-func New(networkID types.NetworkID, systemID types.SystemID, tokensClient sdktypes.TokensPartitionClient, am account.Manager, confirmTx bool, feeManager *fees.FeeManager, maxFee uint64, log *slog.Logger) (*Wallet, error) {
+func New(networkID types.NetworkID, partitionID types.PartitionID, tokensClient sdktypes.TokensPartitionClient, am account.Manager, confirmTx bool, feeManager *fees.FeeManager, maxFee uint64, log *slog.Logger) (*Wallet, error) {
 	return &Wallet{
 		networkID:    networkID,
-		systemID:     systemID,
+		partitionID:  partitionID,
 		am:           am,
 		tokensClient: tokensClient,
 		confirmTx:    confirmTx,
@@ -121,8 +121,8 @@ func (w *Wallet) NetworkID() types.NetworkID {
 	return w.networkID
 }
 
-func (w *Wallet) SystemID() types.SystemID {
-	return w.systemID
+func (w *Wallet) PartitionID() types.PartitionID {
+	return w.partitionID
 }
 
 func (w *Wallet) NewFungibleType(ctx context.Context, accountNumber uint64, ft *sdktypes.FungibleTokenType, subtypePredicateInputs []*PredicateInput) (*SubmissionResult, error) {

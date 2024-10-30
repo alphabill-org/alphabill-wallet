@@ -152,7 +152,7 @@ func initEvmWallet(cobraCmd *cobra.Command, config *types.EvmConfig) (*evmwallet
 	if err != nil {
 		return nil, err
 	}
-	wallet, err := evmwallet.New(evm.DefaultSystemID, uri, am)
+	wallet, err := evmwallet.New(evm.DefaultPartitionID, uri, am)
 	if err != nil {
 		return nil, err
 	}

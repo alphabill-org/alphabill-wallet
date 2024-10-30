@@ -50,15 +50,15 @@ type (
 		log *slog.Logger
 
 		// money partition fields
-		moneySystemID             types.SystemID
+		moneyPartitionID          types.PartitionID
 		moneyClient               sdktypes.MoneyPartitionClient
 		moneyPartitionFcrIDFn     GenerateFcrID
 		moneyPartitionFcrUnitType []byte
 
 		// target partition fields
-		targetPartitionSystemID types.SystemID
-		targetPartitionClient   sdktypes.PartitionClient
-		targetPartitionFcrIDFn  GenerateFcrID
+		targetPartitionPartitionID types.PartitionID
+		targetPartitionClient      sdktypes.PartitionClient
+		targetPartitionFcrIDFn     GenerateFcrID
 
 		maxFee    uint64
 		networkID types.NetworkID
@@ -109,7 +109,7 @@ type (
 	}
 
 	AddFeeCreditCtx struct {
-		TargetPartitionID types.SystemID          `json:"targetPartitionId"`           // target partition id where the fee is being added to
+		TargetPartitionID types.PartitionID       `json:"targetPartitionId"`           // target partition id where the fee is being added to
 		TargetBillID      types.UnitID            `json:"targetBillId"`                // transferFC target bill id
 		TargetBillCounter uint64                  `json:"targetBillCounter"`           // transferFC target bill counter
 		TargetAmount      uint64                  `json:"targetAmount"`                // the amount to add to the fee credit record
@@ -124,7 +124,7 @@ type (
 	}
 
 	ReclaimFeeCreditCtx struct {
-		TargetPartitionID types.SystemID          `json:"targetPartitionId"` // target partition id where the fee credit is being reclaimed from
+		TargetPartitionID types.PartitionID       `json:"targetPartitionId"` // target partition id where the fee credit is being reclaimed from
 		TargetBillID      []byte                  `json:"targetBillId"`      // closeFC target bill id
 		TargetBillCounter uint64                  `json:"targetBillCounter"` // closeFC target bill counter
 		LockingDisabled   bool                    `json:"lockingDisabled,omitempty"`
@@ -143,13 +143,13 @@ type (
 // - fee manager db
 //
 // - money partition:
-//   - systemID
+//   - partitionID
 //   - rpc node client
 //   - fee credit record id generation function
 //   - fee credit record unit type part
 //
 // - target partition:
-//   - systemID
+//   - partitionID
 //   - rpc node client
 //   - fee credit record id generation function
 //   - fee credit record unit type part
@@ -157,27 +157,27 @@ func NewFeeManager(
 	networkID types.NetworkID,
 	am account.Manager,
 	db FeeManagerDB,
-	moneySystemID types.SystemID,
+	moneyPartitionID types.PartitionID,
 	moneyClient sdktypes.MoneyPartitionClient,
 	moneyPartitionFcrIDFn GenerateFcrID,
-	targetPartitionSystemID types.SystemID,
+	targetPartitionPartitionID types.PartitionID,
 	targetPartitionClient sdktypes.PartitionClient,
 	targetPartitionFcrIDFn GenerateFcrID,
 	maxFee uint64,
 	log *slog.Logger,
 ) *FeeManager {
 	return &FeeManager{
-		networkID:               networkID,
-		am:                      am,
-		db:                      db,
-		moneySystemID:           moneySystemID,
-		moneyClient:             moneyClient,
-		moneyPartitionFcrIDFn:   moneyPartitionFcrIDFn,
-		targetPartitionSystemID: targetPartitionSystemID,
-		targetPartitionClient:   targetPartitionClient,
-		targetPartitionFcrIDFn:  targetPartitionFcrIDFn,
-		log:                     log,
-		maxFee:                  maxFee,
+		networkID:                  networkID,
+		am:                         am,
+		db:                         db,
+		moneyPartitionID:           moneyPartitionID,
+		moneyClient:                moneyClient,
+		moneyPartitionFcrIDFn:      moneyPartitionFcrIDFn,
+		targetPartitionPartitionID: targetPartitionPartitionID,
+		targetPartitionClient:      targetPartitionClient,
+		targetPartitionFcrIDFn:     targetPartitionFcrIDFn,
+		log:                        log,
+		maxFee:                     maxFee,
 	}
 }
 
@@ -219,9 +219,9 @@ func (w *FeeManager) AddFeeCredit(ctx context.Context, cmd AddFeeCmd) (*AddFeeCm
 	}
 	if addFeeCtx != nil {
 		// verify fee ctx exists for current partition
-		if addFeeCtx.TargetPartitionID != w.targetPartitionSystemID {
-			return nil, fmt.Errorf("%w: pendingProcessSystemID=%s, providedSystemID=%s",
-				ErrInvalidPartition, addFeeCtx.TargetPartitionID, w.targetPartitionSystemID)
+		if addFeeCtx.TargetPartitionID != w.targetPartitionPartitionID {
+			return nil, fmt.Errorf("%w: pendingProcessPartitionID=%s, providedPartitionID=%s",
+				ErrInvalidPartition, addFeeCtx.TargetPartitionID, w.targetPartitionPartitionID)
 		}
 
 		// handle the pending fee credit process
@@ -268,9 +268,9 @@ func (w *FeeManager) ReclaimFeeCredit(ctx context.Context, cmd ReclaimFeeCmd) (*
 	}
 	if reclaimFeeCtx != nil {
 		// verify fee ctx exists for current partition
-		if reclaimFeeCtx.TargetPartitionID != w.targetPartitionSystemID {
-			return nil, fmt.Errorf("%w: pendingProcessSystemID=%s, providedSystemID=%s",
-				ErrInvalidPartition, reclaimFeeCtx.TargetPartitionID, w.targetPartitionSystemID)
+		if reclaimFeeCtx.TargetPartitionID != w.targetPartitionPartitionID {
+			return nil, fmt.Errorf("%w: pendingProcessPartitionID=%s, providedPartitionID=%s",
+				ErrInvalidPartition, reclaimFeeCtx.TargetPartitionID, w.targetPartitionPartitionID)
 		}
 
 		// handle the pending fee credit process
@@ -451,7 +451,7 @@ func (w *FeeManager) addFees(ctx context.Context, accountKey *account.AccountKey
 		totalTransferredAmount += amount
 
 		feeCtx := &AddFeeCreditCtx{
-			TargetPartitionID: w.targetPartitionSystemID,
+			TargetPartitionID: w.targetPartitionPartitionID,
 			TargetBillID:      targetBill.ID,
 			TargetBillCounter: targetBill.Counter,
 			TargetAmount:      amount,
@@ -639,15 +639,15 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 	if fcr == nil {
 		fcrID := w.targetPartitionFcrIDFn(nil, accountKey.PubKey, latestAdditionTime)
 		fcr = &sdktypes.FeeCreditRecord{
-			SystemID: w.targetPartitionSystemID,
-			ID:       fcrID,
+			PartitionID: w.targetPartitionPartitionID,
+			ID:          fcrID,
 		}
 	}
 	sourceBill := &sdktypes.Bill{
-		NetworkID: w.networkID,
-		SystemID:  w.moneySystemID,
-		ID:        feeCtx.TargetBillID,
-		Counter:   feeCtx.TargetBillCounter,
+		NetworkID:   w.networkID,
+		PartitionID: w.moneyPartitionID,
+		ID:          feeCtx.TargetBillID,
+		Counter:     feeCtx.TargetBillCounter,
 	}
 	tx, err := sourceBill.TransferToFeeCredit(fcr, feeCtx.TargetAmount, latestAdditionTime,
 		sdktypes.WithTimeout(moneyTimeout),
@@ -738,9 +738,9 @@ func (w *FeeManager) sendAddFCTx(ctx context.Context, accountKey *account.Accoun
 
 	// need to use the same FCR that was calculated from transferFC timeout, best to store it in WAL
 	fcr := &sdktypes.FeeCreditRecord{
-		NetworkID: w.networkID,
-		SystemID:  feeCtx.TargetPartitionID,
-		ID:        feeCtx.FeeCreditRecordID,
+		NetworkID:   w.networkID,
+		PartitionID: feeCtx.TargetPartitionID,
+		ID:          feeCtx.FeeCreditRecordID,
 	}
 	ownerPredicate := templates.NewP2pkh256BytesFromKeyHash(accountKey.PubKeyHash.Sha256)
 	addFCTx, err := fcr.AddFeeCredit(ownerPredicate, feeCtx.TransferFCProof,
@@ -814,7 +814,7 @@ func (w *FeeManager) reclaimFees(ctx context.Context, accountKey *account.Accoun
 
 	// create fee ctx to track reclaim process
 	feeCtx := &ReclaimFeeCreditCtx{
-		TargetPartitionID: w.targetPartitionSystemID,
+		TargetPartitionID: w.targetPartitionPartitionID,
 		TargetBillID:      targetBill.ID,
 		TargetBillCounter: targetBill.Counter,
 		LockingDisabled:   cmd.DisableLocking,
@@ -892,10 +892,10 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 		return err
 	}
 	targetBill := &sdktypes.Bill{
-		NetworkID: w.networkID,
-		SystemID:  w.moneySystemID,
-		ID:        feeCtx.TargetBillID,
-		Counter:   feeCtx.TargetBillCounter,
+		NetworkID:   w.networkID,
+		PartitionID: w.moneyPartitionID,
+		ID:          feeCtx.TargetBillID,
+		Counter:     feeCtx.TargetBillCounter,
 	}
 	tx, err := targetBill.Lock(wallet.LockReasonReclaimFees,
 		sdktypes.WithTimeout(timeout),
@@ -1060,10 +1060,10 @@ func (w *FeeManager) sendReclaimFCTx(ctx context.Context, accountKey *account.Ac
 	}
 
 	targetBill := &sdktypes.Bill{
-		NetworkID: w.networkID,
-		SystemID:  w.moneySystemID,
-		ID:        feeCtx.TargetBillID,
-		Counter:   feeCtx.TargetBillCounter,
+		NetworkID:   w.networkID,
+		PartitionID: w.moneyPartitionID,
+		ID:          feeCtx.TargetBillID,
+		Counter:     feeCtx.TargetBillCounter,
 	}
 	reclaimFC, err := targetBill.ReclaimFromFeeCredit(feeCtx.CloseFCProof,
 		sdktypes.WithTimeout(moneyTimeout),

@@ -30,10 +30,10 @@ type (
 	}
 
 	Wallet struct {
-		networkID types.NetworkID
-		systemID  types.SystemID
-		am        account.Manager
-		restCli   evmClient
+		networkID   types.NetworkID
+		partitionID types.PartitionID
+		am          account.Manager
+		restCli     evmClient
 	}
 )
 
@@ -41,9 +41,9 @@ func ConvertBalanceToAlpha(eth *big.Int) uint64 {
 	return evmclient.WeiToAlpha(eth)
 }
 
-func New(systemID types.SystemID, restUrl string, am account.Manager) (*Wallet, error) {
-	if systemID == 0 {
-		return nil, fmt.Errorf("system id is unassigned")
+func New(partitionID types.PartitionID, restUrl string, am account.Manager) (*Wallet, error) {
+	if partitionID == 0 {
+		return nil, fmt.Errorf("partition id is unassigned")
 	}
 	if len(restUrl) == 0 {
 		return nil, fmt.Errorf("rest url is empty")
@@ -59,9 +59,9 @@ func New(systemID types.SystemID, restUrl string, am account.Manager) (*Wallet, 
 		return nil, err
 	}
 	return &Wallet{
-		systemID: systemID,
-		am:       am,
-		restCli:  evmclient.New(*addr),
+		partitionID: partitionID,
+		am:          am,
+		restCli:     evmclient.New(*addr),
 	}, nil
 }
 
@@ -98,7 +98,7 @@ func (w *Wallet) SendEvmTx(ctx context.Context, accountNumber uint64, attrs *evm
 	if attrs.Value == nil {
 		attrs.Value = big.NewInt(0)
 	}
-	txo, err := sdktypes.NewTransactionOrder(w.networkID, w.systemID, from.Bytes(), evm.TransactionTypeEVMCall, attrs, sdktypes.WithTimeout(rnr.RoundNumber+txTimeoutBlockCount))
+	txo, err := sdktypes.NewTransactionOrder(w.networkID, w.partitionID, from.Bytes(), evm.TransactionTypeEVMCall, attrs, sdktypes.WithTimeout(rnr.RoundNumber+txTimeoutBlockCount))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create evm transaction order: %w", err)
 	}

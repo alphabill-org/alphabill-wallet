@@ -32,7 +32,7 @@ func TestBatchCallWithLimit(t *testing.T) {
 	}
 
 	batchCallWithLimit := func(limit int) {
-		client, err := newPartitionClient(context.Background(), "http://" + srv, WithBatchItemLimit(limit))
+		client, err := newPartitionClient(context.Background(), "http://"+srv, WithBatchItemLimit(limit))
 		require.NoError(t, err)
 		t.Cleanup(client.Close)
 		require.NoError(t, client.batchCallWithLimit(context.Background(), batch))
@@ -48,16 +48,16 @@ func TestBatchCallWithLimit(t *testing.T) {
 
 func createUnit(id types.UnitID) *sdktypes.Unit[any] {
 	return &sdktypes.Unit[any]{
-		SystemID: money.DefaultSystemID,
-		UnitID:   id,
-		Data:     id.String(),
+		PartitionID: money.DefaultPartitionID,
+		UnitID:      id,
+		Data:        id.String(),
 	}
 }
 
 func startServerAndPartitionClient(t *testing.T, service *mocksrv.StateServiceMock) *partitionClient {
 	srv := mocksrv.StartStateApiServer(t, service)
 
-	partitionClient, err := newPartitionClient(context.Background(), "http://" + srv, WithBatchItemLimit(2))
+	partitionClient, err := newPartitionClient(context.Background(), "http://"+srv, WithBatchItemLimit(2))
 	t.Cleanup(partitionClient.Close)
 	require.NoError(t, err)
 

@@ -5,6 +5,7 @@ import (
 	"crypto"
 
 	"github.com/alphabill-org/alphabill-go-base/types"
+	"github.com/alphabill-org/alphabill-go-base/types/hex"
 
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 )
@@ -15,7 +16,7 @@ type (
 		Units        map[string]*sdktypes.Unit[any]
 		OwnerUnitIDs map[string][]types.UnitID
 		TxProofs     map[string]*sdktypes.TransactionRecordAndProof
-		Block        types.Bytes
+		Block        hex.Bytes
 		SentTxs      map[string]*types.TransactionOrder
 		Err          error
 		GetUnitCalls int
@@ -91,11 +92,11 @@ func WithError(err error) Option {
 	}
 }
 
-func (s *StateServiceMock) GetRoundNumber(ctx context.Context) (types.Uint64, error) {
+func (s *StateServiceMock) GetRoundNumber(ctx context.Context) (hex.Uint64, error) {
 	if s.Err != nil {
 		return 0, s.Err
 	}
-	return types.Uint64(s.RoundNumber), nil
+	return hex.Uint64(s.RoundNumber), nil
 }
 
 func (s *StateServiceMock) GetUnit(unitID types.UnitID, includeStateProof bool) (*sdktypes.Unit[any], error) {
@@ -110,14 +111,14 @@ func (s *StateServiceMock) GetUnit(unitID types.UnitID, includeStateProof bool) 
 	return u, nil
 }
 
-func (s *StateServiceMock) GetUnitsByOwnerID(ownerID types.Bytes) ([]types.UnitID, error) {
+func (s *StateServiceMock) GetUnitsByOwnerID(ownerID hex.Bytes) ([]types.UnitID, error) {
 	if s.Err != nil {
 		return nil, s.Err
 	}
 	return s.OwnerUnitIDs[string(ownerID)], nil
 }
 
-func (s *StateServiceMock) SendTransaction(ctx context.Context, tx types.Bytes) (types.Bytes, error) {
+func (s *StateServiceMock) SendTransaction(ctx context.Context, tx hex.Bytes) (hex.Bytes, error) {
 	if s.Err != nil {
 		return nil, s.Err
 	}
@@ -130,7 +131,7 @@ func (s *StateServiceMock) SendTransaction(ctx context.Context, tx types.Bytes) 
 	return txHash, nil
 }
 
-func (s *StateServiceMock) GetTransactionProof(ctx context.Context, txHash types.Bytes) (*sdktypes.TransactionRecordAndProof, error) {
+func (s *StateServiceMock) GetTransactionProof(ctx context.Context, txHash hex.Bytes) (*sdktypes.TransactionRecordAndProof, error) {
 	if s.Err != nil {
 		return nil, s.Err
 	}
@@ -146,7 +147,7 @@ func (s *StateServiceMock) GetTransactionProof(ctx context.Context, txHash types
 			TransactionOrder: sentTxo,
 			ServerMetadata: &types.ServerMetadata{
 				SuccessIndicator: 1,
-				ActualFee: 1,
+				ActualFee:        1,
 			},
 		}
 		txp := &types.TxProof{}
@@ -165,7 +166,7 @@ func (s *StateServiceMock) GetTransactionProof(ctx context.Context, txHash types
 	return nil, nil
 }
 
-func (s *StateServiceMock) GetBlock(ctx context.Context, roundNumber types.Uint64) (types.Bytes, error) {
+func (s *StateServiceMock) GetBlock(ctx context.Context, roundNumber hex.Uint64) (hex.Bytes, error) {
 	if s.Err != nil {
 		return nil, s.Err
 	}

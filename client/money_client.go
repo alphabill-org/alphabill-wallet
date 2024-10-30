@@ -40,12 +40,12 @@ func (c *moneyPartitionClient) GetBill(ctx context.Context, unitID types.UnitID)
 		return nil, nil
 	}
 	return &sdktypes.Bill{
-		NetworkID:  u.NetworkID,
-		SystemID:   u.SystemID,
-		ID:         u.UnitID,
-		Value:      u.Data.Value,
-		Counter:    u.Data.Counter,
-		LockStatus: u.Data.Locked,
+		NetworkID:   u.NetworkID,
+		PartitionID: u.PartitionID,
+		ID:          u.UnitID,
+		Value:       u.Data.Value,
+		Counter:     u.Data.Counter,
+		LockStatus:  u.Data.Locked,
 	}, nil
 }
 
@@ -80,12 +80,12 @@ func (c *moneyPartitionClient) GetBills(ctx context.Context, ownerID []byte) ([]
 		}
 		u := batchElem.Result.(*sdktypes.Unit[money.BillData])
 		bills = append(bills, &sdktypes.Bill{
-			NetworkID:  u.NetworkID,
-			SystemID:   u.SystemID,
-			ID:         u.UnitID,
-			Value:      u.Data.Value,
-			Counter:    u.Data.Counter,
-			LockStatus: u.Data.Locked,
+			NetworkID:   u.NetworkID,
+			PartitionID: u.PartitionID,
+			ID:          u.UnitID,
+			Value:       u.Data.Value,
+			Counter:     u.Data.Counter,
+			LockStatus:  u.Data.Locked,
 		})
 	}
 

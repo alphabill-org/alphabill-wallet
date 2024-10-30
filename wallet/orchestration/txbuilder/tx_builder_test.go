@@ -20,14 +20,14 @@ var (
 func TestNewAddVarTx_OK(t *testing.T) {
 	timeout := uint64(10)
 	networkID := types.NetworkLocal
-	systemID := orchestration.DefaultSystemID
+	partitionID := orchestration.DefaultPartitionID
 	unitID := orchestration.NewVarID(nil, test.RandomBytes(32))
 	_var := orchestration.ValidatorAssignmentRecord{}
 
-	tx, err := NewAddVarTx(_var, networkID, systemID, unitID, timeout, 3, accountKey.AccountKey)
+	tx, err := NewAddVarTx(_var, networkID, partitionID, unitID, timeout, 3, accountKey.AccountKey)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.EqualValues(t, systemID, tx.GetSystemID())
+	require.EqualValues(t, partitionID, tx.GetPartitionID())
 	require.EqualValues(t, unitID, tx.GetUnitID())
 	require.EqualValues(t, timeout, tx.Timeout())
 	require.EqualValues(t, 3, tx.MaxFee())
@@ -45,14 +45,14 @@ func TestNewAddVarTx_OK(t *testing.T) {
 func TestNewAddVarTxUnsigned_OK(t *testing.T) {
 	timeout := uint64(10)
 	networkID := types.NetworkLocal
-	systemID := orchestration.DefaultSystemID
+	partitionID := orchestration.DefaultPartitionID
 	unitID := orchestration.NewVarID(nil, test.RandomBytes(32))
 	_var := orchestration.ValidatorAssignmentRecord{}
 
-	tx, err := NewAddVarTx(_var, networkID, systemID, unitID, timeout, 5, nil)
+	tx, err := NewAddVarTx(_var, networkID, partitionID, unitID, timeout, 5, nil)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.EqualValues(t, systemID, tx.GetSystemID())
+	require.EqualValues(t, partitionID, tx.GetPartitionID())
 	require.EqualValues(t, unitID, tx.GetUnitID())
 	require.EqualValues(t, timeout, tx.Timeout())
 	require.EqualValues(t, 5, tx.MaxFee())

@@ -7,6 +7,7 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc/permissioned"
 	"github.com/alphabill-org/alphabill-go-base/types"
+	"github.com/alphabill-org/alphabill-go-base/types/hex"
 )
 
 type (
@@ -15,32 +16,32 @@ type (
 		GetRoundNumber(ctx context.Context) (uint64, error)
 		SendTransaction(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
 		ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*types.TxRecordProof, error)
-		GetTransactionProof(ctx context.Context, txHash types.Bytes) (*types.TxRecordProof, error)
+		GetTransactionProof(ctx context.Context, txHash hex.Bytes) (*types.TxRecordProof, error)
 		GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (*FeeCreditRecord, error)
 		Close()
 	}
 
 	FeeCreditRecord struct {
-		NetworkID  types.NetworkID
-		SystemID   types.SystemID
-		ID         types.UnitID
-		Balance    uint64
-		Timeout    uint64
-		LockStatus uint64
-		Counter    *uint64
+		NetworkID   types.NetworkID
+		PartitionID types.PartitionID
+		ID          types.UnitID
+		Balance     uint64
+		Timeout     uint64
+		LockStatus  uint64
+		Counter     *uint64
 	}
 
 	NodeInfoResponse struct {
-		NetworkID           types.NetworkID `json:"networkId"` // hex encoded network identifier
-		SystemID            types.SystemID  `json:"systemId"`  // hex encoded system identifier
-		Name                string          `json:"name"`      // one of [money node | tokens node | evm node]
-		PermissionedMode    bool            `json:"permissionedMode"`
-		FeelessMode         bool            `json:"feelessMode"`
-		Self                PeerInfo        `json:"self"`      // information about this peer
-		BootstrapNodes      []PeerInfo      `json:"bootstrapNodes"`
-		RootValidators      []PeerInfo      `json:"rootValidators"`
-		PartitionValidators []PeerInfo      `json:"partitionValidators"`
-		OpenConnections     []PeerInfo      `json:"openConnections"` // all libp2p connections to other peers in the network
+		NetworkID           types.NetworkID   `json:"networkId"`   // hex encoded network identifier
+		PartitionID         types.PartitionID `json:"partitionId"` // hex encoded partition identifier
+		Name                string            `json:"name"`        // one of [money node | tokens node | evm node]
+		PermissionedMode    bool              `json:"permissionedMode"`
+		FeelessMode         bool              `json:"feelessMode"`
+		Self                PeerInfo          `json:"self"` // information about this peer
+		BootstrapNodes      []PeerInfo        `json:"bootstrapNodes"`
+		RootValidators      []PeerInfo        `json:"rootValidators"`
+		PartitionValidators []PeerInfo        `json:"partitionValidators"`
+		OpenConnections     []PeerInfo        `json:"openConnections"` // all libp2p connections to other peers in the network
 	}
 
 	PeerInfo struct {
@@ -54,7 +55,7 @@ func (f *FeeCreditRecord) AddFeeCredit(ownerPredicate []byte, transFCProof *type
 		FeeCreditOwnerPredicate: ownerPredicate,
 		FeeCreditTransferProof:  transFCProof,
 	}
-	return NewTransactionOrder(f.NetworkID, f.SystemID, f.ID, fc.TransactionTypeAddFeeCredit, attr, txOptions...)
+	return NewTransactionOrder(f.NetworkID, f.PartitionID, f.ID, fc.TransactionTypeAddFeeCredit, attr, txOptions...)
 }
 
 func (f *FeeCreditRecord) SetFeeCredit(ownerPredicate []byte, amount uint64, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -64,15 +65,15 @@ func (f *FeeCreditRecord) SetFeeCredit(ownerPredicate []byte, amount uint64, txO
 		Counter:        f.Counter,
 	}
 
-	return NewTransactionOrder(f.NetworkID, f.SystemID, f.ID, permissioned.TransactionTypeSetFeeCredit, attr, txOptions...)
+	return NewTransactionOrder(f.NetworkID, f.PartitionID, f.ID, permissioned.TransactionTypeSetFeeCredit, attr, txOptions...)
 }
 
 func (f *FeeCreditRecord) DeleteFeeCredit(txOptions ...Option) (*types.TransactionOrder, error) {
 	attr := &permissioned.DeleteFeeCreditAttributes{
-		Counter:        *f.Counter,
+		Counter: *f.Counter,
 	}
 
-	return NewTransactionOrder(f.NetworkID, f.SystemID, f.ID, permissioned.TransactionTypeDeleteFeeCredit, attr, txOptions...)
+	return NewTransactionOrder(f.NetworkID, f.PartitionID, f.ID, permissioned.TransactionTypeDeleteFeeCredit, attr, txOptions...)
 }
 
 func (f *FeeCreditRecord) CloseFeeCredit(targetBillID types.UnitID, targetBillCounter uint64, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -82,7 +83,7 @@ func (f *FeeCreditRecord) CloseFeeCredit(targetBillID types.UnitID, targetBillCo
 		TargetUnitCounter: targetBillCounter,
 		Counter:           *f.Counter,
 	}
-	return NewTransactionOrder(f.NetworkID, f.SystemID, f.ID, fc.TransactionTypeCloseFeeCredit, attr, txOptions...)
+	return NewTransactionOrder(f.NetworkID, f.PartitionID, f.ID, fc.TransactionTypeCloseFeeCredit, attr, txOptions...)
 }
 
 func (f *FeeCreditRecord) Lock(lockStatus uint64, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -90,12 +91,12 @@ func (f *FeeCreditRecord) Lock(lockStatus uint64, txOptions ...Option) (*types.T
 		LockStatus: lockStatus,
 		Counter:    *f.Counter,
 	}
-	return NewTransactionOrder(f.NetworkID, f.SystemID, f.ID, fc.TransactionTypeLockFeeCredit, attr, txOptions...)
+	return NewTransactionOrder(f.NetworkID, f.PartitionID, f.ID, fc.TransactionTypeLockFeeCredit, attr, txOptions...)
 }
 
 func (f *FeeCreditRecord) Unlock(txOptions ...Option) (*types.TransactionOrder, error) {
 	attr := &fc.UnlockFeeCreditAttributes{
 		Counter: *f.Counter,
 	}
-	return NewTransactionOrder(f.NetworkID, f.SystemID, f.ID, fc.TransactionTypeUnlockFeeCredit, attr, txOptions...)
+	return NewTransactionOrder(f.NetworkID, f.PartitionID, f.ID, fc.TransactionTypeUnlockFeeCredit, attr, txOptions...)
 }
