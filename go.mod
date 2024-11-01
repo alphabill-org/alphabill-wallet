@@ -3,7 +3,7 @@ module github.com/alphabill-org/alphabill-wallet
 go 1.23
 
 require (
-	github.com/alphabill-org/alphabill-go-base v0.5.0-rc1.0.20241029124335-f618bdb92519
+	github.com/alphabill-org/alphabill-go-base v0.5.0-rc1.0.20241101101537-f4500e8d1e34
 	github.com/btcsuite/btcd v0.24.2
 	github.com/btcsuite/btcd/btcutil v1.1.6
 	github.com/ethereum/go-ethereum v1.14.11
