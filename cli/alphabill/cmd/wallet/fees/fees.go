@@ -429,7 +429,7 @@ func newMoneyClient(ctx context.Context, rpcUrl string) (types.MoneyPartitionCli
 	}
 	moneyInfo, err := moneyClient.GetNodeInfo(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to fetch money system info: %w", err)
+		return nil, nil, fmt.Errorf("failed to fetch money partition info: %w", err)
 	}
 	moneyTypeVar := clitypes.MoneyType
 	if !strings.HasPrefix(moneyInfo.Name, moneyTypeVar.String()) {
@@ -468,7 +468,7 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 		}
 		tokenInfo, err := tokensClient.GetNodeInfo(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch tokens system info: %w", err)
+			return nil, fmt.Errorf("failed to fetch tokens partition info: %w", err)
 		}
 		tokenTypeVar := clitypes.TokensType
 		if !strings.HasPrefix(tokenInfo.Name, tokenTypeVar.String()) {
@@ -502,7 +502,7 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 		}
 		tokenInfo, err := tokensClient.GetNodeInfo(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch tokens system info: %w", err)
+			return nil, fmt.Errorf("failed to fetch tokens partition info: %w", err)
 		}
 		tokenTypeVar := clitypes.TokensType
 		if !strings.HasPrefix(tokenInfo.Name, tokenTypeVar.String()) {
@@ -533,7 +533,7 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 		}
 		evmInfo, err := evmClient.GetNodeInfo(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch evm system info: %w", err)
+			return nil, fmt.Errorf("failed to fetch evm partition info: %w", err)
 		}
 		evmTypeVar := clitypes.EvmType
 		if !strings.HasPrefix(evmInfo.Name, evmTypeVar.String()) {

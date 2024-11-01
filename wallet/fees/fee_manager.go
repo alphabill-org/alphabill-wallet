@@ -56,9 +56,9 @@ type (
 		moneyPartitionFcrUnitType []byte
 
 		// target partition fields
-		targetPartitionPartitionID types.PartitionID
-		targetPartitionClient      sdktypes.PartitionClient
-		targetPartitionFcrIDFn     GenerateFcrID
+		targetPartitionID      types.PartitionID
+		targetPartitionClient  sdktypes.PartitionClient
+		targetPartitionFcrIDFn GenerateFcrID
 
 		maxFee    uint64
 		networkID types.NetworkID
@@ -167,17 +167,17 @@ func NewFeeManager(
 	log *slog.Logger,
 ) *FeeManager {
 	return &FeeManager{
-		networkID:                  networkID,
-		am:                         am,
-		db:                         db,
-		moneyPartitionID:           moneyPartitionID,
-		moneyClient:                moneyClient,
-		moneyPartitionFcrIDFn:      moneyPartitionFcrIDFn,
-		targetPartitionPartitionID: targetPartitionPartitionID,
-		targetPartitionClient:      targetPartitionClient,
-		targetPartitionFcrIDFn:     targetPartitionFcrIDFn,
-		log:                        log,
-		maxFee:                     maxFee,
+		networkID:              networkID,
+		am:                     am,
+		db:                     db,
+		moneyPartitionID:       moneyPartitionID,
+		moneyClient:            moneyClient,
+		moneyPartitionFcrIDFn:  moneyPartitionFcrIDFn,
+		targetPartitionID:      targetPartitionPartitionID,
+		targetPartitionClient:  targetPartitionClient,
+		targetPartitionFcrIDFn: targetPartitionFcrIDFn,
+		log:                    log,
+		maxFee:                 maxFee,
 	}
 }
 
@@ -219,9 +219,9 @@ func (w *FeeManager) AddFeeCredit(ctx context.Context, cmd AddFeeCmd) (*AddFeeCm
 	}
 	if addFeeCtx != nil {
 		// verify fee ctx exists for current partition
-		if addFeeCtx.TargetPartitionID != w.targetPartitionPartitionID {
+		if addFeeCtx.TargetPartitionID != w.targetPartitionID {
 			return nil, fmt.Errorf("%w: pendingProcessPartitionID=%s, providedPartitionID=%s",
-				ErrInvalidPartition, addFeeCtx.TargetPartitionID, w.targetPartitionPartitionID)
+				ErrInvalidPartition, addFeeCtx.TargetPartitionID, w.targetPartitionID)
 		}
 
 		// handle the pending fee credit process
@@ -268,9 +268,9 @@ func (w *FeeManager) ReclaimFeeCredit(ctx context.Context, cmd ReclaimFeeCmd) (*
 	}
 	if reclaimFeeCtx != nil {
 		// verify fee ctx exists for current partition
-		if reclaimFeeCtx.TargetPartitionID != w.targetPartitionPartitionID {
+		if reclaimFeeCtx.TargetPartitionID != w.targetPartitionID {
 			return nil, fmt.Errorf("%w: pendingProcessPartitionID=%s, providedPartitionID=%s",
-				ErrInvalidPartition, reclaimFeeCtx.TargetPartitionID, w.targetPartitionPartitionID)
+				ErrInvalidPartition, reclaimFeeCtx.TargetPartitionID, w.targetPartitionID)
 		}
 
 		// handle the pending fee credit process
@@ -451,7 +451,7 @@ func (w *FeeManager) addFees(ctx context.Context, accountKey *account.AccountKey
 		totalTransferredAmount += amount
 
 		feeCtx := &AddFeeCreditCtx{
-			TargetPartitionID: w.targetPartitionPartitionID,
+			TargetPartitionID: w.targetPartitionID,
 			TargetBillID:      targetBill.ID,
 			TargetBillCounter: targetBill.Counter,
 			TargetAmount:      amount,
@@ -639,7 +639,7 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 	if fcr == nil {
 		fcrID := w.targetPartitionFcrIDFn(nil, accountKey.PubKey, latestAdditionTime)
 		fcr = &sdktypes.FeeCreditRecord{
-			PartitionID: w.targetPartitionPartitionID,
+			PartitionID: w.targetPartitionID,
 			ID:          fcrID,
 		}
 	}
@@ -814,7 +814,7 @@ func (w *FeeManager) reclaimFees(ctx context.Context, accountKey *account.Accoun
 
 	// create fee ctx to track reclaim process
 	feeCtx := &ReclaimFeeCreditCtx{
-		TargetPartitionID: w.targetPartitionPartitionID,
+		TargetPartitionID: w.targetPartitionID,
 		TargetBillID:      targetBill.ID,
 		TargetBillCounter: targetBill.Counter,
 		LockingDisabled:   cmd.DisableLocking,

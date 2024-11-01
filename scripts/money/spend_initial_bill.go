@@ -35,7 +35,7 @@ func main() {
 	timeout := flag.Uint64("timeout", 0, "transaction timeout (block number)")
 	counter := flag.Uint64("counter", 0, "bill counter")
 	rpcServerAddr := flag.String("rpc-server-address", "", "money rpc node url")
-	partitionID := flag.Uint("system-id", uint(money.DefaultPartitionID), "the partition identifier")
+	partitionID := flag.Uint("partition-id", uint(money.DefaultPartitionID), "the partition identifier")
 	networkID := flag.Uint("network-id", uint(types.NetworkLocal), "the network identifier")
 	flag.Parse()
 
