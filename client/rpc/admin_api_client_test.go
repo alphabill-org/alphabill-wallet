@@ -17,7 +17,7 @@ func TestAdminClient(t *testing.T) {
 	t.Run("GetNodeInfo_OK", func(t *testing.T) {
 		infoResponse, err := client.GetNodeInfo(context.Background())
 		require.NoError(t, err)
-		require.Equal(t, types.SystemID(1), infoResponse.SystemID)
+		require.Equal(t, types.PartitionID(1), infoResponse.PartitionID)
 		require.Equal(t, "money node", infoResponse.Name)
 		require.Equal(t, "1337", infoResponse.Self.Identifier)
 		require.Empty(t, infoResponse.Self.Addresses)

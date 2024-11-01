@@ -84,13 +84,13 @@ func (c *partitionClient) getFeeCreditRecord(ctx context.Context, unitID types.U
 
 	counterCopy := u.Data.Counter
 	return &sdktypes.FeeCreditRecord{
-		NetworkID:  u.NetworkID,
-		SystemID:   u.SystemID,
-		ID:         u.UnitID,
-		Balance:    u.Data.Balance,
-		Counter:    &counterCopy,
-		Timeout:    u.Data.Timeout,
-		LockStatus: u.Data.Locked,
+		NetworkID:   u.NetworkID,
+		PartitionID: u.PartitionID,
+		ID:          u.UnitID,
+		Balance:     u.Data.Balance,
+		Counter:     &counterCopy,
+		Timeout:     u.Data.Timeout,
+		LockStatus:  u.Data.Locked,
 	}, nil
 }
 

@@ -24,10 +24,10 @@ func createTxOrder() *types.TransactionOrder {
 	attrCBOR, _ := types.Cbor.Marshal(evm.TxAttributes{})
 	return &types.TransactionOrder{
 		Payload: types.Payload{
-			SystemID:   3,
-			UnitID:     []byte{0, 0, 0, 1},
-			Type:       22,
-			Attributes: attrCBOR,
+			PartitionID: 3,
+			UnitID:      []byte{0, 0, 0, 1},
+			Type:        22,
+			Attributes:  attrCBOR,
 			ClientMetadata: &types.ClientMetadata{
 				Timeout: 3,
 			},

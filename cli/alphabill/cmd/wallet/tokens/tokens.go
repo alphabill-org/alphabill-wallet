@@ -210,7 +210,7 @@ func execTokenCmdNewTypeFungible(cmd *cobra.Command, config *types.WalletConfig)
 	}
 	tt := &sdktypes.FungibleTokenType{
 		NetworkID:                tw.NetworkID(),
-		SystemID:                 tw.SystemID(),
+		PartitionID:              tw.PartitionID(),
 		ID:                       typeID,
 		ParentTypeID:             parentType,
 		Symbol:                   symbol,
@@ -302,7 +302,7 @@ func execTokenCmdNewTypeNonFungible(cmd *cobra.Command, config *types.WalletConf
 	}
 	tt := &sdktypes.NonFungibleTokenType{
 		NetworkID:                tw.NetworkID(),
-		SystemID:                 tw.SystemID(),
+		PartitionID:              tw.PartitionID(),
 		ID:                       typeID,
 		ParentTypeID:             parentType,
 		Symbol:                   symbol,
@@ -403,7 +403,7 @@ func execTokenCmdNewTokenFungible(cmd *cobra.Command, config *types.WalletConfig
 
 	ft := &sdktypes.FungibleToken{
 		NetworkID:      tw.NetworkID(),
-		SystemID:       tw.SystemID(),
+		PartitionID:    tw.PartitionID(),
 		TypeID:         typeID,
 		OwnerPredicate: ownerPredicate,
 		Amount:         amount,
@@ -495,7 +495,7 @@ func execTokenCmdNewTokenNonFungible(cmd *cobra.Command, config *types.WalletCon
 
 	nft := &sdktypes.NonFungibleToken{
 		NetworkID:           tw.NetworkID(),
-		SystemID:            tw.SystemID(),
+		PartitionID:         tw.PartitionID(),
 		TypeID:              typeID,
 		OwnerPredicate:      ownerPredicate,
 		Name:                name,
@@ -1193,7 +1193,7 @@ func initTokensWallet(cmd *cobra.Command, config *types.WalletConfig) (*tokenswa
 	if !strings.HasPrefix(nodeInfo.Name, tokensTypeVar.String()) {
 		return nil, errors.New("invalid rpc url provided for tokens partition")
 	}
-	return tokenswallet.New(nodeInfo.NetworkID, nodeInfo.SystemID, tokensClient, am, confirmTx, nil, maxFee, config.Base.Logger)
+	return tokenswallet.New(nodeInfo.NetworkID, nodeInfo.PartitionID, tokensClient, am, confirmTx, nil, maxFee, config.Base.Logger)
 }
 
 func readParentTypeInfo(cmd *cobra.Command, keyNr uint64, am account.Manager) (sdktypes.TokenTypeID, []*tokenswallet.PredicateInput, error) {

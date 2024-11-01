@@ -54,7 +54,7 @@ func (c *tokensPartitionClient) GetFungibleToken(ctx context.Context, tokenID sd
 
 	return &sdktypes.FungibleToken{
 		NetworkID:      ft.NetworkID,
-		SystemID:       ft.SystemID,
+		PartitionID:    ft.PartitionID,
 		ID:             ft.UnitID,
 		Symbol:         ftType.Data.Symbol,
 		TypeID:         ft.Data.TokenType,
@@ -92,7 +92,7 @@ func (c *tokensPartitionClient) GetNonFungibleToken(ctx context.Context, tokenID
 
 	return &sdktypes.NonFungibleToken{
 		NetworkID:           nft.NetworkID,
-		SystemID:            nft.SystemID,
+		PartitionID:         nft.PartitionID,
 		ID:                  nft.UnitID,
 		Symbol:              nftType.Data.Symbol,
 		TypeID:              nft.Data.TypeID,
@@ -103,7 +103,7 @@ func (c *tokensPartitionClient) GetNonFungibleToken(ctx context.Context, tokenID
 		Name:                nft.Data.Name,
 		URI:                 nft.Data.URI,
 		Data:                nft.Data.Data,
-		DataUpdatePredicate: nft.Data.DataUpdatePredicate,
+		DataUpdatePredicate: sdktypes.Predicate(nft.Data.DataUpdatePredicate),
 	}, nil
 }
 
@@ -175,7 +175,7 @@ func (c *tokensPartitionClient) GetFungibleTokens(ctx context.Context, ownerID [
 
 		fts = append(fts, &sdktypes.FungibleToken{
 			NetworkID:      u.NetworkID,
-			SystemID:       u.SystemID,
+			PartitionID:    u.PartitionID,
 			ID:             u.UnitID,
 			Symbol:         ftType.Data.Symbol,
 			TypeID:         u.Data.TokenType,
@@ -258,7 +258,7 @@ func (c *tokensPartitionClient) GetNonFungibleTokens(ctx context.Context, ownerI
 
 		nfts = append(nfts, &sdktypes.NonFungibleToken{
 			NetworkID:           u.NetworkID,
-			SystemID:            u.SystemID,
+			PartitionID:         u.PartitionID,
 			ID:                  u.UnitID,
 			Symbol:              nftType.Data.Symbol,
 			TypeID:              u.Data.TypeID,
@@ -269,7 +269,7 @@ func (c *tokensPartitionClient) GetNonFungibleTokens(ctx context.Context, ownerI
 			Name:                u.Data.Name,
 			URI:                 u.Data.URI,
 			Data:                u.Data.Data,
-			DataUpdatePredicate: u.Data.DataUpdatePredicate,
+			DataUpdatePredicate: sdktypes.Predicate(u.Data.DataUpdatePredicate),
 		})
 	}
 
@@ -353,15 +353,15 @@ func (c *tokensPartitionClient) getFungibleTokenType(ctx context.Context, typeID
 	}
 	return &sdktypes.FungibleTokenType{
 		NetworkID:                ftType.NetworkID,
-		SystemID:                 ftType.SystemID,
+		PartitionID:              ftType.PartitionID,
 		ID:                       ftType.UnitID,
 		ParentTypeID:             ftType.Data.ParentTypeID,
 		Symbol:                   ftType.Data.Symbol,
 		Name:                     ftType.Data.Name,
 		Icon:                     ftType.Data.Icon,
-		SubTypeCreationPredicate: ftType.Data.SubTypeCreationPredicate,
-		TokenMintingPredicate:    ftType.Data.TokenMintingPredicate,
-		TokenTypeOwnerPredicate:  ftType.Data.TokenTypeOwnerPredicate,
+		SubTypeCreationPredicate: sdktypes.Predicate(ftType.Data.SubTypeCreationPredicate),
+		TokenMintingPredicate:    sdktypes.Predicate(ftType.Data.TokenMintingPredicate),
+		TokenTypeOwnerPredicate:  sdktypes.Predicate(ftType.Data.TokenTypeOwnerPredicate),
 		DecimalPlaces:            ftType.Data.DecimalPlaces,
 	}, nil
 }
@@ -378,15 +378,15 @@ func (c *tokensPartitionClient) getNonFungibleTokenType(ctx context.Context, typ
 		return nil, nil
 	}
 	return &sdktypes.NonFungibleTokenType{
-		SystemID:                 nftType.SystemID,
+		PartitionID:              nftType.PartitionID,
 		ID:                       nftType.UnitID,
 		ParentTypeID:             nftType.Data.ParentTypeID,
 		Symbol:                   nftType.Data.Symbol,
 		Name:                     nftType.Data.Name,
 		Icon:                     nftType.Data.Icon,
-		SubTypeCreationPredicate: nftType.Data.SubTypeCreationPredicate,
-		TokenMintingPredicate:    nftType.Data.TokenMintingPredicate,
-		TokenTypeOwnerPredicate:  nftType.Data.TokenTypeOwnerPredicate,
-		DataUpdatePredicate:      nftType.Data.DataUpdatePredicate,
+		SubTypeCreationPredicate: sdktypes.Predicate(nftType.Data.SubTypeCreationPredicate),
+		TokenMintingPredicate:    sdktypes.Predicate(nftType.Data.TokenMintingPredicate),
+		TokenTypeOwnerPredicate:  sdktypes.Predicate(nftType.Data.TokenTypeOwnerPredicate),
+		DataUpdatePredicate:      sdktypes.Predicate(nftType.Data.DataUpdatePredicate),
 	}, nil
 }

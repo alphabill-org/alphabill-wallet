@@ -28,7 +28,7 @@ type (
 
 	FungibleTokenType struct {
 		NetworkID                types.NetworkID
-		SystemID                 types.SystemID
+		PartitionID              types.PartitionID
 		ID                       TokenTypeID
 		ParentTypeID             TokenTypeID
 		Symbol                   string
@@ -42,7 +42,7 @@ type (
 
 	NonFungibleTokenType struct {
 		NetworkID                types.NetworkID
-		SystemID                 types.SystemID
+		PartitionID              types.PartitionID
 		ID                       TokenTypeID
 		ParentTypeID             TokenTypeID
 		Symbol                   string
@@ -56,7 +56,7 @@ type (
 
 	FungibleToken struct {
 		NetworkID      types.NetworkID
-		SystemID       types.SystemID
+		PartitionID    types.PartitionID
 		ID             TokenID
 		Symbol         string
 		TypeID         TokenTypeID
@@ -71,7 +71,7 @@ type (
 
 	NonFungibleToken struct {
 		NetworkID           types.NetworkID
-		SystemID            types.SystemID
+		PartitionID         types.PartitionID
 		ID                  TokenID
 		Symbol              string
 		TypeID              TokenTypeID
@@ -106,7 +106,7 @@ func (tt *FungibleTokenType) Define(txOptions ...Option) (*types.TransactionOrde
 		TokenTypeOwnerPredicate:  tt.TokenTypeOwnerPredicate,
 	}
 
-	return NewTransactionOrder(tt.NetworkID, tt.SystemID, tt.ID, tokens.TransactionTypeDefineFT, attr, txOptions...)
+	return NewTransactionOrder(tt.NetworkID, tt.PartitionID, tt.ID, tokens.TransactionTypeDefineFT, attr, txOptions...)
 }
 
 func (tt *NonFungibleTokenType) Define(txOptions ...Option) (*types.TransactionOrder, error) {
@@ -120,7 +120,7 @@ func (tt *NonFungibleTokenType) Define(txOptions ...Option) (*types.TransactionO
 		TokenMintingPredicate:    tt.TokenMintingPredicate,
 		TokenTypeOwnerPredicate:  tt.TokenTypeOwnerPredicate,
 	}
-	return NewTransactionOrder(tt.NetworkID, tt.SystemID, tt.ID, tokens.TransactionTypeDefineNFT, attr, txOptions...)
+	return NewTransactionOrder(tt.NetworkID, tt.PartitionID, tt.ID, tokens.TransactionTypeDefineNFT, attr, txOptions...)
 }
 
 func (t *FungibleToken) Mint(txOptions ...Option) (*types.TransactionOrder, error) {
@@ -130,7 +130,7 @@ func (t *FungibleToken) Mint(txOptions ...Option) (*types.TransactionOrder, erro
 		Value:          t.Amount,
 		Nonce:          0,
 	}
-	tx, err := NewTransactionOrder(t.NetworkID, t.SystemID, nil, tokens.TransactionTypeMintFT, attr, txOptions...)
+	tx, err := NewTransactionOrder(t.NetworkID, t.PartitionID, nil, tokens.TransactionTypeMintFT, attr, txOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +154,7 @@ func (t *FungibleToken) Transfer(ownerPredicate []byte, txOptions ...Option) (*t
 		Counter:           t.Counter,
 		TypeID:            t.TypeID,
 	}
-	return NewTransactionOrder(t.NetworkID, t.SystemID, t.ID, tokens.TransactionTypeTransferFT, attr, txOptions...)
+	return NewTransactionOrder(t.NetworkID, t.PartitionID, t.ID, tokens.TransactionTypeTransferFT, attr, txOptions...)
 }
 
 func (t *FungibleToken) Split(amount uint64, ownerPredicate []byte, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -164,7 +164,7 @@ func (t *FungibleToken) Split(amount uint64, ownerPredicate []byte, txOptions ..
 		Counter:           t.Counter,
 		TypeID:            t.TypeID,
 	}
-	return NewTransactionOrder(t.NetworkID, t.SystemID, t.ID, tokens.TransactionTypeSplitFT, attr, txOptions...)
+	return NewTransactionOrder(t.NetworkID, t.PartitionID, t.ID, tokens.TransactionTypeSplitFT, attr, txOptions...)
 }
 
 func (t *FungibleToken) Burn(targetTokenID types.UnitID, targetTokenCounter uint64, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -175,20 +175,20 @@ func (t *FungibleToken) Burn(targetTokenID types.UnitID, targetTokenCounter uint
 		TargetTokenCounter: targetTokenCounter,
 		Counter:            t.Counter,
 	}
-	return NewTransactionOrder(t.NetworkID, t.SystemID, t.ID, tokens.TransactionTypeBurnFT, attr, txOptions...)
+	return NewTransactionOrder(t.NetworkID, t.PartitionID, t.ID, tokens.TransactionTypeBurnFT, attr, txOptions...)
 }
 
 func (t *FungibleToken) Join(burnTxProofs []*types.TxRecordProof, txOptions ...Option) (*types.TransactionOrder, error) {
 	attr := &tokens.JoinFungibleTokenAttributes{BurnTokenProofs: burnTxProofs}
-	return NewTransactionOrder(t.NetworkID, t.SystemID, t.ID, tokens.TransactionTypeJoinFT, attr, txOptions...)
+	return NewTransactionOrder(t.NetworkID, t.PartitionID, t.ID, tokens.TransactionTypeJoinFT, attr, txOptions...)
 }
 
 func (t *FungibleToken) Lock(lockStatus uint64, txOptions ...Option) (*types.TransactionOrder, error) {
-	return lockToken(t.NetworkID, t.SystemID, t.ID, t.Counter, lockStatus, txOptions...)
+	return lockToken(t.NetworkID, t.PartitionID, t.ID, t.Counter, lockStatus, txOptions...)
 }
 
 func (t *FungibleToken) Unlock(txOptions ...Option) (*types.TransactionOrder, error) {
-	return unlockToken(t.NetworkID, t.SystemID, t.ID, t.Counter, txOptions...)
+	return unlockToken(t.NetworkID, t.PartitionID, t.ID, t.Counter, txOptions...)
 }
 
 func (t *FungibleToken) GetID() TokenID {
@@ -213,7 +213,7 @@ func (t *NonFungibleToken) Mint(txOptions ...Option) (*types.TransactionOrder, e
 		DataUpdatePredicate: t.DataUpdatePredicate,
 		Nonce:               0,
 	}
-	tx, err := NewTransactionOrder(t.NetworkID, t.SystemID, nil, tokens.TransactionTypeMintNFT, attr, txOptions...)
+	tx, err := NewTransactionOrder(t.NetworkID, t.PartitionID, nil, tokens.TransactionTypeMintNFT, attr, txOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -236,7 +236,7 @@ func (t *NonFungibleToken) Transfer(ownerPredicate []byte, txOptions ...Option) 
 		Counter:           t.Counter,
 		TypeID:            t.TypeID,
 	}
-	return NewTransactionOrder(t.NetworkID, t.SystemID, t.ID, tokens.TransactionTypeTransferNFT, attr, txOptions...)
+	return NewTransactionOrder(t.NetworkID, t.PartitionID, t.ID, tokens.TransactionTypeTransferNFT, attr, txOptions...)
 }
 
 func (t *NonFungibleToken) Update(data []byte, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -244,15 +244,15 @@ func (t *NonFungibleToken) Update(data []byte, txOptions ...Option) (*types.Tran
 		Data:    data,
 		Counter: t.Counter,
 	}
-	return NewTransactionOrder(t.NetworkID, t.SystemID, t.ID, tokens.TransactionTypeUpdateNFT, attr, txOptions...)
+	return NewTransactionOrder(t.NetworkID, t.PartitionID, t.ID, tokens.TransactionTypeUpdateNFT, attr, txOptions...)
 }
 
 func (t *NonFungibleToken) Lock(lockStatus uint64, txOptions ...Option) (*types.TransactionOrder, error) {
-	return lockToken(t.NetworkID, t.SystemID, t.ID, t.Counter, lockStatus, txOptions...)
+	return lockToken(t.NetworkID, t.PartitionID, t.ID, t.Counter, lockStatus, txOptions...)
 }
 
 func (t *NonFungibleToken) Unlock(txOptions ...Option) (*types.TransactionOrder, error) {
-	return unlockToken(t.NetworkID, t.SystemID, t.ID, t.Counter, txOptions...)
+	return unlockToken(t.NetworkID, t.PartitionID, t.ID, t.Counter, txOptions...)
 }
 
 func (t *NonFungibleToken) GetID() TokenID {
@@ -271,17 +271,17 @@ func (pk PubKey) Hash() PubKeyHash {
 	return hash.Sum256(pk)
 }
 
-func lockToken(networkID types.NetworkID, systemID types.SystemID, id types.UnitID, counter uint64, lockStatus uint64, txOptions ...Option) (*types.TransactionOrder, error) {
+func lockToken(networkID types.NetworkID, partitionID types.PartitionID, id types.UnitID, counter uint64, lockStatus uint64, txOptions ...Option) (*types.TransactionOrder, error) {
 	attr := &tokens.LockTokenAttributes{
 		LockStatus: lockStatus,
 		Counter:    counter,
 	}
-	return NewTransactionOrder(networkID, systemID, id, tokens.TransactionTypeLockToken, attr, txOptions...)
+	return NewTransactionOrder(networkID, partitionID, id, tokens.TransactionTypeLockToken, attr, txOptions...)
 }
 
-func unlockToken(networkID types.NetworkID, systemID types.SystemID, id types.UnitID, counter uint64, txOptions ...Option) (*types.TransactionOrder, error) {
+func unlockToken(networkID types.NetworkID, partitionID types.PartitionID, id types.UnitID, counter uint64, txOptions ...Option) (*types.TransactionOrder, error) {
 	attr := &tokens.UnlockTokenAttributes{
 		Counter: counter,
 	}
-	return NewTransactionOrder(networkID, systemID, id, tokens.TransactionTypeUnlockToken, attr, txOptions...)
+	return NewTransactionOrder(networkID, partitionID, id, tokens.TransactionTypeUnlockToken, attr, txOptions...)
 }

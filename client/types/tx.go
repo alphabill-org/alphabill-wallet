@@ -19,7 +19,7 @@ type (
 	Option func(*Options)
 )
 
-func NewTransactionOrder(networkID types.NetworkID, systemID types.SystemID, unitID types.UnitID, txType uint16, attr any, opts ...Option) (*types.TransactionOrder, error) {
+func NewTransactionOrder(networkID types.NetworkID, partitionID types.PartitionID, unitID types.UnitID, txType uint16, attr any, opts ...Option) (*types.TransactionOrder, error) {
 	attrBytes, err := types.Cbor.Marshal(attr)
 	if err != nil {
 		return nil, err
@@ -28,11 +28,11 @@ func NewTransactionOrder(networkID types.NetworkID, systemID types.SystemID, uni
 	o := OptionsWithDefaults(opts)
 	return &types.TransactionOrder{
 		Payload: types.Payload{
-			NetworkID:  networkID,
-			SystemID:   systemID,
-			UnitID:     unitID,
-			Type:       txType,
-			Attributes: attrBytes,
+			NetworkID:   networkID,
+			PartitionID: partitionID,
+			UnitID:      unitID,
+			Type:        txType,
+			Attributes:  attrBytes,
 			ClientMetadata: &types.ClientMetadata{
 				Timeout:           o.Timeout,
 				MaxTransactionFee: o.MaxFee,

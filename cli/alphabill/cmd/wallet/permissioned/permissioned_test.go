@@ -21,7 +21,7 @@ func TestAddFeeCreditCmd(t *testing.T) {
 	as := mocksrv.NewAdminServiceMock(mocksrv.WithInfoResponse(
 		&types.NodeInfoResponse{
 			NetworkID:        1,
-			SystemID:         50,
+			PartitionID:      50,
 			Name:             "tokens",
 			PermissionedMode: true,
 		}))
@@ -46,7 +46,7 @@ func TestAddFeeCreditCmd(t *testing.T) {
 	require.Equal(t, 1, len(ss.SentTxs))
 	for _, tx := range ss.SentTxs {
 		require.EqualValues(t, 1, tx.NetworkID)
-		require.EqualValues(t, 50, tx.SystemID)
+		require.EqualValues(t, 50, tx.PartitionID)
 		require.Equal(t, permissioned.TransactionTypeSetFeeCredit, tx.Type)
 		attr := permissioned.SetFeeCreditAttributes{}
 		require.NoError(t, tx.UnmarshalAttributes(&attr))
@@ -61,7 +61,7 @@ func TestDeleteFeeCreditCmd(t *testing.T) {
 	as := mocksrv.NewAdminServiceMock(mocksrv.WithInfoResponse(
 		&types.NodeInfoResponse{
 			NetworkID:        1,
-			SystemID:         50,
+			PartitionID:      50,
 			Name:             "tokens",
 			PermissionedMode: true,
 		}))

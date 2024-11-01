@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/alphabill-org/alphabill-go-base/types"
+	"github.com/alphabill-org/alphabill-go-base/types/hex"
 
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 )
@@ -16,7 +17,7 @@ import (
 type (
 	TxSubmission struct {
 		UnitID      types.UnitID
-		TxHash      types.Bytes
+		TxHash      hex.Bytes
 		Transaction *types.TransactionOrder
 		Proof       *types.TxRecordProof
 	}

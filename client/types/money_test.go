@@ -14,11 +14,11 @@ import (
 
 func TestBillTransfer(t *testing.T) {
 	b := &Bill{
-		NetworkID: types.NetworkLocal,
-		SystemID:  money.DefaultSystemID,
-		ID:        money.NewBillID(nil, []byte{1}),
-		Value:     2,
-		Counter:   3,
+		NetworkID:   types.NetworkLocal,
+		PartitionID: money.DefaultPartitionID,
+		ID:          money.NewBillID(nil, []byte{1}),
+		Value:       2,
+		Counter:     3,
 	}
 	refNo := []byte("refNo")
 	timeout := uint64(4)
@@ -34,7 +34,7 @@ func TestBillTransfer(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 	require.Equal(t, tx.Type, money.TransactionTypeTransfer)
-	require.Equal(t, b.SystemID, tx.GetSystemID())
+	require.Equal(t, b.PartitionID, tx.GetPartitionID())
 	require.Equal(t, b.ID, tx.GetUnitID())
 	require.Equal(t, timeout, tx.Timeout())
 	require.EqualValues(t, refNo, tx.Payload.ClientMetadata.ReferenceNumber)
@@ -53,10 +53,10 @@ func TestSplitTransactionAmount(t *testing.T) {
 	receiverPubKeyHash := hash.Sum256([]byte{1})
 	billID := money.NewBillID(nil, nil)
 	b := &Bill{
-		SystemID: money.DefaultSystemID,
-		ID:       billID,
-		Value:    500,
-		Counter:  1234,
+		PartitionID: money.DefaultPartitionID,
+		ID:          billID,
+		Value:       500,
+		Counter:     1234,
 	}
 	amount := uint64(150)
 
@@ -70,7 +70,7 @@ func TestSplitTransactionAmount(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 	require.Equal(t, tx.Type, money.TransactionTypeSplit)
-	require.EqualValues(t, b.SystemID, tx.GetSystemID())
+	require.EqualValues(t, b.PartitionID, tx.GetPartitionID())
 	require.EqualValues(t, billID, tx.GetUnitID())
 	require.Nil(t, tx.AuthProof)
 
@@ -84,11 +84,11 @@ func TestSplitTransactionAmount(t *testing.T) {
 
 func TestBillTransferToDustCollector(t *testing.T) {
 	b := &Bill{
-		NetworkID: types.NetworkLocal,
-		SystemID:  money.DefaultSystemID,
-		ID:        money.NewBillID(nil, []byte{1}),
-		Value:     2,
-		Counter:   3,
+		NetworkID:   types.NetworkLocal,
+		PartitionID: money.DefaultPartitionID,
+		ID:          money.NewBillID(nil, []byte{1}),
+		Value:       2,
+		Counter:     3,
 	}
 	targetBill := &Bill{
 		ID:      money.NewBillID(nil, []byte{4}),
@@ -98,7 +98,7 @@ func TestBillTransferToDustCollector(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 	require.Equal(t, tx.Type, money.TransactionTypeTransDC)
-	require.Equal(t, b.SystemID, tx.GetSystemID())
+	require.Equal(t, b.PartitionID, tx.GetPartitionID())
 	require.Equal(t, b.ID, tx.GetUnitID())
 	require.Nil(t, tx.StateUnlock)
 	require.Nil(t, tx.FeeProof)
@@ -113,24 +113,24 @@ func TestBillTransferToDustCollector(t *testing.T) {
 
 func TestBillSwapWithDustCollector(t *testing.T) {
 	db1 := &Bill{
-		NetworkID: types.NetworkLocal,
-		SystemID:  money.DefaultSystemID,
-		ID:        money.NewBillID(nil, []byte{1}),
-		Value:     2,
-		Counter:   3,
+		NetworkID:   types.NetworkLocal,
+		PartitionID: money.DefaultPartitionID,
+		ID:          money.NewBillID(nil, []byte{1}),
+		Value:       2,
+		Counter:     3,
 	}
 	db2 := &Bill{
-		NetworkID: types.NetworkLocal,
-		SystemID:  money.DefaultSystemID,
-		ID:        money.NewBillID(nil, []byte{2}),
-		Value:     3,
-		Counter:   3,
+		NetworkID:   types.NetworkLocal,
+		PartitionID: money.DefaultPartitionID,
+		ID:          money.NewBillID(nil, []byte{2}),
+		Value:       3,
+		Counter:     3,
 	}
 	targetBill := &Bill{
-		NetworkID: types.NetworkLocal,
-		SystemID:  money.DefaultSystemID,
-		ID:        money.NewBillID(nil, []byte{3}),
-		Counter:   4,
+		NetworkID:   types.NetworkLocal,
+		PartitionID: money.DefaultPartitionID,
+		ID:          money.NewBillID(nil, []byte{3}),
+		Counter:     4,
 	}
 	tx1, err := db1.TransferToDustCollector(targetBill)
 	tx2, err := db2.TransferToDustCollector(targetBill)
@@ -149,7 +149,7 @@ func TestBillSwapWithDustCollector(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, tx3)
 	require.Equal(t, tx3.Type, money.TransactionTypeSwapDC)
-	require.Equal(t, targetBill.SystemID, tx3.GetSystemID())
+	require.Equal(t, targetBill.PartitionID, tx3.GetPartitionID())
 	require.Equal(t, targetBill.ID, tx3.GetUnitID())
 	require.Nil(t, tx3.AuthProof)
 	require.Nil(t, tx3.FeeProof)
@@ -161,18 +161,18 @@ func TestBillSwapWithDustCollector(t *testing.T) {
 
 func TestBillTransferToFeeCredit(t *testing.T) {
 	b := &Bill{
-		NetworkID: types.NetworkLocal,
-		SystemID:  money.DefaultSystemID,
-		ID:        money.NewBillID(nil, []byte{1}),
-		Value:     2,
-		Counter:   3,
+		NetworkID:   types.NetworkLocal,
+		PartitionID: money.DefaultPartitionID,
+		ID:          money.NewBillID(nil, []byte{1}),
+		Value:       2,
+		Counter:     3,
 	}
 	fcrCounter := uint64(4)
 	fcr := &FeeCreditRecord{
-		NetworkID: types.NetworkLocal,
-		SystemID:  5,
-		ID:        money.NewFeeCreditRecordID(nil, []byte{6}),
-		Counter:   &fcrCounter,
+		NetworkID:   types.NetworkLocal,
+		PartitionID: 5,
+		ID:          money.NewFeeCreditRecordID(nil, []byte{6}),
+		Counter:     &fcrCounter,
 	}
 	amount := uint64(1)
 	latestAdditionTime := uint64(7)
@@ -180,13 +180,13 @@ func TestBillTransferToFeeCredit(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 	require.Equal(t, tx.Type, fc.TransactionTypeTransferFeeCredit)
-	require.Equal(t, b.SystemID, tx.GetSystemID())
+	require.Equal(t, b.PartitionID, tx.GetPartitionID())
 	require.Equal(t, b.ID, tx.GetUnitID())
 
 	attr := &fc.TransferFeeCreditAttributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))
 	require.Equal(t, amount, attr.Amount)
-	require.Equal(t, fcr.SystemID, attr.TargetSystemIdentifier)
+	require.Equal(t, fcr.PartitionID, attr.TargetPartitionID)
 	require.EqualValues(t, fcr.ID, attr.TargetRecordID)
 	require.Equal(t, latestAdditionTime, attr.LatestAdditionTime)
 	require.Equal(t, fcr.Counter, attr.TargetUnitCounter)
@@ -195,11 +195,11 @@ func TestBillTransferToFeeCredit(t *testing.T) {
 
 func TestBillReclaimFromFeeCredit(t *testing.T) {
 	b := &Bill{
-		NetworkID: types.NetworkLocal,
-		SystemID:  money.DefaultSystemID,
-		ID:        money.NewBillID(nil, []byte{1}),
-		Value:     2,
-		Counter:   3,
+		NetworkID:   types.NetworkLocal,
+		PartitionID: money.DefaultPartitionID,
+		ID:          money.NewBillID(nil, []byte{1}),
+		Value:       2,
+		Counter:     3,
 	}
 	closeFCProof := &types.TxRecordProof{
 		TxRecord: &types.TransactionRecord{},
@@ -209,7 +209,7 @@ func TestBillReclaimFromFeeCredit(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 	require.Equal(t, tx.Type, fc.TransactionTypeReclaimFeeCredit)
-	require.Equal(t, b.SystemID, tx.GetSystemID())
+	require.Equal(t, b.PartitionID, tx.GetPartitionID())
 	require.Equal(t, b.ID, tx.GetUnitID())
 
 	attr := &fc.ReclaimFeeCreditAttributes{}
@@ -219,18 +219,18 @@ func TestBillReclaimFromFeeCredit(t *testing.T) {
 
 func TestBillLock(t *testing.T) {
 	b := &Bill{
-		NetworkID: types.NetworkLocal,
-		SystemID:  money.DefaultSystemID,
-		ID:        money.NewBillID(nil, []byte{1}),
-		Value:     2,
-		Counter:   3,
+		NetworkID:   types.NetworkLocal,
+		PartitionID: money.DefaultPartitionID,
+		ID:          money.NewBillID(nil, []byte{1}),
+		Value:       2,
+		Counter:     3,
 	}
 	lockStatus := uint64(4)
 	tx, err := b.Lock(lockStatus)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 	require.Equal(t, tx.Type, money.TransactionTypeLock)
-	require.Equal(t, b.SystemID, tx.GetSystemID())
+	require.Equal(t, b.PartitionID, tx.GetPartitionID())
 	require.Equal(t, b.ID, tx.GetUnitID())
 
 	attr := &money.LockAttributes{}
@@ -241,17 +241,17 @@ func TestBillLock(t *testing.T) {
 
 func TestBillUnlock(t *testing.T) {
 	b := &Bill{
-		NetworkID: types.NetworkLocal,
-		SystemID:  money.DefaultSystemID,
-		ID:        money.NewBillID(nil, []byte{1}),
-		Value:     2,
-		Counter:   3,
+		NetworkID:   types.NetworkLocal,
+		PartitionID: money.DefaultPartitionID,
+		ID:          money.NewBillID(nil, []byte{1}),
+		Value:       2,
+		Counter:     3,
 	}
 	tx, err := b.Unlock()
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 	require.Equal(t, tx.Type, money.TransactionTypeUnlock)
-	require.Equal(t, b.SystemID, tx.GetSystemID())
+	require.Equal(t, b.PartitionID, tx.GetPartitionID())
 	require.Equal(t, b.ID, tx.GetUnitID())
 
 	attr := &money.UnlockAttributes{}

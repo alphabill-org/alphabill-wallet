@@ -5,19 +5,20 @@ import (
 	"fmt"
 
 	"github.com/alphabill-org/alphabill-go-base/types"
+	"github.com/alphabill-org/alphabill-go-base/types/hex"
 )
 
 type (
 	Unit[T any] struct {
-		NetworkID  types.NetworkID       `json:"networkId"`
-		SystemID   types.SystemID        `json:"systemId"`
-		UnitID     types.UnitID          `json:"unitId"`
-		Data       T                     `json:"data"`
-		StateProof *types.UnitStateProof `json:"stateProof,omitempty"`
+		NetworkID   types.NetworkID       `json:"networkId"`
+		PartitionID types.PartitionID     `json:"partitionId"`
+		UnitID      types.UnitID          `json:"unitId"`
+		Data        T                     `json:"data"`
+		StateProof  *types.UnitStateProof `json:"stateProof,omitempty"`
 	}
 
 	TransactionRecordAndProof struct {
-		TxRecordProof types.Bytes `json:"txRecordProof"`
+		TxRecordProof hex.Bytes `json:"txRecordProof"`
 	}
 )
 

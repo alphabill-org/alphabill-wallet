@@ -8,7 +8,7 @@ type BillsConfig struct {
 	Key           uint64
 	ShowUnswapped bool
 	BillID        BytesHex
-	SystemID      uint32
+	PartitionID   uint32
 }
 
 func (c *BillsConfig) GetRpcUrl() string {

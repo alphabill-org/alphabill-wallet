@@ -22,14 +22,14 @@ func TestTokensRpcClient(t *testing.T) {
 		tokenID := tokentxs.NewFungibleTokenID(nil, []byte{1})
 		tokenTypeID := tokentxs.NewFungibleTokenTypeID(nil, []byte{2})
 		tokenType := &types.FungibleTokenType{
-			SystemID:      tokens.DefaultSystemID,
+			PartitionID:   tokens.DefaultPartitionID,
 			ID:            tokenTypeID,
 			Symbol:        "ABC",
 			Name:          "Name of ABC Token Type",
 			DecimalPlaces: 2,
 		}
 		ft := &types.FungibleToken{
-			SystemID:      tokenType.SystemID,
+			PartitionID:   tokenType.PartitionID,
 			ID:            tokenID,
 			Symbol:        tokenType.Symbol,
 			TypeID:        tokenType.ID,
@@ -40,8 +40,8 @@ func TestTokensRpcClient(t *testing.T) {
 		}
 		*service = *mocksrv.NewStateServiceMock(
 			mocksrv.WithUnit(&types.Unit[any]{
-				SystemID: tokenType.SystemID,
-				UnitID:   tokenType.ID,
+				PartitionID: tokenType.PartitionID,
+				UnitID:      tokenType.ID,
 				Data: tokentxs.FungibleTokenTypeData{
 					Symbol:        tokenType.Symbol,
 					Name:          tokenType.Name,
@@ -49,8 +49,8 @@ func TestTokensRpcClient(t *testing.T) {
 				},
 			}),
 			mocksrv.WithUnit(&types.Unit[any]{
-				SystemID: ft.SystemID,
-				UnitID:   ft.ID,
+				PartitionID: ft.PartitionID,
+				UnitID:      ft.ID,
 				Data: tokentxs.FungibleTokenData{
 					TokenType: tokenType.ID,
 					Value:     ft.Amount,
@@ -86,7 +86,7 @@ func TestTokensRpcClient(t *testing.T) {
 		ftTokenID := tokentxs.NewFungibleTokenID(nil, []byte{1})
 		ftTokenTypeID := tokentxs.NewFungibleTokenTypeID(nil, []byte{2})
 		ftTokenType := &types.FungibleTokenType{
-			SystemID:      tokens.DefaultSystemID,
+			PartitionID:   tokens.DefaultPartitionID,
 			ID:            ftTokenTypeID,
 			Symbol:        "ABC",
 			Name:          "Fungible ABC Token",
@@ -94,7 +94,7 @@ func TestTokensRpcClient(t *testing.T) {
 		}
 
 		ft := &types.FungibleToken{
-			SystemID:       tokens.DefaultSystemID,
+			PartitionID:    tokens.DefaultPartitionID,
 			ID:             ftTokenID,
 			Symbol:         ftTokenType.Symbol,
 			TypeID:         ftTokenTypeID,
@@ -108,13 +108,13 @@ func TestTokensRpcClient(t *testing.T) {
 		nftTokenID := tokentxs.NewNonFungibleTokenID(nil, []byte{3})
 		nftTokenTypeID := tokentxs.NewNonFungibleTokenTypeID(nil, []byte{4})
 		nftTokenType := &types.NonFungibleTokenType{
-			SystemID: tokens.DefaultSystemID,
-			ID:       nftTokenTypeID,
-			Symbol:   "ABC-NFT",
-			Name:     "Non-Fungible ABC Token",
+			PartitionID: tokens.DefaultPartitionID,
+			ID:          nftTokenTypeID,
+			Symbol:      "ABC-NFT",
+			Name:        "Non-Fungible ABC Token",
 		}
 		nft := &types.NonFungibleToken{
-			SystemID:       tokens.DefaultSystemID,
+			PartitionID:    tokens.DefaultPartitionID,
 			ID:             nftTokenID,
 			Symbol:         nftTokenType.Symbol,
 			TypeID:         nftTokenTypeID,
@@ -128,8 +128,8 @@ func TestTokensRpcClient(t *testing.T) {
 		*service = *mocksrv.NewStateServiceMock(
 			// fungible token type
 			mocksrv.WithUnit(&types.Unit[any]{
-				SystemID: tokens.DefaultSystemID,
-				UnitID:   ftTokenTypeID,
+				PartitionID: tokens.DefaultPartitionID,
+				UnitID:      ftTokenTypeID,
 				Data: tokentxs.FungibleTokenTypeData{
 					Symbol:        ftTokenType.Symbol,
 					Name:          ftTokenType.Name,
@@ -138,8 +138,8 @@ func TestTokensRpcClient(t *testing.T) {
 			}),
 			// fungible token unit
 			mocksrv.WithOwnerUnit(ownerID, &types.Unit[any]{
-				SystemID: tokens.DefaultSystemID,
-				UnitID:   ftTokenID,
+				PartitionID: tokens.DefaultPartitionID,
+				UnitID:      ftTokenID,
 				Data: tokentxs.FungibleTokenData{
 					TokenType:      ftTokenTypeID,
 					Value:          ft.Amount,
@@ -150,8 +150,8 @@ func TestTokensRpcClient(t *testing.T) {
 
 			// non-fungible token type
 			mocksrv.WithUnit(&types.Unit[any]{
-				SystemID: tokens.DefaultSystemID,
-				UnitID:   nftTokenTypeID,
+				PartitionID: tokens.DefaultPartitionID,
+				UnitID:      nftTokenTypeID,
 				Data: tokentxs.NonFungibleTokenTypeData{
 					Symbol: nftTokenType.Symbol,
 					Name:   nftTokenType.Name,
@@ -159,8 +159,8 @@ func TestTokensRpcClient(t *testing.T) {
 			}),
 			// non-fungible token unit
 			mocksrv.WithOwnerUnit(ownerID, &types.Unit[any]{
-				SystemID: tokens.DefaultSystemID,
-				UnitID:   nftTokenID,
+				PartitionID: tokens.DefaultPartitionID,
+				UnitID:      nftTokenID,
 				Data: tokentxs.NonFungibleTokenData{
 					TypeID:         nftTokenTypeID,
 					Name:           nft.Name,
@@ -197,7 +197,7 @@ func TestTokensRpcClient(t *testing.T) {
 		for i := uint8(1); i <= 3; i++ {
 			typeID := tokentxs.NewFungibleTokenTypeID(nil, []byte{i})
 			tokenType := &types.FungibleTokenType{
-				SystemID:      tokens.DefaultSystemID,
+				PartitionID:   tokens.DefaultPartitionID,
 				ID:            typeID,
 				ParentTypeID:  prevTypeID,
 				Symbol:        "ABC",
@@ -207,8 +207,8 @@ func TestTokensRpcClient(t *testing.T) {
 			prevTypeID = typeID
 			tokenTypes = append(tokenTypes, tokenType)
 			units = append(units, &types.Unit[any]{
-				SystemID: tokens.DefaultSystemID,
-				UnitID:   typeID,
+				PartitionID: tokens.DefaultPartitionID,
+				UnitID:      typeID,
 				Data: tokentxs.FungibleTokenTypeData{
 					Symbol:        tokenType.Symbol,
 					Name:          tokenType.Name,
@@ -251,7 +251,7 @@ func TestTokensRpcClient(t *testing.T) {
 		for i := uint8(1); i <= 3; i++ {
 			typeID := tokentxs.NewNonFungibleTokenTypeID(nil, []byte{i})
 			tokenType := &types.NonFungibleTokenType{
-				SystemID:     tokens.DefaultSystemID,
+				PartitionID:  tokens.DefaultPartitionID,
 				ID:           typeID,
 				ParentTypeID: prevTypeID,
 				Symbol:       "ABC",
@@ -260,8 +260,8 @@ func TestTokensRpcClient(t *testing.T) {
 			prevTypeID = typeID
 			tokenTypes = append(tokenTypes, tokenType)
 			units = append(units, &types.Unit[any]{
-				SystemID: tokens.DefaultSystemID,
-				UnitID:   typeID,
+				PartitionID: tokens.DefaultPartitionID,
+				UnitID:      typeID,
 				Data: tokentxs.NonFungibleTokenTypeData{
 					Symbol:       tokenType.Symbol,
 					Name:         tokenType.Name,

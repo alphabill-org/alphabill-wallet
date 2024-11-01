@@ -21,12 +21,12 @@ type (
 	}
 
 	Bill struct {
-		NetworkID  types.NetworkID
-		SystemID   types.SystemID
-		ID         types.UnitID
-		Value      uint64
-		LockStatus uint64
-		Counter    uint64
+		NetworkID   types.NetworkID
+		PartitionID types.PartitionID
+		ID          types.UnitID
+		Value       uint64
+		LockStatus  uint64
+		Counter     uint64
 	}
 )
 
@@ -36,7 +36,7 @@ func (b *Bill) Transfer(newOwnerPredicate []byte, txOptions ...Option) (*types.T
 		TargetValue:       b.Value,
 		Counter:           b.Counter,
 	}
-	return NewTransactionOrder(b.NetworkID, b.SystemID, b.ID, money.TransactionTypeTransfer, attr, txOptions...)
+	return NewTransactionOrder(b.NetworkID, b.PartitionID, b.ID, money.TransactionTypeTransfer, attr, txOptions...)
 }
 
 func (b *Bill) Split(targetUnits []*money.TargetUnit, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -48,7 +48,7 @@ func (b *Bill) Split(targetUnits []*money.TargetUnit, txOptions ...Option) (*typ
 		TargetUnits: targetUnits,
 		Counter:     b.Counter,
 	}
-	return NewTransactionOrder(b.NetworkID, b.SystemID, b.ID, money.TransactionTypeSplit, attr, txOptions...)
+	return NewTransactionOrder(b.NetworkID, b.PartitionID, b.ID, money.TransactionTypeSplit, attr, txOptions...)
 }
 
 func (b *Bill) TransferToDustCollector(targetBill *Bill, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -58,7 +58,7 @@ func (b *Bill) TransferToDustCollector(targetBill *Bill, txOptions ...Option) (*
 		Value:             b.Value,
 		Counter:           b.Counter,
 	}
-	return NewTransactionOrder(b.NetworkID, b.SystemID, b.ID, money.TransactionTypeTransDC, attr, txOptions...)
+	return NewTransactionOrder(b.NetworkID, b.PartitionID, b.ID, money.TransactionTypeTransDC, attr, txOptions...)
 }
 
 func (b *Bill) SwapWithDustCollector(transDCProofs []*types.TxRecordProof, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -70,7 +70,7 @@ func (b *Bill) SwapWithDustCollector(transDCProofs []*types.TxRecordProof, txOpt
 		return bytes.Compare(transDCProofs[i].TxRecord.TransactionOrder.GetUnitID(), transDCProofs[j].TxRecord.TransactionOrder.GetUnitID()) < 0
 	})
 	attr := &money.SwapDCAttributes{DustTransferProofs: transDCProofs}
-	txo, err := NewTransactionOrder(b.NetworkID, b.SystemID, b.ID, money.TransactionTypeSwapDC, attr, txOptions...)
+	txo, err := NewTransactionOrder(b.NetworkID, b.PartitionID, b.ID, money.TransactionTypeSwapDC, attr, txOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build swap transaction: %w", err)
 	}
@@ -79,19 +79,19 @@ func (b *Bill) SwapWithDustCollector(transDCProofs []*types.TxRecordProof, txOpt
 
 func (b *Bill) TransferToFeeCredit(fcr *FeeCreditRecord, amount uint64, latestAdditionTime uint64, txOptions ...Option) (*types.TransactionOrder, error) {
 	attr := &fc.TransferFeeCreditAttributes{
-		Amount:                 amount,
-		TargetSystemIdentifier: fcr.SystemID,
-		TargetRecordID:         fcr.ID,
-		LatestAdditionTime:     latestAdditionTime,
-		TargetUnitCounter:      fcr.Counter,
-		Counter:                b.Counter,
+		Amount:             amount,
+		TargetPartitionID:  fcr.PartitionID,
+		TargetRecordID:     fcr.ID,
+		LatestAdditionTime: latestAdditionTime,
+		TargetUnitCounter:  fcr.Counter,
+		Counter:            b.Counter,
 	}
-	return NewTransactionOrder(b.NetworkID, b.SystemID, b.ID, fc.TransactionTypeTransferFeeCredit, attr, txOptions...)
+	return NewTransactionOrder(b.NetworkID, b.PartitionID, b.ID, fc.TransactionTypeTransferFeeCredit, attr, txOptions...)
 }
 
 func (b *Bill) ReclaimFromFeeCredit(closeFCProof *types.TxRecordProof, txOptions ...Option) (*types.TransactionOrder, error) {
 	attr := &fc.ReclaimFeeCreditAttributes{CloseFeeCreditProof: closeFCProof}
-	return NewTransactionOrder(b.NetworkID, b.SystemID, b.ID, fc.TransactionTypeReclaimFeeCredit, attr, txOptions...)
+	return NewTransactionOrder(b.NetworkID, b.PartitionID, b.ID, fc.TransactionTypeReclaimFeeCredit, attr, txOptions...)
 }
 
 func (b *Bill) Lock(lockStatus uint64, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -99,12 +99,12 @@ func (b *Bill) Lock(lockStatus uint64, txOptions ...Option) (*types.TransactionO
 		LockStatus: lockStatus,
 		Counter:    b.Counter,
 	}
-	return NewTransactionOrder(b.NetworkID, b.SystemID, b.ID, money.TransactionTypeLock, attr, txOptions...)
+	return NewTransactionOrder(b.NetworkID, b.PartitionID, b.ID, money.TransactionTypeLock, attr, txOptions...)
 }
 
 func (b *Bill) Unlock(txOptions ...Option) (*types.TransactionOrder, error) {
 	attr := &money.UnlockAttributes{
 		Counter: b.Counter,
 	}
-	return NewTransactionOrder(b.NetworkID, b.SystemID, b.ID, money.TransactionTypeUnlock, attr, txOptions...)
+	return NewTransactionOrder(b.NetworkID, b.PartitionID, b.ID, money.TransactionTypeUnlock, attr, txOptions...)
 }

@@ -12,12 +12,12 @@ import (
 )
 
 // NewAddVarTx creates a 'addVar' transaction order.
-func NewAddVarTx(varData orchestration.ValidatorAssignmentRecord, networkID types.NetworkID, systemID types.SystemID, unitID types.UnitID, timeout uint64, maxFee uint64, signingKey *account.AccountKey) (*types.TransactionOrder, error) {
+func NewAddVarTx(varData orchestration.ValidatorAssignmentRecord, networkID types.NetworkID, partitionID types.PartitionID, unitID types.UnitID, timeout uint64, maxFee uint64, signingKey *account.AccountKey) (*types.TransactionOrder, error) {
 	attr := &orchestration.AddVarAttributes{
 		Var: varData,
 	}
 
-	txo, err := sdktypes.NewTransactionOrder(networkID, systemID, unitID, orchestration.TransactionTypeAddVAR, attr,
+	txo, err := sdktypes.NewTransactionOrder(networkID, partitionID, unitID, orchestration.TransactionTypeAddVAR, attr,
 		sdktypes.WithTimeout(timeout),
 		sdktypes.WithMaxFee(maxFee),
 	)

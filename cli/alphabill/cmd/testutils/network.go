@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	defaultDockerImage   = "ghcr.io/alphabill-org/alphabill:7945c51109e6c7974117dbe6c297ef88e4cd5fbe"
+	defaultDockerImage   = "ghcr.io/alphabill-org/alphabill:4f29cf1e67e7dc5268ad6e962cfada5b65b83c6a"
 	containerGenesisPath = "/home/nonroot/genesis.tar"
 	containerP2pPort     = "8000"
 	containerRpcPort     = "8001"
