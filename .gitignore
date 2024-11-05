@@ -9,3 +9,6 @@ test-coverage-cobertura.xml
 test-coverage.html
 gosec_report.json
 .trivycache/
+
+go.work
+go.work.sum
