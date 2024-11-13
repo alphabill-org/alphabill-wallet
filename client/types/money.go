@@ -65,10 +65,24 @@ func (b *Bill) SwapWithDustCollector(transDCProofs []*types.TxRecordProof, txOpt
 	if len(transDCProofs) == 0 {
 		return nil, errors.New("cannot create swap transaction as no dust transfer proofs exist")
 	}
+	var extErr error
 	// sort proofs by ids smallest first
 	sort.Slice(transDCProofs, func(i, j int) bool {
-		return bytes.Compare(transDCProofs[i].TxRecord.TransactionOrder.GetUnitID(), transDCProofs[j].TxRecord.TransactionOrder.GetUnitID()) < 0
+		txoI, err := transDCProofs[i].TxRecord.GetTransactionOrderV1()
+		if err != nil {
+			extErr = fmt.Errorf("failed to get transaction order from proof: %w", err)
+			return false
+		}
+		txoJ, err := transDCProofs[j].TxRecord.GetTransactionOrderV1()
+		if err != nil {
+			extErr = fmt.Errorf("failed to get transaction order from proof: %w", err)
+			return false
+		}
+		return bytes.Compare(txoI.GetUnitID(), txoJ.GetUnitID()) < 0
 	})
+	if extErr != nil {
+		return nil, extErr
+	}
 	attr := &money.SwapDCAttributes{DustTransferProofs: transDCProofs}
 	txo, err := NewTransactionOrder(b.NetworkID, b.PartitionID, b.ID, money.TransactionTypeSwapDC, attr, txOptions...)
 	if err != nil {

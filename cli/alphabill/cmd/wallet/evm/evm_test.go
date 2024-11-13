@@ -318,6 +318,8 @@ func mockClientCalls(t *testing.T, br *clientMockConf) (*httptest.Server, *url.U
 				writeCBORResponse(t, w, tx.Hash(crypto.SHA256), http.StatusAccepted)
 				return
 			}
+			txBytes, err := types.Cbor.Marshal(br.receivedTx)
+			require.NoError(t, err)
 			// GET
 			writeCBORResponse(t, w, struct {
 				_        struct{} `cbor:",toarray"`
@@ -325,7 +327,7 @@ func mockClientCalls(t *testing.T, br *clientMockConf) (*httptest.Server, *url.U
 				TxProof  *types.TxProof
 			}{
 				TxRecord: &types.TransactionRecord{
-					TransactionOrder: br.receivedTx,
+					TransactionOrder: txBytes,
 					ServerMetadata:   br.serverMeta,
 				},
 				TxProof: &types.TxProof{},

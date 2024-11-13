@@ -168,8 +168,12 @@ func (c *RpcClientMock) GetTransactionProof(ctx context.Context, txHash hex.Byte
 	if len(c.RecordedTxs) > 0 {
 		for _, tx := range c.RecordedTxs {
 			if bytes.Equal(txHash, tx.Hash(crypto.SHA256)) {
+				txBytes, err := tx.MarshalCBOR()
+				if err != nil {
+					return nil, err
+				}
 				txr := &types.TransactionRecord{
-					TransactionOrder: tx,
+					TransactionOrder: txBytes,
 					ServerMetadata:   &types.ServerMetadata{ActualFee: 1, SuccessIndicator: types.TxStatusSuccessful},
 				}
 				return &types.TxRecordProof{

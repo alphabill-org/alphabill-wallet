@@ -105,12 +105,26 @@ func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, tokens []*sdk
 }
 
 func (w *Wallet) joinTokenForDC(ctx context.Context, acc *accountKey, burnProofs []*types.TxRecordProof, targetToken *sdktypes.FungibleToken, fcrID types.UnitID, ownerPredicateInput *PredicateInput, typeOwnerPredicateInputs []*PredicateInput) (uint64, error) {
+	var extErr error
 	// explicitly sort proofs by unit ids in increasing order
 	sort.Slice(burnProofs, func(i, j int) bool {
-		a := burnProofs[i].TxRecord.TransactionOrder.GetUnitID()
-		b := burnProofs[j].TxRecord.TransactionOrder.GetUnitID()
+		txoI, err := burnProofs[i].TxRecord.GetTransactionOrderV1()
+		if err != nil {
+			extErr = fmt.Errorf("failed to get transaction order from proof: %w", err)
+			return false
+		}
+		txoJ, err := burnProofs[j].TxRecord.GetTransactionOrderV1()
+		if err != nil {
+			extErr = fmt.Errorf("failed to get transaction order from proof: %w", err)
+			return false
+		}
+		a := txoI.GetUnitID()
+		b := txoJ.GetUnitID()
 		return a.Compare(b) < 0
 	})
+	if extErr != nil {
+		return 0, extErr
+	}
 	roundNumber, err := w.GetRoundNumber(ctx)
 	if err != nil {
 		return 0, err

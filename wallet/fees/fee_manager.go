@@ -709,8 +709,12 @@ func (w *FeeManager) sendAddFCTx(ctx context.Context, accountKey *account.Accoun
 			}
 			return nil
 		}
+		feeTx, err := feeCtx.TransferFCProof.TxRecord.GetTransactionOrderV1()
+		if err != nil {
+			return fmt.Errorf("failed to get transferFC transaction order: %w", err)
+		}
 		transferFCAttr := &fc.TransferFeeCreditAttributes{}
-		if err := feeCtx.TransferFCProof.TxRecord.TransactionOrder.UnmarshalAttributes(transferFCAttr); err != nil {
+		if err := feeTx.UnmarshalAttributes(transferFCAttr); err != nil {
 			return fmt.Errorf("failed to unmarshal transferFC attributes: %w", err)
 		}
 		roundNumber, err := w.targetPartitionClient.GetRoundNumber(ctx)
