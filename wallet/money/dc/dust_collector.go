@@ -246,15 +246,22 @@ func (d *DustCollectionResult) GetFeeSumAndSwapAmount() (uint64, uint64, error) 
 	var swapAmount uint64
 	if d.SwapProof != nil {
 		feeSum += d.SwapProof.ActualFee()
+		swapTx, err := d.SwapProof.GetTransactionOrderV1()
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to get swap transaction order: %w", err)
+		}
 		var swapAttr *money.SwapDCAttributes
-		if err := d.SwapProof.TransactionOrder().UnmarshalAttributes(&swapAttr); err != nil {
+		if err := swapTx.UnmarshalAttributes(&swapAttr); err != nil {
 			return 0, 0, fmt.Errorf("failed to unmarshal swap transaction to calculate fee sum: %w", err)
 		}
-		for _, dcTx := range swapAttr.DustTransferProofs {
-			feeSum += dcTx.ActualFee()
-
+		for _, dcTxProof := range swapAttr.DustTransferProofs {
+			feeSum += dcTxProof.ActualFee()
+			dcTx, err := dcTxProof.GetTransactionOrderV1()
+			if err != nil {
+				return 0, 0, fmt.Errorf("failed to get dust transfer transaction order: %w", err)
+			}
 			var dustAttr money.TransferDCAttributes
-			if err := dcTx.TransactionOrder().UnmarshalAttributes(&dustAttr); err != nil {
+			if err := dcTx.UnmarshalAttributes(&dustAttr); err != nil {
 				return 0, 0, fmt.Errorf("failed to unmarshal dust transfer transaction to calculate fee: %w", err)
 			}
 			swapAmount += dustAttr.Value

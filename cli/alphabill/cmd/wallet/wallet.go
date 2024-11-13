@@ -437,8 +437,12 @@ func ExecCollectDust(cmd *cobra.Command, config *types.WalletConfig) error {
 	}
 	for _, dcResult := range dcResults {
 		if dcResult.DustCollectionResult != nil {
+			swapTx, err := dcResult.DustCollectionResult.SwapProof.GetTransactionOrderV1()
+			if err != nil {
+				return fmt.Errorf("failed to get swap transaction order: %w", err)
+			}
 			attr := &sdkmoney.SwapDCAttributes{}
-			err := dcResult.DustCollectionResult.SwapProof.TransactionOrder().UnmarshalAttributes(attr)
+			err = swapTx.UnmarshalAttributes(attr)
 			if err != nil {
 				return fmt.Errorf("failed to unmarshal swap tx proof: %w", err)
 			}
@@ -452,7 +456,7 @@ func ExecCollectDust(cmd *cobra.Command, config *types.WalletConfig) error {
 				dcResult.AccountIndex+1,
 				len(attr.DustTransferProofs),
 				util.AmountToString(swapAmount, 8),
-				dcResult.DustCollectionResult.SwapProof.TxRecord.TransactionOrder.GetUnitID(),
+				swapTx.GetUnitID(),
 				util.AmountToString(feeSum, 8),
 			))
 		} else {

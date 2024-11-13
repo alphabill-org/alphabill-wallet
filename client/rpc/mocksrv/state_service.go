@@ -3,6 +3,7 @@ package mocksrv
 import (
 	"context"
 	"crypto"
+	"fmt"
 
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-go-base/types/hex"
@@ -131,7 +132,7 @@ func (s *StateServiceMock) SendTransaction(ctx context.Context, tx hex.Bytes) (h
 	return txHash, nil
 }
 
-func (s *StateServiceMock) GetTransactionProof(ctx context.Context, txHash hex.Bytes) (*sdktypes.TransactionRecordAndProof, error) {
+func (s *StateServiceMock) GetTransactionProof(_ context.Context, txHash hex.Bytes) (*sdktypes.TransactionRecordAndProof, error) {
 	if s.Err != nil {
 		return nil, s.Err
 	}
@@ -143,14 +144,19 @@ func (s *StateServiceMock) GetTransactionProof(ctx context.Context, txHash hex.B
 
 	sentTxo, ok := s.SentTxs[string(txHash)]
 	if ok {
+		sentTxoBytes, err := types.Cbor.Marshal(sentTxo)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal sent transaction order: %w", err)
+		}
 		txr := &types.TransactionRecord{
-			TransactionOrder: sentTxo,
+			Version:          1,
+			TransactionOrder: sentTxoBytes,
 			ServerMetadata: &types.ServerMetadata{
 				SuccessIndicator: 1,
 				ActualFee:        1,
 			},
 		}
-		txp := &types.TxProof{}
+		txp := &types.TxProof{Version: 1}
 		txRecordProof := &types.TxRecordProof{
 			TxRecord: txr,
 			TxProof:  txp,

@@ -59,9 +59,10 @@ func (e *evmClientMock) GetTxProof(ctx context.Context, unitID types.UnitID, txH
 		ErrorDetails: "some error string",
 	}
 	encoded, _ := types.Cbor.Marshal(details)
+	txBytes, _ := (&types.TransactionOrder{}).MarshalCBOR()
 	return &types.TxRecordProof{
 		TxRecord: &types.TransactionRecord{
-			TransactionOrder: &types.TransactionOrder{},
+			TransactionOrder: txBytes,
 			ServerMetadata: &types.ServerMetadata{
 				ActualFee:         1,
 				TargetUnits:       []types.UnitID{test.RandomBytes(20)},

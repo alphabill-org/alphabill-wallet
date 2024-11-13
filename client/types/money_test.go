@@ -133,15 +133,20 @@ func TestBillSwapWithDustCollector(t *testing.T) {
 		Counter:     4,
 	}
 	tx1, err := db1.TransferToDustCollector(targetBill)
+	require.NoError(t, err)
 	tx2, err := db2.TransferToDustCollector(targetBill)
-
+	require.NoError(t, err)
+	tx1Bytes, err := tx1.MarshalCBOR()
+	require.NoError(t, err)
+	tx2Bytes, err := tx2.MarshalCBOR()
+	require.NoError(t, err)
 	proofs := []*types.TxRecordProof{
 		{
-			TxRecord: &types.TransactionRecord{TransactionOrder: tx1},
+			TxRecord: &types.TransactionRecord{TransactionOrder: tx1Bytes},
 			TxProof:  &types.TxProof{},
 		},
 		{
-			TxRecord: &types.TransactionRecord{TransactionOrder: tx2},
+			TxRecord: &types.TransactionRecord{TransactionOrder: tx2Bytes},
 			TxProof:  &types.TxProof{},
 		},
 	}
@@ -202,8 +207,8 @@ func TestBillReclaimFromFeeCredit(t *testing.T) {
 		Counter:     3,
 	}
 	closeFCProof := &types.TxRecordProof{
-		TxRecord: &types.TransactionRecord{},
-		TxProof:  &types.TxProof{Version: types.ABVersion(1)},
+		TxRecord: &types.TransactionRecord{Version: 1},
+		TxProof:  &types.TxProof{Version: 1},
 	}
 	tx, err := b.ReclaimFromFeeCredit(closeFCProof)
 	require.NoError(t, err)

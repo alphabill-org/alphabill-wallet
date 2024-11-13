@@ -22,8 +22,8 @@ func TestFeeCreditRecordAddFeeCredit(t *testing.T) {
 
 	ownerPredicate := []byte{4}
 	transFCProof := &types.TxRecordProof{
-		TxRecord: &types.TransactionRecord{},
-		TxProof:  &types.TxProof{Version: types.ABVersion(1)},
+		TxRecord: &types.TransactionRecord{Version: 1},
+		TxProof:  &types.TxProof{Version: 1},
 	}
 
 	tx, err := fcr.AddFeeCredit(ownerPredicate, transFCProof)
