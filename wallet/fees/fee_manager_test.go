@@ -1371,13 +1371,6 @@ func getTxoV1(t *testing.T, f txFetcher) *types.TransactionOrder {
 	return tx
 }
 
-func getTxoV1FromBytes(t *testing.T, txoBytes []byte) *types.TransactionOrder {
-	txoV1 := &types.TransactionOrder{}
-	err := txoV1.UnmarshalCBOR(txoBytes)
-	require.NoError(t, err)
-	return txoV1
-}
-
 func txV1ToBytes(t *testing.T, tx *types.TransactionOrder) []byte {
 	txoBytes, err := tx.MarshalCBOR()
 	require.NoError(t, err)
