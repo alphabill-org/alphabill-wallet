@@ -148,7 +148,7 @@ func addFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 		return fmt.Errorf("failed to send transaction: %w", err)
 	}
 	config.walletConfig.Base.ConsoleWriter.Println("Fee credit added successfully")
-	config.walletConfig.Base.ConsoleWriter.Println(fmt.Sprintf("FCR ID 0x%x", setFCTx.Payload.UnitID))
+	config.walletConfig.Base.ConsoleWriter.Println(fmt.Sprintf("FCR ID 0x%s", setFCTx.Payload.UnitID))
 	return nil
 }
 
