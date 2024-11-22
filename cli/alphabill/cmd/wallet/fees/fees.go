@@ -111,11 +111,16 @@ func listFeesCmd(config *feesConfig) *cobra.Command {
 		},
 	}
 	cmd.Flags().Uint64P(args.KeyCmdName, "k", 0, "specifies which account fee bills to list (default: all accounts)")
+	cmd.Flags().BoolP(args.FcrIdCmdName, "i", false, "include FCR IDs in output")
 	return cmd
 }
 
 func listFeesCmdExec(cmd *cobra.Command, config *feesConfig) error {
 	accountNumber, err := cmd.Flags().GetUint64(args.KeyCmdName)
+	if err != nil {
+		return err
+	}
+	listFcrIds, err := cmd.Flags().GetBool(args.FcrIdCmdName)
 	if err != nil {
 		return err
 	}
@@ -138,7 +143,7 @@ func listFeesCmdExec(cmd *cobra.Command, config *feesConfig) error {
 	}
 	defer fm.Close()
 
-	return listFees(cmd.Context(), accountNumber, am, config, fm, walletConfig.Base.ConsoleWriter)
+	return listFees(cmd.Context(), accountNumber, listFcrIds, am, config, fm, walletConfig.Base.ConsoleWriter)
 }
 
 func reclaimFeeCreditCmd(config *feesConfig) *cobra.Command {
@@ -315,7 +320,7 @@ type FeeCreditManager interface {
 	Close()
 }
 
-func listFees(ctx context.Context, accountNumber uint64, am account.Manager, c *feesConfig, w FeeCreditManager, consoleWriter clitypes.ConsoleWrapper) error {
+func listFees(ctx context.Context, accountNumber uint64, listFcrIds bool, am account.Manager, c *feesConfig, w FeeCreditManager, consoleWriter clitypes.ConsoleWrapper) error {
 	consoleWriter.Println("Partition: " + c.targetPartitionType)
 	if accountNumber == 0 {
 		pubKeys, err := am.GetPublicKeys()
@@ -323,7 +328,7 @@ func listFees(ctx context.Context, accountNumber uint64, am account.Manager, c *
 			return err
 		}
 		for accountIndex := range pubKeys {
-			accountInfo, err := getAccountInfo(uint64(accountIndex), ctx, w)
+			accountInfo, err := getAccountInfo(uint64(accountIndex), listFcrIds, ctx, w)
 			if err != nil {
 				return err
 			}
@@ -332,7 +337,7 @@ func listFees(ctx context.Context, accountNumber uint64, am account.Manager, c *
 		return nil
 	}
 	accountIndex := accountNumber - 1
-	accountInfo, err := getAccountInfo(accountIndex, ctx, w)
+	accountInfo, err := getAccountInfo(accountIndex, listFcrIds, ctx, w)
 	if err != nil {
 		return err
 	}
@@ -560,17 +565,22 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 	}
 }
 
-func getAccountInfo(accountIndex uint64, ctx context.Context, w FeeCreditManager) (*AccountInfoWrapper, error) {
+func getAccountInfo(accountIndex uint64, listFcrIds bool, ctx context.Context, w FeeCreditManager) (*AccountInfoWrapper, error) {
 	fcr, err := w.GetFeeCredit(ctx, fees.GetFeeCreditCmd{AccountIndex: accountIndex})
 	if err != nil {
 		return nil, err
 	}
 	balance := uint64(0)
+	fcrId := []byte(nil)
 	if fcr != nil {
 		balance = fcr.Balance
+		if listFcrIds {
+			fcrId = fcr.ID
+		}
 	}
 	return &AccountInfoWrapper{
 		AccountNumber: accountIndex + 1,
+		FcrId:         fcrId,
 		Balance:       balance,
 		LockedReason:  getLockedReasonString(fcr),
 	}, nil
@@ -585,11 +595,16 @@ func getLockedReasonString(fcr *types.FeeCreditRecord) string {
 
 type AccountInfoWrapper struct {
 	AccountNumber uint64
+	FcrId         []byte
 	Balance       uint64
 	LockedReason  string
 }
 
 func (a AccountInfoWrapper) String() string {
 	accountAmount := util.AmountToString(a.Balance, 8)
-	return fmt.Sprintf("Account #%d %s%s", a.AccountNumber, accountAmount, a.LockedReason)
+	if a.FcrId == nil {
+		return fmt.Sprintf("Account #%d %s%s", a.AccountNumber, accountAmount, a.LockedReason)
+	} else {
+		return fmt.Sprintf("Account #%d 0x%x %s%s", a.AccountNumber, a.FcrId, accountAmount, a.LockedReason)
+	}
 }
