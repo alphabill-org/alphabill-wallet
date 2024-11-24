@@ -565,16 +565,16 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 	}
 }
 
-func getAccountInfo(accountIndex uint64, listFcrIds bool, ctx context.Context, w FeeCreditManager) (*AccountInfoWrapper, error) {
+func getAccountInfo(accountIndex uint64, showFcrId bool, ctx context.Context, w FeeCreditManager) (*AccountInfoWrapper, error) {
 	fcr, err := w.GetFeeCredit(ctx, fees.GetFeeCreditCmd{AccountIndex: accountIndex})
 	if err != nil {
 		return nil, err
 	}
-	balance := uint64(0)
-	fcrId := []byte(nil)
+	var balance uint64
+	var fcrId basetypes.UnitID
 	if fcr != nil {
 		balance = fcr.Balance
-		if listFcrIds {
+		if showFcrId {
 			fcrId = fcr.ID
 		}
 	}
@@ -595,7 +595,7 @@ func getLockedReasonString(fcr *types.FeeCreditRecord) string {
 
 type AccountInfoWrapper struct {
 	AccountNumber uint64
-	FcrId         []byte
+	FcrId         basetypes.UnitID
 	Balance       uint64
 	LockedReason  string
 }
@@ -605,6 +605,6 @@ func (a AccountInfoWrapper) String() string {
 	if a.FcrId == nil {
 		return fmt.Sprintf("Account #%d %s%s", a.AccountNumber, accountAmount, a.LockedReason)
 	} else {
-		return fmt.Sprintf("Account #%d 0x%x %s%s", a.AccountNumber, a.FcrId, accountAmount, a.LockedReason)
+		return fmt.Sprintf("Account #%d 0x%s %s%s", a.AccountNumber, a.FcrId, accountAmount, a.LockedReason)
 	}
 }
