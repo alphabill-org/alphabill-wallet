@@ -5,6 +5,7 @@ package wallet
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -29,6 +30,11 @@ func TestWalletFeesCmds_MoneyPartition(t *testing.T) {
 	require.Equal(t, "Partition: money", stdout.Lines[0])
 	require.Equal(t, "Account #1 0.000'000'00", stdout.Lines[1])
 
+	// list fees with FCR IDs (no FCR with no free credits, so no change in output)
+	stdout = feesCmd.Exec(t, "list", "--fcr-id")
+	require.Equal(t, "Partition: money", stdout.Lines[0])
+	require.Equal(t, "Account #1 0.000'000'00", stdout.Lines[1])
+
 	// add fee credits
 	amount := uint64(150)
 	stdout = feesCmd.Exec(t, "add", "--amount", strconv.FormatUint(amount, 10))
@@ -40,15 +46,21 @@ func TestWalletFeesCmds_MoneyPartition(t *testing.T) {
 	require.Equal(t, "Partition: money", stdout.Lines[0])
 	require.Equal(t, fmt.Sprintf("Account #1 %s", util.AmountToString(expectedFees, 8)), stdout.Lines[1])
 
+	// verify fee credits with FCR IDs
+	stdout = feesCmd.Exec(t, "list", "--fcr-id")
+	require.Equal(t, "Partition: money", stdout.Lines[0])
+	fcrId := strings.Fields(stdout.Lines[1])[2]
+	require.Equal(t, fmt.Sprintf("Account #1 %s %s", fcrId, util.AmountToString(expectedFees, 8)), stdout.Lines[1])
+
 	// add more fee credits
 	stdout = feesCmd.Exec(t, "add", "--amount", strconv.FormatUint(amount, 10))
 	require.Equal(t, fmt.Sprintf("Successfully created %d fee credits on money partition.", amount), stdout.Lines[0])
 
 	// verify fee credits
 	expectedFees = amount*2*1e8 - 5 // minus 2 for first run, minus 3 for second run
-	stdout = feesCmd.Exec(t, "list")
+	stdout = feesCmd.Exec(t, "list", "--fcr-id")
 	require.Equal(t, "Partition: money", stdout.Lines[0])
-	require.Equal(t, fmt.Sprintf("Account #1 %s", util.AmountToString(expectedFees, 8)), stdout.Lines[1])
+	require.Equal(t, fmt.Sprintf("Account #1 %s %s", fcrId, util.AmountToString(expectedFees, 8)), stdout.Lines[1])
 
 	// reclaim fees
 	stdout = feesCmd.Exec(t, "reclaim")
