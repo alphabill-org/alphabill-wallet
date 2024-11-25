@@ -34,6 +34,7 @@ const (
 	QuietCmdName               = "quiet"
 	ShowUnswappedCmdName       = "show-unswapped"
 	BillIdCmdName              = "bill-id"
+	FcrIdCmdName               = "fcr-id"
 	PartitionIdentifierCmdName = "partition-identifier"
 	ReferenceNumber            = "reference-number"
 	proofOutputFlagName        = "proof-output"
