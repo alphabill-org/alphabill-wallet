@@ -215,6 +215,16 @@ func TestFungibleTokens_Sending_Integration(t *testing.T) {
 		"--address", fmt.Sprintf("0x%X", wallets[0].PubKeys[0]),
 		"-k", "1")
 	testutils.VerifyStdout(t, tokensCmd.Exec(t, "list", "fungible"), "amount='2'", "amount='6'")
+
+	// transfer from w1 key1 to key2 (AB-1750)
+	tokensCmd.Exec(t,
+		"send", "fungible",
+		"--type", typeID1.String(),
+		"--amount", "1",
+		"--address", fmt.Sprintf("0x%X", wallets[0].PubKeys[1]),
+		"-k", "1")
+	// verify list tokens displays tokens for both keys
+	testutils.VerifyStdout(t, tokensCmd.Exec(t, "list", "fungible"), "Tokens owned by account #1", "Tokens owned by account #2")
 }
 
 func TestWalletCreateFungibleTokenTypeAndTokenAndSendCmd_IntegrationTest(t *testing.T) {

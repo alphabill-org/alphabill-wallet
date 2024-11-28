@@ -856,7 +856,7 @@ func tokenCmdList(config *types.WalletConfig, runner runTokenListCmd) *cobra.Com
 	// add sub commands
 	cmd.AddCommand(tokenCmdListFungible(config, runner, &accountNumber))
 	cmd.AddCommand(tokenCmdListNonFungible(config, runner, &accountNumber))
-	cmd.PersistentFlags().Uint64VarP(&accountNumber, args.KeyCmdName, "k", allAccounts, "which key to use for sending the transaction, 0 for all tokens from all accounts")
+	cmd.PersistentFlags().Uint64VarP(&accountNumber, args.KeyCmdName, "k", allAccounts, "which account tokens to list (0 for all accounts)")
 	return cmd
 }
 
@@ -922,20 +922,21 @@ func execTokenCmdList(cmd *cobra.Command, config *types.WalletConfig, accountNum
 		}
 	}
 
-	var start, end uint64
+	var firstAccountNumber, lastAccountNumber uint64
 	if *accountNumber == allAccounts {
-		start = 1
-		end, err = tw.GetAccountManager().GetMaxAccountIndex()
+		firstAccountNumber = 1
+		maxAccountIndex, err := tw.GetAccountManager().GetMaxAccountIndex()
 		if err != nil {
 			return err
 		}
+		lastAccountNumber = maxAccountIndex + 1
 	} else {
-		start = *accountNumber
-		end = *accountNumber
+		firstAccountNumber = *accountNumber
+		lastAccountNumber = *accountNumber
 	}
 
 	atLeastOneFound := false
-	for accountNumber := start; accountNumber <= end; accountNumber++ {
+	for accountNumber := firstAccountNumber; accountNumber <= lastAccountNumber; accountNumber++ {
 		ownerAccount := fmt.Sprintf("Tokens owned by account #%v", accountNumber)
 		atLeastOneFoundForAccount := false
 
