@@ -166,6 +166,7 @@ func createTransferFC(networkID types.NetworkID, partitionID types.PartitionID, 
 		return nil, fmt.Errorf("failed to marshal transferFC attributes: %w", err)
 	}
 	tx := &types.TransactionOrder{
+		Version: 1,
 		Payload: types.Payload{
 			NetworkID:      networkID,
 			PartitionID:    partitionID,
@@ -192,6 +193,7 @@ func createAddFC(networkID types.NetworkID, partitionID types.PartitionID, unitI
 		return nil, fmt.Errorf("failed to marshal transferFC attributes: %w", err)
 	}
 	tx := &types.TransactionOrder{
+		Version: 1,
 		Payload: types.Payload{
 			NetworkID:      networkID,
 			PartitionID:    partitionID,
@@ -219,6 +221,7 @@ func createTransferTx(networkID types.NetworkID, partitionID types.PartitionID, 
 		return nil, fmt.Errorf("failed to marshal transfer attributes: %w", err)
 	}
 	tx := &types.TransactionOrder{
+		Version: 1,
 		Payload: types.Payload{
 			NetworkID:   networkID,
 			PartitionID: partitionID,

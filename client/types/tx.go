@@ -27,6 +27,7 @@ func NewTransactionOrder(networkID types.NetworkID, partitionID types.PartitionI
 
 	o := OptionsWithDefaults(opts)
 	return &types.TransactionOrder{
+		Version: 1,
 		Payload: types.Payload{
 			NetworkID:   networkID,
 			PartitionID: partitionID,
