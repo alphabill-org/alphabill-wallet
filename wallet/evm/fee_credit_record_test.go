@@ -16,11 +16,16 @@ func TestFeeCreditRecordIDFromPublicKey(t *testing.T) {
 	unitID, err := hex.DecodeString("276B52B4808893d1e2Affd5310898818E8e7699d")
 	require.NoError(t, err)
 	// shard part can be nil
-	require.EqualValues(t, unitID, NewFeeCreditRecordIDFromPublicKey(nil, pubKey[:], 0))
+	fcr, err := NewFeeCreditRecordIDFromPublicKey(nil, pubKey[:], 0)
+	require.NoError(t, err)
+	require.EqualValues(t, unitID, fcr)
 	// or any other value, evm will ignore this
-	require.EqualValues(t, unitID, NewFeeCreditRecordIDFromPublicKey(testutils.RandomBytes(2), pubKey[:], 0))
+	fcr, err = NewFeeCreditRecordIDFromPublicKey(testutils.RandomBytes(2), pubKey[:], 0)
+	require.NoError(t, err)
+	require.EqualValues(t, unitID, fcr)
 	// if pubkey is nil, unitID returns O address
-	require.EqualValues(t, make([]byte, 20), NewFeeCreditRecordIDFromPublicKey(nil, nil, 0))
+	fcr, err = NewFeeCreditRecordIDFromPublicKey(nil, nil, 0)
+	require.EqualValues(t, make([]byte, 20), fcr)
 }
 
 func Test_generateAddress(t *testing.T) {

@@ -78,7 +78,10 @@ func main() {
 		log.Fatal(err)
 	}
 	latestAdditionTime := roundNumber + *timeout
-	fcrID := money.NewFeeCreditRecordIDFromOwnerPredicate(nil, templates.AlwaysTrueBytes(), latestAdditionTime)
+	fcrID, err := money.NewFeeCreditRecordIDFromOwnerPredicate(nil, templates.AlwaysTrueBytes(), latestAdditionTime)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	if err = execInitialBill(ctx, moneyClient, types.NetworkID(*networkID), types.PartitionID(*partitionID), billID, fcrID, *billValue, latestAdditionTime, pubKey, *counter); err != nil {
 		log.Fatal(err)
@@ -236,7 +239,10 @@ func createTransferTx(networkID types.NetworkID, partitionID types.PartitionID, 
 }
 
 func waitForConf(ctx context.Context, c sdktypes.PartitionClient, tx *types.TransactionOrder) (*types.TxRecordProof, error) {
-	txHash := tx.Hash(crypto.SHA256)
+	txHash, err := tx.Hash(crypto.SHA256)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate transaction hash: %w", err)
+	}
 	for {
 		// fetch round number before proof to ensure that we cannot miss the proof
 		roundNumber, err := c.GetRoundNumber(ctx)

@@ -7,6 +7,7 @@ import (
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	abtypes "github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-go-base/util"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
@@ -183,8 +184,11 @@ func TestSendingFailsWithInsufficientBalance(t *testing.T) {
 			}),
 		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t),
 			&sdktypes.Unit[any]{
-				UnitID: money.NewFeeCreditRecordIDFromPublicKeyHash(nil, testutils.TestPubKey0Hash(t), 1000),
-				Data:   fc.FeeCreditRecord{Balance: 1e8},
+				UnitID: func() abtypes.UnitID {
+					id, _ := money.NewFeeCreditRecordIDFromPublicKeyHash(nil, testutils.TestPubKey0Hash(t), 1000)
+					return id
+				}(),
+				Data: fc.FeeCreditRecord{Balance: 1e8},
 			}),
 	))
 

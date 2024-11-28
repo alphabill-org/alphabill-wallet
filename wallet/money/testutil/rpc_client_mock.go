@@ -145,7 +145,7 @@ func (c *RpcClientMock) SendTransaction(ctx context.Context, tx *types.Transacti
 		return nil, c.Err
 	}
 	c.RecordedTxs = append(c.RecordedTxs, tx)
-	return tx.Hash(crypto.SHA256), nil
+	return tx.Hash(crypto.SHA256)
 }
 
 func (c *RpcClientMock) ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*types.TxRecordProof, error) {
@@ -153,7 +153,11 @@ func (c *RpcClientMock) ConfirmTransaction(ctx context.Context, tx *types.Transa
 		return nil, c.Err
 	}
 	c.RecordedTxs = append(c.RecordedTxs, tx)
-	return c.GetTransactionProof(ctx, tx.Hash(crypto.SHA256))
+	hash, err := tx.Hash(crypto.SHA256)
+	if err != nil {
+		return nil, err
+	}
+	return c.GetTransactionProof(ctx, hash)
 }
 
 func (c *RpcClientMock) GetTransactionProof(ctx context.Context, txHash hex.Bytes) (*types.TxRecordProof, error) {
@@ -167,7 +171,11 @@ func (c *RpcClientMock) GetTransactionProof(ctx context.Context, txHash hex.Byte
 	// return proof for sent tx if one exists
 	if len(c.RecordedTxs) > 0 {
 		for _, tx := range c.RecordedTxs {
-			if bytes.Equal(txHash, tx.Hash(crypto.SHA256)) {
+			hash, err := tx.Hash(crypto.SHA256)
+			if err != nil {
+				return nil, err
+			}
+			if bytes.Equal(txHash, hash) {
 				txBytes, err := tx.MarshalCBOR()
 				if err != nil {
 					return nil, err
@@ -212,7 +220,7 @@ func NewLockedBill(value uint64, counter, lockStatus uint64) *sdktypes.Bill {
 }
 
 func NewMoneyFCR(pubKeyHash []byte, balance uint64, lockStatus uint64, counter uint64) *sdktypes.FeeCreditRecord {
-	id := money.NewFeeCreditRecordIDFromPublicKeyHash(nil, pubKeyHash, 1000+transferFCLatestAdditionTime)
+	id, _ := money.NewFeeCreditRecordIDFromPublicKeyHash(nil, pubKeyHash, 1000+transferFCLatestAdditionTime)
 	return &sdktypes.FeeCreditRecord{
 		PartitionID: money.DefaultPartitionID,
 		ID:          id,

@@ -163,7 +163,10 @@ func (w *Wallet) joinTokenForDC(ctx context.Context, acc *accountKey, burnProofs
 		return 0, fmt.Errorf("failed to sign tx fee proof: %w", err)
 	}
 
-	sub := txsubmitter.New(tx)
+	sub, err := txsubmitter.New(tx)
+	if err != nil {
+		return 0, err
+	}
 	if err = sub.ToBatch(w.tokensClient, w.log).SendTx(ctx, true); err != nil {
 		return 0, err
 	}
@@ -213,7 +216,11 @@ func (w *Wallet) burnTokensForDC(ctx context.Context, acc *accountKey, tokensToB
 			return 0, 0, nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
 		}
 
-		burnBatch.Add(txsubmitter.New(tx))
+		sub, err := txsubmitter.New(tx)
+		if err != nil {
+			return 0, 0, nil, fmt.Errorf("failed to create tx submission: %w", err)
+		}
+		burnBatch.Add(sub)
 	}
 
 	if err := burnBatch.SendTx(ctx, true); err != nil {
@@ -293,7 +300,10 @@ func (w *Wallet) lockTokenForDC(ctx context.Context, acc *accountKey, fcrID type
 		return 0, fmt.Errorf("failed to sign tx fee proof: %w", err)
 	}
 
-	sub := txsubmitter.New(tx)
+	sub, err := txsubmitter.New(tx)
+	if err != nil {
+		return 0, err
+	}
 	if err = sub.ToBatch(w.tokensClient, w.log).SendTx(ctx, true); err != nil {
 		return 0, err
 	}

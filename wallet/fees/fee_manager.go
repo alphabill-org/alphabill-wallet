@@ -32,7 +32,7 @@ var (
 
 type (
 	// GenerateFcrID function to generate fee credit record ID
-	GenerateFcrID func(shardPart, pubKey []byte, latestAdditionTime uint64) types.UnitID
+	GenerateFcrID func(shardPart, pubKey []byte, latestAdditionTime uint64) (types.UnitID, error)
 
 	FeeManagerDB interface {
 		GetAddFeeContext(accountID []byte) (*AddFeeCreditCtx, error)
@@ -508,7 +508,11 @@ func (w *FeeManager) sendLockFCTx(ctx context.Context, accountKey *account.Accou
 			return fmt.Errorf("failed to wait for confirmation: %w", err)
 		}
 		if proof != nil {
-			w.log.InfoContext(ctx, fmt.Sprintf("lockFC tx '%x' confirmed", feeCtx.LockFCTx.Hash(crypto.SHA256)))
+			txHash, err := feeCtx.LockFCTx.Hash(crypto.SHA256)
+			if err != nil {
+				return fmt.Errorf("failed to hash lockFC tx: %w", err)
+			}
+			w.log.InfoContext(ctx, fmt.Sprintf("lockFC tx '%x' confirmed", txHash))
 			feeCtx.LockFCProof = proof
 			if err := w.db.SetAddFeeContext(accountKey.PubKey, feeCtx); err != nil {
 				return fmt.Errorf("failed to store lockFC proof: %w", err)
@@ -637,7 +641,10 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 		return fmt.Errorf("faild to fetch fee credit record: %w", err)
 	}
 	if fcr == nil {
-		fcrID := w.targetPartitionFcrIDFn(nil, accountKey.PubKey, latestAdditionTime)
+		fcrID, err := w.targetPartitionFcrIDFn(nil, accountKey.PubKey, latestAdditionTime)
+		if err != nil {
+			return fmt.Errorf("failed to generate fee credit record id: %w", err)
+		}
 		fcr = &sdktypes.FeeCreditRecord{
 			PartitionID: w.targetPartitionID,
 			ID:          fcrID,
@@ -870,7 +877,11 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 			return fmt.Errorf("failed to wait for confirmation: %w", err)
 		}
 		if proof != nil {
-			w.log.InfoContext(ctx, fmt.Sprintf("lock tx '%x' confirmed", feeCtx.LockTx.Hash(crypto.SHA256)))
+			txHash, err := feeCtx.LockTx.Hash(crypto.SHA256)
+			if err != nil {
+				return fmt.Errorf("failed to hash lockFC tx: %w", err)
+			}
+			w.log.InfoContext(ctx, fmt.Sprintf("lock tx '%x' confirmed", txHash))
 			feeCtx.LockTxProof = proof
 			feeCtx.TargetBillCounter += 1
 			if err := w.db.SetReclaimFeeContext(accountKey.PubKey, feeCtx); err != nil {
@@ -1249,7 +1260,10 @@ func (p *ReclaimFeeTxProofs) GetFees() uint64 {
 }
 
 func waitForConf(ctx context.Context, partitionClient sdktypes.PartitionClient, tx *types.TransactionOrder) (*types.TxRecordProof, error) {
-	txHash := tx.Hash(crypto.SHA256)
+	txHash, err := tx.Hash(crypto.SHA256)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash tx: %w", err)
+	}
 	for {
 		// fetch round number before proof to ensure that we cannot miss the proof
 		roundNumber, err := partitionClient.GetRoundNumber(ctx)

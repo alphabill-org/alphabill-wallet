@@ -21,9 +21,10 @@ func TestConfirmUnitsTx_skip(t *testing.T) {
 		},
 	}
 	batch := txsubmitter.NewBatch(rpcClient, logger.New(t))
-	batch.Add(txsubmitter.New(&types.TransactionOrder{Payload: types.Payload{ClientMetadata: &types.ClientMetadata{Timeout: 1}}}))
-	err := batch.SendTx(context.Background(), false)
+	sub, err := txsubmitter.New(&types.TransactionOrder{Payload: types.Payload{ClientMetadata: &types.ClientMetadata{Timeout: 1}}})
 	require.NoError(t, err)
+	batch.Add(sub)
+	require.NoError(t, batch.SendTx(context.Background(), false))
 
 }
 
@@ -44,9 +45,10 @@ func TestConfirmUnitsTx_ok(t *testing.T) {
 		},
 	}
 	batch := txsubmitter.NewBatch(rpcClient, logger.New(t))
-	batch.Add(txsubmitter.New(&types.TransactionOrder{Payload: types.Payload{ClientMetadata: &types.ClientMetadata{Timeout: 101}}}))
-	err := batch.SendTx(context.Background(), true)
+	sub, err := txsubmitter.New(&types.TransactionOrder{Payload: types.Payload{ClientMetadata: &types.ClientMetadata{Timeout: 101}}})
 	require.NoError(t, err)
+	batch.Add(sub)
+	require.NoError(t, batch.SendTx(context.Background(), true))
 	require.True(t, getRoundNumberCalled)
 	require.True(t, getTxProofCalled)
 }
@@ -75,13 +77,14 @@ func TestConfirmUnitsTx_timeout(t *testing.T) {
 		},
 	}
 	batch := txsubmitter.NewBatch(rpcClient, logger.New(t))
-	sub1 := txsubmitter.New(&types.TransactionOrder{Payload: types.Payload{ClientMetadata: &types.ClientMetadata{Timeout: 101}}})
+	sub1, err := txsubmitter.New(&types.TransactionOrder{Payload: types.Payload{ClientMetadata: &types.ClientMetadata{Timeout: 101}}})
 	sub1.TxHash = randomTxHash1
+	require.NoError(t, err)
 	batch.Add(sub1)
-	sub2 := txsubmitter.New(&types.TransactionOrder{Payload: types.Payload{ClientMetadata: &types.ClientMetadata{Timeout: 102}}})
+	sub2, err := txsubmitter.New(&types.TransactionOrder{Payload: types.Payload{ClientMetadata: &types.ClientMetadata{Timeout: 102}}})
+	require.NoError(t, err)
 	batch.Add(sub2)
-	err := batch.SendTx(context.Background(), true)
-	require.ErrorContains(t, err, "confirmation timeout")
+	require.ErrorContains(t, batch.SendTx(context.Background(), true), "confirmation timeout")
 	require.EqualValues(t, 2, getRoundNumberCalled)
 	require.EqualValues(t, 2, getTxProofCalled)
 	require.True(t, sub1.Confirmed())

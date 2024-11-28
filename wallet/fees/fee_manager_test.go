@@ -2,13 +2,13 @@ package fees
 
 import (
 	"context"
-	"crypto"
 	"log/slog"
 	"testing"
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	"github.com/stretchr/testify/require"
 
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
@@ -512,7 +512,7 @@ func TestAddFeeCredit_ExistingLockFC(t *testing.T) {
 		TransactionOrder: txV1ToBytes(t, lockFCTx),
 		ServerMetadata:   &types.ServerMetadata{ActualFee: 1},
 	}
-	lockFCTxHash := getTxoV1(t, lockFCRecord).Hash(crypto.SHA256)
+	lockFCTxHash := testutils.TxHash(t, getTxoV1(t, lockFCRecord))
 	lockFCProof := &types.TxRecordProof{TxRecord: lockFCRecord, TxProof: &types.TxProof{}}
 
 	targetBill := testutil.NewBill(0, 200)
@@ -612,7 +612,7 @@ func TestAddFeeCredit_ExistingTransferFC(t *testing.T) {
 		TransactionOrder: txV1ToBytes(t, transferFCTx),
 		ServerMetadata:   &types.ServerMetadata{ActualFee: 1},
 	}
-	transferFCTxHash := getTxoV1(t, transferFCRecord).Hash(crypto.SHA256)
+	transferFCTxHash := testutils.TxHash(t, getTxoV1(t, transferFCRecord))
 	transferFCProof := &types.TxRecordProof{TxRecord: transferFCRecord, TxProof: &types.TxProof{}}
 
 	t.Run("transferFC confirmed => send addFC using the confirmed transferFC", func(t *testing.T) {
@@ -764,7 +764,7 @@ func TestAddFeeCredit_ExistingAddFC(t *testing.T) {
 		TransactionOrder: txV1ToBytes(t, addFCTx),
 		ServerMetadata:   &types.ServerMetadata{ActualFee: 1},
 	}
-	addFCTxHash := getTxoV1(t, addFCRecord).Hash(crypto.SHA256)
+	addFCTxHash := testutils.TxHash(t, getTxoV1(t, addFCRecord))
 	addFCProof := &types.TxRecordProof{TxRecord: addFCRecord, TxProof: &types.TxProof{}}
 
 	t.Run("addFC confirmed => return no error (and optionally the fee txs)", func(t *testing.T) {
@@ -872,7 +872,7 @@ func TestReclaimFeeCredit_ExistingLock(t *testing.T) {
 		ServerMetadata:   &types.ServerMetadata{ActualFee: 1},
 	}
 	lockTxProof := &types.TxRecordProof{TxRecord: lockTxRecord, TxProof: &types.TxProof{}}
-	lockTxHash := getTxoV1(t, lockTxRecord).Hash(crypto.SHA256)
+	lockTxHash := testutils.TxHash(t, getTxoV1(t, lockTxRecord))
 	targetBill := testutil.NewBill(50, 200)
 
 	t.Run("lock tx confirmed => update target bill counter and send follow-up transactions", func(t *testing.T) {
@@ -982,7 +982,7 @@ func TestReclaimFeeCredit_ExistingCloseFC(t *testing.T) {
 		TransactionOrder: txV1ToBytes(t, closeFCTx),
 		ServerMetadata:   &types.ServerMetadata{ActualFee: 1},
 	}
-	closeFCTxHash := getTxoV1(t, closeFCRecord).Hash(crypto.SHA256)
+	closeFCTxHash := testutils.TxHash(t, getTxoV1(t, closeFCRecord))
 	closeFCProof := &types.TxRecordProof{TxRecord: closeFCRecord, TxProof: &types.TxProof{}}
 
 	t.Run("closeFC confirmed => send reclaimFC using the confirmed closeFC", func(t *testing.T) {
@@ -1086,7 +1086,7 @@ func TestReclaimFeeCredit_ExistingReclaimFC(t *testing.T) {
 		TransactionOrder: txV1ToBytes(t, reclaimFCTx),
 		ServerMetadata:   &types.ServerMetadata{ActualFee: 1},
 	}
-	reclaimFCTxHash := getTxoV1(t, reclaimFCRecord).Hash(crypto.SHA256)
+	reclaimFCTxHash := testutils.TxHash(t, getTxoV1(t, reclaimFCRecord))
 	reclaimFCProof := &types.TxRecordProof{TxRecord: reclaimFCRecord, TxProof: &types.TxProof{}}
 
 	t.Run("reclaimFC confirmed => return proofs", func(t *testing.T) {
@@ -1353,7 +1353,7 @@ func createFeeManagerDB(t *testing.T) *BoltStore {
 	return feeManagerDB
 }
 
-func testFeeCreditRecordIDFromPublicKey(shardPart, pubKey []byte, latestAdditionTime uint64) types.UnitID {
+func testFeeCreditRecordIDFromPublicKey(shardPart, pubKey []byte, latestAdditionTime uint64) (types.UnitID, error) {
 	return money.NewFeeCreditRecordIDFromPublicKey(shardPart, pubKey, latestAdditionTime)
 }
 

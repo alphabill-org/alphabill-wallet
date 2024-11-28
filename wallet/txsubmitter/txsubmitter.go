@@ -30,12 +30,16 @@ type (
 	}
 )
 
-func New(tx *types.TransactionOrder) *TxSubmission {
+func New(tx *types.TransactionOrder) (*TxSubmission, error) {
+	txHash, err := tx.Hash(crypto.SHA256)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash tx: %w", err)
+	}
 	return &TxSubmission{
 		UnitID:      tx.GetUnitID(),
-		TxHash:      tx.Hash(crypto.SHA256),
+		TxHash:      txHash,
 		Transaction: tx,
-	}
+	}, nil
 }
 
 func (s *TxSubmission) ToBatch(partitionClient sdktypes.PartitionClient, log *slog.Logger) *TxSubmissionBatch {

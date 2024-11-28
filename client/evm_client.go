@@ -93,9 +93,13 @@ func weiToAlpha(wei *uint256.Int) uint64 {
 }
 
 func (c *evmPartitionClient) ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*types.TxRecordProof, error) {
-	txBatch := txsubmitter.New(tx).ToBatch(c, log)
-	err := txBatch.SendTx(ctx, true)
+	sub, err := txsubmitter.New(tx)
 	if err != nil {
+		return nil, fmt.Errorf("failed to create tx submission: %w", err)
+	}
+	txBatch := sub.ToBatch(c, log)
+
+	if err := txBatch.SendTx(ctx, true); err != nil {
 		return nil, err
 	}
 	return txBatch.Submissions()[0].Proof, nil
