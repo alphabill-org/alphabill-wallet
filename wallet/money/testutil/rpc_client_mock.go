@@ -221,7 +221,9 @@ func NewLockedBill(value uint64, counter, lockStatus uint64) *sdktypes.Bill {
 
 func NewMoneyFCR(pubKeyHash []byte, balance uint64, lockStatus uint64, counter uint64) *sdktypes.FeeCreditRecord {
 	id, err := money.NewFeeCreditRecordIDFromPublicKeyHash(nil, pubKeyHash, 1000+transferFCLatestAdditionTime)
-	panic(err)
+	if err != nil {
+		panic(err)
+	}
 	return &sdktypes.FeeCreditRecord{
 		PartitionID: money.DefaultPartitionID,
 		ID:          id,
