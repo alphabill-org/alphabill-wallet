@@ -78,8 +78,8 @@ func TestConfirmUnitsTx_timeout(t *testing.T) {
 	}
 	batch := txsubmitter.NewBatch(rpcClient, logger.New(t))
 	sub1, err := txsubmitter.New(&types.TransactionOrder{Payload: types.Payload{ClientMetadata: &types.ClientMetadata{Timeout: 101}}})
-	sub1.TxHash = randomTxHash1
 	require.NoError(t, err)
+	sub1.TxHash = randomTxHash1
 	batch.Add(sub1)
 	sub2, err := txsubmitter.New(&types.TransactionOrder{Payload: types.Payload{ClientMetadata: &types.ClientMetadata{Timeout: 102}}})
 	require.NoError(t, err)

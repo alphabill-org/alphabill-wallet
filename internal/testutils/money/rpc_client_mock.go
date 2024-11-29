@@ -1,14 +1,16 @@
-package testutil
+package money
 
 import (
 	"bytes"
 	"context"
 	"crypto"
 	"log/slog"
+	"testing"
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-go-base/types/hex"
+	"github.com/stretchr/testify/require"
 
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
@@ -219,11 +221,9 @@ func NewLockedBill(value uint64, counter, lockStatus uint64) *sdktypes.Bill {
 	}
 }
 
-func NewMoneyFCR(pubKeyHash []byte, balance uint64, lockStatus uint64, counter uint64) *sdktypes.FeeCreditRecord {
+func NewMoneyFCR(t *testing.T, pubKeyHash []byte, balance uint64, lockStatus uint64, counter uint64) *sdktypes.FeeCreditRecord {
 	id, err := money.NewFeeCreditRecordIDFromPublicKeyHash(nil, pubKeyHash, 1000+transferFCLatestAdditionTime)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 	return &sdktypes.FeeCreditRecord{
 		PartitionID: money.DefaultPartitionID,
 		ID:          id,

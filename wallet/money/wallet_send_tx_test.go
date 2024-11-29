@@ -9,17 +9,17 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/hash"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	testmoney "github.com/alphabill-org/alphabill-wallet/internal/testutils/money"
 	"github.com/stretchr/testify/require"
 
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 )
 
 func TestWalletSendFunction_Ok(t *testing.T) {
-	w := createTestWallet(t, testutil.NewRpcClientMock(
-		testutil.WithOwnerBill(testutil.NewBill(50, 1)),
-		testutil.WithOwnerFeeCreditRecord(newMoneyFCR(t, testPubKey0Hash, 100*1e8, 200)),
+	w := createTestWallet(t, testmoney.NewRpcClientMock(
+		testmoney.WithOwnerBill(testmoney.NewBill(50, 1)),
+		testmoney.WithOwnerFeeCreditRecord(newMoneyFCR(t, testPubKey0Hash, 100*1e8, 200)),
 	))
 	validPubKey := make([]byte, 33)
 	amount := uint64(50)
@@ -31,8 +31,8 @@ func TestWalletSendFunction_Ok(t *testing.T) {
 }
 
 func TestWalletSendFunction_NoFCR(t *testing.T) {
-	w := createTestWallet(t, testutil.NewRpcClientMock(
-		testutil.WithOwnerBill(testutil.NewBill(50, 1)),
+	w := createTestWallet(t, testmoney.NewRpcClientMock(
+		testmoney.WithOwnerBill(testmoney.NewBill(50, 1)),
 	))
 	validPubKey := make([]byte, 33)
 	amount := uint64(50)
@@ -44,7 +44,7 @@ func TestWalletSendFunction_NoFCR(t *testing.T) {
 }
 
 func TestWalletSendFunction_InvalidPubKey(t *testing.T) {
-	w := createTestWallet(t, testutil.NewRpcClientMock())
+	w := createTestWallet(t, testmoney.NewRpcClientMock())
 	invalidPubKey := make([]byte, 32)
 	amount := uint64(50)
 	ctx := context.Background()
@@ -56,9 +56,9 @@ func TestWalletSendFunction_InvalidPubKey(t *testing.T) {
 }
 
 func TestWalletSendFunction_InsufficientBalance(t *testing.T) {
-	w := createTestWallet(t, testutil.NewRpcClientMock(
-		testutil.WithOwnerBill(testutil.NewBill(49, 1)),
-		testutil.WithOwnerFeeCreditRecord(newMoneyFCR(t, testPubKey0Hash, 100, 200)),
+	w := createTestWallet(t, testmoney.NewRpcClientMock(
+		testmoney.WithOwnerBill(testmoney.NewBill(49, 1)),
+		testmoney.WithOwnerFeeCreditRecord(newMoneyFCR(t, testPubKey0Hash, 100, 200)),
 	))
 	validPubKey := make([]byte, 33)
 	amount := uint64(50)
@@ -70,10 +70,10 @@ func TestWalletSendFunction_InsufficientBalance(t *testing.T) {
 }
 
 func TestWalletSendFunction_ClientError(t *testing.T) {
-	w := createTestWallet(t, testutil.NewRpcClientMock(
-		testutil.WithError(errors.New("some error")),
-		testutil.WithOwnerBill(testutil.NewBill(50, 1)),
-		testutil.WithOwnerFeeCreditRecord(newMoneyFCR(t, testPubKey0Hash, 100*1e8, 200)),
+	w := createTestWallet(t, testmoney.NewRpcClientMock(
+		testmoney.WithError(errors.New("some error")),
+		testmoney.WithOwnerBill(testmoney.NewBill(50, 1)),
+		testmoney.WithOwnerFeeCreditRecord(newMoneyFCR(t, testPubKey0Hash, 100*1e8, 200)),
 	))
 	validPubKey := make([]byte, 33)
 	amount := uint64(50)
@@ -84,9 +84,9 @@ func TestWalletSendFunction_ClientError(t *testing.T) {
 }
 
 func TestWalletSendFunction_WaitForConfirmation(t *testing.T) {
-	moneyClient := testutil.NewRpcClientMock(
-		testutil.WithOwnerBill(testutil.NewBill(100, 1)),
-		testutil.WithOwnerFeeCreditRecord(newMoneyFCR(t, testPubKey0Hash, 100, 200)),
+	moneyClient := testmoney.NewRpcClientMock(
+		testmoney.WithOwnerBill(testmoney.NewBill(100, 1)),
+		testmoney.WithOwnerFeeCreditRecord(newMoneyFCR(t, testPubKey0Hash, 100, 200)),
 	)
 	w := createTestWallet(t, moneyClient)
 
@@ -106,10 +106,10 @@ func TestWalletSendFunction_WaitForConfirmation(t *testing.T) {
 }
 
 func TestWalletSendFunction_WaitForMultipleTxConfirmations(t *testing.T) {
-	moneyClient := testutil.NewRpcClientMock(
-		testutil.WithOwnerBill(testutil.NewBill(10, 1)),
-		testutil.WithOwnerBill(testutil.NewBill(10, 2)),
-		testutil.WithOwnerFeeCreditRecord(newMoneyFCR(t, testPubKey0Hash, 100, 200)),
+	moneyClient := testmoney.NewRpcClientMock(
+		testmoney.WithOwnerBill(testmoney.NewBill(10, 1)),
+		testmoney.WithOwnerBill(testmoney.NewBill(10, 2)),
+		testmoney.WithOwnerFeeCreditRecord(newMoneyFCR(t, testPubKey0Hash, 100, 200)),
 	)
 	w := createTestWallet(t, moneyClient)
 
@@ -123,9 +123,9 @@ func TestWalletSendFunction_WaitForMultipleTxConfirmations(t *testing.T) {
 
 func TestWholeBalanceIsSentUsingBillTransferOrder(t *testing.T) {
 	// create wallet with single bill
-	moneyClient := testutil.NewRpcClientMock(
-		testutil.WithOwnerBill(testutil.NewBill(100, 1)),
-		testutil.WithOwnerFeeCreditRecord(newMoneyFCR(t, testPubKey0Hash, 100, 200)),
+	moneyClient := testmoney.NewRpcClientMock(
+		testmoney.WithOwnerBill(testmoney.NewBill(100, 1)),
+		testmoney.WithOwnerFeeCreditRecord(newMoneyFCR(t, testPubKey0Hash, 100, 200)),
 	)
 	w := createTestWallet(t, moneyClient)
 
@@ -141,9 +141,9 @@ func TestWholeBalanceIsSentUsingBillTransferOrder(t *testing.T) {
 }
 
 func TestWalletSendFunction_LockedBillIsNotUsed(t *testing.T) {
-	w := createTestWallet(t, testutil.NewRpcClientMock(
-		testutil.WithOwnerBill(testutil.NewLockedBill(50, 1, wallet.LockReasonManual)),
-		testutil.WithOwnerFeeCreditRecord(newMoneyFCR(t, testPubKey0Hash, 100*1e8, 200)),
+	w := createTestWallet(t, testmoney.NewRpcClientMock(
+		testmoney.WithOwnerBill(testmoney.NewLockedBill(50, 1, wallet.LockReasonManual)),
+		testmoney.WithOwnerFeeCreditRecord(newMoneyFCR(t, testPubKey0Hash, 100*1e8, 200)),
 	))
 	pubKey, err := hex.DecodeString(testPubKey0Hex)
 	require.NoError(t, err)
@@ -157,11 +157,11 @@ func TestWalletSendFunction_LockedBillIsNotUsed(t *testing.T) {
 
 func TestWalletSendFunction_BillWithExactAmount(t *testing.T) {
 	// create test wallet with 2 bills with different values
-	exactBill := testutil.NewBill(77, 2)
-	moneyClient := testutil.NewRpcClientMock(
-		testutil.WithOwnerBill(testutil.NewBill(100, 1)),
-		testutil.WithOwnerBill(exactBill),
-		testutil.WithOwnerFeeCreditRecord(newMoneyFCR(t, testPubKey0Hash, 100, 200)),
+	exactBill := testmoney.NewBill(77, 2)
+	moneyClient := testmoney.NewRpcClientMock(
+		testmoney.WithOwnerBill(testmoney.NewBill(100, 1)),
+		testmoney.WithOwnerBill(exactBill),
+		testmoney.WithOwnerFeeCreditRecord(newMoneyFCR(t, testPubKey0Hash, 100, 200)),
 	)
 	w := createTestWallet(t, moneyClient)
 
@@ -183,10 +183,10 @@ func TestWalletSendFunction_BillWithExactAmount(t *testing.T) {
 func TestWalletSendFunction_NWaySplit(t *testing.T) {
 	// create test wallet with a single bill
 	pubKey := make([]byte, 33)
-	bill := testutil.NewBill(100, 1)
-	moneyClient := testutil.NewRpcClientMock(
-		testutil.WithOwnerBill(bill),
-		testutil.WithOwnerFeeCreditRecord(newMoneyFCR(t, testPubKey0Hash, 100, 200)),
+	bill := testmoney.NewBill(100, 1)
+	moneyClient := testmoney.NewRpcClientMock(
+		testmoney.WithOwnerBill(bill),
+		testmoney.WithOwnerFeeCreditRecord(newMoneyFCR(t, testPubKey0Hash, 100, 200)),
 	)
 	w := createTestWallet(t, moneyClient)
 
@@ -222,5 +222,5 @@ func TestWalletSendFunction_NWaySplit(t *testing.T) {
 func newMoneyFCR(t *testing.T, pubKeyHashHex string, balance, counter uint64) *sdktypes.FeeCreditRecord {
 	pubKeyHash, err := hex.DecodeString(pubKeyHashHex)
 	require.NoError(t, err)
-	return testutil.NewMoneyFCR(pubKeyHash, balance, 0, counter)
+	return testmoney.NewMoneyFCR(t, pubKeyHash, balance, 0, counter)
 }

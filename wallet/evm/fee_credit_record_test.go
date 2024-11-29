@@ -25,6 +25,7 @@ func TestFeeCreditRecordIDFromPublicKey(t *testing.T) {
 	require.EqualValues(t, unitID, fcr)
 	// if pubkey is nil, unitID returns O address
 	fcr, err = NewFeeCreditRecordIDFromPublicKey(nil, nil, 0)
+	require.NoError(t, err)
 	require.EqualValues(t, make([]byte, 20), fcr)
 }
 

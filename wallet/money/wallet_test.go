@@ -6,6 +6,7 @@ import (
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
+	testmoney "github.com/alphabill-org/alphabill-wallet/internal/testutils/money"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
 
@@ -13,7 +14,6 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 )
 
 const (
@@ -29,7 +29,7 @@ func TestExistingWalletCanBeLoaded(t *testing.T) {
 	homedir := t.TempDir()
 	am, err := account.NewManager(homedir, "", true)
 	require.NoError(t, err)
-	rpcClient := testutil.NewRpcClientMock()
+	rpcClient := testmoney.NewRpcClientMock()
 	feeManagerDB, err := fees.NewFeeManagerDB(homedir)
 	require.NoError(t, err)
 	_, err = NewWallet(types.NetworkLocal, money.DefaultPartitionID, am, feeManagerDB, rpcClient, maxFee, logger.New(t))
@@ -73,8 +73,8 @@ func TestWallet_AddKey(t *testing.T) {
 }
 
 func TestWallet_GetBalance(t *testing.T) {
-	rpcClient := testutil.NewRpcClientMock(
-		testutil.WithOwnerBill(testutil.NewBill(10, 1)),
+	rpcClient := testmoney.NewRpcClientMock(
+		testmoney.WithOwnerBill(testmoney.NewBill(10, 1)),
 	)
 	w := createTestWallet(t, rpcClient)
 	balance, err := w.GetBalance(context.Background(), GetBalanceCmd{})
@@ -83,8 +83,8 @@ func TestWallet_GetBalance(t *testing.T) {
 }
 
 func TestWallet_GetBalances(t *testing.T) {
-	rpcClient := testutil.NewRpcClientMock(
-		testutil.WithOwnerBill(testutil.NewBill(10, 1)),
+	rpcClient := testmoney.NewRpcClientMock(
+		testmoney.WithOwnerBill(testmoney.NewBill(10, 1)),
 	)
 	w := createTestWallet(t, rpcClient)
 	_, _, err := w.am.AddAccount()
