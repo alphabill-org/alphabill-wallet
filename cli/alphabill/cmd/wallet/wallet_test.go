@@ -185,7 +185,8 @@ func TestSendingFailsWithInsufficientBalance(t *testing.T) {
 		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t),
 			&sdktypes.Unit[any]{
 				UnitID: func() abtypes.UnitID {
-					id, _ := money.NewFeeCreditRecordIDFromPublicKeyHash(nil, testutils.TestPubKey0Hash(t), 1000)
+					id, err := money.NewFeeCreditRecordIDFromPublicKeyHash(nil, testutils.TestPubKey0Hash(t), 1000)
+					require.NoError(t, err)
 					return id
 				}(),
 				Data: fc.FeeCreditRecord{Balance: 1e8},
