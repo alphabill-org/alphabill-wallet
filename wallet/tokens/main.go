@@ -917,7 +917,10 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 }
 
 func (w *Wallet) submitTx(ctx context.Context, tx *types.TransactionOrder, accountNumber uint64) (*SubmissionResult, error) {
-	sub := txsubmitter.New(tx)
+	sub, err := txsubmitter.New(tx)
+	if err != nil {
+		return nil, err
+	}
 	if err := sub.ToBatch(w.tokensClient, w.log).SendTx(ctx, w.confirmTx); err != nil {
 		return nil, err
 	}

@@ -7,10 +7,10 @@ import (
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
+	testmoney "github.com/alphabill-org/alphabill-wallet/internal/testutils/money"
 	"github.com/stretchr/testify/require"
 
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
-	"github.com/alphabill-org/alphabill-wallet/wallet/money/testutil"
 )
 
 var (
@@ -54,13 +54,13 @@ func TestCreateTransferTx(t *testing.T) {
 }
 
 func TestExecBill_OK(t *testing.T) {
-	rpcClientMock := testutil.NewRpcClientMock()
+	rpcClientMock := testmoney.NewRpcClientMock()
 	require.NoError(t, execInitialBill(context.Background(), rpcClientMock, types.NetworkLocal, money.DefaultPartitionID, unitID, fcrID, billValue, latestAdditionTime, ownerPredicate, counter))
 }
 
 func TestExecBill_NOK(t *testing.T) {
-	rpcClientMock := testutil.NewRpcClientMock(
-		testutil.WithError(errors.New("some error")),
+	rpcClientMock := testmoney.NewRpcClientMock(
+		testmoney.WithError(errors.New("some error")),
 	)
 	require.ErrorContains(t, execInitialBill(context.Background(), rpcClientMock, types.NetworkLocal, money.DefaultPartitionID, unitID, fcrID, billValue, latestAdditionTime, ownerPredicate, counter), "some error")
 

@@ -140,11 +140,12 @@ func TestNewTypes(t *testing.T) {
 		},
 		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
 			recTxs[string(tx.GetUnitID())] = tx
-			return tx.Hash(crypto.SHA256), nil
+			return tx.Hash(crypto.SHA256)
 		},
 		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
-			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			require.NoError(t, err)
 			return []types.UnitID{fcrID}, nil
 		},
 	}
@@ -272,11 +273,12 @@ func TestNewFungibleToken(t *testing.T) {
 	rpcClient := &mockTokensPartitionClient{
 		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
 			recTxs = append(recTxs, tx)
-			return tx.Hash(crypto.SHA256), nil
+			return tx.Hash(crypto.SHA256)
 		},
 		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
-			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			require.NoError(t, err)
 			return []types.UnitID{fcrID}, nil
 		},
 	}
@@ -376,12 +378,13 @@ func TestSendFungible(t *testing.T) {
 		},
 		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
-			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			require.NoError(t, err)
 			return []types.UnitID{fcrID}, nil
 		},
 		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
 			recTxs = append(recTxs, tx)
-			return tx.Hash(crypto.SHA256), nil
+			return tx.Hash(crypto.SHA256)
 		},
 	}
 	tw := initTestWallet(t, rpcClient)
@@ -567,11 +570,12 @@ func TestNewNFT(t *testing.T) {
 	rpcClient := &mockTokensPartitionClient{
 		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
 			recTxs = append(recTxs, tx)
-			return tx.Hash(crypto.SHA256), nil
+			return tx.Hash(crypto.SHA256)
 		},
 		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
-			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			require.NoError(t, err)
 			return []types.UnitID{fcrID}, nil
 		},
 	}
@@ -656,11 +660,12 @@ func TestTransferNFT(t *testing.T) {
 		},
 		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
 			recTxs[string(tx.GetUnitID())] = tx
-			return tx.Hash(crypto.SHA256), nil
+			return tx.Hash(crypto.SHA256)
 		},
 		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
-			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			require.NoError(t, err)
 			return []types.UnitID{fcrID}, nil
 		},
 	}
@@ -726,11 +731,12 @@ func TestUpdateNFTData(t *testing.T) {
 		},
 		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
 			recTxs[string(tx.GetUnitID())] = tx
-			return tx.Hash(crypto.SHA256), nil
+			return tx.Hash(crypto.SHA256)
 		},
 		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
-			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			require.NoError(t, err)
 			return []types.UnitID{fcrID}, nil
 		},
 	}
@@ -768,11 +774,12 @@ func TestLockToken(t *testing.T) {
 		},
 		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
 			recTxs[string(tx.GetUnitID())] = tx
-			return tx.Hash(crypto.SHA256), nil
+			return tx.Hash(crypto.SHA256)
 		},
 		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
-			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			require.NoError(t, err)
 			return []types.UnitID{fcrID}, nil
 		},
 	}
@@ -806,11 +813,12 @@ func TestUnlockToken(t *testing.T) {
 		},
 		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
 			recTxs[string(tx.GetUnitID())] = tx
-			return tx.Hash(crypto.SHA256), nil
+			return tx.Hash(crypto.SHA256)
 		},
 		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
-			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			require.NoError(t, err)
 			return []types.UnitID{fcrID}, nil
 		},
 	}
@@ -849,7 +857,8 @@ func TestSendFungibleByID(t *testing.T) {
 		},
 		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
-			fcrID := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			require.NoError(t, err)
 			return []types.UnitID{fcrID}, nil
 		},
 		sendTransaction: func(ctx context.Context, txs *types.TransactionOrder) ([]byte, error) {

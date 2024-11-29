@@ -104,7 +104,7 @@ func (w *Wallet) prepareSplitOrTransferTx(acc *accountKey, amount uint64, ft *sd
 		if err != nil {
 			return nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
 		}
-		return txsubmitter.New(tx), nil
+		return txsubmitter.New(tx)
 	} else {
 		tx, err := ft.Split(amount, OwnerPredicateFromPubKey(receiverPubKey),
 			sdktypes.WithTimeout(timeout),
@@ -137,6 +137,6 @@ func (w *Wallet) prepareSplitOrTransferTx(acc *accountKey, amount uint64, ft *sd
 		if err != nil {
 			return nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
 		}
-		return txsubmitter.New(tx), nil
+		return txsubmitter.New(tx)
 	}
 }

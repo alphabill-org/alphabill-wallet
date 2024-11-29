@@ -32,7 +32,10 @@ func NewTxPublisher(restClient Client) *TxPublisher {
 
 // SendTx sends a tx and waits for confirmation, returns tx proof
 func (w *TxPublisher) SendTx(ctx context.Context, tx *types.TransactionOrder, _ []byte) (*types.TxRecordProof, error) {
-	txHash := tx.Hash(crypto.SHA256)
+	txHash, err := tx.Hash(crypto.SHA256)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash tx: %w", err)
+	}
 	if err := w.cli.PostTransaction(ctx, tx); err != nil {
 		return nil, fmt.Errorf("evm post tx failed: %w", err)
 	}

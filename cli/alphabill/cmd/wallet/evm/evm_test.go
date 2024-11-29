@@ -315,7 +315,9 @@ func mockClientCalls(t *testing.T, br *clientMockConf) (*httptest.Server, *url.U
 					return
 				}
 				br.receivedTx = tx
-				writeCBORResponse(t, w, tx.Hash(crypto.SHA256), http.StatusAccepted)
+				txHash, err := tx.Hash(crypto.SHA256)
+				require.NoError(t, err)
+				writeCBORResponse(t, w, txHash, http.StatusAccepted)
 				return
 			}
 			txBytes, err := types.Cbor.Marshal(br.receivedTx)

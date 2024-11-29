@@ -130,7 +130,11 @@ func (w *DustCollector) submitDCBatch(ctx context.Context, k *account.AccountKey
 		if err = txSigner.SignTx(txo); err != nil {
 			return nil, fmt.Errorf("failed to sign tx: %w", err)
 		}
-		dcBatch.Add(txsubmitter.New(txo))
+		sub, err := txsubmitter.New(txo)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create tx submission: %w", err)
+		}
+		dcBatch.Add(sub)
 	}
 
 	// send dc batch
@@ -174,7 +178,10 @@ func (w *DustCollector) swapDCBills(ctx context.Context, txSigner *sdktypes.Mone
 
 	// create tx submitter batch
 	dcBatch := txsubmitter.NewBatch(w.moneyClient, w.log)
-	sub := txsubmitter.New(swapTx)
+	sub, err := txsubmitter.New(swapTx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create tx submission: %w", err)
+	}
 	dcBatch.Add(sub)
 
 	// send swap tx
@@ -210,7 +217,11 @@ func (w *DustCollector) lockTargetBill(ctx context.Context, k *account.AccountKe
 	// lock target bill server side
 	w.log.InfoContext(ctx, fmt.Sprintf("locking target bill in node %s", targetBill.ID))
 	lockTxBatch := txsubmitter.NewBatch(w.moneyClient, w.log)
-	lockTxBatch.Add(txsubmitter.New(lockTx))
+	sub, err := txsubmitter.New(lockTx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create tx submission: %w", err)
+	}
+	lockTxBatch.Add(sub)
 	if err := lockTxBatch.SendTx(ctx, true); err != nil {
 		return nil, fmt.Errorf("failed to send or confirm lock tx: %w", err)
 	}

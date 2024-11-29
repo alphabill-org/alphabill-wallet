@@ -256,7 +256,11 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*types.TxRecordProof,
 	}
 
 	for _, tx := range txs {
-		batch.Add(txsubmitter.New(tx))
+		sub, err := txsubmitter.New(tx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create tx submission: %w", err)
+		}
+		batch.Add(sub)
 	}
 
 	txsCost := cmd.MaxFee * uint64(len(batch.Submissions()))
