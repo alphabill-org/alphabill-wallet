@@ -84,7 +84,10 @@ func execAddVarCmd(cmd *cobra.Command, config *clitypes.AddVarCmdConfig) error {
 	}
 
 	// create 'addVar' tx
-	unitPart := hash.Sum(crypto.SHA256, util.Uint32ToBytes(config.PartitionID), config.ShardID)
+	unitPart, err := hash.HashValues(crypto.SHA256, config.PartitionID, config.ShardID)
+	if err != nil {
+		return fmt.Errorf("failed to hash partition and shard id: %w", err)
+	}
 	unitID := orchestration.NewVarID(config.ShardID, unitPart)
 	roundNumber, err := orcClient.GetRoundNumber(cmd.Context())
 	if err != nil {

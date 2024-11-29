@@ -121,7 +121,10 @@ func addFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 
 	ownerPredicate := templates.NewP2pkh256BytesFromKeyHash(ownerID)
 	if fcr == nil {
-		fcrID := tokens.NewFeeCreditRecordIDFromOwnerPredicate(nil, ownerPredicate, timeout)
+		fcrID, err := tokens.NewFeeCreditRecordIDFromOwnerPredicate(nil, ownerPredicate, timeout)
+		if err != nil {
+			return fmt.Errorf("failed to create fee credit record ID: %w", err)
+		}
 		fcr = &sdktypes.FeeCreditRecord{
 			NetworkID:   nodeInfo.NetworkID,
 			PartitionID: nodeInfo.PartitionID,

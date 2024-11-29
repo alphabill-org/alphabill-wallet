@@ -127,7 +127,10 @@ func (s *StateServiceMock) SendTransaction(ctx context.Context, tx hex.Bytes) (h
 	if err := types.Cbor.Unmarshal(tx, &txo); err != nil {
 		return nil, err
 	}
-	txHash := txo.Hash(crypto.SHA256)
+	txHash, err := txo.Hash(crypto.SHA256)
+	if err != nil {
+		return nil, err
+	}
 	s.SentTxs[string(txHash)] = txo
 	return txHash, nil
 }

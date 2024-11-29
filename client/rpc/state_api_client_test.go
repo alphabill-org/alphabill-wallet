@@ -2,11 +2,11 @@ package rpc
 
 import (
 	"context"
-	"crypto"
 	"errors"
 	"testing"
 
 	"github.com/alphabill-org/alphabill-go-base/types"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/client/rpc/mocksrv"
@@ -62,7 +62,7 @@ func TestRpcClient(t *testing.T) {
 
 		txHash, err := client.SendTransaction(context.Background(), tx)
 		require.NoError(t, err)
-		require.Equal(t, tx.Hash(crypto.SHA256), txHash)
+		require.Equal(t, testutils.TxHash(t, tx), txHash)
 	})
 	t.Run("SendTransaction_NOK", func(t *testing.T) {
 		service.Reset()
