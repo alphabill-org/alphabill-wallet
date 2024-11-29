@@ -79,6 +79,7 @@ type (
 
 	runTokenListTypesCmd func(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind Kind) error
 	runTokenListCmd      func(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64, kind Kind) error
+	runTokenCmdDC        func(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64) error
 )
 
 func NewTokenCmd(config *types.WalletConfig) *cobra.Command {
@@ -90,7 +91,7 @@ func NewTokenCmd(config *types.WalletConfig) *cobra.Command {
 	cmd.AddCommand(tokenCmdNewToken(config))
 	cmd.AddCommand(tokenCmdUpdateNFTData(config))
 	cmd.AddCommand(tokenCmdSend(config))
-	cmd.AddCommand(tokenCmdDC(config))
+	cmd.AddCommand(tokenCmdDC(config, execTokenCmdDC))
 	cmd.AddCommand(tokenCmdList(config, execTokenCmdList))
 	cmd.AddCommand(tokenCmdListTypes(config, execTokenCmdListTypes))
 	cmd.AddCommand(tokenCmdLock(config))
@@ -703,14 +704,14 @@ func execTokenCmdSendNonFungible(cmd *cobra.Command, config *types.WalletConfig)
 	return err
 }
 
-func tokenCmdDC(config *types.WalletConfig) *cobra.Command {
+func tokenCmdDC(config *types.WalletConfig, runner runTokenCmdDC) *cobra.Command {
 	var accountNumber uint64
 
 	cmd := &cobra.Command{
 		Use:   "collect-dust",
 		Short: "join fungible tokens into one unit",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return execTokenCmdDC(cmd, config, &accountNumber)
+			return runner(cmd, config, &accountNumber)
 		},
 	}
 
@@ -718,6 +719,11 @@ func tokenCmdDC(config *types.WalletConfig) *cobra.Command {
 	cmd.Flags().StringSlice(cmdFlagType, nil, "type unit identifier (hex)")
 	cmd.Flags().StringSlice(cmdFlagInheritBearerClauseInput, []string{predicateTrue}, "input to satisfy the owner predicates inherited from types. "+helpPredicateArgument)
 	cmd.Flags().String(cmdFlagBearerClauseInput, predicatePtpkh, "input to satisfy the bearer clause. "+helpPredicateArgument)
+
+	if err := cmd.MarkFlagRequired(cmdFlagType); err != nil {
+		panic(err)
+	}
+
 	return cmd
 }
 

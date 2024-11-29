@@ -295,3 +295,36 @@ func TestWalletUpdateNonFungibleTokenDataCmd_Flags(t *testing.T) {
 		"--token-identifier", "12AB")
 	tokensCmd.ExecWithError(t, "required flag(s) \"token-identifier\" not set")
 }
+
+func TestWalletTokenCollectDustCmd_Flags(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr string
+	}{
+		{
+			name: "ok",
+			args: []string{"--type", "123456789abcdef"},
+		},
+		{
+			name:    "type flag is required",
+			args:    []string{},
+			wantErr: "required flag(s) \"type\" not set",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := tokenCmdDC(&types.WalletConfig{}, func(cmd *cobra.Command, config *types.WalletConfig, accountNumber *uint64) error {
+				return nil
+			})
+			cmd.SetArgs(tt.args)
+			err := cmd.Execute()
+
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, tt.wantErr)
+			}
+		})
+	}
+}
