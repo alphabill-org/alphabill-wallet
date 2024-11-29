@@ -125,8 +125,7 @@ func (m *managerImpl) GetMnemonic() (string, error) {
 }
 
 // AddAccount adds the next account in account key series to the wallet.
-// New accounts are indexed only from the time of creation and not backwards in time.
-// Returns newManager account's index and public key.
+// Returns the created account index and public key.
 func (m *managerImpl) AddAccount() (uint64, []byte, error) {
 	masterKeyString, err := m.db.Do().GetMasterKey()
 	if err != nil {
