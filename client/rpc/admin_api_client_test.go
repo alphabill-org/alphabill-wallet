@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/alphabill-org/alphabill-go-base/types"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/client/rpc/mocksrv"
@@ -18,7 +19,7 @@ func TestAdminClient(t *testing.T) {
 		infoResponse, err := client.GetNodeInfo(context.Background())
 		require.NoError(t, err)
 		require.Equal(t, types.PartitionID(1), infoResponse.PartitionID)
-		require.Equal(t, "money node", infoResponse.Name)
+		require.Equal(t, money.PartitionTypeID, infoResponse.PartitionTypeID)
 		require.Equal(t, "1337", infoResponse.Self.Identifier)
 		require.Empty(t, infoResponse.Self.Addresses)
 	})

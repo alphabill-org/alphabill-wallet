@@ -32,16 +32,16 @@ type (
 	}
 
 	NodeInfoResponse struct {
-		NetworkID           types.NetworkID   `json:"networkId"`   // hex encoded network identifier
-		PartitionID         types.PartitionID `json:"partitionId"` // hex encoded partition identifier
-		Name                string            `json:"name"`        // one of [money node | tokens node | evm node]
-		PermissionedMode    bool              `json:"permissionedMode"`
-		FeelessMode         bool              `json:"feelessMode"`
-		Self                PeerInfo          `json:"self"` // information about this peer
-		BootstrapNodes      []PeerInfo        `json:"bootstrapNodes"`
-		RootValidators      []PeerInfo        `json:"rootValidators"`
-		PartitionValidators []PeerInfo        `json:"partitionValidators"`
-		OpenConnections     []PeerInfo        `json:"openConnections"` // all libp2p connections to other peers in the network
+		NetworkID           types.NetworkID       `json:"networkId"`   // hex encoded network identifier
+		PartitionID         types.PartitionID     `json:"partitionId"` // hex encoded partition identifier
+		PartitionTypeID     types.PartitionTypeID `json:"partitionTypeId"` // hex encoded partition identifier
+		PermissionedMode    bool                  `json:"permissionedMode"`
+		FeelessMode         bool                  `json:"feelessMode"`
+		Self                PeerInfo              `json:"self"` // information about this peer
+		BootstrapNodes      []PeerInfo            `json:"bootstrapNodes"`
+		RootValidators      []PeerInfo            `json:"rootValidators"`
+		PartitionValidators []PeerInfo            `json:"partitionValidators"`
+		OpenConnections     []PeerInfo            `json:"openConnections"` // all libp2p connections to other peers in the network
 	}
 
 	PeerInfo struct {

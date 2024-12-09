@@ -933,8 +933,8 @@ type mockTokensPartitionClient struct {
 
 func (m *mockTokensPartitionClient) GetNodeInfo(ctx context.Context) (*sdktypes.NodeInfoResponse, error) {
 	return &sdktypes.NodeInfoResponse{
-		PartitionID: 2,
-		Name:        "tokens node",
+		PartitionID:     2,
+		PartitionTypeID: tokens.PartitionTypeID,
 	}, nil
 }
 

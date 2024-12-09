@@ -98,8 +98,8 @@ func WithError(err error) Option {
 
 func (c *RpcClientMock) GetNodeInfo(ctx context.Context) (*sdktypes.NodeInfoResponse, error) {
 	return &sdktypes.NodeInfoResponse{
-		PartitionID: 0,
-		Name:        "mock",
+		PartitionID:     0,
+		PartitionTypeID: money.PartitionTypeID,
 	}, nil
 }
 

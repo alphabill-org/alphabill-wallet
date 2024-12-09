@@ -6,7 +6,6 @@ import (
 	"mime"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	basetypes "github.com/alphabill-org/alphabill-go-base/types"
@@ -1196,8 +1195,7 @@ func initTokensWallet(cmd *cobra.Command, config *types.WalletConfig) (*tokenswa
 	if err != nil {
 		return nil, err
 	}
-	tokensTypeVar := types.TokensType
-	if !strings.HasPrefix(nodeInfo.Name, tokensTypeVar.String()) {
+	if nodeInfo.PartitionTypeID != tokens.PartitionTypeID {
 		return nil, errors.New("invalid rpc url provided for tokens partition")
 	}
 	return tokenswallet.New(nodeInfo.NetworkID, nodeInfo.PartitionID, tokensClient, am, confirmTx, nil, maxFee, config.Base.Logger)
