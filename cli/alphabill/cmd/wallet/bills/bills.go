@@ -3,7 +3,6 @@ package bills
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
@@ -145,8 +144,7 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch node info rpc: %w", err)
 	}
-	moneyTypeVar := clitypes.MoneyType
-	if !strings.HasPrefix(infoResponse.Name, moneyTypeVar.String()) {
+	if infoResponse.PartitionTypeID != money.PartitionTypeID {
 		return errors.New("invalid rpc url provided for money partition")
 	}
 	maxFee, err := args.ParseMaxFeeFlag(cmd)
@@ -237,8 +235,7 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch node info rpc: %w", err)
 	}
-	moneyTypeVar := clitypes.MoneyType
-	if !strings.HasPrefix(infoResponse.Name, moneyTypeVar.String()) {
+	if infoResponse.PartitionTypeID != money.PartitionTypeID {
 		return errors.New("invalid rpc url provided for money partition")
 	}
 	maxFee, err := args.ParseMaxFeeFlag(cmd)

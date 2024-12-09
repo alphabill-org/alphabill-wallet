@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 
+	"github.com/alphabill-org/alphabill-go-base/txsystem/evm"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	basetypes "github.com/alphabill-org/alphabill-go-base/types"
@@ -432,15 +432,14 @@ func newMoneyClient(ctx context.Context, rpcUrl string) (types.MoneyPartitionCli
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to dial money rpc url: %w", err)
 	}
-	moneyInfo, err := moneyClient.GetNodeInfo(ctx)
+	nodeInfo, err := moneyClient.GetNodeInfo(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to fetch money partition info: %w", err)
 	}
-	moneyTypeVar := clitypes.MoneyType
-	if !strings.HasPrefix(moneyInfo.Name, moneyTypeVar.String()) {
+	if nodeInfo.PartitionTypeID != money.PartitionTypeID {
 		return nil, nil, errors.New("invalid rpc url provided for money partition")
 	}
-	return moneyClient, moneyInfo, nil
+	return moneyClient, nodeInfo, nil
 }
 
 // Creates a fees.FeeManager that needs to be closed with the Close() method.
@@ -471,19 +470,18 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 		if err != nil {
 			return nil, fmt.Errorf("failed to dial tokens rpc url: %w", err)
 		}
-		tokenInfo, err := tokensClient.GetNodeInfo(ctx)
+		nodeInfo, err := tokensClient.GetNodeInfo(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch tokens partition info: %w", err)
 		}
-		tokenTypeVar := clitypes.TokensType
-		if !strings.HasPrefix(tokenInfo.Name, tokenTypeVar.String()) {
+		if nodeInfo.PartitionTypeID != tokens.PartitionTypeID {
 			return nil, errors.New("invalid rpc url provided for tokens partition")
 		}
 		moneyClient, moneyInfo, err := newMoneyClient(ctx, c.getMoneyRpcUrl())
 		if err != nil {
 			return nil, err
 		}
-		if moneyInfo.NetworkID != tokenInfo.NetworkID {
+		if moneyInfo.NetworkID != nodeInfo.NetworkID {
 			return nil, errors.New("money and tokens rpc clients must be in the same network")
 		}
 		return fees.NewFeeManager(
@@ -493,7 +491,7 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 			moneyInfo.PartitionID,
 			moneyClient,
 			money.NewFeeCreditRecordIDFromPublicKey,
-			tokenInfo.PartitionID,
+			nodeInfo.PartitionID,
 			tokensClient,
 			tokens.NewFeeCreditRecordIDFromPublicKey,
 			maxFee,
@@ -505,22 +503,21 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 		if err != nil {
 			return nil, fmt.Errorf("failed to dial tokens rpc url: %w", err)
 		}
-		tokenInfo, err := tokensClient.GetNodeInfo(ctx)
+		nodeInfo, err := tokensClient.GetNodeInfo(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch tokens partition info: %w", err)
 		}
-		tokenTypeVar := clitypes.TokensType
-		if !strings.HasPrefix(tokenInfo.Name, tokenTypeVar.String()) {
+		if nodeInfo.PartitionTypeID != tokens.PartitionTypeID {
 			return nil, errors.New("invalid rpc url provided for tokens partition")
 		}
 		return fees.NewFeeManager(
-			tokenInfo.NetworkID,
+			nodeInfo.NetworkID,
 			am,
 			feeManagerDB,
 			0,
 			nil,
 			nil,
-			tokenInfo.PartitionID,
+			nodeInfo.PartitionID,
 			tokensClient,
 			tokens.NewFeeCreditRecordIDFromPublicKey,
 			maxFee,
@@ -536,15 +533,14 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 		if err != nil {
 			return nil, fmt.Errorf("failed to dial evm rpc url: %w", err)
 		}
-		evmInfo, err := evmClient.GetNodeInfo(ctx)
+		nodeInfo, err := evmClient.GetNodeInfo(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch evm partition info: %w", err)
 		}
-		evmTypeVar := clitypes.EvmType
-		if !strings.HasPrefix(evmInfo.Name, evmTypeVar.String()) {
-			return nil, errors.New("invalid validator node URL provided for evm partition")
+		if nodeInfo.PartitionTypeID != evm.PartitionTypeID {
+			return nil, errors.New("invalid rpc url provided for evm partition")
 		}
-		if moneyInfo.NetworkID != evmInfo.NetworkID {
+		if moneyInfo.NetworkID != nodeInfo.NetworkID {
 			return nil, errors.New("money and evm rpc clients must be in the same network")
 		}
 		return fees.NewFeeManager(
@@ -554,7 +550,7 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 			moneyInfo.PartitionID,
 			moneyClient,
 			money.NewFeeCreditRecordIDFromPublicKey,
-			evmInfo.PartitionID,
+			nodeInfo.PartitionID,
 			evmClient,
 			evmwallet.NewFeeCreditRecordIDFromPublicKey,
 			maxFee,

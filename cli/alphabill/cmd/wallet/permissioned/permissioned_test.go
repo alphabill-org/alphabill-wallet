@@ -22,7 +22,7 @@ func TestAddFeeCreditCmd(t *testing.T) {
 		&types.NodeInfoResponse{
 			NetworkID:        1,
 			PartitionID:      50,
-			Name:             "tokens",
+			PartitionTypeID:  tokens.PartitionTypeID,
 			PermissionedMode: true,
 		}))
 	ss := mocksrv.NewStateServiceMock(
@@ -62,7 +62,7 @@ func TestDeleteFeeCreditCmd(t *testing.T) {
 		&types.NodeInfoResponse{
 			NetworkID:        1,
 			PartitionID:      50,
-			Name:             "tokens",
+			PartitionTypeID:  tokens.PartitionTypeID,
 			PermissionedMode: true,
 		}))
 	ss := mocksrv.NewStateServiceMock(
