@@ -52,9 +52,9 @@ func TestTokensRpcClient(t *testing.T) {
 				PartitionID: ft.PartitionID,
 				UnitID:      ft.ID,
 				Data: tokentxs.FungibleTokenData{
-					TokenType: tokenType.ID,
-					Value:     ft.Amount,
-					Counter:   ft.Counter,
+					TypeID:  tokenType.ID,
+					Value:   ft.Amount,
+					Counter: ft.Counter,
 				},
 			}),
 		)
@@ -141,7 +141,7 @@ func TestTokensRpcClient(t *testing.T) {
 				PartitionID: tokens.DefaultPartitionID,
 				UnitID:      ftTokenID,
 				Data: tokentxs.FungibleTokenData{
-					TokenType:      ftTokenTypeID,
+					TypeID:         ftTokenTypeID,
 					Value:          ft.Amount,
 					Counter:        ft.Counter,
 					OwnerPredicate: ownerID,
