@@ -89,7 +89,7 @@ func (c *partitionClient) getFeeCreditRecord(ctx context.Context, unitID types.U
 		ID:          u.UnitID,
 		Balance:     u.Data.Balance,
 		Counter:     &counterCopy,
-		Timeout:     u.Data.Timeout,
+		MinLifetime: u.Data.MinLifetime,
 		LockStatus:  u.Data.Locked,
 	}, nil
 }
