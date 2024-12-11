@@ -30,7 +30,7 @@ type (
 
 	alphaBillLink struct {
 		Counter        uint64
-		Timeout        uint64
+		MinLifetime    uint64
 		OwnerPredicate []byte
 	}
 )
@@ -66,9 +66,9 @@ func (c *evmPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ow
 	}
 	stateObj := u.Data
 	fcr := &fc.FeeCreditRecord{
-		Balance: weiToAlpha(stateObj.Account.Balance),
-		Counter: stateObj.AlphaBill.Counter,
-		Timeout: stateObj.AlphaBill.Timeout,
+		Balance:     weiToAlpha(stateObj.Account.Balance),
+		Counter:     stateObj.AlphaBill.Counter,
+		MinLifetime: stateObj.AlphaBill.MinLifetime,
 	}
 	counterCopy := fcr.Counter
 	return &sdktypes.FeeCreditRecord{
@@ -77,7 +77,7 @@ func (c *evmPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ow
 		ID:          u.UnitID,
 		Balance:     fcr.Balance,
 		Counter:     &counterCopy,
-		Timeout:     fcr.Timeout,
+		MinLifetime: fcr.MinLifetime,
 		LockStatus:  0,
 	}, nil
 }

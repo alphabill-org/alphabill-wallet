@@ -31,7 +31,7 @@ func TestGetFeeCreditRecordByOwnerID(t *testing.T) {
 						},
 						AlphaBill: &alphaBillLink{
 							Counter:        5,
-							Timeout:        42,
+							MinLifetime:    42,
 							OwnerPredicate: []byte{1},
 						},
 					},
@@ -46,7 +46,7 @@ func TestGetFeeCreditRecordByOwnerID(t *testing.T) {
 				require.NotNil(t, fcr.Counter)
 				require.EqualValues(t, 1, fcr.Balance)
 				require.EqualValues(t, 5, *fcr.Counter)
-				require.EqualValues(t, 42, fcr.Timeout)
+				require.EqualValues(t, 42, fcr.MinLifetime)
 			},
 		},
 		{
