@@ -45,7 +45,7 @@ func (c *tokensPartitionClient) GetFungibleToken(ctx context.Context, tokenID sd
 	}
 
 	var ftType *sdktypes.Unit[tokens.FungibleTokenTypeData]
-	if err := c.RpcClient.CallContext(ctx, &ftType, "state_getUnit", ft.Data.TokenType, false); err != nil {
+	if err := c.RpcClient.CallContext(ctx, &ftType, "state_getUnit", ft.Data.TypeID, false); err != nil {
 		return nil, err
 	}
 	if ftType == nil {
@@ -57,7 +57,7 @@ func (c *tokensPartitionClient) GetFungibleToken(ctx context.Context, tokenID sd
 		PartitionID:    ft.PartitionID,
 		ID:             ft.UnitID,
 		Symbol:         ftType.Data.Symbol,
-		TypeID:         ft.Data.TokenType,
+		TypeID:         ft.Data.TypeID,
 		TypeName:       ftType.Data.Name,
 		OwnerPredicate: ft.Data.OwnerPredicate,
 		Counter:        ft.Data.Counter,
@@ -142,7 +142,7 @@ func (c *tokensPartitionClient) GetFungibleTokens(ctx context.Context, ownerID [
 			return nil, fmt.Errorf("failed to fetch fungible token: %w", batchElem.Error)
 		}
 		u := batchElem.Result.(*sdktypes.Unit[tokens.FungibleTokenData])
-		typeID, _ := u.Data.TokenType.MarshalText()
+		typeID, _ := u.Data.TypeID.MarshalText()
 		types[string(typeID)] = nil
 	}
 
@@ -170,7 +170,7 @@ func (c *tokensPartitionClient) GetFungibleTokens(ctx context.Context, ownerID [
 
 	for _, batchElem := range batch {
 		u := batchElem.Result.(*sdktypes.Unit[tokens.FungibleTokenData])
-		typeID, _ := u.Data.TokenType.MarshalText()
+		typeID, _ := u.Data.TypeID.MarshalText()
 		ftType := types[string(typeID)]
 
 		fts = append(fts, &sdktypes.FungibleToken{
@@ -178,7 +178,7 @@ func (c *tokensPartitionClient) GetFungibleTokens(ctx context.Context, ownerID [
 			PartitionID:    u.PartitionID,
 			ID:             u.UnitID,
 			Symbol:         ftType.Data.Symbol,
-			TypeID:         u.Data.TokenType,
+			TypeID:         u.Data.TypeID,
 			TypeName:       ftType.Data.Name,
 			OwnerPredicate: u.Data.OwnerPredicate,
 			Counter:        u.Data.Counter,
