@@ -26,14 +26,14 @@ type (
 		PartitionID types.PartitionID
 		ID          types.UnitID
 		Balance     uint64
-		Timeout     uint64
+		MinLifetime uint64
 		LockStatus  uint64
 		Counter     *uint64
 	}
 
 	NodeInfoResponse struct {
-		NetworkID           types.NetworkID       `json:"networkId"`   // hex encoded network identifier
-		PartitionID         types.PartitionID     `json:"partitionId"` // hex encoded partition identifier
+		NetworkID           types.NetworkID       `json:"networkId"`       // hex encoded network identifier
+		PartitionID         types.PartitionID     `json:"partitionId"`     // hex encoded partition identifier
 		PartitionTypeID     types.PartitionTypeID `json:"partitionTypeId"` // hex encoded partition identifier
 		PermissionedMode    bool                  `json:"permissionedMode"`
 		FeelessMode         bool                  `json:"feelessMode"`
