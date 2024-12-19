@@ -4,7 +4,7 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -15,16 +15,12 @@ var pubKey = [33]byte{0x03,
 func TestFeeCreditRecordIDFromPublicKey(t *testing.T) {
 	unitID, err := hex.DecodeString("276B52B4808893d1e2Affd5310898818E8e7699d")
 	require.NoError(t, err)
-	// shard part can be nil
-	fcr, err := NewFeeCreditRecordIDFromPublicKey(nil, pubKey[:], 0)
-	require.NoError(t, err)
-	require.EqualValues(t, unitID, fcr)
-	// or any other value, evm will ignore this
-	fcr, err = NewFeeCreditRecordIDFromPublicKey(testutils.RandomBytes(2), pubKey[:], 0)
+	// evm will ignore shard
+	fcr, err := NewFeeCreditRecordIDFromPublicKey(types.ShardID{}, pubKey[:], 0)
 	require.NoError(t, err)
 	require.EqualValues(t, unitID, fcr)
 	// if pubkey is nil, unitID returns O address
-	fcr, err = NewFeeCreditRecordIDFromPublicKey(nil, nil, 0)
+	fcr, err = NewFeeCreditRecordIDFromPublicKey(types.ShardID{}, nil, 0)
 	require.NoError(t, err)
 	require.EqualValues(t, make([]byte, 20), fcr)
 }

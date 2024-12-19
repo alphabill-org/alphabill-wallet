@@ -19,7 +19,7 @@ type moneyPartitionClient struct {
 
 // NewMoneyPartitionClient creates a money partition client for the given RPC URL.
 func NewMoneyPartitionClient(ctx context.Context, rpcUrl string, opts ...Option) (sdktypes.MoneyPartitionClient, error) {
-	partitionClient, err := newPartitionClient(ctx, rpcUrl, opts...)
+	partitionClient, err := newPartitionClient(ctx, rpcUrl, money.PartitionTypeID, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +57,7 @@ func (c *moneyPartitionClient) GetBills(ctx context.Context, ownerID []byte) ([]
 	var bills []*sdktypes.Bill
 	var batch []rpc.BatchElem
 	for _, unitID := range unitIDs {
-		if !unitID.HasType(money.BillUnitType) {
+		if unitID.TypeMustBe(money.BillUnitType, c.pdr) != nil {
 			continue
 		}
 

@@ -9,14 +9,15 @@ import (
 	"math"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/stretchr/testify/require"
+
 	"github.com/alphabill-org/alphabill-go-base/hash"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
+	tokenid "github.com/alphabill-org/alphabill-go-base/testutils/tokens"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-go-base/types/hex"
-
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/stretchr/testify/require"
 
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
@@ -33,12 +34,14 @@ const (
 func Test_GetRoundNumber_OK(t *testing.T) {
 	t.Parallel()
 
+	pdr := tokenid.PDR()
 	rpcClient := &mockTokensPartitionClient{
+		pdr: &pdr,
 		getRoundNumber: func(ctx context.Context) (uint64, error) {
 			return 42, nil
 		},
 	}
-	w, err := New(types.NetworkLocal, tokens.DefaultPartitionID, rpcClient, nil, false, nil, 0, logger.New(t))
+	w, err := New(rpcClient, nil, false, nil, 0, logger.New(t))
 	require.NoError(t, err)
 
 	roundNumber, err := w.GetRoundNumber(context.Background())
@@ -109,8 +112,10 @@ func Test_ListTokenTypes(t *testing.T) {
 func TestNewTypes(t *testing.T) {
 	t.Parallel()
 
+	pdr := tokenid.PDR()
 	recTxs := make(map[string]*types.TransactionOrder)
 	rpcClient := &mockTokensPartitionClient{
+		pdr: &pdr,
 		getFungibleTokenTypeHierarchy: func(ctx context.Context, id sdktypes.TokenTypeID) ([]*sdktypes.FungibleTokenType, error) {
 			tx, found := recTxs[string(id)]
 			if found {
@@ -144,7 +149,7 @@ func TestNewTypes(t *testing.T) {
 		},
 		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
-			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(&pdr, types.ShardID{}, ownerID, fcrTimeout)
 			require.NoError(t, err)
 			return []types.UnitID{fcrID}, nil
 		},
@@ -152,7 +157,7 @@ func TestNewTypes(t *testing.T) {
 	tw := initTestWallet(t, rpcClient)
 
 	t.Run("fungible type", func(t *testing.T) {
-		typeID := tokens.NewFungibleTokenTypeID(nil, test.RandomBytes(32))
+		typeID := tokenid.NewFungibleTokenTypeID(t)
 		tt1 := &sdktypes.FungibleTokenType{
 			ID:                       typeID,
 			Symbol:                   "AB",
@@ -202,16 +207,16 @@ func TestNewTypes(t *testing.T) {
 		require.ErrorContains(t, err, "invalid token type ID: expected hex length is 66 characters (33 bytes)")
 
 		//check typeId unit type validation
-		tt2.ID = make([]byte, tokens.UnitIDLength)
+		tt2.ID = make([]byte, (tw.pdr.UnitIDLen+tw.pdr.TypeIDLen)/8)
 		_, err = tw.NewFungibleType(context.Background(), 1, tt2, nil)
-		require.ErrorContains(t, err, "invalid token type ID: expected unit type is 0x01")
+		require.ErrorContains(t, err, "invalid token type ID: expected unit type is 0x1")
 
 		//check typeId generation if typeId parameter is nil
 		tt2.ID = nil
 		tt2.DecimalPlaces = 0
 		result, err = tw.NewFungibleType(context.Background(), 1, tt2, nil)
 		require.NoError(t, err)
-		require.True(t, result.GetUnit().HasType(tokens.FungibleTokenTypeUnitType))
+		require.NoError(t, result.GetUnit().TypeMustBe(tokens.FungibleTokenTypeUnitType, tw.pdr))
 
 		//check fungible token type hierarchy
 		ftType, err := tw.GetFungibleTokenType(context.Background(), tt2.ID)
@@ -220,7 +225,7 @@ func TestNewTypes(t *testing.T) {
 	})
 
 	t.Run("non-fungible type", func(t *testing.T) {
-		typeID := tokens.NewNonFungibleTokenTypeID(nil, test.RandomBytes(32))
+		typeID := tokenid.NewNonFungibleTokenTypeID(t)
 		tt := &sdktypes.NonFungibleTokenType{
 			ID:                       typeID,
 			Symbol:                   "ABNFT",
@@ -252,14 +257,15 @@ func TestNewTypes(t *testing.T) {
 		require.ErrorContains(t, err, "invalid token type ID: expected hex length is 66 characters (33 bytes)")
 
 		//check typeId unit type validation
-		tt.ID = make([]byte, tokens.UnitIDLength)
+		tt.ID = make([]byte, (tw.pdr.UnitIDLen+tw.pdr.TypeIDLen)/8)
 		_, err = tw.NewNonFungibleType(context.Background(), 1, tt, nil)
-		require.ErrorContains(t, err, "invalid token type ID: expected unit type is 0x02")
+		require.ErrorContains(t, err, "invalid token type ID: expected unit type is 0x2")
 
 		//check typeId generation if typeId parameter is nil
 		tt.ID = nil
-		result, _ = tw.NewNonFungibleType(context.Background(), 1, tt, nil)
-		require.True(t, result.GetUnit().HasType(tokens.NonFungibleTokenTypeUnitType))
+		result, err = tw.NewNonFungibleType(context.Background(), 1, tt, nil)
+		require.NoError(t, err)
+		require.NoError(t, result.GetUnit().TypeMustBe(tokens.NonFungibleTokenTypeUnitType, tw.pdr))
 
 		//check non-fungible token type hierarchy
 		nftType, err := tw.GetNonFungibleTokenType(context.Background(), tt.ID)
@@ -269,15 +275,17 @@ func TestNewTypes(t *testing.T) {
 }
 
 func TestNewFungibleToken(t *testing.T) {
+	pdr := tokenid.PDR()
 	recTxs := make([]*types.TransactionOrder, 0)
 	rpcClient := &mockTokensPartitionClient{
+		pdr: &pdr,
 		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
 			recTxs = append(recTxs, tx)
 			return tx.Hash(crypto.SHA256)
 		},
 		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
-			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(&pdr, types.ShardID{}, ownerID, fcrTimeout)
 			require.NoError(t, err)
 			return []types.UnitID{fcrID}, nil
 		},
@@ -320,7 +328,7 @@ func TestNewFungibleToken(t *testing.T) {
 			attr := &tokens.MintFungibleTokenAttributes{}
 			require.NotNil(t, result)
 			require.Len(t, tx.GetUnitID(), 33)
-			require.True(t, tx.GetUnitID().HasType(tokens.FungibleTokenUnitType))
+			require.NoError(t, tx.GetUnitID().TypeMustBe(tokens.FungibleTokenUnitType, tw.pdr))
 			require.EqualValues(t, tx.GetUnitID(), result.GetUnit())
 			require.EqualValues(t, tx.GetUnitID(), ft.ID)
 
@@ -343,10 +351,8 @@ func newFungibleToken(_ *testing.T, id sdktypes.TokenID, typeID sdktypes.TokenTy
 }
 
 func newNonFungibleToken(t *testing.T, symbol string, ownerPredicate []byte, lockStatus, counter uint64) *sdktypes.NonFungibleToken {
-	nftID, err := tokens.NewRandomNonFungibleTokenID(nil)
-	require.NoError(t, err)
-	nftTypeID, err := tokens.NewRandomNonFungibleTokenTypeID(nil)
-	require.NoError(t, err)
+	nftID := tokenid.NewNonFungibleTokenID(t)
+	nftTypeID := tokenid.NewNonFungibleTokenTypeID(t)
 
 	return &sdktypes.NonFungibleToken{
 		ID:             nftID,
@@ -359,11 +365,13 @@ func newNonFungibleToken(t *testing.T, symbol string, ownerPredicate []byte, loc
 }
 
 func TestSendFungible(t *testing.T) {
+	pdr := tokenid.PDR()
 	recTxs := make([]*types.TransactionOrder, 0)
 	typeId := test.RandomBytes(32)
 	typeId2 := test.RandomBytes(32)
 	typeIdForOverflow := test.RandomBytes(32)
 	rpcClient := &mockTokensPartitionClient{
+		pdr: &pdr,
 		getFungibleTokens: func(ctx context.Context, ownerID []byte) ([]*sdktypes.FungibleToken, error) {
 			return []*sdktypes.FungibleToken{
 				newFungibleToken(t, test.RandomBytes(32), typeId, "AB", 3, 0),
@@ -378,7 +386,7 @@ func TestSendFungible(t *testing.T) {
 		},
 		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
-			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(&pdr, types.ShardID{}, ownerID, fcrTimeout)
 			require.NoError(t, err)
 			return []types.UnitID{fcrID}, nil
 		},
@@ -566,15 +574,17 @@ func TestNewNFT_InvalidInputs(t *testing.T) {
 }
 
 func TestNewNFT(t *testing.T) {
+	pdr := tokenid.PDR()
 	recTxs := make([]*types.TransactionOrder, 0)
 	rpcClient := &mockTokensPartitionClient{
+		pdr: &pdr,
 		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
 			recTxs = append(recTxs, tx)
 			return tx.Hash(crypto.SHA256)
 		},
 		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
-			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(&pdr, types.ShardID{}, ownerID, fcrTimeout)
 			require.NoError(t, err)
 			return []types.UnitID{fcrID}, nil
 		},
@@ -623,7 +633,7 @@ func TestNewNFT(t *testing.T) {
 			require.NoError(t, err)
 			nft := &sdktypes.NonFungibleToken{
 				PartitionID:         tokens.DefaultPartitionID,
-				TypeID:              tokens.NewNonFungibleTokenTypeID(nil, test.RandomBytes(32)),
+				TypeID:              tokenid.NewNonFungibleTokenTypeID(t),
 				OwnerPredicate:      ownerPredicateFromHash(key.PubKeyHash.Sha256),
 				URI:                 "https://alphabill.org",
 				Data:                nil,
@@ -636,7 +646,7 @@ func TestNewNFT(t *testing.T) {
 			require.Len(t, tx.GetUnitID(), 33)
 			require.EqualValues(t, tx.GetUnitID(), result.GetUnit())
 			require.EqualValues(t, tx.GetUnitID(), nft.ID)
-			require.True(t, tx.GetUnitID().HasType(tokens.NonFungibleTokenUnitType))
+			require.NoError(t, tx.GetUnitID().TypeMustBe(tokens.NonFungibleTokenUnitType, tw.pdr))
 
 			attr := &tokens.MintNonFungibleTokenAttributes{}
 			require.NoError(t, tx.UnmarshalAttributes(attr))
@@ -652,9 +662,11 @@ func TestNewNFT(t *testing.T) {
 }
 
 func TestTransferNFT(t *testing.T) {
+	pdr := tokenid.PDR()
 	tokenz := make(map[string]*sdktypes.NonFungibleToken)
 	recTxs := make(map[string]*types.TransactionOrder)
 	rpcClient := &mockTokensPartitionClient{
+		pdr: &pdr,
 		getNonFungibleToken: func(ctx context.Context, id sdktypes.TokenID) (*sdktypes.NonFungibleToken, error) {
 			return tokenz[string(id)], nil
 		},
@@ -664,7 +676,7 @@ func TestTransferNFT(t *testing.T) {
 		},
 		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
-			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(&pdr, types.ShardID{}, ownerID, fcrTimeout)
 			require.NoError(t, err)
 			return []types.UnitID{fcrID}, nil
 		},
@@ -723,9 +735,11 @@ func TestTransferNFT(t *testing.T) {
 }
 
 func TestUpdateNFTData(t *testing.T) {
+	pdr := tokenid.PDR()
 	tokenz := make(map[string]*sdktypes.NonFungibleToken)
 	recTxs := make(map[string]*types.TransactionOrder)
 	rpcClient := &mockTokensPartitionClient{
+		pdr: &pdr,
 		getNonFungibleToken: func(ctx context.Context, id sdktypes.TokenID) (*sdktypes.NonFungibleToken, error) {
 			return tokenz[string(id)], nil
 		},
@@ -735,7 +749,7 @@ func TestUpdateNFTData(t *testing.T) {
 		},
 		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
-			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(&pdr, types.ShardID{}, ownerID, fcrTimeout)
 			require.NoError(t, err)
 			return []types.UnitID{fcrID}, nil
 		},
@@ -766,9 +780,11 @@ func TestUpdateNFTData(t *testing.T) {
 }
 
 func TestLockToken(t *testing.T) {
+	pdr := tokenid.PDR()
 	var token *sdktypes.NonFungibleToken
 	recTxs := make(map[string]*types.TransactionOrder)
 	rpcClient := &mockTokensPartitionClient{
+		pdr: &pdr,
 		getNonFungibleToken: func(ctx context.Context, id sdktypes.TokenID) (*sdktypes.NonFungibleToken, error) {
 			return token, nil
 		},
@@ -778,7 +794,7 @@ func TestLockToken(t *testing.T) {
 		},
 		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
-			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(&pdr, types.ShardID{}, ownerID, fcrTimeout)
 			require.NoError(t, err)
 			return []types.UnitID{fcrID}, nil
 		},
@@ -805,9 +821,11 @@ func TestLockToken(t *testing.T) {
 }
 
 func TestUnlockToken(t *testing.T) {
+	pdr := tokenid.PDR()
 	var token *sdktypes.NonFungibleToken
 	recTxs := make(map[string]*types.TransactionOrder)
 	rpcClient := &mockTokensPartitionClient{
+		pdr: &pdr,
 		getNonFungibleToken: func(ctx context.Context, id sdktypes.TokenID) (*sdktypes.NonFungibleToken, error) {
 			return token, nil
 		},
@@ -817,7 +835,7 @@ func TestUnlockToken(t *testing.T) {
 		},
 		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
-			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(&pdr, types.ShardID{}, ownerID, fcrTimeout)
 			require.NoError(t, err)
 			return []types.UnitID{fcrID}, nil
 		},
@@ -846,9 +864,11 @@ func TestUnlockToken(t *testing.T) {
 func TestSendFungibleByID(t *testing.T) {
 	t.Parallel()
 
+	pdr := tokenid.PDR()
 	token := newFungibleToken(t, test.RandomBytes(32), test.RandomBytes(32), "AB", 100, 0)
 
 	be := &mockTokensPartitionClient{
+		pdr: &pdr,
 		getFungibleToken: func(ctx context.Context, id sdktypes.TokenID) (*sdktypes.FungibleToken, error) {
 			if bytes.Equal(id, token.ID) {
 				return token, nil
@@ -857,7 +877,7 @@ func TestSendFungibleByID(t *testing.T) {
 		},
 		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
 			// by default returns only the fee credit record id
-			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(nil, ownerID, fcrTimeout)
+			fcrID, err := tokens.NewFeeCreditRecordIDFromPublicKeyHash(&pdr, types.ShardID{}, ownerID, fcrTimeout)
 			require.NoError(t, err)
 			return []types.UnitID{fcrID}, nil
 		},
@@ -896,7 +916,12 @@ func TestSendFungibleByID(t *testing.T) {
 
 func initTestWallet(t *testing.T, tokensClient sdktypes.TokensPartitionClient) *Wallet {
 	t.Helper()
+	pdr, err := tokensClient.PartitionDescription(context.Background())
+	if err != nil {
+		t.Fatal("requesting PDR:", err)
+	}
 	return &Wallet{
+		pdr:          pdr,
 		am:           initAccountManager(t),
 		tokensClient: tokensClient,
 		log:          logger.New(t),
@@ -912,6 +937,7 @@ func initAccountManager(t *testing.T) account.Manager {
 }
 
 type mockTokensPartitionClient struct {
+	pdr                           *types.PartitionDescriptionRecord
 	getFungibleToken              func(ctx context.Context, id sdktypes.TokenID) (*sdktypes.FungibleToken, error)
 	getFungibleTokens             func(ctx context.Context, ownerID []byte) ([]*sdktypes.FungibleToken, error)
 	getFungibleTokenTypes         func(ctx context.Context, creator sdktypes.PubKey) ([]*sdktypes.FungibleTokenType, error)
@@ -929,6 +955,10 @@ type mockTokensPartitionClient struct {
 	getFeeCreditRecordByOwnerID func(ctx context.Context, ownerID []byte) (*sdktypes.FeeCreditRecord, error)
 	getBlock                    func(ctx context.Context, roundNumber uint64) (*types.Block, error)
 	getUnitsByOwnerID           func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error)
+}
+
+func (m *mockTokensPartitionClient) PartitionDescription(ctx context.Context) (*types.PartitionDescriptionRecord, error) {
+	return m.pdr, nil
 }
 
 func (m *mockTokensPartitionClient) GetNodeInfo(ctx context.Context) (*sdktypes.NodeInfoResponse, error) {
@@ -1027,13 +1057,13 @@ func (m *mockTokensPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Cont
 		return m.getFeeCreditRecordByOwnerID(ctx, ownerID)
 	}
 	c := uint64(2)
-	id := tokens.NewFeeCreditRecordID(nil, []byte{1})
+	id, err := m.pdr.ComposeUnitID(types.ShardID{}, tokens.FeeCreditRecordUnitType, func(b []byte) error { b[len(b)-1] = 1; return nil })
 	return &sdktypes.FeeCreditRecord{
 		PartitionID: tokens.DefaultPartitionID,
 		ID:          id,
 		Balance:     100000,
 		Counter:     &c,
-	}, nil
+	}, err
 }
 
 func (m *mockTokensPartitionClient) GetBlock(ctx context.Context, roundNumber uint64) (*types.Block, error) {

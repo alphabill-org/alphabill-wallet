@@ -4,14 +4,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
-	"github.com/alphabill-org/alphabill-go-base/types"
-	testmoney "github.com/alphabill-org/alphabill-wallet/internal/testutils/money"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
 
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
+	testmoney "github.com/alphabill-org/alphabill-wallet/internal/testutils/money"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 )
@@ -32,19 +30,21 @@ func TestExistingWalletCanBeLoaded(t *testing.T) {
 	rpcClient := testmoney.NewRpcClientMock()
 	feeManagerDB, err := fees.NewFeeManagerDB(homedir)
 	require.NoError(t, err)
-	_, err = NewWallet(types.NetworkLocal, money.DefaultPartitionID, am, feeManagerDB, rpcClient, maxFee, logger.New(t))
+	_, err = NewWallet(context.Background(), am, feeManagerDB, rpcClient, maxFee, logger.New(t))
 	require.NoError(t, err)
 }
 
 func TestWallet_GetPublicKey(t *testing.T) {
-	w := createTestWallet(t, nil)
+	rpcClient := testmoney.NewRpcClientMock()
+	w := createTestWallet(t, rpcClient)
 	pubKey, err := w.am.GetPublicKey(0)
 	require.NoError(t, err)
 	require.EqualValues(t, "0x"+testPubKey0Hex, hexutil.Encode(pubKey))
 }
 
 func TestWallet_GetPublicKeys(t *testing.T) {
-	w := createTestWallet(t, nil)
+	rpcClient := testmoney.NewRpcClientMock()
+	w := createTestWallet(t, rpcClient)
 	_, _, _ = w.am.AddAccount()
 
 	pubKeys, err := w.am.GetPublicKeys()
@@ -55,7 +55,8 @@ func TestWallet_GetPublicKeys(t *testing.T) {
 }
 
 func TestWallet_AddKey(t *testing.T) {
-	w := createTestWallet(t, nil)
+	rpcClient := testmoney.NewRpcClientMock()
+	w := createTestWallet(t, rpcClient)
 
 	accIdx, accPubKey, err := w.am.AddAccount()
 	require.NoError(t, err)
@@ -74,7 +75,7 @@ func TestWallet_AddKey(t *testing.T) {
 
 func TestWallet_GetBalance(t *testing.T) {
 	rpcClient := testmoney.NewRpcClientMock(
-		testmoney.WithOwnerBill(testmoney.NewBill(10, 1)),
+		testmoney.WithOwnerBill(testmoney.NewBill(t, 10, 1)),
 	)
 	w := createTestWallet(t, rpcClient)
 	balance, err := w.GetBalance(context.Background(), GetBalanceCmd{})
@@ -84,7 +85,7 @@ func TestWallet_GetBalance(t *testing.T) {
 
 func TestWallet_GetBalances(t *testing.T) {
 	rpcClient := testmoney.NewRpcClientMock(
-		testmoney.WithOwnerBill(testmoney.NewBill(10, 1)),
+		testmoney.WithOwnerBill(testmoney.NewBill(t, 10, 1)),
 	)
 	w := createTestWallet(t, rpcClient)
 	_, _, err := w.am.AddAccount()
@@ -108,7 +109,7 @@ func createTestWallet(t *testing.T, moneyClient sdktypes.MoneyPartitionClient) *
 	feeManagerDB, err := fees.NewFeeManagerDB(dir)
 	require.NoError(t, err)
 
-	w, err := NewWallet(types.NetworkLocal, money.DefaultPartitionID, am, feeManagerDB, moneyClient, maxFee, logger.New(t))
+	w, err := NewWallet(context.Background(), am, feeManagerDB, moneyClient, maxFee, logger.New(t))
 	require.NoError(t, err)
 
 	return w

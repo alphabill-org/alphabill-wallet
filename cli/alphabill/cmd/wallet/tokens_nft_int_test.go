@@ -11,14 +11,15 @@ import (
 	"os"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-go-base/hash"
-	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
-	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
-	"github.com/alphabill-org/alphabill-go-base/types"
-	"github.com/alphabill-org/alphabill-wallet/client"
 	"github.com/stretchr/testify/require"
 
+	"github.com/alphabill-org/alphabill-go-base/hash"
+	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
+	tokenid "github.com/alphabill-org/alphabill-go-base/testutils/tokens"
+	"github.com/alphabill-org/alphabill-go-base/types"
+
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
+	"github.com/alphabill-org/alphabill-wallet/client"
 )
 
 func TestNFTs_Integration(t *testing.T) {
@@ -45,8 +46,8 @@ func TestNFTs_Integration(t *testing.T) {
 	require.Equal(t, "Successfully created 50 fee credits on tokens partition.", stdout.Lines[0])
 
 	// non-fungible token types
-	typeID := randomNonFungibleTokenTypeID(t)
-	typeID2 := randomNonFungibleTokenTypeID(t)
+	typeID := tokenid.NewNonFungibleTokenTypeID(t)
+	typeID2 := tokenid.NewNonFungibleTokenTypeID(t)
 	symbol := "ABNFT"
 
 	tokensCmd := walletCmd.WithPrefixArgs("token", "--rpc-url", abNet.TokensRpcUrl)
@@ -127,7 +128,7 @@ func TestNFTs_CustomBearer_Integration(t *testing.T) {
 	walletCmd := newWalletCmdExecutor().WithHome(wallets[0].Homedir)
 
 	// non-fungible token types
-	typeID := randomNonFungibleTokenTypeID(t)
+	typeID := tokenid.NewNonFungibleTokenTypeID(t)
 	symbol := "ABNFT"
 
 	tokensCmd := walletCmd.WithPrefixArgs("token", "--rpc-url", abNet.TokensRpcUrl)
@@ -167,7 +168,7 @@ func TestNFTs_CustomBearer_Integration(t *testing.T) {
 func TestNFTDataUpdateCmd_Integration(t *testing.T) {
 	wallets, abNet := testutils.SetupNetworkWithWallets(t, testutils.WithTokensNode(t))
 
-	typeID := randomNonFungibleTokenTypeID(t)
+	typeID := tokenid.NewNonFungibleTokenTypeID(t)
 	symbol := "ABNFT"
 
 	// create type
@@ -228,8 +229,8 @@ func TestNFT_InvariantPredicate_Integration(t *testing.T) {
 	wallets, abNet := testutils.SetupNetworkWithWallets(t, testutils.WithTokensNode(t))
 
 	symbol1 := "ABNFT"
-	typeID11 := randomNonFungibleTokenTypeID(t)
-	typeID12 := randomNonFungibleTokenTypeID(t)
+	typeID11 := tokenid.NewNonFungibleTokenTypeID(t)
+	typeID12 := tokenid.NewNonFungibleTokenTypeID(t)
 
 	tokensCmd := newWalletCmdExecutor("token", "--rpc-url", abNet.TokensRpcUrl).WithHome(wallets[0].Homedir)
 
@@ -270,7 +271,7 @@ func TestNFT_InvariantPredicate_Integration(t *testing.T) {
 func TestNFT_LockUnlock_Integration(t *testing.T) {
 	wallets, abNet := testutils.SetupNetworkWithWallets(t, testutils.WithTokensNode(t))
 
-	typeID := randomNonFungibleTokenTypeID(t)
+	typeID := tokenid.NewNonFungibleTokenTypeID(t)
 	symbol := "ABNFT"
 
 	walletCmd := newWalletCmdExecutor().WithHome(wallets[0].Homedir)
@@ -300,10 +301,4 @@ func extractTokenID(t *testing.T, s string) types.UnitID {
 	nftIdBytes, err := hex.DecodeString(nftIDStr)
 	require.NoError(t, err)
 	return nftIdBytes
-}
-
-func randomNonFungibleTokenTypeID(t *testing.T) types.UnitID {
-	unitID, err := tokens.NewRandomNonFungibleTokenTypeID(nil)
-	require.NoError(t, err)
-	return unitID
 }

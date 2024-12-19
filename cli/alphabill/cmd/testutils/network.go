@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	defaultDockerImage   = "ghcr.io/alphabill-org/alphabill:2978bb93036b15ad65384eb1e24e09c0d184f294"
+	defaultDockerImage   = "ghcr.io/alphabill-org/alphabill:4cbabccb0869e8597dfc59ad2519cd9870cdd234"
 	containerGenesisPath = "/home/nonroot/genesis.tar"
 	containerP2pPort     = "8000"
 	containerRpcPort     = "8001"
@@ -375,5 +375,5 @@ func p2pUrl(t *testing.T, ctx context.Context, container tc.Container, keyFile s
 
 	id, err := io.ReadAll(r)
 	require.NoError(t, err)
-	return fmt.Sprintf("%s@/ip4/%s/tcp/%s", strings.TrimSpace(string(id)), ip, containerP2pPort)
+	return fmt.Sprintf("/ip4/%s/tcp/%s/p2p/%s", ip, containerP2pPort, strings.TrimSpace(string(id)))
 }

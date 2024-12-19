@@ -7,6 +7,7 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc/permissioned"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
+	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/spf13/cobra"
 
 	clitypes "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
@@ -89,6 +90,11 @@ func addFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 		return fmt.Errorf("cannot add fee credit, partition not in permissioned mode")
 	}
 
+	pdr, err := tokensClient.PartitionDescription(cmd.Context())
+	if err != nil {
+		return fmt.Errorf("failed to get PDR: %w", err)
+	}
+
 	am, err := cliaccount.LoadExistingAccountManager(config.walletConfig)
 	if err != nil {
 		return fmt.Errorf("failed to load account manager: %w", err)
@@ -121,7 +127,7 @@ func addFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 
 	ownerPredicate := templates.NewP2pkh256BytesFromKeyHash(ownerID)
 	if fcr == nil {
-		fcrID, err := tokens.NewFeeCreditRecordIDFromOwnerPredicate(nil, ownerPredicate, timeout)
+		fcrID, err := tokens.NewFeeCreditRecordIDFromOwnerPredicate(pdr, types.ShardID{}, ownerPredicate, timeout)
 		if err != nil {
 			return fmt.Errorf("failed to create fee credit record ID: %w", err)
 		}

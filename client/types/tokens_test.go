@@ -3,17 +3,19 @@ package types
 import (
 	"testing"
 
+	tokenid "github.com/alphabill-org/alphabill-go-base/testutils/tokens"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/stretchr/testify/require"
 )
 
 func TestFungibleTokenTypeCreate(t *testing.T) {
+	pdr := tokenid.PDR()
 	tt := &FungibleTokenType{
 		NetworkID:    types.NetworkLocal,
 		PartitionID:  tokens.DefaultPartitionID,
-		ID:           tokens.NewFungibleTokenTypeID(nil, []byte{2}),
-		ParentTypeID: tokens.NewFungibleTokenTypeID(nil, []byte{1}),
+		ID:           tokenid.NewFungibleTokenTypeID(t),
+		ParentTypeID: tokenid.NewFungibleTokenTypeID(t),
 		Symbol:       "symbol",
 		Name:         "name",
 		Icon: &tokens.Icon{
@@ -35,7 +37,7 @@ func TestFungibleTokenTypeCreate(t *testing.T) {
 	require.Equal(t, tx.Type, tokens.TransactionTypeDefineFT)
 	require.EqualValues(t, tt.PartitionID, tx.GetPartitionID())
 	require.NotNil(t, tt.ID)
-	require.True(t, tt.ID.HasType(tokens.FungibleTokenTypeUnitType))
+	require.NoError(t, tt.ID.TypeMustBe(tokens.FungibleTokenTypeUnitType, &pdr))
 	require.EqualValues(t, tt.ID, tx.GetUnitID())
 	require.EqualValues(t, timeout, tx.Timeout())
 	require.EqualValues(t, refNo, tx.Payload.ClientMetadata.ReferenceNumber)
@@ -54,11 +56,12 @@ func TestFungibleTokenTypeCreate(t *testing.T) {
 }
 
 func TestNonFungibleTokenTypeCreate(t *testing.T) {
+	pdr := tokenid.PDR()
 	tt := &NonFungibleTokenType{
 		NetworkID:    types.NetworkLocal,
 		PartitionID:  tokens.DefaultPartitionID,
-		ID:           tokens.NewFungibleTokenTypeID(nil, []byte{2}),
-		ParentTypeID: tokens.NewFungibleTokenTypeID(nil, []byte{1}),
+		ID:           tokenid.NewFungibleTokenTypeID(t),
+		ParentTypeID: tokenid.NewFungibleTokenTypeID(t),
 		Symbol:       "symbol",
 		Name:         "name",
 		Icon: &tokens.Icon{
@@ -76,7 +79,7 @@ func TestNonFungibleTokenTypeCreate(t *testing.T) {
 	require.Equal(t, tx.Type, tokens.TransactionTypeDefineNFT)
 	require.EqualValues(t, tt.PartitionID, tx.GetPartitionID())
 	require.NotNil(t, tt.ID)
-	require.True(t, tt.ID.HasType(tokens.FungibleTokenTypeUnitType))
+	require.NoError(t, tt.ID.TypeMustBe(tokens.FungibleTokenTypeUnitType, &pdr))
 	require.EqualValues(t, tt.ID, tx.GetUnitID())
 	require.Nil(t, tx.AuthProof)
 
@@ -93,20 +96,21 @@ func TestNonFungibleTokenTypeCreate(t *testing.T) {
 }
 
 func TestFungibleTokenCreate(t *testing.T) {
+	pdr := tokenid.PDR()
 	ft := &FungibleToken{
 		NetworkID:      types.NetworkLocal,
 		PartitionID:    tokens.DefaultPartitionID,
 		OwnerPredicate: []byte{99},
-		TypeID:         tokens.NewFungibleTokenTypeID(nil, []byte{1}),
+		TypeID:         tokenid.NewFungibleTokenTypeID(t),
 		Amount:         uint64(50),
 	}
-	tx, err := ft.Mint()
+	tx, err := ft.Mint(&pdr)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 	require.Equal(t, tx.Type, tokens.TransactionTypeMintFT)
 	require.EqualValues(t, ft.PartitionID, tx.GetPartitionID())
 	require.NotNil(t, ft.ID)
-	require.True(t, ft.ID.HasType(tokens.FungibleTokenUnitType))
+	require.NoError(t, ft.ID.TypeMustBe(tokens.FungibleTokenUnitType, &pdr))
 	require.EqualValues(t, ft.ID, tx.GetUnitID())
 	require.Nil(t, tx.AuthProof)
 
@@ -121,9 +125,9 @@ func TestFungibleTokenTransfer(t *testing.T) {
 	ft := &FungibleToken{
 		NetworkID:      types.NetworkLocal,
 		PartitionID:    tokens.DefaultPartitionID,
-		ID:             tokens.NewFungibleTokenID(nil, []byte{1}),
+		ID:             tokenid.NewFungibleTokenID(t),
 		OwnerPredicate: []byte{2},
-		TypeID:         tokens.NewFungibleTokenTypeID(nil, []byte{3}),
+		TypeID:         tokenid.NewFungibleTokenTypeID(t),
 		Amount:         uint64(4),
 	}
 	newOwnerPredicate := []byte{5}
@@ -145,9 +149,9 @@ func TestFungibleTokenSplit(t *testing.T) {
 	ft := &FungibleToken{
 		NetworkID:      types.NetworkLocal,
 		PartitionID:    tokens.DefaultPartitionID,
-		ID:             tokens.NewFungibleTokenID(nil, []byte{1}),
+		ID:             tokenid.NewFungibleTokenID(t),
 		OwnerPredicate: []byte{2},
-		TypeID:         tokens.NewFungibleTokenTypeID(nil, []byte{3}),
+		TypeID:         tokenid.NewFungibleTokenTypeID(t),
 		Amount:         uint64(4),
 	}
 	newOwnerPredicate := []byte{5}
@@ -169,12 +173,12 @@ func TestFungibleTokenBurn(t *testing.T) {
 	ft := &FungibleToken{
 		NetworkID:      types.NetworkLocal,
 		PartitionID:    tokens.DefaultPartitionID,
-		ID:             tokens.NewFungibleTokenID(nil, []byte{1}),
+		ID:             tokenid.NewFungibleTokenID(t),
 		OwnerPredicate: []byte{2},
-		TypeID:         tokens.NewFungibleTokenTypeID(nil, []byte{3}),
+		TypeID:         tokenid.NewFungibleTokenTypeID(t),
 		Amount:         uint64(4),
 	}
-	targetTokenID := tokens.NewFungibleTokenID(nil, []byte{5})
+	targetTokenID := tokenid.NewFungibleTokenID(t)
 	targetTokenCounter := uint64(6)
 
 	tx, err := ft.Burn(targetTokenID, targetTokenCounter)
@@ -196,9 +200,9 @@ func TestFungibleTokenJoin(t *testing.T) {
 	ft := &FungibleToken{
 		NetworkID:      types.NetworkLocal,
 		PartitionID:    tokens.DefaultPartitionID,
-		ID:             tokens.NewFungibleTokenID(nil, []byte{1}),
+		ID:             tokenid.NewFungibleTokenID(t),
 		OwnerPredicate: []byte{2},
-		TypeID:         tokens.NewFungibleTokenTypeID(nil, []byte{3}),
+		TypeID:         tokenid.NewFungibleTokenTypeID(t),
 		Amount:         uint64(4),
 	}
 
@@ -218,9 +222,9 @@ func TestFungibleTokenLock(t *testing.T) {
 	ft := &FungibleToken{
 		NetworkID:      types.NetworkLocal,
 		PartitionID:    tokens.DefaultPartitionID,
-		ID:             tokens.NewFungibleTokenID(nil, []byte{1}),
+		ID:             tokenid.NewFungibleTokenID(t),
 		OwnerPredicate: []byte{2},
-		TypeID:         tokens.NewFungibleTokenTypeID(nil, []byte{3}),
+		TypeID:         tokenid.NewFungibleTokenTypeID(t),
 		Amount:         uint64(4),
 	}
 
@@ -240,9 +244,9 @@ func TestNonFungibleTokenUnlock(t *testing.T) {
 	ft := &FungibleToken{
 		NetworkID:      types.NetworkLocal,
 		PartitionID:    tokens.DefaultPartitionID,
-		ID:             tokens.NewFungibleTokenID(nil, []byte{1}),
+		ID:             tokenid.NewFungibleTokenID(t),
 		OwnerPredicate: []byte{2},
-		TypeID:         tokens.NewFungibleTokenTypeID(nil, []byte{3}),
+		TypeID:         tokenid.NewFungibleTokenTypeID(t),
 		Amount:         uint64(4),
 	}
 
@@ -258,23 +262,24 @@ func TestNonFungibleTokenUnlock(t *testing.T) {
 }
 
 func TestNonFungibleTokenCreate(t *testing.T) {
+	pdr := tokenid.PDR()
 	nft := &NonFungibleToken{
 		NetworkID:           types.NetworkLocal,
 		PartitionID:         tokens.DefaultPartitionID,
 		OwnerPredicate:      []byte{1},
-		TypeID:              tokens.NewFungibleTokenTypeID(nil, []byte{2}),
+		TypeID:              tokenid.NewFungibleTokenTypeID(t),
 		Name:                "name",
 		URI:                 "uri",
 		Data:                []byte{3},
 		DataUpdatePredicate: []byte{4},
 	}
-	tx, err := nft.Mint()
+	tx, err := nft.Mint(&pdr)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
 	require.Equal(t, tx.Type, tokens.TransactionTypeMintNFT)
 	require.EqualValues(t, nft.PartitionID, tx.GetPartitionID())
 	require.NotNil(t, nft.ID)
-	require.True(t, nft.ID.HasType(tokens.NonFungibleTokenUnitType))
+	require.NoError(t, nft.ID.TypeMustBe(tokens.NonFungibleTokenUnitType, &pdr))
 	require.EqualValues(t, nft.ID, tx.GetUnitID())
 	require.Nil(t, tx.AuthProof)
 
@@ -292,9 +297,9 @@ func TestNonFungibleTokenTransfer(t *testing.T) {
 	nft := &NonFungibleToken{
 		NetworkID:      types.NetworkLocal,
 		PartitionID:    tokens.DefaultPartitionID,
-		ID:             tokens.NewNonFungibleTokenID(nil, []byte{1}),
+		ID:             tokenid.NewNonFungibleTokenID(t),
 		OwnerPredicate: []byte{2},
-		TypeID:         tokens.NewNonFungibleTokenTypeID(nil, []byte{3}),
+		TypeID:         tokenid.NewNonFungibleTokenTypeID(t),
 	}
 	newOwnerPredicate := []byte{4}
 	tx, err := nft.Transfer(newOwnerPredicate)
@@ -314,9 +319,9 @@ func TestNonFungibleTokenUpdate(t *testing.T) {
 	nft := &NonFungibleToken{
 		NetworkID:      types.NetworkLocal,
 		PartitionID:    tokens.DefaultPartitionID,
-		ID:             tokens.NewNonFungibleTokenID(nil, []byte{1}),
+		ID:             tokenid.NewNonFungibleTokenID(t),
 		OwnerPredicate: []byte{2},
-		TypeID:         tokens.NewNonFungibleTokenTypeID(nil, []byte{3}),
+		TypeID:         tokenid.NewNonFungibleTokenTypeID(t),
 		Data:           []byte{4},
 	}
 	newData := []byte{5}
