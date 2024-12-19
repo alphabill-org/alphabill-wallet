@@ -177,7 +177,7 @@ func ExecSendCmd(ctx context.Context, cmd *cobra.Command, config *types.WalletCo
 		return err
 	}
 
-	w, err := money.NewWallet(0, 0, am, feeManagerDB, moneyClient, maxFee, config.Base.Logger)
+	w, err := money.NewWallet(cmd.Context(), am, feeManagerDB, moneyClient, maxFee, config.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -281,7 +281,7 @@ func ExecGetBalanceCmd(cmd *cobra.Command, config *types.WalletConfig) error {
 	}
 	defer feeManagerDB.Close()
 
-	w, err := money.NewWallet(0, 0, am, feeManagerDB, moneyClient, 0, config.Base.Logger)
+	w, err := money.NewWallet(cmd.Context(), am, feeManagerDB, moneyClient, 0, config.Base.Logger)
 	if err != nil {
 		return err
 	}
@@ -418,12 +418,7 @@ func ExecCollectDust(cmd *cobra.Command, config *types.WalletConfig) error {
 		return err
 	}
 
-	nodeInfo, err := moneyClient.GetNodeInfo(cmd.Context())
-	if err != nil {
-		return fmt.Errorf("failed to get node info: %w", err)
-	}
-
-	w, err := money.NewWallet(nodeInfo.NetworkID, nodeInfo.PartitionID, am, feeManagerDB, moneyClient, maxFee, config.Base.Logger)
+	w, err := money.NewWallet(cmd.Context(), am, feeManagerDB, moneyClient, maxFee, config.Base.Logger)
 	if err != nil {
 		return err
 	}

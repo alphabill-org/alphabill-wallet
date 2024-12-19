@@ -6,12 +6,12 @@ import (
 
 	"github.com/alphabill-org/alphabill-go-base/hash"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
+	tokenid "github.com/alphabill-org/alphabill-go-base/testutils/tokens"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc/permissioned"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
 	"github.com/alphabill-org/alphabill-wallet/client/rpc/mocksrv"
-	"github.com/alphabill-org/alphabill-wallet/client/types"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +19,7 @@ import (
 func TestAddFeeCreditCmd(t *testing.T) {
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
 	as := mocksrv.NewAdminServiceMock(mocksrv.WithInfoResponse(
-		&types.NodeInfoResponse{
+		&sdktypes.NodeInfoResponse{
 			NetworkID:        1,
 			PartitionID:      50,
 			PartitionTypeID:  tokens.PartitionTypeID,
@@ -28,7 +28,7 @@ func TestAddFeeCreditCmd(t *testing.T) {
 	ss := mocksrv.NewStateServiceMock(
 		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t),
 			&sdktypes.Unit[any]{
-				UnitID: tokens.NewFeeCreditRecordID(nil, []byte{1}),
+				UnitID: tokenid.NewFeeCreditRecordID(t),
 				Data:   fc.FeeCreditRecord{Balance: 3, OwnerPredicate: nil},
 			}))
 	rpcUrl := mocksrv.StartServer(t, map[string]interface{}{
@@ -59,7 +59,7 @@ func TestDeleteFeeCreditCmd(t *testing.T) {
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
 	targetPubkey := []byte{1, 2, 3}
 	as := mocksrv.NewAdminServiceMock(mocksrv.WithInfoResponse(
-		&types.NodeInfoResponse{
+		&sdktypes.NodeInfoResponse{
 			NetworkID:        1,
 			PartitionID:      50,
 			PartitionTypeID:  tokens.PartitionTypeID,
@@ -68,7 +68,7 @@ func TestDeleteFeeCreditCmd(t *testing.T) {
 	ss := mocksrv.NewStateServiceMock(
 		mocksrv.WithOwnerUnit(hash.Sum256(targetPubkey),
 			&sdktypes.Unit[any]{
-				UnitID: tokens.NewFeeCreditRecordID(nil, []byte{1}),
+				UnitID: tokenid.NewFeeCreditRecordID(t),
 				Data:   fc.FeeCreditRecord{Balance: 3, OwnerPredicate: nil},
 			}))
 	rpcUrl := mocksrv.StartServer(t, map[string]interface{}{

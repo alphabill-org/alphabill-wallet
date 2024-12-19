@@ -19,7 +19,7 @@ type tokensPartitionClient struct {
 
 // NewTokensPartitionClient creates a tokens partition client for the given RPC URL.
 func NewTokensPartitionClient(ctx context.Context, rpcUrl string, opts ...Option) (sdktypes.TokensPartitionClient, error) {
-	partitionClient, err := newPartitionClient(ctx, rpcUrl, opts...)
+	partitionClient, err := newPartitionClient(ctx, rpcUrl, tokens.PartitionTypeID, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -32,8 +32,8 @@ func NewTokensPartitionClient(ctx context.Context, rpcUrl string, opts ...Option
 // GetFungibleToken returns fungible token for the given token id.
 // Returns nil,nil if the token does not exist.
 func (c *tokensPartitionClient) GetFungibleToken(ctx context.Context, tokenID sdktypes.TokenID) (*sdktypes.FungibleToken, error) {
-	if !tokenID.HasType(tokens.FungibleTokenUnitType) {
-		return nil, fmt.Errorf("invalid fungible token id: %s", tokenID)
+	if err := tokenID.TypeMustBe(tokens.FungibleTokenUnitType, c.pdr); err != nil {
+		return nil, fmt.Errorf("invalid fungible token id: %w", err)
 	}
 
 	var ft *sdktypes.Unit[tokens.FungibleTokenData]
@@ -70,8 +70,8 @@ func (c *tokensPartitionClient) GetFungibleToken(ctx context.Context, tokenID sd
 // GetNonFungibleToken returns non-fungible token for the given token id.
 // Returns nil,nil if the token does not exist.
 func (c *tokensPartitionClient) GetNonFungibleToken(ctx context.Context, tokenID sdktypes.TokenID) (*sdktypes.NonFungibleToken, error) {
-	if !tokenID.HasType(tokens.NonFungibleTokenUnitType) {
-		return nil, fmt.Errorf("invalid non-fungible token id: %s", tokenID)
+	if err := tokenID.TypeMustBe(tokens.NonFungibleTokenUnitType, c.pdr); err != nil {
+		return nil, fmt.Errorf("invalid non-fungible token id: %w", err)
 	}
 
 	var nft *sdktypes.Unit[tokens.NonFungibleTokenData]
@@ -117,7 +117,7 @@ func (c *tokensPartitionClient) GetFungibleTokens(ctx context.Context, ownerID [
 	var fts []*sdktypes.FungibleToken
 	var batch []rpc.BatchElem
 	for _, unitID := range unitIDs {
-		if !unitID.HasType(tokens.FungibleTokenUnitType) {
+		if unitID.TypeMustBe(tokens.FungibleTokenUnitType, c.pdr) != nil {
 			continue
 		}
 
@@ -201,7 +201,7 @@ func (c *tokensPartitionClient) GetNonFungibleTokens(ctx context.Context, ownerI
 	var nfts []*sdktypes.NonFungibleToken
 	var batch []rpc.BatchElem
 	for _, unitID := range unitIDs {
-		if !unitID.HasType(tokens.NonFungibleTokenUnitType) {
+		if unitID.TypeMustBe(tokens.NonFungibleTokenUnitType, c.pdr) != nil {
 			continue
 		}
 
@@ -345,8 +345,8 @@ func (c *tokensPartitionClient) Close() {
 }
 
 func (c *tokensPartitionClient) getFungibleTokenType(ctx context.Context, typeID sdktypes.TokenTypeID) (*sdktypes.FungibleTokenType, error) {
-	if !typeID.HasType(tokens.FungibleTokenTypeUnitType) {
-		return nil, fmt.Errorf("invalid fungible token type id: %s", typeID)
+	if err := typeID.TypeMustBe(tokens.FungibleTokenTypeUnitType, c.pdr); err != nil {
+		return nil, fmt.Errorf("invalid fungible token type id: %w", err)
 	}
 	var ftType *sdktypes.Unit[tokens.FungibleTokenTypeData]
 	if err := c.RpcClient.CallContext(ctx, &ftType, "state_getUnit", typeID, false); err != nil {
@@ -371,8 +371,8 @@ func (c *tokensPartitionClient) getFungibleTokenType(ctx context.Context, typeID
 }
 
 func (c *tokensPartitionClient) getNonFungibleTokenType(ctx context.Context, typeID sdktypes.TokenTypeID) (*sdktypes.NonFungibleTokenType, error) {
-	if !typeID.HasType(tokens.NonFungibleTokenTypeUnitType) {
-		return nil, fmt.Errorf("invalid non-fungible token type id: %s", typeID)
+	if err := typeID.TypeMustBe(tokens.NonFungibleTokenTypeUnitType, c.pdr); err != nil {
+		return nil, fmt.Errorf("invalid non-fungible token type id: %w", err)
 	}
 	var nftType *sdktypes.Unit[tokens.NonFungibleTokenTypeData]
 	if err := c.RpcClient.CallContext(ctx, &nftType, "state_getUnit", typeID, false); err != nil {

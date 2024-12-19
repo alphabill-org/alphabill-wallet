@@ -29,8 +29,7 @@ const (
 
 type (
 	Wallet struct {
-		partitionID   types.PartitionID
-		networkID     types.NetworkID
+		pdr           *types.PartitionDescriptionRecord
 		am            account.Manager
 		moneyClient   sdktypes.MoneyPartitionClient
 		feeManager    *fees.FeeManager
@@ -74,16 +73,26 @@ func GenerateKeys(am account.Manager, mnemonic string) error {
 }
 
 // NewWallet creates a new money wallet from specified parameters. The account manager must contain pre-generated keys.
-func NewWallet(networkID types.NetworkID, partitionID types.PartitionID, am account.Manager, feeManagerDB fees.FeeManagerDB, moneyClient sdktypes.MoneyPartitionClient, maxFee uint64, log *slog.Logger) (*Wallet, error) {
-	feeManager := fees.NewFeeManager(networkID, am, feeManagerDB,
-		partitionID, moneyClient, money.NewFeeCreditRecordIDFromPublicKey,
-		partitionID, moneyClient, money.NewFeeCreditRecordIDFromPublicKey,
+func NewWallet(ctx context.Context, am account.Manager, feeManagerDB fees.FeeManagerDB, moneyClient sdktypes.MoneyPartitionClient, maxFee uint64, log *slog.Logger) (*Wallet, error) {
+	pdr, err := moneyClient.PartitionDescription(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("loading partition description: %w", err)
+	}
+	if pdr.PartitionTypeID != money.PartitionTypeID {
+		return nil, fmt.Errorf("invalid rpc url: expected money partition (%d) node reports partition type %d", money.PartitionTypeID, pdr.PartitionTypeID)
+	}
+	fcrGen := func(shard types.ShardID, pubKey []byte, latestAdditionTime uint64) (types.UnitID, error) {
+		return money.NewFeeCreditRecordIDFromPublicKey(pdr, shard, pubKey, latestAdditionTime)
+	}
+
+	feeManager := fees.NewFeeManager(pdr.NetworkID, am, feeManagerDB,
+		pdr.PartitionID, moneyClient, fcrGen,
+		pdr.PartitionID, moneyClient, fcrGen,
 		maxFee, log,
 	)
 	dustCollector := dc.NewDustCollector(maxBillsForDustCollection, txTimeoutBlockCount, moneyClient, maxFee, log)
 	return &Wallet{
-		networkID:     networkID,
-		partitionID:   partitionID,
+		pdr:           pdr,
 		am:            am,
 		moneyClient:   moneyClient,
 		feeManager:    feeManager,
@@ -98,11 +107,11 @@ func (w *Wallet) GetAccountManager() account.Manager {
 }
 
 func (w *Wallet) NetworkID() types.NetworkID {
-	return w.networkID
+	return w.pdr.NetworkID
 }
 
 func (w *Wallet) PartitionID() types.PartitionID {
-	return w.partitionID
+	return w.pdr.PartitionID
 }
 
 // Close terminates connection to alphabill node, closes account manager and cancels any background goroutines.

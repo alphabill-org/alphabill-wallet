@@ -1,7 +1,6 @@
 package tokens
 
 import (
-	"errors"
 	"fmt"
 	"mime"
 	"os"
@@ -1191,14 +1190,7 @@ func initTokensWallet(cmd *cobra.Command, config *types.WalletConfig) (*tokenswa
 		return nil, fmt.Errorf("failed to dial rpc client: %w", err)
 	}
 
-	nodeInfo, err := tokensClient.GetNodeInfo(cmd.Context())
-	if err != nil {
-		return nil, err
-	}
-	if nodeInfo.PartitionTypeID != tokens.PartitionTypeID {
-		return nil, errors.New("invalid rpc url provided for tokens partition")
-	}
-	return tokenswallet.New(nodeInfo.NetworkID, nodeInfo.PartitionID, tokensClient, am, confirmTx, nil, maxFee, config.Base.Logger)
+	return tokenswallet.New(tokensClient, am, confirmTx, nil, maxFee, config.Base.Logger)
 }
 
 func readParentTypeInfo(cmd *cobra.Command, keyNr uint64, am account.Manager) (sdktypes.TokenTypeID, []*tokenswallet.PredicateInput, error) {

@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
-	tokentxs "github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/stretchr/testify/require"
+
+	tokenid "github.com/alphabill-org/alphabill-go-base/testutils/tokens"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 
 	"github.com/alphabill-org/alphabill-wallet/client/rpc/mocksrv"
 	"github.com/alphabill-org/alphabill-wallet/client/types"
@@ -19,8 +20,8 @@ func TestTokensRpcClient(t *testing.T) {
 	client := startServerAndTokensClient(t, service)
 
 	t.Run("GetFungibleToken_OK", func(t *testing.T) {
-		tokenID := tokentxs.NewFungibleTokenID(nil, []byte{1})
-		tokenTypeID := tokentxs.NewFungibleTokenTypeID(nil, []byte{2})
+		tokenID := tokenid.NewFungibleTokenID(t)
+		tokenTypeID := tokenid.NewFungibleTokenTypeID(t)
 		tokenType := &types.FungibleTokenType{
 			PartitionID:   tokens.DefaultPartitionID,
 			ID:            tokenTypeID,
@@ -42,7 +43,7 @@ func TestTokensRpcClient(t *testing.T) {
 			mocksrv.WithUnit(&types.Unit[any]{
 				PartitionID: tokenType.PartitionID,
 				UnitID:      tokenType.ID,
-				Data: tokentxs.FungibleTokenTypeData{
+				Data: tokens.FungibleTokenTypeData{
 					Symbol:        tokenType.Symbol,
 					Name:          tokenType.Name,
 					DecimalPlaces: tokenType.DecimalPlaces,
@@ -51,7 +52,7 @@ func TestTokensRpcClient(t *testing.T) {
 			mocksrv.WithUnit(&types.Unit[any]{
 				PartitionID: ft.PartitionID,
 				UnitID:      ft.ID,
-				Data: tokentxs.FungibleTokenData{
+				Data: tokens.FungibleTokenData{
 					TypeID:  tokenType.ID,
 					Value:   ft.Amount,
 					Counter: ft.Counter,
@@ -63,17 +64,19 @@ func TestTokensRpcClient(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, ft, actualToken)
 	})
+
 	t.Run("GetFungibleToken_NOK", func(t *testing.T) {
 		*service = *mocksrv.NewStateServiceMock(mocksrv.WithError(errors.New("some error")))
-		tokenID := tokentxs.NewFungibleTokenID(nil, []byte{1})
+		tokenID := tokenid.NewFungibleTokenID(t)
 
 		ft, err := client.GetFungibleToken(context.Background(), tokenID)
 		require.ErrorContains(t, err, "some error")
 		require.Nil(t, ft)
 	})
+
 	t.Run("GetFungibleToken_NotFound", func(t *testing.T) {
 		*service = *mocksrv.NewStateServiceMock()
-		tokenID := tokentxs.NewFungibleTokenID(nil, []byte{1})
+		tokenID := tokenid.NewFungibleTokenID(t)
 
 		ft, err := client.GetFungibleToken(context.Background(), tokenID)
 		require.Nil(t, err)
@@ -83,8 +86,8 @@ func TestTokensRpcClient(t *testing.T) {
 	t.Run("GetTokens_OK", func(t *testing.T) {
 		ownerID := []byte{1}
 
-		ftTokenID := tokentxs.NewFungibleTokenID(nil, []byte{1})
-		ftTokenTypeID := tokentxs.NewFungibleTokenTypeID(nil, []byte{2})
+		ftTokenID := tokenid.NewFungibleTokenID(t)
+		ftTokenTypeID := tokenid.NewFungibleTokenTypeID(t)
 		ftTokenType := &types.FungibleTokenType{
 			PartitionID:   tokens.DefaultPartitionID,
 			ID:            ftTokenTypeID,
@@ -105,8 +108,8 @@ func TestTokensRpcClient(t *testing.T) {
 			DecimalPlaces:  ftTokenType.DecimalPlaces,
 		}
 
-		nftTokenID := tokentxs.NewNonFungibleTokenID(nil, []byte{3})
-		nftTokenTypeID := tokentxs.NewNonFungibleTokenTypeID(nil, []byte{4})
+		nftTokenID := tokenid.NewNonFungibleTokenID(t)
+		nftTokenTypeID := tokenid.NewNonFungibleTokenTypeID(t)
 		nftTokenType := &types.NonFungibleTokenType{
 			PartitionID: tokens.DefaultPartitionID,
 			ID:          nftTokenTypeID,
@@ -130,7 +133,7 @@ func TestTokensRpcClient(t *testing.T) {
 			mocksrv.WithUnit(&types.Unit[any]{
 				PartitionID: tokens.DefaultPartitionID,
 				UnitID:      ftTokenTypeID,
-				Data: tokentxs.FungibleTokenTypeData{
+				Data: tokens.FungibleTokenTypeData{
 					Symbol:        ftTokenType.Symbol,
 					Name:          ftTokenType.Name,
 					DecimalPlaces: ftTokenType.DecimalPlaces,
@@ -140,7 +143,7 @@ func TestTokensRpcClient(t *testing.T) {
 			mocksrv.WithOwnerUnit(ownerID, &types.Unit[any]{
 				PartitionID: tokens.DefaultPartitionID,
 				UnitID:      ftTokenID,
-				Data: tokentxs.FungibleTokenData{
+				Data: tokens.FungibleTokenData{
 					TypeID:         ftTokenTypeID,
 					Value:          ft.Amount,
 					Counter:        ft.Counter,
@@ -152,7 +155,7 @@ func TestTokensRpcClient(t *testing.T) {
 			mocksrv.WithUnit(&types.Unit[any]{
 				PartitionID: tokens.DefaultPartitionID,
 				UnitID:      nftTokenTypeID,
-				Data: tokentxs.NonFungibleTokenTypeData{
+				Data: tokens.NonFungibleTokenTypeData{
 					Symbol: nftTokenType.Symbol,
 					Name:   nftTokenType.Name,
 				},
@@ -161,7 +164,7 @@ func TestTokensRpcClient(t *testing.T) {
 			mocksrv.WithOwnerUnit(ownerID, &types.Unit[any]{
 				PartitionID: tokens.DefaultPartitionID,
 				UnitID:      nftTokenID,
-				Data: tokentxs.NonFungibleTokenData{
+				Data: tokens.NonFungibleTokenData{
 					TypeID:         nftTokenTypeID,
 					Name:           nft.Name,
 					Counter:        nft.Counter,
@@ -180,9 +183,10 @@ func TestTokensRpcClient(t *testing.T) {
 		require.Len(t, fts, 1)
 		require.Equal(t, ft, fts[0])
 	})
+
 	t.Run("GetFungibleToken_NOK", func(t *testing.T) {
 		*service = *mocksrv.NewStateServiceMock(mocksrv.WithError(errors.New("some error")))
-		tokenID := tokentxs.NewFungibleTokenID(nil, []byte{1})
+		tokenID := tokenid.NewFungibleTokenID(t)
 
 		ft, err := client.GetFungibleToken(context.Background(), tokenID)
 		require.ErrorContains(t, err, "some error")
@@ -195,7 +199,7 @@ func TestTokensRpcClient(t *testing.T) {
 		var units []*types.Unit[any]
 		prevTypeID := types.NoParent
 		for i := uint8(1); i <= 3; i++ {
-			typeID := tokentxs.NewFungibleTokenTypeID(nil, []byte{i})
+			typeID := tokenid.NewFungibleTokenTypeID(t)
 			tokenType := &types.FungibleTokenType{
 				PartitionID:   tokens.DefaultPartitionID,
 				ID:            typeID,
@@ -209,7 +213,7 @@ func TestTokensRpcClient(t *testing.T) {
 			units = append(units, &types.Unit[any]{
 				PartitionID: tokens.DefaultPartitionID,
 				UnitID:      typeID,
-				Data: tokentxs.FungibleTokenTypeData{
+				Data: tokens.FungibleTokenTypeData{
 					Symbol:        tokenType.Symbol,
 					Name:          tokenType.Name,
 					DecimalPlaces: tokenType.DecimalPlaces,
@@ -234,9 +238,10 @@ func TestTokensRpcClient(t *testing.T) {
 		require.Equal(t, typeHierarchy[1].ParentTypeID, typeHierarchy[2].ID)
 		require.Equal(t, typeHierarchy[2].ParentTypeID, types.NoParent)
 	})
+
 	t.Run("GetFungibleTokenTypeHierarchy_NOK", func(t *testing.T) {
 		*service = *mocksrv.NewStateServiceMock()
-		typeID := tokentxs.NewFungibleTokenTypeID(nil, []byte{1})
+		typeID := tokenid.NewFungibleTokenTypeID(t)
 
 		typeHierarchy, err := client.GetFungibleTokenTypeHierarchy(context.Background(), typeID)
 		require.ErrorContains(t, err, fmt.Sprintf("fungible token type %s not found", typeID.String()))
@@ -249,7 +254,7 @@ func TestTokensRpcClient(t *testing.T) {
 		var units []*types.Unit[any]
 		prevTypeID := types.NoParent
 		for i := uint8(1); i <= 3; i++ {
-			typeID := tokentxs.NewNonFungibleTokenTypeID(nil, []byte{i})
+			typeID := tokenid.NewNonFungibleTokenTypeID(t)
 			tokenType := &types.NonFungibleTokenType{
 				PartitionID:  tokens.DefaultPartitionID,
 				ID:           typeID,
@@ -262,7 +267,7 @@ func TestTokensRpcClient(t *testing.T) {
 			units = append(units, &types.Unit[any]{
 				PartitionID: tokens.DefaultPartitionID,
 				UnitID:      typeID,
-				Data: tokentxs.NonFungibleTokenTypeData{
+				Data: tokens.NonFungibleTokenTypeData{
 					Symbol:       tokenType.Symbol,
 					Name:         tokenType.Name,
 					ParentTypeID: tokenType.ParentTypeID,
@@ -286,9 +291,10 @@ func TestTokensRpcClient(t *testing.T) {
 		require.Equal(t, typeHierarchy[1].ParentTypeID, typeHierarchy[2].ID)
 		require.Equal(t, typeHierarchy[2].ParentTypeID, types.NoParent)
 	})
+
 	t.Run("GetNonFungibleTokenTypeHierarchy_NOK", func(t *testing.T) {
 		*service = *mocksrv.NewStateServiceMock()
-		typeID := tokentxs.NewNonFungibleTokenTypeID(nil, []byte{1})
+		typeID := tokenid.NewNonFungibleTokenTypeID(t)
 
 		typeHierarchy, err := client.GetNonFungibleTokenTypeHierarchy(context.Background(), typeID)
 		require.ErrorContains(t, err, fmt.Sprintf("non-fungible token type %s not found", typeID.String()))
@@ -297,11 +303,20 @@ func TestTokensRpcClient(t *testing.T) {
 }
 
 func startServerAndTokensClient(t *testing.T, service *mocksrv.StateServiceMock) types.TokensPartitionClient {
-	srv := mocksrv.StartStateApiServer(t, service)
+	// as a part of client init it queries admin service for getNodeInfo so we need to
+	// set up the response. Once AB-1800 gets resolved might not be necessary anymore.
+	pdr := tokenid.PDR()
+	admin := mocksrv.AdminServiceMock{InfoResponse: &types.NodeInfoResponse{
+		NetworkID:       pdr.NetworkID,
+		PartitionID:     pdr.PartitionID,
+		PartitionTypeID: pdr.PartitionTypeID,
+	}}
+
+	srv := mocksrv.StartServer(t, map[string]interface{}{"state": service, "admin": &admin})
 
 	tokensClient, err := NewTokensPartitionClient(context.Background(), "http://"+srv)
-	t.Cleanup(tokensClient.Close)
 	require.NoError(t, err)
+	t.Cleanup(tokensClient.Close)
 
 	return tokensClient
 }

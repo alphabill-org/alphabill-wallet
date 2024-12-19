@@ -18,10 +18,10 @@ func TestDC_OK(t *testing.T) {
 	// create wallet with 3 normal bills
 	accountKeys, err := account.NewKeys("dinosaur simple verify deliver bless ridge monkey design venue six problem lucky")
 	require.NoError(t, err)
-	targetBill := testmoney.NewBill(3, 3)
+	targetBill := testmoney.NewBill(t, 3, 3)
 	moneyClient := testmoney.NewRpcClientMock(
-		testmoney.WithOwnerBill(testmoney.NewBill(1, 1)),
-		testmoney.WithOwnerBill(testmoney.NewBill(2, 2)),
+		testmoney.WithOwnerBill(testmoney.NewBill(t, 1, 1)),
+		testmoney.WithOwnerBill(testmoney.NewBill(t, 2, 2)),
 		testmoney.WithOwnerBill(targetBill),
 		testmoney.WithOwnerFeeCreditRecord(
 			testmoney.NewMoneyFCR(t, accountKeys.AccountKey.PubKeyHash.Sha256, 100, maxFee, 100)),
@@ -48,7 +48,7 @@ func TestDCWontRunForSingleBill(t *testing.T) {
 	accountKeys, err := account.NewKeys("dinosaur simple verify deliver bless ridge monkey design venue six problem lucky")
 	require.NoError(t, err)
 	moneyClient := testmoney.NewRpcClientMock(
-		testmoney.WithOwnerBill(testmoney.NewBill(1, 1)),
+		testmoney.WithOwnerBill(testmoney.NewBill(t, 1, 1)),
 		testmoney.WithOwnerFeeCreditRecord(
 			testmoney.NewMoneyFCR(t, accountKeys.AccountKey.PubKeyHash.Sha256, 100, 0, 100)),
 	)
@@ -67,10 +67,10 @@ func TestAllBillsAreSwapped_WhenWalletBillCountEqualToMaxBillCount(t *testing.T)
 	maxBillsPerDC := 3
 	accountKeys, err := account.NewKeys("dinosaur simple verify deliver bless ridge monkey design venue six problem lucky")
 	require.NoError(t, err)
-	targetBill := testmoney.NewBill(3, 3)
+	targetBill := testmoney.NewBill(t, 3, 3)
 	moneyClient := testmoney.NewRpcClientMock(
-		testmoney.WithOwnerBill(testmoney.NewBill(1, 1)),
-		testmoney.WithOwnerBill(testmoney.NewBill(2, 2)),
+		testmoney.WithOwnerBill(testmoney.NewBill(t, 1, 1)),
+		testmoney.WithOwnerBill(testmoney.NewBill(t, 2, 2)),
 		testmoney.WithOwnerBill(targetBill),
 		testmoney.WithOwnerFeeCreditRecord(testmoney.NewMoneyFCR(t, accountKeys.AccountKey.PubKeyHash.Sha256, 100, 0, 100)),
 	)
@@ -100,11 +100,11 @@ func TestOnlyFirstNBillsAreSwapped_WhenBillCountOverLimit(t *testing.T) {
 	maxBillsPerDC := 3
 	accountKeys, err := account.NewKeys("dinosaur simple verify deliver bless ridge monkey design venue six problem lucky")
 	require.NoError(t, err)
-	targetBill := testmoney.NewBill(4, 4)
+	targetBill := testmoney.NewBill(t, 4, 4)
 	moneyClient := testmoney.NewRpcClientMock(
-		testmoney.WithOwnerBill(testmoney.NewBill(1, 1)),
-		testmoney.WithOwnerBill(testmoney.NewBill(2, 2)),
-		testmoney.WithOwnerBill(testmoney.NewBill(3, 3)),
+		testmoney.WithOwnerBill(testmoney.NewBill(t, 1, 1)),
+		testmoney.WithOwnerBill(testmoney.NewBill(t, 2, 2)),
+		testmoney.WithOwnerBill(testmoney.NewBill(t, 3, 3)),
 		testmoney.WithOwnerBill(targetBill),
 		testmoney.WithOwnerFeeCreditRecord(testmoney.NewMoneyFCR(t, accountKeys.AccountKey.PubKeyHash.Sha256, 100, 0, 100)),
 	)
