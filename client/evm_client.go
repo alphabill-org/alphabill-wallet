@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/alphabill-org/alphabill-go-base/txsystem/evm"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/types"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
@@ -37,7 +38,7 @@ type (
 
 // NewEvmPartitionClient creates an evm partition client for the given RPC URL.
 func NewEvmPartitionClient(ctx context.Context, rpcUrl string) (sdktypes.PartitionClient, error) {
-	partitionClient, err := newPartitionClient(ctx, rpcUrl)
+	partitionClient, err := newPartitionClient(ctx, rpcUrl, evm.PartitionTypeID)
 	if err != nil {
 		return nil, err
 	}

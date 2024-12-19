@@ -7,19 +7,21 @@ import (
 	"log/slog"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
+	moneyid "github.com/alphabill-org/alphabill-go-base/testutils/money"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-go-base/types/hex"
-	"github.com/stretchr/testify/require"
 
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
-	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 )
 
 const transferFCLatestAdditionTime = 65536 // relative timeout after which transferFC unit becomes unusable
 
 type (
 	RpcClientMock struct {
+		pdr                   *types.PartitionDescriptionRecord
 		Err                   error
 		Bills                 map[string]*sdktypes.Bill
 		OwnerBills            []*sdktypes.Bill
@@ -32,6 +34,7 @@ type (
 	}
 
 	Options struct {
+		pdr                   *types.PartitionDescriptionRecord
 		Err                   error
 		RoundNumber           uint64
 		TxProofs              map[string]*types.TxRecordProof
@@ -45,7 +48,9 @@ type (
 )
 
 func NewRpcClientMock(opts ...Option) *RpcClientMock {
+	pdr := moneyid.PDR()
 	options := &Options{
+		pdr:              &pdr,
 		Bills:            map[string]*sdktypes.Bill{},
 		FeeCreditRecords: map[string]*sdktypes.FeeCreditRecord{},
 		TxProofs:         map[string]*types.TxRecordProof{},
@@ -54,6 +59,7 @@ func NewRpcClientMock(opts ...Option) *RpcClientMock {
 		option(options)
 	}
 	return &RpcClientMock{
+		pdr:                   options.pdr,
 		Err:                   options.Err,
 		RoundNumber:           options.RoundNumber,
 		Bills:                 options.Bills,
@@ -61,6 +67,12 @@ func NewRpcClientMock(opts ...Option) *RpcClientMock {
 		FeeCreditRecords:      options.FeeCreditRecords,
 		OwnerFeeCreditRecords: options.OwnerFeeCreditRecords,
 		TxProofs:              options.TxProofs,
+	}
+}
+
+func WithPartition(pdr *types.PartitionDescriptionRecord) Option {
+	return func(o *Options) {
+		o.pdr = pdr
 	}
 }
 
@@ -94,6 +106,10 @@ func WithError(err error) Option {
 	return func(o *Options) {
 		o.Err = err
 	}
+}
+
+func (c *RpcClientMock) PartitionDescription(ctx context.Context) (*types.PartitionDescriptionRecord, error) {
+	return c.pdr, nil
 }
 
 func (c *RpcClientMock) GetNodeInfo(ctx context.Context) (*sdktypes.NodeInfoResponse, error) {
@@ -207,14 +223,14 @@ func (c *RpcClientMock) Close() {
 	// Nothing to close
 }
 
-func NewBill(value, counter uint64) *sdktypes.Bill {
-	return NewLockedBill(value, counter, 0)
+func NewBill(t *testing.T, value, counter uint64) *sdktypes.Bill {
+	return NewLockedBill(t, value, counter, 0)
 }
 
-func NewLockedBill(value uint64, counter, lockStatus uint64) *sdktypes.Bill {
+func NewLockedBill(t *testing.T, value uint64, counter, lockStatus uint64) *sdktypes.Bill {
 	return &sdktypes.Bill{
 		PartitionID: money.DefaultPartitionID,
-		ID:          money.NewBillID(nil, testutils.RandomBytes(32)),
+		ID:          moneyid.NewBillID(t),
 		Value:       value,
 		LockStatus:  lockStatus,
 		Counter:     counter,
@@ -222,7 +238,8 @@ func NewLockedBill(value uint64, counter, lockStatus uint64) *sdktypes.Bill {
 }
 
 func NewMoneyFCR(t *testing.T, pubKeyHash []byte, balance uint64, lockStatus uint64, counter uint64) *sdktypes.FeeCreditRecord {
-	id, err := money.NewFeeCreditRecordIDFromPublicKeyHash(nil, pubKeyHash, 1000+transferFCLatestAdditionTime)
+	pdr := moneyid.PDR()
+	id, err := money.NewFeeCreditRecordIDFromPublicKeyHash(&pdr, types.ShardID{}, pubKeyHash, 1000+transferFCLatestAdditionTime)
 	require.NoError(t, err)
 	return &sdktypes.FeeCreditRecord{
 		PartitionID: money.DefaultPartitionID,

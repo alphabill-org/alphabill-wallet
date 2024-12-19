@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/alphabill-org/alphabill-go-base/txsystem/orchestration"
 	"github.com/alphabill-org/alphabill-go-base/types"
 
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
@@ -19,7 +20,7 @@ type (
 
 // NewOrchestrationPartitionClient creates an orchestration partition client for the given RPC URL.
 func NewOrchestrationPartitionClient(ctx context.Context, rpcUrl string) (sdktypes.PartitionClient, error) {
-	partitionClient, err := newPartitionClient(ctx, rpcUrl)
+	partitionClient, err := newPartitionClient(ctx, rpcUrl, orchestration.PartitionTypeID)
 	if err != nil {
 		return nil, err
 	}

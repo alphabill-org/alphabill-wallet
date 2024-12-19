@@ -5,16 +5,19 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/stretchr/testify/require"
 
+	moneyid "github.com/alphabill-org/alphabill-go-base/testutils/money"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-wallet/client/rpc/mocksrv"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 )
 
 func TestMoneyClient(t *testing.T) {
+	pdr := moneyid.PDR()
 	service := mocksrv.NewStateServiceMock()
-	client := startServerAndMoneyClient(t, service)
+	client := startServerAndMoneyClient(t, &pdr, service)
 
 	t.Run("GetBill_OK", func(t *testing.T) {
 		service.Reset()
@@ -60,8 +63,8 @@ func TestMoneyClient(t *testing.T) {
 	})
 }
 
-func startServerAndMoneyClient(t *testing.T, service *mocksrv.StateServiceMock) sdktypes.MoneyPartitionClient {
-	srv := mocksrv.StartStateApiServer(t, service)
+func startServerAndMoneyClient(t *testing.T, pdr *types.PartitionDescriptionRecord, service *mocksrv.StateServiceMock) sdktypes.MoneyPartitionClient {
+	srv := mocksrv.StartStateApiServer(t, pdr, service)
 
 	moneyClient, err := NewMoneyPartitionClient(context.Background(), "http://"+srv)
 	t.Cleanup(moneyClient.Close)

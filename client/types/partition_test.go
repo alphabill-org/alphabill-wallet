@@ -3,9 +3,9 @@ package types
 import (
 	"testing"
 
+	moneyid "github.com/alphabill-org/alphabill-go-base/testutils/money"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc/permissioned"
-	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
 
 	"github.com/stretchr/testify/require"
@@ -16,7 +16,7 @@ func TestFeeCreditRecordAddFeeCredit(t *testing.T) {
 	fcr := &FeeCreditRecord{
 		NetworkID:   types.NetworkLocal,
 		PartitionID: 2,
-		ID:          money.NewFeeCreditRecordID(nil, []byte{3}),
+		ID:          moneyid.NewFeeCreditRecordID(t),
 		Counter:     &fcrCounter,
 	}
 
@@ -44,12 +44,12 @@ func TestFeeCreditRecordCloseFeeCredit(t *testing.T) {
 	fcr := &FeeCreditRecord{
 		NetworkID:   types.NetworkLocal,
 		PartitionID: 1,
-		ID:          money.NewFeeCreditRecordID(nil, []byte{2}),
+		ID:          moneyid.NewFeeCreditRecordID(t),
 		Balance:     3,
 		Counter:     &fcrCounter,
 	}
 
-	targetBillID := money.NewBillID(nil, []byte{4})
+	targetBillID := moneyid.NewBillID(t)
 	targetBillCounter := uint64(5)
 
 	tx, err := fcr.CloseFeeCredit(targetBillID, targetBillCounter)
@@ -72,7 +72,7 @@ func TestFeeCreditRecordLock(t *testing.T) {
 	fcr := &FeeCreditRecord{
 		NetworkID:   types.NetworkLocal,
 		PartitionID: 2,
-		ID:          money.NewFeeCreditRecordID(nil, []byte{3}),
+		ID:          moneyid.NewFeeCreditRecordID(t),
 		Counter:     &fcrCounter,
 	}
 	lockStatus := uint64(4)
@@ -94,7 +94,7 @@ func TestFeeCreditRecordUnlock(t *testing.T) {
 	fcr := &FeeCreditRecord{
 		NetworkID:   types.NetworkLocal,
 		PartitionID: 2,
-		ID:          money.NewFeeCreditRecordID(nil, []byte{3}),
+		ID:          moneyid.NewFeeCreditRecordID(t),
 		Counter:     &fcrCounter,
 	}
 	tx, err := fcr.Unlock()
@@ -114,7 +114,7 @@ func TestFeeCreditRecordSetFeeCredit(t *testing.T) {
 	fcr := &FeeCreditRecord{
 		NetworkID:   types.NetworkLocal,
 		PartitionID: 2,
-		ID:          money.NewFeeCreditRecordID(nil, []byte{3}),
+		ID:          moneyid.NewFeeCreditRecordID(t),
 		Counter:     &fcrCounter,
 	}
 
@@ -138,7 +138,7 @@ func TestFeeCreditRecordDeleteFeeCredit(t *testing.T) {
 	fcr := &FeeCreditRecord{
 		NetworkID:   types.NetworkLocal,
 		PartitionID: 2,
-		ID:          money.NewFeeCreditRecordID(nil, []byte{3}),
+		ID:          moneyid.NewFeeCreditRecordID(t),
 		Counter:     &fcrCounter,
 	}
 

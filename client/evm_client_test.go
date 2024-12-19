@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-wallet/client/rpc/mocksrv"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/holiman/uint256"
@@ -70,10 +71,16 @@ func TestGetFeeCreditRecordByOwnerID(t *testing.T) {
 		},
 	}
 
+	pdr := types.PartitionDescriptionRecord{
+		NetworkID:       3,
+		PartitionID:     3,
+		PartitionTypeID: 3,
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			service := tt.setupMock()
-			client := startServerAndEvmClient(t, service)
+			client := startServerAndEvmClient(t, &pdr, service)
 
 			fcr, err := client.GetFeeCreditRecordByOwnerID(context.Background(), tt.ownerID)
 
@@ -87,8 +94,8 @@ func TestGetFeeCreditRecordByOwnerID(t *testing.T) {
 	}
 }
 
-func startServerAndEvmClient(t *testing.T, service *mocksrv.StateServiceMock) sdktypes.PartitionClient {
-	srv := mocksrv.StartStateApiServer(t, service)
+func startServerAndEvmClient(t *testing.T, pdr *types.PartitionDescriptionRecord, service *mocksrv.StateServiceMock) sdktypes.PartitionClient {
+	srv := mocksrv.StartStateApiServer(t, pdr, service)
 
 	evmClient, err := NewEvmPartitionClient(context.Background(), "http://"+srv)
 	require.NoError(t, err)

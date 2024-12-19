@@ -2,7 +2,7 @@ package types
 
 import (
 	"context"
-	"crypto"
+	"fmt"
 
 	"github.com/alphabill-org/alphabill-go-base/hash"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
@@ -123,26 +123,23 @@ func (tt *NonFungibleTokenType) Define(txOptions ...Option) (*types.TransactionO
 	return NewTransactionOrder(tt.NetworkID, tt.PartitionID, tt.ID, tokens.TransactionTypeDefineNFT, attr, txOptions...)
 }
 
-func (t *FungibleToken) Mint(txOptions ...Option) (*types.TransactionOrder, error) {
+func (t *FungibleToken) Mint(pdr *types.PartitionDescriptionRecord, txOptions ...Option) (*types.TransactionOrder, error) {
 	attr := &tokens.MintFungibleTokenAttributes{
 		OwnerPredicate: t.OwnerPredicate,
 		TypeID:         t.TypeID,
 		Value:          t.Amount,
 		Nonce:          0,
 	}
-	tx, err := NewTransactionOrder(t.NetworkID, t.PartitionID, nil, tokens.TransactionTypeMintFT, attr, txOptions...)
+	tx, err := NewTransactionOrder(pdr.NetworkID, pdr.PartitionID, nil, tokens.TransactionTypeMintFT, attr, txOptions...)
 	if err != nil {
 		return nil, err
 	}
 
 	// generate tokenID
-	unitPart, err := tokens.HashForNewTokenID(tx, crypto.SHA256)
-	if err != nil {
-		return nil, err
+	if err = tokens.GenerateUnitID(tx, types.ShardID{}, pdr); err != nil {
+		return nil, fmt.Errorf("generating token ID: %w", err)
 	}
-	unitID := tokens.NewFungibleTokenID(t.ID, unitPart)
-	tx.UnitID = unitID
-	t.ID = unitID
+	t.ID = tx.UnitID
 
 	return tx, nil
 }
@@ -203,7 +200,7 @@ func (t *FungibleToken) GetLockStatus() uint64 {
 	return t.LockStatus
 }
 
-func (t *NonFungibleToken) Mint(txOptions ...Option) (*types.TransactionOrder, error) {
+func (t *NonFungibleToken) Mint(pdr *types.PartitionDescriptionRecord, txOptions ...Option) (*types.TransactionOrder, error) {
 	attr := &tokens.MintNonFungibleTokenAttributes{
 		OwnerPredicate:      t.OwnerPredicate,
 		TypeID:              t.TypeID,
@@ -213,18 +210,14 @@ func (t *NonFungibleToken) Mint(txOptions ...Option) (*types.TransactionOrder, e
 		DataUpdatePredicate: t.DataUpdatePredicate,
 		Nonce:               0,
 	}
-	tx, err := NewTransactionOrder(t.NetworkID, t.PartitionID, nil, tokens.TransactionTypeMintNFT, attr, txOptions...)
+	tx, err := NewTransactionOrder(pdr.NetworkID, pdr.PartitionID, nil, tokens.TransactionTypeMintNFT, attr, txOptions...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("building transaction order: %w", err)
 	}
 
-	// generate tokenID
-	unitPart, err := tokens.HashForNewTokenID(tx, crypto.SHA256)
-	if err != nil {
-		return nil, err
+	if err = tokens.GenerateUnitID(tx, types.ShardID{}, pdr); err != nil {
+		return nil, fmt.Errorf("generating token ID: %w", err)
 	}
-	unitID := tokens.NewNonFungibleTokenID(t.ID, unitPart)
-	tx.UnitID = unitID
 	t.ID = tx.UnitID
 
 	return tx, nil

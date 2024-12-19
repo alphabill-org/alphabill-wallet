@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/alphabill-org/alphabill-go-base/txsystem/evm"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	basetypes "github.com/alphabill-org/alphabill-go-base/types"
@@ -427,73 +426,69 @@ func (c *feesConfig) getTargetPartitionUrl() string {
 	}
 }
 
-func newMoneyClient(ctx context.Context, rpcUrl string) (types.MoneyPartitionClient, *types.NodeInfoResponse, error) {
-	moneyClient, err := client.NewMoneyPartitionClient(ctx, rpcUrl)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to dial money rpc url: %w", err)
-	}
-	nodeInfo, err := moneyClient.GetNodeInfo(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to fetch money partition info: %w", err)
-	}
-	if nodeInfo.PartitionTypeID != money.PartitionTypeID {
-		return nil, nil, errors.New("invalid rpc url provided for money partition")
-	}
-	return moneyClient, nodeInfo, nil
-}
-
 // Creates a fees.FeeManager that needs to be closed with the Close() method.
 // Does not close the account.Manager passed as an argument.
 func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager, feeManagerDB fees.FeeManagerDB, maxFee uint64, logger *slog.Logger) (*fees.FeeManager, error) {
 	switch c.targetPartitionType {
 	case clitypes.MoneyType:
-		moneyClient, moneyInfo, err := newMoneyClient(ctx, c.getMoneyRpcUrl())
+		moneyClient, err := client.NewMoneyPartitionClient(ctx, c.getMoneyRpcUrl())
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create money rpc client: %w", err)
+		}
+		pdr, err := moneyClient.PartitionDescription(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("loading PDR: %w", err)
+		}
+		fcrGenerator := func(shard basetypes.ShardID, pubKey []byte, latestAdditionTime uint64) (basetypes.UnitID, error) {
+			return money.NewFeeCreditRecordIDFromPublicKey(pdr, shard, pubKey, latestAdditionTime)
 		}
 		return fees.NewFeeManager(
-			moneyInfo.NetworkID,
+			pdr.NetworkID,
 			am,
 			feeManagerDB,
-			moneyInfo.PartitionID,
+			pdr.PartitionID,
 			moneyClient,
-			money.NewFeeCreditRecordIDFromPublicKey,
-			moneyInfo.PartitionID,
+			fcrGenerator,
+			pdr.PartitionID,
 			moneyClient,
-			money.NewFeeCreditRecordIDFromPublicKey,
+			fcrGenerator,
 			maxFee,
 			logger,
 		), nil
 	case clitypes.TokensType:
-		tokensRpcUrl := c.getTargetPartitionRpcUrl()
-		tokensClient, err := client.NewTokensPartitionClient(ctx, tokensRpcUrl)
+		tokensClient, err := client.NewTokensPartitionClient(ctx, c.getTargetPartitionRpcUrl())
 		if err != nil {
 			return nil, fmt.Errorf("failed to dial tokens rpc url: %w", err)
 		}
-		nodeInfo, err := tokensClient.GetNodeInfo(ctx)
+		tokenPDR, err := tokensClient.PartitionDescription(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch tokens partition info: %w", err)
+			return nil, fmt.Errorf("loading tokens PDR: %w", err)
 		}
-		if nodeInfo.PartitionTypeID != tokens.PartitionTypeID {
-			return nil, errors.New("invalid rpc url provided for tokens partition")
-		}
-		moneyClient, moneyInfo, err := newMoneyClient(ctx, c.getMoneyRpcUrl())
+		moneyClient, err := client.NewMoneyPartitionClient(ctx, c.getMoneyRpcUrl())
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create money rpc client: %w", err)
 		}
-		if moneyInfo.NetworkID != nodeInfo.NetworkID {
+		moneyPDR, err := moneyClient.PartitionDescription(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("loading money PDR: %w", err)
+		}
+		if moneyPDR.NetworkID != tokenPDR.NetworkID {
 			return nil, errors.New("money and tokens rpc clients must be in the same network")
 		}
 		return fees.NewFeeManager(
-			moneyInfo.NetworkID,
+			moneyPDR.NetworkID,
 			am,
 			feeManagerDB,
-			moneyInfo.PartitionID,
+			moneyPDR.PartitionID,
 			moneyClient,
-			money.NewFeeCreditRecordIDFromPublicKey,
-			nodeInfo.PartitionID,
+			func(shard basetypes.ShardID, pubKey []byte, latestAdditionTime uint64) (basetypes.UnitID, error) {
+				return money.NewFeeCreditRecordIDFromPublicKey(moneyPDR, shard, pubKey, latestAdditionTime)
+			},
+			tokenPDR.PartitionID,
 			tokensClient,
-			tokens.NewFeeCreditRecordIDFromPublicKey,
+			func(shard basetypes.ShardID, pubKey []byte, latestAdditionTime uint64) (basetypes.UnitID, error) {
+				return tokens.NewFeeCreditRecordIDFromPublicKey(tokenPDR, shard, pubKey, latestAdditionTime)
+			},
 			maxFee,
 			logger,
 		), nil
@@ -503,30 +498,33 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 		if err != nil {
 			return nil, fmt.Errorf("failed to dial tokens rpc url: %w", err)
 		}
-		nodeInfo, err := tokensClient.GetNodeInfo(ctx)
+		pdr, err := tokensClient.PartitionDescription(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch tokens partition info: %w", err)
-		}
-		if nodeInfo.PartitionTypeID != tokens.PartitionTypeID {
-			return nil, errors.New("invalid rpc url provided for tokens partition")
+			return nil, fmt.Errorf("loading PDR: %w", err)
 		}
 		return fees.NewFeeManager(
-			nodeInfo.NetworkID,
+			pdr.NetworkID,
 			am,
 			feeManagerDB,
 			0,
 			nil,
 			nil,
-			nodeInfo.PartitionID,
+			pdr.PartitionID,
 			tokensClient,
-			tokens.NewFeeCreditRecordIDFromPublicKey,
+			func(shard basetypes.ShardID, pubKey []byte, latestAdditionTime uint64) (basetypes.UnitID, error) {
+				return tokens.NewFeeCreditRecordIDFromPublicKey(pdr, shard, pubKey, latestAdditionTime)
+			},
 			maxFee,
 			logger,
 		), nil
 	case clitypes.EvmType:
-		moneyClient, moneyInfo, err := newMoneyClient(ctx, c.getMoneyRpcUrl())
+		moneyClient, err := client.NewMoneyPartitionClient(ctx, c.getMoneyRpcUrl())
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to create money rpc client: %w", err)
+		}
+		moneyPDR, err := moneyClient.PartitionDescription(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("loading money PDR: %w", err)
 		}
 		evmRpcUrl := c.getTargetPartitionRpcUrl()
 		evmClient, err := client.NewEvmPartitionClient(ctx, evmRpcUrl)
@@ -537,19 +535,18 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch evm partition info: %w", err)
 		}
-		if nodeInfo.PartitionTypeID != evm.PartitionTypeID {
-			return nil, errors.New("invalid rpc url provided for evm partition")
-		}
-		if moneyInfo.NetworkID != nodeInfo.NetworkID {
+		if moneyPDR.NetworkID != nodeInfo.NetworkID {
 			return nil, errors.New("money and evm rpc clients must be in the same network")
 		}
 		return fees.NewFeeManager(
-			moneyInfo.NetworkID,
+			moneyPDR.NetworkID,
 			am,
 			feeManagerDB,
-			moneyInfo.PartitionID,
+			moneyPDR.PartitionID,
 			moneyClient,
-			money.NewFeeCreditRecordIDFromPublicKey,
+			func(shard basetypes.ShardID, pubKey []byte, latestAdditionTime uint64) (basetypes.UnitID, error) {
+				return money.NewFeeCreditRecordIDFromPublicKey(moneyPDR, shard, pubKey, latestAdditionTime)
+			},
 			nodeInfo.PartitionID,
 			evmClient,
 			evmwallet.NewFeeCreditRecordIDFromPublicKey,

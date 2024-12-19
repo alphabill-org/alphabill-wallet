@@ -37,8 +37,7 @@ var (
 
 type (
 	Wallet struct {
-		networkID    types.NetworkID
-		partitionID  types.PartitionID
+		pdr          *types.PartitionDescriptionRecord
 		am           account.Manager
 		tokensClient sdktypes.TokensPartitionClient
 		confirmTx    bool
@@ -63,10 +62,17 @@ type (
 	}
 )
 
-func New(networkID types.NetworkID, partitionID types.PartitionID, tokensClient sdktypes.TokensPartitionClient, am account.Manager, confirmTx bool, feeManager *fees.FeeManager, maxFee uint64, log *slog.Logger) (*Wallet, error) {
+func New(tokensClient sdktypes.TokensPartitionClient, am account.Manager, confirmTx bool, feeManager *fees.FeeManager, maxFee uint64, log *slog.Logger) (*Wallet, error) {
+	pdr, err := tokensClient.PartitionDescription(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("loading partition description: %w", err)
+	}
+	if pdr.PartitionTypeID != tokens.PartitionTypeID {
+		return nil, fmt.Errorf("invalid rpc url: expected tokens partition (%d) node reports partition type %d", tokens.PartitionTypeID, pdr.PartitionTypeID)
+	}
+
 	return &Wallet{
-		networkID:    networkID,
-		partitionID:  partitionID,
+		pdr:          pdr,
 		am:           am,
 		tokensClient: tokensClient,
 		confirmTx:    confirmTx,
@@ -118,30 +124,23 @@ func (w *Wallet) GetAccountManager() account.Manager {
 }
 
 func (w *Wallet) NetworkID() types.NetworkID {
-	return w.networkID
+	return w.pdr.NetworkID
 }
 
 func (w *Wallet) PartitionID() types.PartitionID {
-	return w.partitionID
+	return w.pdr.PartitionID
 }
 
 func (w *Wallet) NewFungibleType(ctx context.Context, accountNumber uint64, ft *sdktypes.FungibleTokenType, subtypePredicateInputs []*PredicateInput) (*SubmissionResult, error) {
 	w.log.Info("Creating new FT type")
 
-	if ft.ID == nil {
-		var err error
-		ft.ID, err = tokens.NewRandomFungibleTokenTypeID(nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate fungible token type ID: %w", err)
+	if len(ft.ID) != 0 {
+		if idLen := int(w.pdr.UnitIDLen+w.pdr.TypeIDLen) / 8; idLen != len(ft.ID) {
+			return nil, fmt.Errorf("invalid token type ID: expected hex length is %d characters (%d bytes)", idLen*2, idLen)
 		}
-	}
-
-	if len(ft.ID) != tokens.UnitIDLength {
-		return nil, fmt.Errorf("invalid token type ID: expected hex length is %d characters (%d bytes)",
-			tokens.UnitIDLength*2, tokens.UnitIDLength)
-	}
-	if !ft.ID.HasType(tokens.FungibleTokenTypeUnitType) {
-		return nil, fmt.Errorf("invalid token type ID: expected unit type is 0x%X", tokens.FungibleTokenTypeUnitType)
+		if ft.ID.TypeMustBe(tokens.FungibleTokenTypeUnitType, w.pdr) != nil {
+			return nil, fmt.Errorf("invalid token type ID: expected unit type is 0x%X", tokens.FungibleTokenTypeUnitType)
+		}
 	}
 
 	if ft.ParentTypeID != nil && !bytes.Equal(ft.ParentTypeID, sdktypes.NoParent) {
@@ -167,6 +166,8 @@ func (w *Wallet) NewFungibleType(ctx context.Context, accountNumber uint64, ft *
 		return nil, err
 	}
 
+	ft.NetworkID = w.pdr.NetworkID
+	ft.PartitionID = w.pdr.PartitionID
 	tx, err := ft.Define(
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
@@ -174,6 +175,12 @@ func (w *Wallet) NewFungibleType(ctx context.Context, accountNumber uint64, ft *
 	)
 	if err != nil {
 		return nil, err
+	}
+	if len(ft.ID) == 0 {
+		if err = tokens.GenerateUnitID(tx, types.ShardID{}, w.pdr); err != nil {
+			return nil, fmt.Errorf("failed to generate fungible token type ID: %w", err)
+		}
+		ft.ID = tx.UnitID
 	}
 
 	sigBytes, err := tx.AuthProofSigBytes()
@@ -201,20 +208,13 @@ func (w *Wallet) NewFungibleType(ctx context.Context, accountNumber uint64, ft *
 func (w *Wallet) NewNonFungibleType(ctx context.Context, accountNumber uint64, nft *sdktypes.NonFungibleTokenType, subtypePredicateInputs []*PredicateInput) (*SubmissionResult, error) {
 	w.log.Info("Creating new NFT type")
 
-	if nft.ID == nil {
-		var err error
-		nft.ID, err = tokens.NewRandomNonFungibleTokenTypeID(nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate non-fungible token type ID: %w", err)
+	if len(nft.ID) != 0 {
+		if idLen := int(w.pdr.UnitIDLen+w.pdr.TypeIDLen) / 8; idLen != len(nft.ID) {
+			return nil, fmt.Errorf("invalid token type ID: expected hex length is %d characters (%d bytes)", idLen*2, idLen)
 		}
-	}
-
-	if len(nft.ID) != tokens.UnitIDLength {
-		return nil, fmt.Errorf("invalid token type ID: expected hex length is %d characters (%d bytes)",
-			tokens.UnitIDLength*2, tokens.UnitIDLength)
-	}
-	if !nft.ID.HasType(tokens.NonFungibleTokenTypeUnitType) {
-		return nil, fmt.Errorf("invalid token type ID: expected unit type is 0x%X", tokens.NonFungibleTokenTypeUnitType)
+		if nft.ID.TypeMustBe(tokens.NonFungibleTokenTypeUnitType, w.pdr) != nil {
+			return nil, fmt.Errorf("invalid token type ID: expected unit type is %#x", tokens.NonFungibleTokenTypeUnitType)
+		}
 	}
 
 	acc, err := w.getAccount(accountNumber)
@@ -230,6 +230,8 @@ func (w *Wallet) NewNonFungibleType(ctx context.Context, accountNumber uint64, n
 		return nil, err
 	}
 
+	nft.NetworkID = w.pdr.NetworkID
+	nft.PartitionID = w.pdr.PartitionID
 	tx, err := nft.Define(
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
@@ -237,6 +239,12 @@ func (w *Wallet) NewNonFungibleType(ctx context.Context, accountNumber uint64, n
 	)
 	if err != nil {
 		return nil, err
+	}
+	if len(tx.UnitID) == 0 {
+		if err = tokens.GenerateUnitID(tx, types.ShardID{}, w.pdr); err != nil {
+			return nil, fmt.Errorf("failed to generate non-fungible token type ID: %w", err)
+		}
+		nft.ID = tx.UnitID
 	}
 
 	sigBytes, err := tx.AuthProofSigBytes()
@@ -278,6 +286,7 @@ func (w *Wallet) NewFungibleToken(ctx context.Context, accountNumber uint64, ft 
 	}
 
 	tx, err := ft.Mint(
+		w.pdr,
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
 		sdktypes.WithMaxFee(w.maxFee),
@@ -336,6 +345,7 @@ func (w *Wallet) NewNFT(ctx context.Context, accountNumber uint64, nft *sdktypes
 	}
 
 	tx, err := nft.Mint(
+		w.pdr,
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
 		sdktypes.WithMaxFee(w.maxFee),
@@ -794,12 +804,17 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID ty
 		return nil, err
 	}
 
+	tid, err := w.pdr.ExtractUnitType(tokenID)
+	if err != nil {
+		return nil, fmt.Errorf("extracting token type: %w", err)
+	}
 	var token Token
-	if tokenID.HasType(tokens.FungibleTokenUnitType) {
+	switch tid {
+	case tokens.FungibleTokenUnitType:
 		token, err = w.GetFungibleToken(ctx, tokenID)
-	} else if tokenID.HasType(tokens.NonFungibleTokenUnitType) {
+	case tokens.NonFungibleTokenUnitType:
 		token, err = w.GetNonFungibleToken(ctx, tokenID)
-	} else {
+	default:
 		return nil, errors.New("invalid token ID")
 	}
 	if err != nil {
@@ -862,12 +877,17 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 		return nil, err
 	}
 
+	tid, err := w.pdr.ExtractUnitType(tokenID)
+	if err != nil {
+		return nil, fmt.Errorf("extracting token type: %w", err)
+	}
 	var token Token
-	if tokenID.HasType(tokens.FungibleTokenUnitType) {
+	switch tid {
+	case tokens.FungibleTokenUnitType:
 		token, err = w.GetFungibleToken(ctx, tokenID)
-	} else if tokenID.HasType(tokens.NonFungibleTokenUnitType) {
+	case tokens.NonFungibleTokenUnitType:
 		token, err = w.GetNonFungibleToken(ctx, tokenID)
-	} else {
+	default:
 		return nil, errors.New("invalid token ID")
 	}
 	if err != nil {

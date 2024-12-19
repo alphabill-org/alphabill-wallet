@@ -1,5 +1,7 @@
 package types
 
+import "github.com/alphabill-org/alphabill-go-base/types"
+
 type (
 	OrchestrationConfig struct {
 		WalletConfig *WalletConfig
@@ -10,7 +12,7 @@ type (
 	AddVarCmdConfig struct {
 		OrchestrationConfig *OrchestrationConfig
 		PartitionID         uint32
-		ShardID             BytesHex
+		ShardID             types.ShardID
 		VarFilePath         string
 	}
 )

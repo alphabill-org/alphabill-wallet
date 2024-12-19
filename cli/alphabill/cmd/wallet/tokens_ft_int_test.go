@@ -8,10 +8,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-go-base/hash"
-	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
-	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/stretchr/testify/require"
+
+	"github.com/alphabill-org/alphabill-go-base/hash"
+	tokenid "github.com/alphabill-org/alphabill-go-base/testutils/tokens"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
 	"github.com/alphabill-org/alphabill-wallet/util"
@@ -27,10 +27,10 @@ func TestFungibleToken_Subtyping_Integration(t *testing.T) {
 
 	symbol1 := "AB"
 	// test subtyping
-	typeID11 := randomFungibleTokenTypeID(t)
-	typeID12 := randomFungibleTokenTypeID(t)
-	typeID13 := randomFungibleTokenTypeID(t)
-	typeID14 := randomFungibleTokenTypeID(t)
+	typeID11 := tokenid.NewFungibleTokenTypeID(t)
+	typeID12 := tokenid.NewFungibleTokenTypeID(t)
+	typeID13 := tokenid.NewFungibleTokenTypeID(t)
+	typeID14 := tokenid.NewFungibleTokenTypeID(t)
 
 	addFeeCredit(t, wallets[0].Homedir, 100, "tokens", abNet.TokensRpcUrl, abNet.MoneyRpcUrl)
 
@@ -98,8 +98,8 @@ func TestFungibleToken_InvariantPredicate_Integration(t *testing.T) {
 	wallets, abNet := testutils.SetupNetworkWithWallets(t, testutils.WithTokensNode(t))
 
 	symbol1 := "AB"
-	typeID11 := randomFungibleTokenTypeID(t)
-	typeID12 := randomFungibleTokenTypeID(t)
+	typeID11 := tokenid.NewFungibleTokenTypeID(t)
+	typeID12 := tokenid.NewFungibleTokenTypeID(t)
 
 	addFeeCredit(t, wallets[0].Homedir, 100, "tokens", abNet.TokensRpcUrl, abNet.MoneyRpcUrl)
 
@@ -146,7 +146,7 @@ func TestFungibleToken_InvariantPredicate_Integration(t *testing.T) {
 func TestFungibleTokens_Sending_Integration(t *testing.T) {
 	wallets, abNet := testutils.SetupNetworkWithWallets(t, testutils.WithTokensNode(t))
 
-	typeID1 := randomFungibleTokenTypeID(t)
+	typeID1 := tokenid.NewFungibleTokenTypeID(t)
 	// fungible token types
 	symbol1 := "AB"
 
@@ -234,7 +234,7 @@ func TestWalletCreateFungibleTokenTypeAndTokenAndSendCmd_IntegrationTest(t *test
 	addFeeCredit(t, wallets[0].Homedir, 100, "money", abNet.MoneyRpcUrl, abNet.MoneyRpcUrl)
 	addFeeCredit(t, wallets[0].Homedir, 100, "tokens", abNet.TokensRpcUrl, abNet.MoneyRpcUrl)
 
-	typeID := tokens.NewFungibleTokenTypeID(nil, []byte{0x10})
+	typeID := tokenid.NewFungibleTokenTypeID(t)
 	symbol := "AB"
 	name := "Long name for AB"
 
@@ -249,12 +249,12 @@ func TestWalletCreateFungibleTokenTypeAndTokenAndSendCmd_IntegrationTest(t *test
 		"--decimals", "3")
 
 	// non-existing id
-	nonExistingTypeId := tokens.NewFungibleTokenID(nil, []byte{0x11})
+	nonExistingTypeId := tokenid.NewFungibleTokenID(t)
 
 	newFungibleCmd := tokensCmd.WithPrefixArgs("new", "fungible", "--type", typeID.String())
 
 	// new token creation fails
-	newFungibleCmd.ExecWithError(t, fmt.Sprintf("invalid fungible token type id: %s", nonExistingTypeId),
+	newFungibleCmd.ExecWithError(t, "invalid fungible token type id: expected type 0X1, got 0X3",
 		"--amount", "3", "--type", nonExistingTypeId.String())
 	newFungibleCmd.ExecWithError(t, "0 is not valid amount", "--amount", "0")
 	newFungibleCmd.ExecWithError(t, "0 is not valid amount", "--amount", "00.000")
@@ -287,7 +287,7 @@ func TestWalletCreateFungibleTokenTypeAndTokenAndSendCmd_IntegrationTest(t *test
 		"--address", fmt.Sprintf("0x%X", wallets[1].PubKeys[0]))
 
 	// test send fails
-	sendFungibleCmd.ExecWithError(t, fmt.Sprintf("invalid fungible token type id: %s", nonExistingTypeId), "--amount", "2", "--type", nonExistingTypeId.String())
+	sendFungibleCmd.ExecWithError(t, "invalid fungible token type id: expected type 0X1, got 0X3", "--amount", "2", "--type", nonExistingTypeId.String())
 	sendFungibleCmd.ExecWithError(t, "0 is not valid amount", "--amount", "0")
 	sendFungibleCmd.ExecWithError(t, "0 is not valid amount", "--amount", "000.000")
 	sendFungibleCmd.ExecWithError(t, "more than one comma", "--amount", "00.0.00")
@@ -302,7 +302,7 @@ func TestFungibleTokens_CollectDust_Integration(t *testing.T) {
 	addFeeCredit(t, wallets[0].Homedir, 100, "money", abNet.MoneyRpcUrl, abNet.MoneyRpcUrl)
 	addFeeCredit(t, wallets[0].Homedir, 100, "tokens", abNet.TokensRpcUrl, abNet.MoneyRpcUrl)
 
-	typeID1 := randomFungibleTokenTypeID(t)
+	typeID1 := tokenid.NewFungibleTokenTypeID(t)
 	symbol1 := "AB"
 
 	walletCmd := newWalletCmdExecutor().WithHome(wallets[0].Homedir)
@@ -342,7 +342,7 @@ func TestFungibleTokens_LockUnlock_Integration(t *testing.T) {
 	addFeeCredit(t, wallets[0].Homedir, 100, "money", abNet.MoneyRpcUrl, abNet.MoneyRpcUrl)
 	addFeeCredit(t, wallets[0].Homedir, 100, "tokens", abNet.TokensRpcUrl, abNet.MoneyRpcUrl)
 
-	typeID := randomFungibleTokenTypeID(t)
+	typeID := tokenid.NewFungibleTokenTypeID(t)
 	symbol := "AB"
 
 	walletCmd := newWalletCmdExecutor().WithHome(wallets[0].Homedir)
@@ -395,10 +395,4 @@ func extractID(input string) string {
 		return ""
 	}
 	return match[1]
-}
-
-func randomFungibleTokenTypeID(t *testing.T) types.UnitID {
-	unitID, err := tokens.NewRandomFungibleTokenTypeID(nil)
-	require.NoError(t, err)
-	return unitID
 }

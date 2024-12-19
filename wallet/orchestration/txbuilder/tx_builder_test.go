@@ -3,11 +3,12 @@ package txbuilder
 import (
 	"testing"
 
-	"github.com/alphabill-org/alphabill-go-base/txsystem/orchestration"
-	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/stretchr/testify/require"
 
-	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
+	orchid "github.com/alphabill-org/alphabill-go-base/testutils/orchestration"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/orchestration"
+	"github.com/alphabill-org/alphabill-go-base/types"
+
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 )
 
@@ -21,7 +22,7 @@ func TestNewAddVarTx_OK(t *testing.T) {
 	timeout := uint64(10)
 	networkID := types.NetworkLocal
 	partitionID := orchestration.DefaultPartitionID
-	unitID := orchestration.NewVarID(nil, test.RandomBytes(32))
+	unitID := orchid.NewVarID(t)
 	_var := orchestration.ValidatorAssignmentRecord{}
 
 	tx, err := NewAddVarTx(_var, networkID, partitionID, unitID, timeout, 3, accountKey.AccountKey)
@@ -46,7 +47,7 @@ func TestNewAddVarTxUnsigned_OK(t *testing.T) {
 	timeout := uint64(10)
 	networkID := types.NetworkLocal
 	partitionID := orchestration.DefaultPartitionID
-	unitID := orchestration.NewVarID(nil, test.RandomBytes(32))
+	unitID := orchid.NewVarID(t)
 	_var := orchestration.ValidatorAssignmentRecord{}
 
 	tx, err := NewAddVarTx(_var, networkID, partitionID, unitID, timeout, 5, nil)

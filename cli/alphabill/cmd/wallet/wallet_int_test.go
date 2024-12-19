@@ -9,12 +9,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
-	"github.com/alphabill-org/alphabill-go-base/txsystem/orchestration"
-	baseutil "github.com/alphabill-org/alphabill-go-base/util"
-
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/stretchr/testify/require"
+
+	moneyid "github.com/alphabill-org/alphabill-go-base/testutils/money"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/orchestration"
+	baseutil "github.com/alphabill-org/alphabill-go-base/util"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
 	"github.com/alphabill-org/alphabill-wallet/util"
@@ -179,6 +179,8 @@ func TestCollectDustInMultiAccountWallet(t *testing.T) {
 func TestWalletBillsLockUnlockCmd_Ok(t *testing.T) {
 	// setup network
 	wallets, abNet := testutils.SetupNetworkWithWallets(t)
+	pdr := moneyid.PDR()
+	billID := moneyid.BillIDWithSuffix(t, 1, &pdr)
 
 	walletCmd := newWalletCmdExecutor("--rpc-url", abNet.MoneyRpcUrl).WithHome(wallets[0].Homedir)
 
@@ -187,7 +189,7 @@ func TestWalletBillsLockUnlockCmd_Ok(t *testing.T) {
 	require.Equal(t, "Successfully created 1 fee credits on money partition.", stdout.Lines[0])
 
 	// lock bill
-	stdout = walletCmd.Exec(t, "bills", "lock", "--bill-id", money.NewBillID(nil, []byte{1}).String())
+	stdout = walletCmd.Exec(t, "bills", "lock", "--bill-id", billID.String())
 	testutils.VerifyStdout(t, stdout, "Bill locked successfully.")
 
 	// verify bill locked
@@ -195,7 +197,7 @@ func TestWalletBillsLockUnlockCmd_Ok(t *testing.T) {
 	testutils.VerifyStdout(t, stdout, "#1 0x000000000000000000000000000000000000000000000000000000000000000101 9'999'999'999.000'000'00 (manually locked by user)")
 
 	// unlock bill
-	stdout = walletCmd.Exec(t, "bills", "unlock", "--bill-id", money.NewBillID(nil, []byte{1}).String())
+	stdout = walletCmd.Exec(t, "bills", "unlock", "--bill-id", billID.String())
 	testutils.VerifyStdout(t, stdout, "Bill unlocked successfully.")
 
 	// verify bill unlocked

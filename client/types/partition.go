@@ -13,6 +13,7 @@ import (
 type (
 	PartitionClient interface {
 		GetNodeInfo(ctx context.Context) (*NodeInfoResponse, error)
+		PartitionDescription(ctx context.Context) (*types.PartitionDescriptionRecord, error)
 		GetRoundNumber(ctx context.Context) (uint64, error)
 		SendTransaction(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
 		ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*types.TxRecordProof, error)

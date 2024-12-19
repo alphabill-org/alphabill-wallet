@@ -31,7 +31,7 @@ func TestCreateTransactions(t *testing.T) {
 	}{
 		{
 			name:   "have more bills than target amount",
-			bills:  []*sdktypes.Bill{createBill(5), createBill(3), createBill(1)},
+			bills:  []*sdktypes.Bill{createBill(t, 5), createBill(t, 3), createBill(t, 1)},
 			amount: uint64(7),
 			verify: func(t *testing.T, partitionID types.PartitionID, txs []*types.TransactionOrder) {
 				// verify tx count
@@ -56,7 +56,7 @@ func TestCreateTransactions(t *testing.T) {
 		},
 		{
 			name:   "have less bills than target amount",
-			bills:  []*sdktypes.Bill{createBill(5), createBill(1)},
+			bills:  []*sdktypes.Bill{createBill(t, 5), createBill(t, 1)},
 			amount: uint64(7),
 			verify: func(t *testing.T, partitionID types.PartitionID, txs []*types.TransactionOrder) {
 				require.Empty(t, txs)
@@ -65,7 +65,7 @@ func TestCreateTransactions(t *testing.T) {
 		},
 		{
 			name:   "have exact amount of bills than target amount",
-			bills:  []*sdktypes.Bill{createBill(5), createBill(5)},
+			bills:  []*sdktypes.Bill{createBill(t, 5), createBill(t, 5)},
 			amount: uint64(10),
 			verify: func(t *testing.T, partitionID types.PartitionID, txs []*types.TransactionOrder) {
 				// verify tx count
@@ -83,7 +83,7 @@ func TestCreateTransactions(t *testing.T) {
 		},
 		{
 			name:   "have exactly one bill with equal target amount",
-			bills:  []*sdktypes.Bill{createBill(5)},
+			bills:  []*sdktypes.Bill{createBill(t, 5)},
 			amount: uint64(5),
 			verify: func(t *testing.T, partitionID types.PartitionID, txs []*types.TransactionOrder) {
 				// verify tx count
@@ -117,6 +117,6 @@ func TestCreateTransactions(t *testing.T) {
 	}
 }
 
-func createBill(value uint64) *sdktypes.Bill {
-	return testmoney.NewBill(value, 0)
+func createBill(t *testing.T, value uint64) *sdktypes.Bill {
+	return testmoney.NewBill(t, value, 0)
 }

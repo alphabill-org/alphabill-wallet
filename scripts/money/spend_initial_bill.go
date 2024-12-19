@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto"
+	"encoding/binary"
 	"errors"
 	"flag"
 	"fmt"
@@ -14,7 +15,6 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
-	"github.com/alphabill-org/alphabill-go-base/util"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
 	"github.com/alphabill-org/alphabill-wallet/client"
@@ -62,8 +62,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	billID := money.NewBillID(nil, util.Uint64ToBytes(*billIdUint))
-
 	// create rpc client
 	ctx := context.Background()
 	moneyClient, err := client.NewMoneyPartitionClient(ctx, args.BuildRpcUrl(*rpcServerAddr))
@@ -72,13 +70,25 @@ func main() {
 	}
 	defer moneyClient.Close()
 
+	pdr, err := moneyClient.PartitionDescription(ctx)
+	if err != nil {
+		log.Fatal("loading PDR:", err)
+	}
+	billID, err := pdr.ComposeUnitID(types.ShardID{}, money.BillUnitType, func(b []byte) error {
+		binary.BigEndian.PutUint64(b[len(b)-8:], *billIdUint)
+		return nil
+	})
+	if err != nil {
+		log.Fatal("composing initial bill ID:", err)
+	}
+
 	// calculate fee credit record id
 	roundNumber, err := moneyClient.GetRoundNumber(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
 	latestAdditionTime := roundNumber + *timeout
-	fcrID, err := money.NewFeeCreditRecordIDFromOwnerPredicate(nil, templates.AlwaysTrueBytes(), latestAdditionTime)
+	fcrID, err := money.NewFeeCreditRecordIDFromOwnerPredicate(pdr, types.ShardID{}, templates.AlwaysTrueBytes(), latestAdditionTime)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	moneyid "github.com/alphabill-org/alphabill-go-base/testutils/money"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -14,13 +15,14 @@ import (
 )
 
 func TestBatchCallWithLimit(t *testing.T) {
+	pdr := moneyid.PDR()
 	service := mocksrv.NewStateServiceMock()
-	srv := mocksrv.StartStateApiServer(t, service)
+	srv := mocksrv.StartStateApiServer(t, &pdr, service)
 
 	var batch []rpc.BatchElem
 	service.Units = make(map[string]*sdktypes.Unit[any])
 	for i := byte(0); i < 11; i++ {
-		id := money.NewBillID(nil, []byte{i})
+		id := moneyid.NewBillID(t)
 		service.Units[string(id)] = createUnit(id)
 
 		var u sdktypes.Unit[string]
@@ -32,7 +34,7 @@ func TestBatchCallWithLimit(t *testing.T) {
 	}
 
 	batchCallWithLimit := func(limit int) {
-		client, err := newPartitionClient(context.Background(), "http://"+srv, WithBatchItemLimit(limit))
+		client, err := newPartitionClient(context.Background(), "http://"+srv, pdr.PartitionTypeID, WithBatchItemLimit(limit))
 		require.NoError(t, err)
 		t.Cleanup(client.Close)
 		require.NoError(t, client.batchCallWithLimit(context.Background(), batch))
@@ -52,14 +54,4 @@ func createUnit(id types.UnitID) *sdktypes.Unit[any] {
 		UnitID:      id,
 		Data:        id.String(),
 	}
-}
-
-func startServerAndPartitionClient(t *testing.T, service *mocksrv.StateServiceMock) *partitionClient {
-	srv := mocksrv.StartStateApiServer(t, service)
-
-	partitionClient, err := newPartitionClient(context.Background(), "http://"+srv, WithBatchItemLimit(2))
-	t.Cleanup(partitionClient.Close)
-	require.NoError(t, err)
-
-	return partitionClient
 }

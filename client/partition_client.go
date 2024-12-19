@@ -18,6 +18,7 @@ type (
 	partitionClient struct {
 		*rpc.AdminAPIClient
 		*rpc.StateAPIClient
+		pdr *types.PartitionDescriptionRecord
 
 		batchItemLimit int
 	}
@@ -36,7 +37,7 @@ func WithBatchItemLimit(batchItemLimit int) Option {
 }
 
 // newPartitionClient creates a generic partition client for the given RPC URL.
-func newPartitionClient(ctx context.Context, rpcUrl string, opts ...Option) (*partitionClient, error) {
+func newPartitionClient(ctx context.Context, rpcUrl string, kind types.PartitionTypeID, opts ...Option) (*partitionClient, error) {
 	// TODO: duplicate underlying rpc clients, could use one?
 	stateApiClient, err := rpc.NewStateAPIClient(ctx, rpcUrl)
 	if err != nil {
@@ -46,25 +47,45 @@ func newPartitionClient(ctx context.Context, rpcUrl string, opts ...Option) (*pa
 	if err != nil {
 		return nil, err
 	}
+	// TODO: load PDR from backend! (AB-1800)
+	info, err := adminApiClient.GetNodeInfo(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("requesting node info: %w", err)
+	}
+	if info.PartitionTypeID != kind {
+		return nil, fmt.Errorf("expected node partition type %x but it is %x", kind, info.PartitionTypeID)
+	}
 
 	o := optionsWithDefaults(opts)
 	return &partitionClient{
 		AdminAPIClient: adminApiClient,
 		StateAPIClient: stateApiClient,
+		// TODO: load full PDR from backend! (AB-1800)
+		pdr: &types.PartitionDescriptionRecord{
+			NetworkID:       info.NetworkID,
+			PartitionID:     info.PartitionID,
+			PartitionTypeID: info.PartitionTypeID,
+			UnitIDLen:       256,
+			TypeIDLen:       8,
+		},
 
 		batchItemLimit: o.BatchItemLimit,
 	}, nil
 }
 
+func (c *partitionClient) PartitionDescription(ctx context.Context) (*types.PartitionDescriptionRecord, error) {
+	return c.pdr, nil
+}
+
 // GetFeeCreditRecordByOwnerID finds the first fee credit record in money partition for the given owner ID,
 // returns nil,nil if fee credit record does not exist.
-func (c *partitionClient) getFeeCreditRecordByOwnerID(ctx context.Context, ownerID, fcrUnitType []byte) (*sdktypes.FeeCreditRecord, error) {
+func (c *partitionClient) getFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte, fcrUnitType uint32) (*sdktypes.FeeCreditRecord, error) {
 	unitIDs, err := c.GetUnitsByOwnerID(ctx, ownerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch units: %w", err)
 	}
 	for _, unitID := range unitIDs {
-		if unitID.HasType(fcrUnitType) {
+		if unitID.TypeMustBe(fcrUnitType, c.pdr) == nil {
 			return c.getFeeCreditRecord(ctx, unitID)
 		}
 	}

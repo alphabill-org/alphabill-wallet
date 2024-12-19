@@ -3,8 +3,10 @@ package bills
 import (
 	"testing"
 
+	moneyid "github.com/alphabill-org/alphabill-go-base/testutils/money"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	basetypes "github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
 
 	"github.com/alphabill-org/alphabill-wallet/client/rpc/mocksrv"
@@ -14,7 +16,8 @@ import (
 )
 
 func TestWalletBillsListCmd_EmptyWallet(t *testing.T) {
-	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock())
+	pdr := moneyid.PDR()
+	rpcUrl := mocksrv.StartStateApiServer(t, &pdr, mocksrv.NewStateServiceMock())
 	homedir := testutils.CreateNewTestWallet(t)
 	billsCmd := testutils.NewSubCmdExecutor(NewBillsCmd, "--rpc-url", rpcUrl).WithHome(homedir)
 
@@ -22,10 +25,11 @@ func TestWalletBillsListCmd_EmptyWallet(t *testing.T) {
 }
 
 func TestWalletBillsListCmd_Single(t *testing.T) {
-	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(
+	pdr := moneyid.PDR()
+	rpcUrl := mocksrv.StartStateApiServer(t, &pdr, mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(
 		testutils.TestPubKey0Hash(t),
 		&types.Unit[any]{
-			UnitID: money.NewBillID(nil, []byte{1}),
+			UnitID: moneyid.BillIDWithSuffix(t, 1, &pdr),
 			Data:   money.BillData{Value: 1e8},
 		},
 	)))
@@ -36,11 +40,12 @@ func TestWalletBillsListCmd_Single(t *testing.T) {
 }
 
 func TestWalletBillsListCmd_Multiple(t *testing.T) {
-	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(
-		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: money.NewBillID(nil, []byte{1}), Data: money.BillData{Value: 1}}),
-		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: money.NewBillID(nil, []byte{2}), Data: money.BillData{Value: 2}}),
-		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: money.NewBillID(nil, []byte{3}), Data: money.BillData{Value: 3}}),
-		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: money.NewBillID(nil, []byte{4}), Data: money.BillData{Value: 4}}),
+	pdr := moneyid.PDR()
+	rpcUrl := mocksrv.StartStateApiServer(t, &pdr, mocksrv.NewStateServiceMock(
+		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: moneyid.BillIDWithSuffix(t, 1, &pdr), Data: money.BillData{Value: 1}}),
+		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: moneyid.BillIDWithSuffix(t, 2, &pdr), Data: money.BillData{Value: 2}}),
+		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: moneyid.BillIDWithSuffix(t, 3, &pdr), Data: money.BillData{Value: 3}}),
+		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: moneyid.BillIDWithSuffix(t, 4, &pdr), Data: money.BillData{Value: 4}}),
 	))
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
 	billsCmd := testutils.NewSubCmdExecutor(NewBillsCmd, "--rpc-url", rpcUrl).WithHome(homedir)
@@ -55,8 +60,9 @@ func TestWalletBillsListCmd_Multiple(t *testing.T) {
 }
 
 func TestWalletBillsListCmd_ExtraAccount(t *testing.T) {
-	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(
-		mocksrv.WithOwnerUnit(testutils.TestPubKey1Hash(t), &types.Unit[any]{UnitID: money.NewBillID(nil, []byte{1}), Data: money.BillData{Value: 1}}),
+	pdr := moneyid.PDR()
+	rpcUrl := mocksrv.StartStateApiServer(t, &pdr, mocksrv.NewStateServiceMock(
+		mocksrv.WithOwnerUnit(testutils.TestPubKey1Hash(t), &types.Unit[any]{UnitID: moneyid.BillIDWithSuffix(t, 1, &pdr), Data: money.BillData{Value: 1}}),
 	))
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic(), testutils.WithNumberOfAccounts(2))
 	billsCmd := testutils.NewSubCmdExecutor(NewBillsCmd, "--rpc-url", rpcUrl).WithHome(homedir)
@@ -70,8 +76,9 @@ func TestWalletBillsListCmd_ExtraAccount(t *testing.T) {
 }
 
 func TestWalletBillsListCmd_ExtraAccountTotal(t *testing.T) {
-	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(
-		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: money.NewBillID(nil, []byte{1}), Data: money.BillData{Value: 1e9}}),
+	pdr := moneyid.PDR()
+	rpcUrl := mocksrv.StartStateApiServer(t, &pdr, mocksrv.NewStateServiceMock(
+		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: moneyid.BillIDWithSuffix(t, 1, &pdr), Data: money.BillData{Value: 1e9}}),
 	))
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic(), testutils.WithNumberOfAccounts(2))
 	billsCmd := testutils.NewSubCmdExecutor(NewBillsCmd, "--rpc-url", rpcUrl).WithHome(homedir)
@@ -109,11 +116,12 @@ func TestWalletBillsListCmd_ShowUnswappedFlag(t *testing.T) {
 }
 
 func TestWalletBillsListCmd_ShowLockedBills(t *testing.T) {
+	pdr := moneyid.PDR()
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
-	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(
-		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: money.NewBillID(nil, []byte{1}), Data: money.BillData{Value: 1e8, Locked: wallet.LockReasonAddFees}}),
-		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: money.NewBillID(nil, []byte{2}), Data: money.BillData{Value: 1e8, Locked: wallet.LockReasonReclaimFees}}),
-		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: money.NewBillID(nil, []byte{3}), Data: money.BillData{Value: 1e8, Locked: wallet.LockReasonCollectDust}}),
+	rpcUrl := mocksrv.StartStateApiServer(t, &pdr, mocksrv.NewStateServiceMock(
+		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: moneyid.BillIDWithSuffix(t, 1, &pdr), Data: money.BillData{Value: 1e8, Locked: wallet.LockReasonAddFees}}),
+		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: moneyid.BillIDWithSuffix(t, 2, &pdr), Data: money.BillData{Value: 1e8, Locked: wallet.LockReasonReclaimFees}}),
+		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: moneyid.BillIDWithSuffix(t, 3, &pdr), Data: money.BillData{Value: 1e8, Locked: wallet.LockReasonCollectDust}}),
 	))
 	billsCmd := testutils.NewSubCmdExecutor(NewBillsCmd, "--rpc-url", rpcUrl).WithHome(homedir)
 
@@ -125,12 +133,17 @@ func TestWalletBillsListCmd_ShowLockedBills(t *testing.T) {
 }
 
 func TestWalletBillsLockUnlockCmd_Nok(t *testing.T) {
+	pdr := moneyid.PDR()
+	billID := moneyid.BillIDWithSuffix(t, 1, &pdr)
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic(), testutils.WithNumberOfAccounts(2))
 
+	// create FeeCredit unit ID similar to the bill ID (type part differs)
+	fcrID, err := pdr.ComposeUnitID(basetypes.ShardID{}, money.FeeCreditRecordUnitType, func(b []byte) error { b[len(b)-1] = 1; return nil })
+	require.NoError(t, err)
 	rpcUrl := mocksrv.StartServer(t, map[string]interface{}{
 		"state": mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t),
 			&types.Unit[any]{
-				UnitID: money.NewFeeCreditRecordID(nil, []byte{1}),
+				UnitID: fcrID,
 				Data:   fc.FeeCreditRecord{Balance: 100},
 			})),
 		"admin": mocksrv.NewAdminServiceMock(),
@@ -138,9 +151,9 @@ func TestWalletBillsLockUnlockCmd_Nok(t *testing.T) {
 
 	billsCmd := testutils.NewSubCmdExecutor(NewBillsCmd, "--rpc-url", rpcUrl).WithHome(homedir)
 
-	billsCmd.ExecWithError(t, "bill not found", "lock", "--bill-id", money.NewBillID(nil, []byte{1}).String())
-	billsCmd.ExecWithError(t, "bill not found", "unlock", "--bill-id", money.NewBillID(nil, []byte{1}).String())
+	billsCmd.ExecWithError(t, "bill not found", "lock", "--bill-id", billID.String())
+	billsCmd.ExecWithError(t, "bill not found", "unlock", "--bill-id", billID.String())
 
-	billsCmd.ExecWithError(t, "not enough fee credit in wallet", "lock", "--key", "2", "--bill-id", testutils.DefaultInitialBillID.String())
-	billsCmd.ExecWithError(t, "not enough fee credit in wallet", "unlock", "--key", "2", "--bill-id", testutils.DefaultInitialBillID.String())
+	billsCmd.ExecWithError(t, "not enough fee credit in wallet", "lock", "--key", "2", "--bill-id", billID.String())
+	billsCmd.ExecWithError(t, "not enough fee credit in wallet", "unlock", "--key", "2", "--bill-id", billID.String())
 }

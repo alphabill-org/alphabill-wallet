@@ -5,6 +5,7 @@ import (
 
 	"github.com/alphabill-org/alphabill-go-base/hash"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
+	moneyid "github.com/alphabill-org/alphabill-go-base/testutils/money"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
@@ -16,14 +17,14 @@ func TestBillTransfer(t *testing.T) {
 	b := &Bill{
 		NetworkID:   types.NetworkLocal,
 		PartitionID: money.DefaultPartitionID,
-		ID:          money.NewBillID(nil, []byte{1}),
+		ID:          moneyid.NewBillID(t),
 		Value:       2,
 		Counter:     3,
 	}
 	refNo := []byte("refNo")
 	timeout := uint64(4)
 	newOwnerPredicate := []byte{5}
-	fcrID := money.NewFeeCreditRecordID(nil, []byte{6})
+	fcrID := moneyid.NewFeeCreditRecordID(t)
 	maxFee := uint64(7)
 	tx, err := b.Transfer(newOwnerPredicate,
 		WithFeeCreditRecordID(fcrID),
@@ -51,7 +52,7 @@ func TestBillTransfer(t *testing.T) {
 
 func TestSplitTransactionAmount(t *testing.T) {
 	receiverPubKeyHash := hash.Sum256([]byte{1})
-	billID := money.NewBillID(nil, nil)
+	billID := moneyid.NewBillID(t)
 	b := &Bill{
 		PartitionID: money.DefaultPartitionID,
 		ID:          billID,
@@ -86,12 +87,12 @@ func TestBillTransferToDustCollector(t *testing.T) {
 	b := &Bill{
 		NetworkID:   types.NetworkLocal,
 		PartitionID: money.DefaultPartitionID,
-		ID:          money.NewBillID(nil, []byte{1}),
+		ID:          moneyid.NewBillID(t),
 		Value:       2,
 		Counter:     3,
 	}
 	targetBill := &Bill{
-		ID:      money.NewBillID(nil, []byte{4}),
+		ID:      moneyid.NewBillID(t),
 		Counter: 5,
 	}
 	tx, err := b.TransferToDustCollector(targetBill)
@@ -115,21 +116,21 @@ func TestBillSwapWithDustCollector(t *testing.T) {
 	db1 := &Bill{
 		NetworkID:   types.NetworkLocal,
 		PartitionID: money.DefaultPartitionID,
-		ID:          money.NewBillID(nil, []byte{1}),
+		ID:          moneyid.NewBillID(t),
 		Value:       2,
 		Counter:     3,
 	}
 	db2 := &Bill{
 		NetworkID:   types.NetworkLocal,
 		PartitionID: money.DefaultPartitionID,
-		ID:          money.NewBillID(nil, []byte{2}),
+		ID:          moneyid.NewBillID(t),
 		Value:       3,
 		Counter:     3,
 	}
 	targetBill := &Bill{
 		NetworkID:   types.NetworkLocal,
 		PartitionID: money.DefaultPartitionID,
-		ID:          money.NewBillID(nil, []byte{3}),
+		ID:          moneyid.NewBillID(t),
 		Counter:     4,
 	}
 	tx1, err := db1.TransferToDustCollector(targetBill)
@@ -168,7 +169,7 @@ func TestBillTransferToFeeCredit(t *testing.T) {
 	b := &Bill{
 		NetworkID:   types.NetworkLocal,
 		PartitionID: money.DefaultPartitionID,
-		ID:          money.NewBillID(nil, []byte{1}),
+		ID:          moneyid.NewBillID(t),
 		Value:       2,
 		Counter:     3,
 	}
@@ -176,7 +177,7 @@ func TestBillTransferToFeeCredit(t *testing.T) {
 	fcr := &FeeCreditRecord{
 		NetworkID:   types.NetworkLocal,
 		PartitionID: 5,
-		ID:          money.NewFeeCreditRecordID(nil, []byte{6}),
+		ID:          moneyid.NewFeeCreditRecordID(t),
 		Counter:     &fcrCounter,
 	}
 	amount := uint64(1)
@@ -202,7 +203,7 @@ func TestBillReclaimFromFeeCredit(t *testing.T) {
 	b := &Bill{
 		NetworkID:   types.NetworkLocal,
 		PartitionID: money.DefaultPartitionID,
-		ID:          money.NewBillID(nil, []byte{1}),
+		ID:          moneyid.NewBillID(t),
 		Value:       2,
 		Counter:     3,
 	}
@@ -226,7 +227,7 @@ func TestBillLock(t *testing.T) {
 	b := &Bill{
 		NetworkID:   types.NetworkLocal,
 		PartitionID: money.DefaultPartitionID,
-		ID:          money.NewBillID(nil, []byte{1}),
+		ID:          moneyid.NewBillID(t),
 		Value:       2,
 		Counter:     3,
 	}
@@ -248,7 +249,7 @@ func TestBillUnlock(t *testing.T) {
 	b := &Bill{
 		NetworkID:   types.NetworkLocal,
 		PartitionID: money.DefaultPartitionID,
-		ID:          money.NewBillID(nil, []byte{1}),
+		ID:          moneyid.NewBillID(t),
 		Value:       2,
 		Counter:     3,
 	}

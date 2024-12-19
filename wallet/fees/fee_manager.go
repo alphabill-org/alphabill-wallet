@@ -32,7 +32,7 @@ var (
 
 type (
 	// GenerateFcrID function to generate fee credit record ID
-	GenerateFcrID func(shardPart, pubKey []byte, latestAdditionTime uint64) (types.UnitID, error)
+	GenerateFcrID func(shard types.ShardID, pubKey []byte, latestAdditionTime uint64) (types.UnitID, error)
 
 	FeeManagerDB interface {
 		GetAddFeeContext(accountID []byte) (*AddFeeCreditCtx, error)
@@ -50,10 +50,9 @@ type (
 		log *slog.Logger
 
 		// money partition fields
-		moneyPartitionID          types.PartitionID
-		moneyClient               sdktypes.MoneyPartitionClient
-		moneyPartitionFcrIDFn     GenerateFcrID
-		moneyPartitionFcrUnitType []byte
+		moneyPartitionID      types.PartitionID
+		moneyClient           sdktypes.MoneyPartitionClient
+		moneyPartitionFcrIDFn GenerateFcrID
 
 		// target partition fields
 		targetPartitionID      types.PartitionID
@@ -638,10 +637,10 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 	w.log.InfoContext(ctx, "sending transfer fee credit transaction")
 	fcr, err := w.fetchTargetPartitionFCR(ctx, accountKey)
 	if err != nil {
-		return fmt.Errorf("faild to fetch fee credit record: %w", err)
+		return fmt.Errorf("failed to fetch fee credit record: %w", err)
 	}
 	if fcr == nil {
-		fcrID, err := w.targetPartitionFcrIDFn(nil, accountKey.PubKey, latestAdditionTime)
+		fcrID, err := w.targetPartitionFcrIDFn(types.ShardID{}, accountKey.PubKey, latestAdditionTime)
 		if err != nil {
 			return fmt.Errorf("failed to generate fee credit record id: %w", err)
 		}

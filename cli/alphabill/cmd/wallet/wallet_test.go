@@ -5,12 +5,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/stretchr/testify/require"
+
+	moneyid "github.com/alphabill-org/alphabill-go-base/testutils/money"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	abtypes "github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-go-base/util"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/types"
@@ -74,11 +76,12 @@ func TestWalletCreateCmd_invalidSeed(t *testing.T) {
 }
 
 func TestWalletGetBalanceCmd(t *testing.T) {
+	pdr := moneyid.PDR()
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
-	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(
+	rpcUrl := mocksrv.StartStateApiServer(t, &pdr, mocksrv.NewStateServiceMock(
 		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t),
 			&sdktypes.Unit[any]{
-				UnitID: money.NewBillID(nil, []byte{1}),
+				UnitID: moneyid.NewBillID(t),
 				Data:   money.BillData{Value: 15 * 1e8},
 			}),
 	))
@@ -89,10 +92,11 @@ func TestWalletGetBalanceCmd(t *testing.T) {
 }
 
 func TestWalletGetBalanceKeyCmdKeyFlag(t *testing.T) {
+	pdr := moneyid.PDR()
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic(), testutils.WithNumberOfAccounts(2))
-	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(testutils.TestPubKey1Hash(t),
+	rpcUrl := mocksrv.StartStateApiServer(t, &pdr, mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(testutils.TestPubKey1Hash(t),
 		&sdktypes.Unit[any]{
-			UnitID: money.NewBillID(nil, []byte{1}),
+			UnitID: moneyid.NewBillID(t),
 			Data:   money.BillData{Value: 15 * 1e8},
 		})))
 
@@ -103,10 +107,11 @@ func TestWalletGetBalanceKeyCmdKeyFlag(t *testing.T) {
 }
 
 func TestWalletGetBalanceCmdTotalFlag(t *testing.T) {
+	pdr := moneyid.PDR()
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
-	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t),
+	rpcUrl := mocksrv.StartStateApiServer(t, &pdr, mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t),
 		&sdktypes.Unit[any]{
-			UnitID: money.NewBillID(nil, []byte{1}),
+			UnitID: moneyid.NewBillID(t),
 			Data:   money.BillData{Value: 15 * 1e8},
 		},
 	)))
@@ -118,10 +123,11 @@ func TestWalletGetBalanceCmdTotalFlag(t *testing.T) {
 }
 
 func TestWalletGetBalanceCmdTotalWithKeyFlag(t *testing.T) {
+	pdr := moneyid.PDR()
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
-	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t),
+	rpcUrl := mocksrv.StartStateApiServer(t, &pdr, mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t),
 		&sdktypes.Unit[any]{
-			UnitID: money.NewBillID(nil, []byte{1}),
+			UnitID: moneyid.NewBillID(t),
 			Data:   money.BillData{Value: 15 * 1e8},
 		})))
 
@@ -132,10 +138,11 @@ func TestWalletGetBalanceCmdTotalWithKeyFlag(t *testing.T) {
 }
 
 func TestWalletGetBalanceCmdQuietFlag(t *testing.T) {
+	pdr := moneyid.PDR()
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
-	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t),
+	rpcUrl := mocksrv.StartStateApiServer(t, &pdr, mocksrv.NewStateServiceMock(mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t),
 		&sdktypes.Unit[any]{
-			UnitID: money.NewBillID(nil, []byte{1}),
+			UnitID: moneyid.NewBillID(t),
 			Data:   money.BillData{Value: 15 * 1e8},
 		})))
 
@@ -175,17 +182,18 @@ func TestPubKeysCmd(t *testing.T) {
 }
 
 func TestSendingFailsWithInsufficientBalance(t *testing.T) {
+	pdr := moneyid.PDR()
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
-	rpcUrl := mocksrv.StartStateApiServer(t, mocksrv.NewStateServiceMock(
+	rpcUrl := mocksrv.StartStateApiServer(t, &pdr, mocksrv.NewStateServiceMock(
 		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t),
 			&sdktypes.Unit[any]{
-				UnitID: money.NewBillID(nil, []byte{8}),
+				UnitID: moneyid.NewBillID(t),
 				Data:   money.BillData{Value: 5 * 1e8},
 			}),
 		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t),
 			&sdktypes.Unit[any]{
 				UnitID: func() abtypes.UnitID {
-					id, err := money.NewFeeCreditRecordIDFromPublicKeyHash(nil, testutils.TestPubKey0Hash(t), 1000)
+					id, err := money.NewFeeCreditRecordIDFromPublicKeyHash(&pdr, abtypes.ShardID{}, testutils.TestPubKey0Hash(t), 1000)
 					require.NoError(t, err)
 					return id
 				}(),
