@@ -13,25 +13,25 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 )
 
-type tokensPartitionClient struct {
+type TokensPartitionClient struct {
 	*partitionClient
 }
 
 // NewTokensPartitionClient creates a tokens partition client for the given RPC URL.
-func NewTokensPartitionClient(ctx context.Context, rpcUrl string, opts ...Option) (sdktypes.TokensPartitionClient, error) {
+func NewTokensPartitionClient(ctx context.Context, rpcUrl string, opts ...Option) (*TokensPartitionClient, error) {
 	partitionClient, err := newPartitionClient(ctx, rpcUrl, tokens.PartitionTypeID, opts...)
 	if err != nil {
 		return nil, err
 	}
 
-	return &tokensPartitionClient{
+	return &TokensPartitionClient{
 		partitionClient: partitionClient,
 	}, nil
 }
 
 // GetFungibleToken returns fungible token for the given token id.
 // Returns nil,nil if the token does not exist.
-func (c *tokensPartitionClient) GetFungibleToken(ctx context.Context, tokenID sdktypes.TokenID) (*sdktypes.FungibleToken, error) {
+func (c *TokensPartitionClient) GetFungibleToken(ctx context.Context, tokenID sdktypes.TokenID) (*sdktypes.FungibleToken, error) {
 	if err := tokenID.TypeMustBe(tokens.FungibleTokenUnitType, c.pdr); err != nil {
 		return nil, fmt.Errorf("invalid fungible token id: %w", err)
 	}
@@ -69,7 +69,7 @@ func (c *tokensPartitionClient) GetFungibleToken(ctx context.Context, tokenID sd
 
 // GetNonFungibleToken returns non-fungible token for the given token id.
 // Returns nil,nil if the token does not exist.
-func (c *tokensPartitionClient) GetNonFungibleToken(ctx context.Context, tokenID sdktypes.TokenID) (*sdktypes.NonFungibleToken, error) {
+func (c *TokensPartitionClient) GetNonFungibleToken(ctx context.Context, tokenID sdktypes.TokenID) (*sdktypes.NonFungibleToken, error) {
 	if err := tokenID.TypeMustBe(tokens.NonFungibleTokenUnitType, c.pdr); err != nil {
 		return nil, fmt.Errorf("invalid non-fungible token id: %w", err)
 	}
@@ -108,7 +108,7 @@ func (c *tokensPartitionClient) GetNonFungibleToken(ctx context.Context, tokenID
 }
 
 // GetFungibleTokens returns fungible tokens for the given owner id.
-func (c *tokensPartitionClient) GetFungibleTokens(ctx context.Context, ownerID []byte) ([]*sdktypes.FungibleToken, error) {
+func (c *TokensPartitionClient) GetFungibleTokens(ctx context.Context, ownerID []byte) ([]*sdktypes.FungibleToken, error) {
 	unitIDs, err := c.GetUnitsByOwnerID(ctx, ownerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch owner unit ids: %w", err)
@@ -192,7 +192,7 @@ func (c *tokensPartitionClient) GetFungibleTokens(ctx context.Context, ownerID [
 }
 
 // GetNonFungibleTokens returns non-fungible tokens for the given owner id.
-func (c *tokensPartitionClient) GetNonFungibleTokens(ctx context.Context, ownerID []byte) ([]*sdktypes.NonFungibleToken, error) {
+func (c *TokensPartitionClient) GetNonFungibleTokens(ctx context.Context, ownerID []byte) ([]*sdktypes.NonFungibleToken, error) {
 	unitIDs, err := c.GetUnitsByOwnerID(ctx, ownerID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch owner unit ids: %w", err)
@@ -276,18 +276,18 @@ func (c *tokensPartitionClient) GetNonFungibleTokens(ctx context.Context, ownerI
 	return nfts, nil
 }
 
-func (c *tokensPartitionClient) GetFungibleTokenTypes(ctx context.Context, creator sdktypes.PubKey) ([]*sdktypes.FungibleTokenType, error) {
+func (c *TokensPartitionClient) GetFungibleTokenTypes(ctx context.Context, creator sdktypes.PubKey) ([]*sdktypes.FungibleTokenType, error) {
 	// TODO AB-1448
 	return nil, nil
 }
 
-func (c *tokensPartitionClient) GetNonFungibleTokenTypes(ctx context.Context, creator sdktypes.PubKey) ([]*sdktypes.NonFungibleTokenType, error) {
+func (c *TokensPartitionClient) GetNonFungibleTokenTypes(ctx context.Context, creator sdktypes.PubKey) ([]*sdktypes.NonFungibleTokenType, error) {
 	// TODO AB-1448
 	return nil, nil
 }
 
 // GetFungibleTokenTypeHierarchy returns type hierarchy for given token type id where the root type is the last element (no parent).
-func (c *tokensPartitionClient) GetFungibleTokenTypeHierarchy(ctx context.Context, typeID sdktypes.TokenTypeID) ([]*sdktypes.FungibleTokenType, error) {
+func (c *TokensPartitionClient) GetFungibleTokenTypeHierarchy(ctx context.Context, typeID sdktypes.TokenTypeID) ([]*sdktypes.FungibleTokenType, error) {
 	var tokenTypes []*sdktypes.FungibleTokenType
 	for len(typeID) > 0 && !typeID.Eq(sdktypes.NoParent) {
 		tokenType, err := c.getFungibleTokenType(ctx, typeID)
@@ -304,7 +304,7 @@ func (c *tokensPartitionClient) GetFungibleTokenTypeHierarchy(ctx context.Contex
 }
 
 // GetNonFungibleTokenTypeHierarchy returns type hierarchy for given token type id where the root type is the last element (no parent).
-func (c *tokensPartitionClient) GetNonFungibleTokenTypeHierarchy(ctx context.Context, typeID sdktypes.TokenTypeID) ([]*sdktypes.NonFungibleTokenType, error) {
+func (c *TokensPartitionClient) GetNonFungibleTokenTypeHierarchy(ctx context.Context, typeID sdktypes.TokenTypeID) ([]*sdktypes.NonFungibleTokenType, error) {
 	var tokenTypes []*sdktypes.NonFungibleTokenType
 	for len(typeID) > 0 && !typeID.Eq(sdktypes.NoParent) {
 		tokenType, err := c.getNonFungibleTokenType(ctx, typeID)
@@ -322,11 +322,11 @@ func (c *tokensPartitionClient) GetNonFungibleTokenTypeHierarchy(ctx context.Con
 
 // GetFeeCreditRecordByOwnerID finds the first fee credit record in tokens partition for the given owner ID,
 // returns nil if fee credit record does not exist.
-func (c *tokensPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (*sdktypes.FeeCreditRecord, error) {
+func (c *TokensPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ownerID []byte) (*sdktypes.FeeCreditRecord, error) {
 	return c.getFeeCreditRecordByOwnerID(ctx, ownerID, tokens.FeeCreditRecordUnitType)
 }
 
-func (c *tokensPartitionClient) ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*types.TxRecordProof, error) {
+func (c *TokensPartitionClient) ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*types.TxRecordProof, error) {
 	sub, err := txsubmitter.New(tx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create tx submission: %w", err)
@@ -339,12 +339,12 @@ func (c *tokensPartitionClient) ConfirmTransaction(ctx context.Context, tx *type
 	return txBatch.Submissions()[0].Proof, nil
 }
 
-func (c *tokensPartitionClient) Close() {
+func (c *TokensPartitionClient) Close() {
 	c.AdminAPIClient.Close()
 	c.StateAPIClient.Close()
 }
 
-func (c *tokensPartitionClient) getFungibleTokenType(ctx context.Context, typeID sdktypes.TokenTypeID) (*sdktypes.FungibleTokenType, error) {
+func (c *TokensPartitionClient) getFungibleTokenType(ctx context.Context, typeID sdktypes.TokenTypeID) (*sdktypes.FungibleTokenType, error) {
 	if err := typeID.TypeMustBe(tokens.FungibleTokenTypeUnitType, c.pdr); err != nil {
 		return nil, fmt.Errorf("invalid fungible token type id: %w", err)
 	}
@@ -370,7 +370,7 @@ func (c *tokensPartitionClient) getFungibleTokenType(ctx context.Context, typeID
 	}, nil
 }
 
-func (c *tokensPartitionClient) getNonFungibleTokenType(ctx context.Context, typeID sdktypes.TokenTypeID) (*sdktypes.NonFungibleTokenType, error) {
+func (c *TokensPartitionClient) getNonFungibleTokenType(ctx context.Context, typeID sdktypes.TokenTypeID) (*sdktypes.NonFungibleTokenType, error) {
 	if err := typeID.TypeMustBe(tokens.NonFungibleTokenTypeUnitType, c.pdr); err != nil {
 		return nil, fmt.Errorf("invalid non-fungible token type id: %w", err)
 	}

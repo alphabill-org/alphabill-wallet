@@ -90,6 +90,14 @@ func (c *StateAPIClient) GetBlock(ctx context.Context, roundNumber uint64) (*typ
 	return block, nil
 }
 
+// GetUnits returns list of all unit identifiers optionally filtered by type identifier.
+// This request needs to be explicitly enabled on the validator node.
+func (c *StateAPIClient) GetUnits(ctx context.Context, unitTypeID *uint32) ([]types.UnitID, error) {
+	var res []types.UnitID
+	err := c.RpcClient.CallContext(ctx, &res, "state_getUnits", unitTypeID)
+	return res, err
+}
+
 func encodeCbor(v interface{}) (hex.Bytes, error) {
 	data, err := types.Cbor.Marshal(v)
 	if err != nil {

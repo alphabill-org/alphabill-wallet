@@ -1,6 +1,7 @@
 package permissioned
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/alphabill-org/alphabill-go-base/hash"
@@ -34,8 +35,10 @@ func NewCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 	}
 	cmd.AddCommand(addFeeCreditCmd(config))
 	cmd.AddCommand(deleteFeeCreditCmd(config))
+	cmd.AddCommand(listFeeCreditCmd(config))
 
-	cmd.PersistentFlags().StringVarP(&config.rpcUrl, args.RpcUrl, "r", "", "RPC URL of a partition node")
+	cmd.PersistentFlags().StringVarP(&config.rpcUrl, args.RpcUrl, "r", "", "RPC URL of the partition node")
+	cmd.MarkPersistentFlagRequired(args.RpcUrl)
 	return cmd
 }
 
@@ -70,13 +73,7 @@ func addFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 		return err
 	}
 
-	targetPubkey := *cmd.Flag(args.TargetPubkeyFlagName).Value.(*clitypes.BytesHex)
-
-	rpcUrl, err := cmd.Flags().GetString(args.RpcUrl)
-	if err != nil {
-		return err
-	}
-	tokensClient, err := client.NewTokensPartitionClient(cmd.Context(), args.BuildRpcUrl(rpcUrl))
+	tokensClient, err := client.NewTokensPartitionClient(cmd.Context(), config.buildRpcUrl())
 	if err != nil {
 		return fmt.Errorf("failed to dial rpc url: %w", err)
 	}
@@ -113,6 +110,7 @@ func addFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 		return fmt.Errorf("failed to get account key for account %d", accountNumber)
 	}
 
+	targetPubkey := *cmd.Flag(args.TargetPubkeyFlagName).Value.(*clitypes.BytesHex)
 	ownerID := hash.Sum256(targetPubkey)
 	fcr, err := tokensClient.GetFeeCreditRecordByOwnerID(cmd.Context(), ownerID)
 	if err != nil {
@@ -182,13 +180,7 @@ func deleteFeeCreditCmd(config *config) *cobra.Command {
 }
 
 func deleteFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
-	targetPubkey := *cmd.Flag(args.TargetPubkeyFlagName).Value.(*clitypes.BytesHex)
-
-	rpcUrl, err := cmd.Flags().GetString(args.RpcUrl)
-	if err != nil {
-		return err
-	}
-	tokensClient, err := client.NewTokensPartitionClient(cmd.Context(), args.BuildRpcUrl(rpcUrl))
+	tokensClient, err := client.NewTokensPartitionClient(cmd.Context(), config.buildRpcUrl())
 	if err != nil {
 		return fmt.Errorf("failed to dial rpc url: %w", err)
 	}
@@ -220,6 +212,7 @@ func deleteFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 		return fmt.Errorf("failed to get account key for account %d", accountNumber)
 	}
 
+	targetPubkey := *cmd.Flag(args.TargetPubkeyFlagName).Value.(*clitypes.BytesHex)
 	ownerID := hash.Sum256(targetPubkey)
 	fcr, err := tokensClient.GetFeeCreditRecordByOwnerID(cmd.Context(), ownerID)
 	if err != nil {
@@ -256,7 +249,66 @@ func deleteFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 	return nil
 }
 
+func listFeeCreditCmd(config *config) *cobra.Command {
+	listCreditConf := &listCreditConfig{config: config}
+	cmd := &cobra.Command{
+		Use:   "list-credit",
+		Short: "lists all fee credit records in the given partition",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return listFeeCreditCmdExec(cmd, listCreditConf)
+		},
+	}
+	cmd.Flags().BoolVarP(&listCreditConf.verbose, "verbose", "v", false, "if true then lists "+
+		"full info for each fee credit record in json format; if false then lists only the fee credit record ids")
+	cmd.Flags().Uint32VarP(&listCreditConf.unitTypeID, "unit-type-id", "t", tokens.FeeCreditRecordUnitType,
+		"the fee credit record type id (partition specific)")
+	return cmd
+}
+
+func listFeeCreditCmdExec(cmd *cobra.Command, config *listCreditConfig) error {
+	tokensClient, err := client.NewTokensPartitionClient(cmd.Context(), config.buildRpcUrl())
+	if err != nil {
+		return fmt.Errorf("failed to dial rpc url: %w", err)
+	}
+	defer tokensClient.Close()
+
+	unitIDs, err := tokensClient.GetUnits(cmd.Context(), &config.unitTypeID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch units: %w", err)
+	}
+	writer := config.walletConfig.Base.ConsoleWriter
+	writer.Println(fmt.Sprintf("Total Fee Credit Records: %d", len(unitIDs)))
+	if config.verbose {
+		for _, unitID := range unitIDs {
+			fcr, err := tokensClient.GetFeeCreditRecord(cmd.Context(), unitID)
+			if err != nil {
+				return fmt.Errorf("failed to fetch unit %s: %w", unitID, err)
+			}
+			fcrJson, err := json.Marshal(fcr)
+			if err != nil {
+				return fmt.Errorf("failed to marshal fcr to json")
+			}
+			writer.Println(string(fcrJson))
+		}
+	} else {
+		for _, unitID := range unitIDs {
+			writer.Println(fmt.Sprintf("0x%s", unitID))
+		}
+	}
+	return nil
+}
+
 type config struct {
 	walletConfig *clitypes.WalletConfig
 	rpcUrl       string
+}
+
+func (c *config) buildRpcUrl() string {
+	return args.BuildRpcUrl(c.rpcUrl)
+}
+
+type listCreditConfig struct {
+	*config
+	verbose    bool
+	unitTypeID uint32
 }
