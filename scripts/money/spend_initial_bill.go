@@ -83,11 +83,11 @@ func main() {
 	}
 
 	// calculate fee credit record id
-	roundNumber, err := moneyClient.GetRoundNumber(ctx)
+	roundInfo, err := moneyClient.GetRoundInfo(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
-	latestAdditionTime := roundNumber + *timeout
+	latestAdditionTime := roundInfo.RoundNumber + *timeout
 	fcrID, err := money.NewFeeCreditRecordIDFromOwnerPredicate(pdr, types.ShardID{}, templates.AlwaysTrueBytes(), latestAdditionTime)
 	if err != nil {
 		log.Fatal(err)
@@ -258,9 +258,9 @@ func waitForConf(ctx context.Context, c sdktypes.PartitionClient, tx *types.Tran
 	}
 	for {
 		// fetch round number before proof to ensure that we cannot miss the proof
-		roundNumber, err := c.GetRoundNumber(ctx)
+		roundInfo, err := c.GetRoundInfo(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch target partition round number: %w", err)
+			return nil, fmt.Errorf("failed to fetch target partition round info: %w", err)
 		}
 		proof, err := c.GetTransactionProof(ctx, txHash)
 		if err != nil {
@@ -269,7 +269,7 @@ func waitForConf(ctx context.Context, c sdktypes.PartitionClient, tx *types.Tran
 		if proof != nil {
 			return proof, nil
 		}
-		if roundNumber >= tx.Timeout() {
+		if roundInfo.RoundNumber >= tx.Timeout() {
 			return nil, errors.New("transaction timed out")
 		}
 		select {

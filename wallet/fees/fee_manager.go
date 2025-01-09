@@ -627,11 +627,11 @@ func (w *FeeManager) sendTransferFCTx(ctx context.Context, accountKey *account.A
 	if err != nil {
 		return err
 	}
-	targetRoundNumber, err := w.targetPartitionClient.GetRoundNumber(ctx)
+	targetRoundInfo, err := w.targetPartitionClient.GetRoundInfo(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to fetch target partition round number: %w", err)
+		return fmt.Errorf("failed to fetch target partition round info: %w", err)
 	}
-	latestAdditionTime := targetRoundNumber + transferFCLatestAdditionTime
+	latestAdditionTime := targetRoundInfo.RoundNumber + transferFCLatestAdditionTime
 
 	// create transferFC transaction
 	w.log.InfoContext(ctx, "sending transfer fee credit transaction")
@@ -723,11 +723,11 @@ func (w *FeeManager) sendAddFCTx(ctx context.Context, accountKey *account.Accoun
 		if err := feeTx.UnmarshalAttributes(transferFCAttr); err != nil {
 			return fmt.Errorf("failed to unmarshal transferFC attributes: %w", err)
 		}
-		roundNumber, err := w.targetPartitionClient.GetRoundNumber(ctx)
+		roundInfo, err := w.targetPartitionClient.GetRoundInfo(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to fetch target partition round number: %w", err)
+			return fmt.Errorf("failed to fetch target partition round info: %w", err)
 		}
-		if roundNumber >= transferFCAttr.LatestAdditionTime {
+		if roundInfo.RoundNumber >= transferFCAttr.LatestAdditionTime {
 			_, err := w.unlockFeeCreditRecord(ctx, accountKey)
 			if err != nil {
 				return fmt.Errorf("failed to unlock remote fee credit record: %w", err)
@@ -1117,19 +1117,19 @@ func (w *FeeManager) sendReclaimFCTx(ctx context.Context, accountKey *account.Ac
 }
 
 func (w *FeeManager) getMoneyPartitionTimeout(ctx context.Context) (uint64, error) {
-	roundNumber, err := w.moneyClient.GetRoundNumber(ctx)
+	roundInfo, err := w.moneyClient.GetRoundInfo(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("failed to fetch money partition round number: %w", err)
+		return 0, fmt.Errorf("failed to fetch money partition round info: %w", err)
 	}
-	return roundNumber + txTimeoutBlockCount, nil
+	return roundInfo.RoundNumber + txTimeoutBlockCount, nil
 }
 
 func (w *FeeManager) getTargetPartitionTimeout(ctx context.Context) (uint64, error) {
-	roundNumber, err := w.targetPartitionClient.GetRoundNumber(ctx)
+	roundInfo, err := w.targetPartitionClient.GetRoundInfo(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("failed to fetch target partition round number: %w", err)
+		return 0, fmt.Errorf("failed to fetch target partition round info: %w", err)
 	}
-	return roundNumber + txTimeoutBlockCount, nil
+	return roundInfo.RoundNumber + txTimeoutBlockCount, nil
 }
 
 // fetchBills fetches bills from money rpc node and sorts them by value (descending, largest first)
@@ -1265,9 +1265,9 @@ func waitForConf(ctx context.Context, partitionClient sdktypes.PartitionClient, 
 	}
 	for {
 		// fetch round number before proof to ensure that we cannot miss the proof
-		roundNumber, err := partitionClient.GetRoundNumber(ctx)
+		roundInfo, err := partitionClient.GetRoundInfo(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to fetch target partition round number: %w", err)
+			return nil, fmt.Errorf("failed to fetch target partition round info: %w", err)
 		}
 		proof, err := partitionClient.GetTransactionProof(ctx, txHash)
 		if err != nil {
@@ -1276,7 +1276,7 @@ func waitForConf(ctx context.Context, partitionClient sdktypes.PartitionClient, 
 		if proof != nil {
 			return proof, nil
 		}
-		if roundNumber >= tx.Timeout() {
+		if roundInfo.RoundNumber >= tx.Timeout() {
 			break
 		}
 

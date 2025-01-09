@@ -31,14 +31,14 @@ const (
 	fcrTimeout                   = 1000 + transferFCLatestAdditionTime
 )
 
-func Test_GetRoundNumber_OK(t *testing.T) {
+func Test_GetRoundInfo_OK(t *testing.T) {
 	t.Parallel()
 
 	pdr := tokenid.PDR()
 	rpcClient := &mockTokensPartitionClient{
 		pdr: &pdr,
-		getRoundNumber: func(ctx context.Context) (uint64, error) {
-			return 42, nil
+		getRoundInfo: func(ctx context.Context) (*sdktypes.RoundInfo, error) {
+			return &sdktypes.RoundInfo{RoundNumber: 42}, nil
 		},
 	}
 	w, err := New(rpcClient, nil, false, nil, 0, logger.New(t))
@@ -948,7 +948,7 @@ type mockTokensPartitionClient struct {
 	getNonFungibleTokenTypes         func(ctx context.Context, creator sdktypes.PubKey) ([]*sdktypes.NonFungibleTokenType, error)
 	getNonFungibleTokenTypeHierarchy func(ctx context.Context, id sdktypes.TokenTypeID) ([]*sdktypes.NonFungibleTokenType, error)
 
-	getRoundNumber              func(ctx context.Context) (uint64, error)
+	getRoundInfo                func(ctx context.Context) (*sdktypes.RoundInfo, error)
 	sendTransaction             func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
 	confirmTransaction          func(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*types.TxRecordProof, error)
 	getTransactionProof         func(ctx context.Context, txHash hex.Bytes) (*types.TxRecordProof, error)
@@ -1024,11 +1024,11 @@ func (m *mockTokensPartitionClient) GetNonFungibleTokenTypes(ctx context.Context
 	return nil, fmt.Errorf("GetNonFungibleTokenTypes not implemented")
 }
 
-func (m *mockTokensPartitionClient) GetRoundNumber(ctx context.Context) (uint64, error) {
-	if m.getRoundNumber != nil {
-		return m.getRoundNumber(ctx)
+func (m *mockTokensPartitionClient) GetRoundInfo(ctx context.Context) (*sdktypes.RoundInfo, error) {
+	if m.getRoundInfo != nil {
+		return m.getRoundInfo(ctx)
 	}
-	return 1, nil
+	return &sdktypes.RoundInfo{RoundNumber: 1}, nil
 }
 
 func (m *mockTokensPartitionClient) SendTransaction(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {

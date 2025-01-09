@@ -163,7 +163,11 @@ func (w *Wallet) GetBalances(ctx context.Context, cmd GetBalanceCmd) ([]uint64, 
 
 // GetRoundNumber returns the latest round number in node.
 func (w *Wallet) GetRoundNumber(ctx context.Context) (uint64, error) {
-	return w.moneyClient.GetRoundNumber(ctx)
+	roundInfo, err := w.moneyClient.GetRoundInfo(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return roundInfo.RoundNumber, nil
 }
 
 // Send creates, signs and broadcasts transactions, in total for the given amount,
@@ -181,7 +185,7 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*types.TxRecordProof,
 		return nil, fmt.Errorf("failed to load public key: %w", err)
 	}
 
-	roundNumber, err := w.moneyClient.GetRoundNumber(ctx)
+	roundInfo, err := w.moneyClient.GetRoundInfo(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +215,7 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*types.TxRecordProof,
 	if totalAmount > balance {
 		return nil, errors.New("insufficient balance for transaction")
 	}
-	timeout := roundNumber + txTimeoutBlockCount
+	timeout := roundInfo.RoundNumber + txTimeoutBlockCount
 	batch := txsubmitter.NewBatch(w.moneyClient, w.log)
 
 	txSigner, err := sdktypes.NewMoneyTxSignerFromKey(k.PrivKey)

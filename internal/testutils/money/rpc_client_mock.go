@@ -119,11 +119,11 @@ func (c *RpcClientMock) GetNodeInfo(ctx context.Context) (*sdktypes.NodeInfoResp
 	}, nil
 }
 
-func (c *RpcClientMock) GetRoundNumber(ctx context.Context) (uint64, error) {
+func (c *RpcClientMock) GetRoundInfo(ctx context.Context) (*sdktypes.RoundInfo, error) {
 	if c.Err != nil {
-		return 0, c.Err
+		return nil, c.Err
 	}
-	return c.RoundNumber, nil
+	return &sdktypes.RoundInfo{RoundNumber: c.RoundNumber}, nil
 }
 
 func (c *RpcClientMock) GetBill(ctx context.Context, unitID types.UnitID) (*sdktypes.Bill, error) {

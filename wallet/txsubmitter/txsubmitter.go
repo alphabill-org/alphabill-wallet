@@ -97,7 +97,7 @@ func (t *TxSubmissionBatch) confirmUnitsTx(ctx context.Context) error {
 			return fmt.Errorf("confirming transactions interrupted: %w", err)
 		}
 
-		roundNumber, err := t.partitionClient.GetRoundNumber(ctx)
+		roundInfo, err := t.partitionClient.GetRoundInfo(ctx)
 		if err != nil {
 			return err
 		}
@@ -107,7 +107,7 @@ func (t *TxSubmissionBatch) confirmUnitsTx(ctx context.Context) error {
 			if sub.Confirmed() {
 				continue
 			}
-			if roundNumber <= sub.Transaction.Timeout() {
+			if roundInfo.RoundNumber <= sub.Transaction.Timeout() {
 				proof, err := t.partitionClient.GetTransactionProof(ctx, sub.TxHash)
 				if err != nil {
 					return err
@@ -136,8 +136,8 @@ func (t *TxSubmissionBatch) confirmUnitsTx(ctx context.Context) error {
 		}
 		if unconfirmed {
 			// If this was the last attempt to get proofs, log the ones that timed out.
-			if roundNumber > t.maxTimeout {
-				t.log.InfoContext(ctx, fmt.Sprintf("Tx confirmation timeout is reached: round=%d", roundNumber))
+			if roundInfo.RoundNumber > t.maxTimeout {
+				t.log.InfoContext(ctx, fmt.Sprintf("Tx confirmation timeout is reached: round=%d", roundInfo.RoundNumber))
 
 				for _, sub := range t.submissions {
 					if !sub.Confirmed() {

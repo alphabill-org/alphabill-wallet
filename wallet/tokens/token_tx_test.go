@@ -9,6 +9,7 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/types/hex"
 	"github.com/stretchr/testify/require"
 
+	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
@@ -29,15 +30,15 @@ func TestConfirmUnitsTx_skip(t *testing.T) {
 }
 
 func TestConfirmUnitsTx_ok(t *testing.T) {
-	getRoundNumberCalled := false
+	getRoundInfoCalled := false
 	getTxProofCalled := false
 	rpcClient := &mockTokensPartitionClient{
 		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
 			return nil, nil
 		},
-		getRoundNumber: func(ctx context.Context) (uint64, error) {
-			getRoundNumberCalled = true
-			return 100, nil
+		getRoundInfo: func(ctx context.Context) (*sdktypes.RoundInfo, error) {
+			getRoundInfoCalled = true
+			return &sdktypes.RoundInfo{RoundNumber: 100}, nil
 		},
 		getTransactionProof: func(ctx context.Context, txHash hex.Bytes) (*types.TxRecordProof, error) {
 			getTxProofCalled = true
@@ -49,24 +50,24 @@ func TestConfirmUnitsTx_ok(t *testing.T) {
 	require.NoError(t, err)
 	batch.Add(sub)
 	require.NoError(t, batch.SendTx(context.Background(), true))
-	require.True(t, getRoundNumberCalled)
+	require.True(t, getRoundInfoCalled)
 	require.True(t, getTxProofCalled)
 }
 
 func TestConfirmUnitsTx_timeout(t *testing.T) {
-	getRoundNumberCalled := 0
+	getRoundInfoCalled := 0
 	getTxProofCalled := 0
 	randomTxHash1 := testutils.RandomBytes(32)
 	rpcClient := &mockTokensPartitionClient{
 		sendTransaction: func(ctx context.Context, tx *types.TransactionOrder) ([]byte, error) {
 			return nil, nil
 		},
-		getRoundNumber: func(ctx context.Context) (uint64, error) {
-			getRoundNumberCalled++
-			if getRoundNumberCalled == 1 {
-				return 100, nil
+		getRoundInfo: func(ctx context.Context) (*sdktypes.RoundInfo, error) {
+			getRoundInfoCalled++
+			if getRoundInfoCalled == 1 {
+				return &sdktypes.RoundInfo{RoundNumber: 100}, nil
 			}
-			return 103, nil
+			return &sdktypes.RoundInfo{RoundNumber: 103}, nil
 		},
 		getTransactionProof: func(ctx context.Context, txHash hex.Bytes) (*types.TxRecordProof, error) {
 			getTxProofCalled++
@@ -85,7 +86,7 @@ func TestConfirmUnitsTx_timeout(t *testing.T) {
 	require.NoError(t, err)
 	batch.Add(sub2)
 	require.ErrorContains(t, batch.SendTx(context.Background(), true), "confirmation timeout")
-	require.EqualValues(t, 2, getRoundNumberCalled)
+	require.EqualValues(t, 2, getRoundInfoCalled)
 	require.EqualValues(t, 2, getTxProofCalled)
 	require.True(t, sub1.Confirmed())
 	require.False(t, sub2.Confirmed())
