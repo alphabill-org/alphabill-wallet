@@ -99,11 +99,11 @@ func execAddVarCmd(cmd *cobra.Command, config *clitypes.AddVarCmdConfig) error {
 		return fmt.Errorf("creating unit id: %w", err)
 	}
 
-	roundNumber, err := orcClient.GetRoundNumber(cmd.Context())
+	roundInfo, err := orcClient.GetRoundInfo(cmd.Context())
 	if err != nil {
-		return fmt.Errorf("failed to fetch round number: %w", err)
+		return fmt.Errorf("failed to fetch round info: %w", err)
 	}
-	timeout := roundNumber + txTimeoutBlockCount
+	timeout := roundInfo.RoundNumber + txTimeoutBlockCount
 	maxFee, err := args.ParseMaxFeeFlag(cmd)
 	if err != nil {
 		return err

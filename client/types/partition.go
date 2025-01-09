@@ -14,7 +14,7 @@ type (
 	PartitionClient interface {
 		GetNodeInfo(ctx context.Context) (*NodeInfoResponse, error)
 		PartitionDescription(ctx context.Context) (*types.PartitionDescriptionRecord, error)
-		GetRoundNumber(ctx context.Context) (uint64, error)
+		GetRoundInfo(ctx context.Context) (*RoundInfo, error)
 		SendTransaction(ctx context.Context, tx *types.TransactionOrder) ([]byte, error)
 		ConfirmTransaction(ctx context.Context, tx *types.TransactionOrder, log *slog.Logger) (*types.TxRecordProof, error)
 		GetTransactionProof(ctx context.Context, txHash hex.Bytes) (*types.TxRecordProof, error)
@@ -43,6 +43,11 @@ type (
 		RootValidators      []PeerInfo            `json:"rootValidators"`
 		PartitionValidators []PeerInfo            `json:"partitionValidators"`
 		OpenConnections     []PeerInfo            `json:"openConnections"` // all libp2p connections to other peers in the network
+	}
+
+	RoundInfo struct {
+		RoundNumber uint64 `json:"roundNumber"`
+		Epoch       uint64 `json:"epoch"`
 	}
 
 	PeerInfo struct {

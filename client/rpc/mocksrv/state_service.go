@@ -93,11 +93,11 @@ func WithError(err error) Option {
 	}
 }
 
-func (s *StateServiceMock) GetRoundNumber(ctx context.Context) (hex.Uint64, error) {
+func (s *StateServiceMock) GetRoundInfo(ctx context.Context) (*sdktypes.RoundInfo, error) {
 	if s.Err != nil {
-		return 0, s.Err
+		return nil, s.Err
 	}
-	return hex.Uint64(s.RoundNumber), nil
+	return &sdktypes.RoundInfo{RoundNumber: s.RoundNumber}, nil
 }
 
 func (s *StateServiceMock) GetUnit(unitID types.UnitID, includeStateProof bool) (*sdktypes.Unit[any], error) {

@@ -32,11 +32,11 @@ func (c *StateAPIClient) Close() {
 	c.RpcClient.Close()
 }
 
-// GetRoundNumber returns the latest round number seen by the rpc node.
-func (c *StateAPIClient) GetRoundNumber(ctx context.Context) (uint64, error) {
-	var num hex.Uint64
-	err := c.RpcClient.CallContext(ctx, &num, "state_getRoundNumber")
-	return uint64(num), err
+// GetRoundInfo returns the latest round number and epoch seen by the rpc node.
+func (c *StateAPIClient) GetRoundInfo(ctx context.Context) (*sdktypes.RoundInfo, error) {
+	var res *sdktypes.RoundInfo
+	err := c.RpcClient.CallContext(ctx, &res, "state_getRoundInfo")
+	return res, err
 }
 
 // GetUnitsByOwnerID returns list of unit identifiers that belong to the given owner.

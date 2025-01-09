@@ -753,7 +753,11 @@ func (w *Wallet) SendFungibleByID(ctx context.Context, accountNumber uint64, tok
 }
 
 func (w *Wallet) GetRoundNumber(ctx context.Context) (uint64, error) {
-	return w.tokensClient.GetRoundNumber(ctx)
+	roundInfo, err := w.tokensClient.GetRoundInfo(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return roundInfo.RoundNumber, nil
 }
 
 // GetFeeCredit returns fee credit record for the given account,

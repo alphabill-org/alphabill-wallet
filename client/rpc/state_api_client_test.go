@@ -17,19 +17,19 @@ func TestRpcClient(t *testing.T) {
 	service := mocksrv.NewStateServiceMock()
 	client := startStateServer(t, service)
 
-	t.Run("GetRoundNumber_OK", func(t *testing.T) {
+	t.Run("GetRoundInfo_OK", func(t *testing.T) {
 		service.Reset()
 		service.RoundNumber = 1337
 
-		roundNumber, err := client.GetRoundNumber(context.Background())
+		roundInfo, err := client.GetRoundInfo(context.Background())
 		require.NoError(t, err)
-		require.EqualValues(t, 1337, roundNumber)
+		require.EqualValues(t, 1337, roundInfo.RoundNumber)
 	})
-	t.Run("GetRoundNumber_NOK", func(t *testing.T) {
+	t.Run("GetRoundInfo_NOK", func(t *testing.T) {
 		service.Reset()
 		service.Err = errors.New("some error")
 
-		_, err := client.GetRoundNumber(context.Background())
+		_, err := client.GetRoundInfo(context.Background())
 		require.ErrorContains(t, err, "some error")
 	})
 	t.Run("GetUnitsByOwnerID_OK", func(t *testing.T) {
