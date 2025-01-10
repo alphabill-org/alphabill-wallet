@@ -237,11 +237,11 @@ func (w *DustCollector) extractProofsFromBatch(dcBatch *txsubmitter.TxSubmission
 }
 
 func (w *DustCollector) getTxTimeout(ctx context.Context) (uint64, error) {
-	roundNumber, err := w.moneyClient.GetRoundNumber(ctx)
+	roundInfo, err := w.moneyClient.GetRoundInfo(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("failed to fetch round number: %w", err)
 	}
-	return roundNumber + w.txTimeout, nil
+	return roundInfo.RoundNumber + w.txTimeout, nil
 }
 
 func (w *DustCollector) Close() error {
