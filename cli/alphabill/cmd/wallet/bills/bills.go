@@ -168,12 +168,12 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if bill.LockStatus != 0 {
 		return errors.New("bill is already locked")
 	}
-	roundNumber, err := moneyClient.GetRoundNumber(cmd.Context())
+	roundInfo, err := moneyClient.GetRoundInfo(cmd.Context())
 	if err != nil {
-		return fmt.Errorf("failed to fetch round number: %w", err)
+		return fmt.Errorf("failed to fetch round info: %w", err)
 	}
 	tx, err := bill.Lock(wallet.LockReasonManual,
-		sdktypes.WithTimeout(roundNumber+10),
+		sdktypes.WithTimeout(roundInfo.RoundNumber+10),
 		sdktypes.WithFeeCreditRecordID(fcr.ID),
 		sdktypes.WithMaxFee(maxFee),
 	)
@@ -262,12 +262,12 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 		return errors.New("bill is already unlocked")
 	}
 
-	roundNumber, err := moneyClient.GetRoundNumber(cmd.Context())
+	roundInfo, err := moneyClient.GetRoundInfo(cmd.Context())
 	if err != nil {
-		return fmt.Errorf("failed to fetch round number: %w", err)
+		return fmt.Errorf("failed to fetch round info: %w", err)
 	}
 	tx, err := bill.Unlock(
-		sdktypes.WithTimeout(roundNumber+10),
+		sdktypes.WithTimeout(roundInfo.RoundNumber+10),
 		sdktypes.WithFeeCreditRecordID(fcr.ID),
 		sdktypes.WithMaxFee(maxFee),
 	)

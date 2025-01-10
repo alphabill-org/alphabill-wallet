@@ -117,11 +117,11 @@ func addFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 		return fmt.Errorf("failed to fetch fee credit record: %w", err)
 	}
 
-	round, err := tokensClient.GetRoundNumber(cmd.Context())
+	roundInfo, err := tokensClient.GetRoundInfo(cmd.Context())
 	if err != nil {
-		return fmt.Errorf("failed to get current round number: %w", err)
+		return fmt.Errorf("failed to get current round info: %w", err)
 	}
-	timeout := round + txTimeoutBlockCount
+	timeout := roundInfo.RoundNumber + txTimeoutBlockCount
 
 	ownerPredicate := templates.NewP2pkh256BytesFromKeyHash(ownerID)
 	if fcr == nil {
@@ -222,12 +222,12 @@ func deleteFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 		return fmt.Errorf("fee credit record not found")
 	}
 
-	round, err := tokensClient.GetRoundNumber(cmd.Context())
+	roundInfo, err := tokensClient.GetRoundInfo(cmd.Context())
 	if err != nil {
-		return fmt.Errorf("failed to get current round number: %w", err)
+		return fmt.Errorf("failed to get current round info: %w", err)
 	}
 
-	setFCTx, err := fcr.DeleteFeeCredit(sdktypes.WithTimeout(round + txTimeoutBlockCount))
+	setFCTx, err := fcr.DeleteFeeCredit(sdktypes.WithTimeout(roundInfo.RoundNumber + txTimeoutBlockCount))
 	if err != nil {
 		return fmt.Errorf("failed to create deleteFC transaction: %w", err)
 	}
