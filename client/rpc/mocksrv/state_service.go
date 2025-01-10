@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto"
 	"fmt"
+	"slices"
 
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-go-base/types/hex"
@@ -117,6 +118,20 @@ func (s *StateServiceMock) GetUnitsByOwnerID(ownerID hex.Bytes) ([]types.UnitID,
 		return nil, s.Err
 	}
 	return s.OwnerUnitIDs[string(ownerID)], nil
+}
+
+func (s *StateServiceMock) GetUnits(unitTypeID uint32) ([]types.UnitID, error) {
+	if s.Err != nil {
+		return nil, s.Err
+	}
+	var unitIDs []types.UnitID
+	for _, unit := range s.Units {
+		unitIDs = append(unitIDs, unit.UnitID)
+	}
+	slices.SortFunc(unitIDs, func(a, b types.UnitID) int {
+		return a.Compare(b)
+	})
+	return unitIDs, nil
 }
 
 func (s *StateServiceMock) SendTransaction(ctx context.Context, tx hex.Bytes) (hex.Bytes, error) {

@@ -302,7 +302,7 @@ func TestTokensRpcClient(t *testing.T) {
 	})
 }
 
-func startServerAndTokensClient(t *testing.T, service *mocksrv.StateServiceMock) types.TokensPartitionClient {
+func startServerAndTokensClient(t *testing.T, service *mocksrv.StateServiceMock) *TokensPartitionClient {
 	// as a part of client init it queries admin service for getNodeInfo so we need to
 	// set up the response. Once AB-1800 gets resolved might not be necessary anymore.
 	pdr := tokenid.PDR()

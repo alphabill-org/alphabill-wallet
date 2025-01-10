@@ -86,15 +86,15 @@ func (c *partitionClient) getFeeCreditRecordByOwnerID(ctx context.Context, owner
 	}
 	for _, unitID := range unitIDs {
 		if unitID.TypeMustBe(fcrUnitType, c.pdr) == nil {
-			return c.getFeeCreditRecord(ctx, unitID)
+			return c.GetFeeCreditRecord(ctx, unitID)
 		}
 	}
 	return nil, nil
 }
 
-// getFeeCreditRecord returns the fee credit record for the given unit ID.
-// Returns nil,nil if the fee credit record does not exist.
-func (c *partitionClient) getFeeCreditRecord(ctx context.Context, unitID types.UnitID) (*sdktypes.FeeCreditRecord, error) {
+// GetFeeCreditRecord returns the fee credit record for the given unit ID.
+// Returns nil, nil if the fee credit record does not exist.
+func (c *partitionClient) GetFeeCreditRecord(ctx context.Context, unitID types.UnitID) (*sdktypes.FeeCreditRecord, error) {
 	var u *sdktypes.Unit[fc.FeeCreditRecord]
 	if err := c.RpcClient.CallContext(ctx, &u, "state_getUnit", unitID, false); err != nil {
 		return nil, err
@@ -105,13 +105,14 @@ func (c *partitionClient) getFeeCreditRecord(ctx context.Context, unitID types.U
 
 	counterCopy := u.Data.Counter
 	return &sdktypes.FeeCreditRecord{
-		NetworkID:   u.NetworkID,
-		PartitionID: u.PartitionID,
-		ID:          u.UnitID,
-		Balance:     u.Data.Balance,
-		Counter:     &counterCopy,
-		MinLifetime: u.Data.MinLifetime,
-		LockStatus:  u.Data.Locked,
+		NetworkID:      u.NetworkID,
+		PartitionID:    u.PartitionID,
+		ID:             u.UnitID,
+		Balance:        u.Data.Balance,
+		OwnerPredicate: u.Data.OwnerPredicate,
+		MinLifetime:    u.Data.MinLifetime,
+		LockStatus:     u.Data.Locked,
+		Counter:        &counterCopy,
 	}, nil
 }
 
