@@ -194,7 +194,7 @@ func TestWalletBillsLockUnlockCmd_Ok(t *testing.T) {
 
 	// verify bill locked
 	stdout = walletCmd.Exec(t, "bills", "list")
-	testutils.VerifyStdout(t, stdout, "#1 0x000000000000000000000000000000000000000000000000000000000000000101 9'999'999'999.000'000'00 (manually locked by user)")
+	testutils.VerifyStdout(t, stdout, "#1 0x000000000000000000000000000000000000000000000000000000000000000101 9'999'999'999.000'000'00 lockStatus=4 (manually locked by user)")
 
 	// unlock bill
 	stdout = walletCmd.Exec(t, "bills", "unlock", "--bill-id", billID.String())
