@@ -48,7 +48,7 @@ type (
 
 	RoundInfo struct {
 		RoundNumber uint64 `json:"roundNumber"`
-		Epoch       uint64 `json:"epoch"`
+		EpochNumber uint64 `json:"epochNumber"`
 	}
 
 	PeerInfo struct {
