@@ -258,7 +258,7 @@ func TestWalletFeesLockCmds_Ok(t *testing.T) {
 	// verify fee credit bill locked
 	stdout = feesCmd.Exec(t, "list")
 	require.Equal(t, "Partition: money", stdout.Lines[0])
-	require.Equal(t, "Account #1 0.999'999'97 (manually locked by user)", stdout.Lines[1])
+	require.Equal(t, "Account #1 0.999'999'97 lockStatus=4 (manually locked by user)", stdout.Lines[1])
 
 	// unlock fee credit record
 	stdout = feesCmd.Exec(t, "unlock", "--key", "1")

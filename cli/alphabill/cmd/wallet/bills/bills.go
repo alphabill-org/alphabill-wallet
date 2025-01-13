@@ -293,7 +293,7 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 
 func getLockedReasonString(bill *sdktypes.Bill) string {
 	if bill.LockStatus != 0 {
-		return fmt.Sprintf(" (%s)", wallet.LockReason(bill.LockStatus).String())
+		return fmt.Sprintf(" lockStatus=%d (%s)", bill.LockStatus, wallet.LockReason(bill.LockStatus).String())
 	}
 	return ""
 }
