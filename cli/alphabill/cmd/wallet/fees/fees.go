@@ -581,7 +581,7 @@ func getAccountInfo(accountIndex uint64, showFcrId bool, ctx context.Context, w 
 
 func getLockedReasonString(fcr *types.FeeCreditRecord) string {
 	if fcr != nil && fcr.LockStatus != 0 {
-		return fmt.Sprintf(" (%s)", wallet.LockReason(fcr.LockStatus).String())
+		return fmt.Sprintf(" lockStatus=%d (%s)", fcr.LockStatus, wallet.LockReason(fcr.LockStatus).String())
 	}
 	return ""
 }
