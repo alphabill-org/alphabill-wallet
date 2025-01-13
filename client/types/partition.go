@@ -23,13 +23,14 @@ type (
 	}
 
 	FeeCreditRecord struct {
-		NetworkID   types.NetworkID
-		PartitionID types.PartitionID
-		ID          types.UnitID
-		Balance     uint64
-		MinLifetime uint64
-		LockStatus  uint64
-		Counter     *uint64
+		NetworkID      types.NetworkID   `json:"networkId"`
+		PartitionID    types.PartitionID `json:"partitionId"`
+		ID             types.UnitID      `json:"id"`
+		Balance        uint64            `json:"balance"`
+		OwnerPredicate hex.Bytes         `json:"ownerPredicate"`
+		MinLifetime    uint64            `json:"minLifetime"`
+		LockStatus     uint64            `json:"lockStatus"`
+		Counter        *uint64           `json:"counter"`
 	}
 
 	NodeInfoResponse struct {
