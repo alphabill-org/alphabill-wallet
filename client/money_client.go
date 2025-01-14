@@ -108,5 +108,8 @@ func (c *moneyPartitionClient) ConfirmTransaction(ctx context.Context, tx *types
 	if err := txBatch.SendTx(ctx, true); err != nil {
 		return nil, err
 	}
-	return txBatch.Submissions()[0].Proof, nil
+	if !sub.Success() {
+		return nil, fmt.Errorf("transaction failed with status %d", sub.Status())
+	}
+	return sub.Proof, nil
 }

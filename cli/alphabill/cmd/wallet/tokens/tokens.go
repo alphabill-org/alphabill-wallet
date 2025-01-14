@@ -626,6 +626,11 @@ func execTokenCmdSendFungible(cmd *cobra.Command, config *types.WalletConfig) er
 	if err != nil {
 		return err
 	}
+	for _, sub := range result.Submissions {
+		if sub.Confirmed() && !sub.Success() {
+			config.Base.ConsoleWriter.Println(fmt.Sprintf("Transaction failed for unit %s with status %d", sub.UnitID, sub.Status()))
+		}
+	}
 	if result.FeeSum > 0 {
 		config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for transaction(s).", util.AmountToString(result.FeeSum, 8)))
 	}
@@ -693,6 +698,7 @@ func execTokenCmdSendNonFungible(cmd *cobra.Command, config *types.WalletConfig)
 	if err != nil {
 		return err
 	}
+	config.Base.ConsoleWriter.Println(fmt.Sprintf("Sent request to transfer NFT with id=%s", result.GetUnit()))
 	if result.FeeSum > 0 {
 		config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for transaction(s).", util.AmountToString(result.FeeSum, 8)))
 	}
@@ -829,6 +835,12 @@ func execTokenCmdUpdateNFTData(cmd *cobra.Command, config *types.WalletConfig) e
 	result, err := tw.UpdateNFTData(cmd.Context(), accountNumber, tokenID, data, tokenDataUpdatePredicateInput, tokenTypeDataUpdatePredicateInputs)
 	if err != nil {
 		return err
+	}
+	config.Base.ConsoleWriter.Println(fmt.Sprintf("Sent request to update NFT with id=%s", result.GetUnit()))
+	for _, sub := range result.Submissions {
+		if sub.Confirmed() && !sub.Success() {
+			config.Base.ConsoleWriter.Println(fmt.Sprintf("Transaction failed for unit %s with status %d", sub.UnitID, sub.Status()))
+		}
 	}
 	if result.FeeSum > 0 {
 		config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for transaction(s).", util.AmountToString(result.FeeSum, 8)))
@@ -1109,6 +1121,7 @@ func execTokenCmdLock(cmd *cobra.Command, config *types.WalletConfig) error {
 	if err != nil {
 		return err
 	}
+	config.Base.ConsoleWriter.Println(fmt.Sprintf("Sent request to lock token with id=%s", result.GetUnit()))
 	if result.FeeSum > 0 {
 		config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for transaction(s).", util.AmountToString(result.FeeSum, 8)))
 	}
@@ -1159,6 +1172,7 @@ func execTokenCmdUnlock(cmd *cobra.Command, config *types.WalletConfig) error {
 	if err != nil {
 		return err
 	}
+	config.Base.ConsoleWriter.Println(fmt.Sprintf("Sent request to unlock token with id=%s", result.GetUnit()))
 	if result.FeeSum > 0 {
 		config.Base.ConsoleWriter.Println(fmt.Sprintf("Paid %s fees for transaction(s).", util.AmountToString(result.FeeSum, 8)))
 	}

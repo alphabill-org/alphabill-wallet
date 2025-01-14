@@ -93,15 +93,11 @@ func (w *Wallet) Close() {
 }
 
 func newSingleResult(sub *txsubmitter.TxSubmission, accNr uint64) *SubmissionResult {
-	res := &SubmissionResult{AccountNumber: accNr}
-	if sub == nil {
-		return res
+	return &SubmissionResult{
+		Submissions:   []*txsubmitter.TxSubmission{sub},
+		AccountNumber: accNr,
+		FeeSum:        sub.ActualFee(),
 	}
-	res.Submissions = []*txsubmitter.TxSubmission{sub}
-	if sub.Confirmed() {
-		res.FeeSum = sub.Proof.TxRecord.ServerMetadata.ActualFee
-	}
-	return res
 }
 
 func (r *SubmissionResult) GetProofs() []*types.TxRecordProof {
@@ -655,8 +651,10 @@ func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId 
 		if err != nil {
 			return nil, err
 		}
-		err = sub.ToBatch(w.tokensClient, w.log).SendTx(ctx, w.confirmTx)
-		return newSingleResult(sub, accountNumber), err
+		if err = sub.ToBatch(w.tokensClient, w.log).SendTx(ctx, w.confirmTx); err != nil {
+			return nil, err
+		}
+		return newSingleResult(sub, accountNumber), nil
 	} else {
 		return w.doSendMultiple(ctx, targetAmount, matchingTokens, acc, fcrID, receiverPubKey, ownerPredicateInput, typeOwnerPredicateInputs)
 	}
@@ -748,8 +746,10 @@ func (w *Wallet) SendFungibleByID(ctx context.Context, accountNumber uint64, tok
 	if err != nil {
 		return nil, err
 	}
-	err = sub.ToBatch(w.tokensClient, w.log).SendTx(ctx, w.confirmTx)
-	return newSingleResult(sub, accountNumber), err
+	if err = sub.ToBatch(w.tokensClient, w.log).SendTx(ctx, w.confirmTx); err != nil {
+		return nil, err
+	}
+	return newSingleResult(sub, accountNumber), nil
 }
 
 func (w *Wallet) GetRoundNumber(ctx context.Context) (uint64, error) {

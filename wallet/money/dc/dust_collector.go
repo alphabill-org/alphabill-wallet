@@ -189,6 +189,9 @@ func (w *DustCollector) swapDCBills(ctx context.Context, txSigner *sdktypes.Mone
 	if err := dcBatch.SendTx(ctx, true); err != nil {
 		return nil, fmt.Errorf("failed to send swap tx: %w", err)
 	}
+	if !sub.Success() {
+		return nil, fmt.Errorf("tx failed with status: %d", sub.Status())
+	}
 	return sub.Proof, nil
 }
 
@@ -225,12 +228,18 @@ func (w *DustCollector) lockTargetBill(ctx context.Context, k *account.AccountKe
 	if err := lockTxBatch.SendTx(ctx, true); err != nil {
 		return nil, fmt.Errorf("failed to send or confirm lock tx: %w", err)
 	}
-	return lockTxBatch.Submissions()[0], nil
+	if !sub.Success() {
+		return nil, fmt.Errorf("tx failed with status %d", sub.Status())
+	}
+	return sub, nil
 }
 
 func (w *DustCollector) extractProofsFromBatch(dcBatch *txsubmitter.TxSubmissionBatch) ([]*types.TxRecordProof, error) {
 	var proofs []*types.TxRecordProof
 	for _, sub := range dcBatch.Submissions() {
+		if !sub.Success() {
+			return nil, fmt.Errorf("tx failed with status: %d", sub.Status())
+		}
 		proofs = append(proofs, sub.Proof)
 	}
 	return proofs, nil
