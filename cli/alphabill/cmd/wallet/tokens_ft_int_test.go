@@ -370,11 +370,11 @@ func TestFungibleTokens_LockUnlock_Integration(t *testing.T) {
 
 	// lock token
 	tokensCmd.Exec(t, "lock", "--token-identifier", tokenID, "-k", "1")
-	testutils.VerifyStdoutEventually(t, tokensCmd.ExecFunc(t, "list", "fungible"), "locked='manually locked by user'")
+	testutils.VerifyStdoutEventually(t, tokensCmd.ExecFunc(t, "list", "fungible"), "lockStatus='4 (manually locked by user)'")
 
 	// unlock token
 	tokensCmd.Exec(t, "unlock", "--token-identifier", tokenID, "-k", "1")
-	testutils.VerifyStdoutEventually(t, tokensCmd.ExecFunc(t, "list", "fungible"), "locked=''")
+	testutils.VerifyStdoutEventually(t, tokensCmd.ExecFunc(t, "list", "fungible"), "lockStatus='0 (unlocked)'")
 }
 
 func addFeeCredit(t *testing.T, home string, amount uint64, partition, partitionRpcUrl, moneyRpcUrl string) {
