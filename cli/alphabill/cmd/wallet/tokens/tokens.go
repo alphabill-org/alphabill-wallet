@@ -960,8 +960,8 @@ func execTokenCmdList(cmd *cobra.Command, config *types.WalletConfig, accountNum
 					typeName = fmt.Sprintf(", token-type-name='%s'", t.TypeName)
 				}
 				amount := util.AmountToString(t.Amount, t.DecimalPlaces)
-				config.Base.ConsoleWriter.Println(fmt.Sprintf("ID='%s', symbol='%s', amount='%v', token-type='%s', locked='%s'",
-					t.ID, t.Symbol, amount, t.TypeID, wallet.LockReason(t.LockStatus).String()) + typeName + " (fungible)")
+				config.Base.ConsoleWriter.Println(fmt.Sprintf("ID='%s', symbol='%s', amount='%v', token-type='%s', lockStatus='%d (%s)'",
+					t.ID, t.Symbol, amount, t.TypeID, t.LockStatus, wallet.LockReason(t.LockStatus).String()) + typeName + " (fungible)")
 			}
 		}
 
@@ -988,8 +988,8 @@ func execTokenCmdList(cmd *cobra.Command, config *types.WalletConfig, accountNum
 					nftData = fmt.Sprintf(", data='%X'", t.Data)
 				}
 
-				config.Base.ConsoleWriter.Println(fmt.Sprintf("ID='%s', symbol='%s', name='%s', token-type='%s', locked='%s'",
-					t.ID, t.Symbol, t.Name, t.TypeID, wallet.LockReason(t.LockStatus).String()) + typeName + nftURI + nftData + " (nft)")
+				config.Base.ConsoleWriter.Println(fmt.Sprintf("ID='%s', symbol='%s', name='%s', token-type='%s', lockStatus='%d (%s)'",
+					t.ID, t.Symbol, t.Name, t.TypeID, t.LockStatus, wallet.LockReason(t.LockStatus).String()) + typeName + nftURI + nftData + " (nft)")
 			}
 		}
 	}
