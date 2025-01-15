@@ -170,7 +170,10 @@ func (w *Wallet) joinTokenForDC(ctx context.Context, acc *accountKey, burnProofs
 	if err = sub.ToBatch(w.tokensClient, w.log).SendTx(ctx, true); err != nil {
 		return 0, err
 	}
-	return sub.Proof.TxRecord.ServerMetadata.ActualFee, nil
+	if !sub.Success() {
+		return 0, fmt.Errorf("tx failed with status: %d", sub.Status())
+	}
+	return sub.ActualFee(), nil
 }
 
 func (w *Wallet) burnTokensForDC(ctx context.Context, acc *accountKey, tokensToBurn []*sdktypes.FungibleToken, targetToken *sdktypes.FungibleToken, fcrID types.UnitID, ownerPredicateInput *PredicateInput, typeOwnerPredicateInputs []*PredicateInput) (uint64, uint64, []*types.TxRecordProof, error) {
@@ -231,7 +234,7 @@ func (w *Wallet) burnTokensForDC(ctx context.Context, acc *accountKey, tokensToB
 	feeSum := uint64(0)
 	for _, sub := range burnBatch.Submissions() {
 		proofs = append(proofs, sub.Proof)
-		feeSum += sub.Proof.TxRecord.ServerMetadata.ActualFee
+		feeSum += sub.ActualFee()
 	}
 	return burnBatchAmount, feeSum, proofs, nil
 }
@@ -307,5 +310,8 @@ func (w *Wallet) lockTokenForDC(ctx context.Context, acc *accountKey, fcrID type
 	if err = sub.ToBatch(w.tokensClient, w.log).SendTx(ctx, true); err != nil {
 		return 0, err
 	}
-	return sub.Proof.TxRecord.ServerMetadata.ActualFee, nil
+	if !sub.Success() {
+		return 0, fmt.Errorf("tx failed with status: %d", sub.Status())
+	}
+	return sub.ActualFee(), nil
 }

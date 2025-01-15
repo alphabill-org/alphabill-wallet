@@ -60,14 +60,16 @@ func (w *Wallet) doSendMultiple(ctx context.Context, amount uint64, tokens []*sd
 			break
 		}
 	}
-	err = batch.SendTx(ctx, w.confirmTx)
-	feeSum := uint64(0)
+	if err = batch.SendTx(ctx, w.confirmTx); err != nil {
+		return nil, err
+	}
+	var feeSum uint64
 	for _, sub := range batch.Submissions() {
 		if sub.Confirmed() {
-			feeSum += sub.Proof.TxRecord.ServerMetadata.ActualFee
+			feeSum += sub.ActualFee()
 		}
 	}
-	return &SubmissionResult{Submissions: batch.Submissions(), FeeSum: feeSum, AccountNumber: acc.AccountNumber()}, err
+	return &SubmissionResult{Submissions: batch.Submissions(), FeeSum: feeSum, AccountNumber: acc.AccountNumber()}, nil
 }
 
 func (w *Wallet) prepareSplitOrTransferTx(acc *accountKey, amount uint64, ft *sdktypes.FungibleToken, fcrID, receiverPubKey []byte, timeout uint64, ownerPredicateInput *PredicateInput, typeOwnerPredicateInputs []*PredicateInput) (*txsubmitter.TxSubmission, error) {

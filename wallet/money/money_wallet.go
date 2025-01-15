@@ -174,7 +174,9 @@ func (w *Wallet) GetRoundNumber(ctx context.Context) (uint64, error) {
 // to the given public key, the public key must be in compressed secp256k1 format.
 // Sends one transaction per bill, prioritizing larger bills.
 // Waits for initial response from the node, returns error if any transaction was not accepted to the mempool.
-// Returns list of tx proofs, if waitForConfirmation=true, otherwise nil.
+// Returns list of tx proofs if WaitForConfirmation is true, otherwise returns nil.
+// Note that the transaction proofs can contain "failed" transactions if the transaction was included
+// in the block but with a failed status e.g. when owner proof verification fails.
 func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*types.TxRecordProof, error) {
 	if err := cmd.isValid(); err != nil {
 		return nil, err

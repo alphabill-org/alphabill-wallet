@@ -221,8 +221,9 @@ func TestNFTDataUpdateCmd_Integration(t *testing.T) {
 	// try to update and Observe failure
 	// TODO: a very slow way (10s) to verify that transaction failed, can we do better without inspecting node internals?
 	// or configure shorter confirmation timeout (AB-868)
-	tokensCmd.ExecWithError(t, "transaction(s) failed",
-		"update", "--token-identifier", nftID2.String(), "--data", "02", "--data-update-input", "false", "--inherit-data-update-input", "true")
+	stdout = tokensCmd.Exec(t, "update", "--token-identifier", nftID2.String(), "--data", "02",
+		"--data-update-input", "false", "--inherit-data-update-input", "true")
+	testutils.VerifyStdout(t, stdout, fmt.Sprintf("Transaction failed for unit %s with status 0", nftID2.String()))
 }
 
 func TestNFT_InvariantPredicate_Integration(t *testing.T) {
