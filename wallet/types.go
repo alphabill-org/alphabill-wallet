@@ -14,7 +14,7 @@ type (
 func (r LockReason) String() string {
 	switch r {
 	case 0:
-		return ""
+		return "unlocked"
 	case LockReasonAddFees:
 		return "locked for adding fees"
 	case LockReasonReclaimFees:
@@ -24,5 +24,5 @@ func (r LockReason) String() string {
 	case LockReasonManual:
 		return "manually locked by user"
 	}
-	return "reason unknown"
+	return "locked"
 }
