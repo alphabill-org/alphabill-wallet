@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	tokenid "github.com/alphabill-org/alphabill-go-base/testutils/tokens"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/nop"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/stretchr/testify/require"
@@ -225,19 +226,25 @@ func TestFungibleTokenLock(t *testing.T) {
 		ID:             tokenid.NewFungibleTokenID(t),
 		OwnerPredicate: []byte{2},
 		TypeID:         tokenid.NewFungibleTokenTypeID(t),
-		Amount:         uint64(4),
+		Amount:         4,
+		Counter:        5,
 	}
 
-	tx, err := ft.Lock(5)
+	stateLock := &types.StateLock{
+		ExecutionPredicate: []byte{1},
+		RollbackPredicate:  []byte{2},
+	}
+	tx, err := ft.Lock(stateLock)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.Type, tokens.TransactionTypeLockToken)
+	require.Equal(t, tx.Type, nop.TransactionTypeNOP)
 	require.Equal(t, ft.PartitionID, tx.GetPartitionID())
 	require.Equal(t, ft.ID, tx.GetUnitID())
+	require.Equal(t, stateLock, tx.StateLock)
 
-	attr := &tokens.LockTokenAttributes{}
+	attr := &nop.Attributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))
-	require.EqualValues(t, 5, attr.LockStatus)
+	require.EqualValues(t, 5, *attr.Counter)
 }
 
 func TestNonFungibleTokenUnlock(t *testing.T) {
@@ -253,11 +260,11 @@ func TestNonFungibleTokenUnlock(t *testing.T) {
 	tx, err := ft.Unlock()
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.Type, tokens.TransactionTypeUnlockToken)
+	require.Equal(t, tx.Type, nop.TransactionTypeNOP)
 	require.Equal(t, ft.PartitionID, tx.GetPartitionID())
 	require.Equal(t, ft.ID, tx.GetUnitID())
 
-	attr := &tokens.UnlockTokenAttributes{}
+	attr := &nop.Attributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))
 }
 

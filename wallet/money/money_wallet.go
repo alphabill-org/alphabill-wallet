@@ -364,7 +364,7 @@ func (w *Wallet) getUnlockedBills(ctx context.Context, ownerID []byte) ([]*sdkty
 	})
 	// filter locked bills
 	for _, b := range bills {
-		if b.LockStatus == 0 {
+		if b.StateLockTx == nil {
 			unlockedBills = append(unlockedBills, b)
 		}
 	}

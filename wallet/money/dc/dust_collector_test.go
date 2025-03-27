@@ -24,7 +24,7 @@ func TestDC_OK(t *testing.T) {
 		testmoney.WithOwnerBill(testmoney.NewBill(t, 2, 2)),
 		testmoney.WithOwnerBill(targetBill),
 		testmoney.WithOwnerFeeCreditRecord(
-			testmoney.NewMoneyFCR(t, accountKeys.AccountKey.PubKeyHash.Sha256, 100, maxFee, 100)),
+			testmoney.NewMoneyFCR(t, accountKeys.AccountKey.PubKeyHash.Sha256, 100, nil, 100)),
 	)
 	dc := NewDustCollector(10, 10, moneyClient, 10, logger.New(t))
 
@@ -50,7 +50,7 @@ func TestDCWontRunForSingleBill(t *testing.T) {
 	moneyClient := testmoney.NewRpcClientMock(
 		testmoney.WithOwnerBill(testmoney.NewBill(t, 1, 1)),
 		testmoney.WithOwnerFeeCreditRecord(
-			testmoney.NewMoneyFCR(t, accountKeys.AccountKey.PubKeyHash.Sha256, 100, 0, 100)),
+			testmoney.NewMoneyFCR(t, accountKeys.AccountKey.PubKeyHash.Sha256, 100, nil, 100)),
 	)
 	dc := NewDustCollector(10, 10, moneyClient, maxFee, logger.New(t))
 
@@ -72,7 +72,7 @@ func TestAllBillsAreSwapped_WhenWalletBillCountEqualToMaxBillCount(t *testing.T)
 		testmoney.WithOwnerBill(testmoney.NewBill(t, 1, 1)),
 		testmoney.WithOwnerBill(testmoney.NewBill(t, 2, 2)),
 		testmoney.WithOwnerBill(targetBill),
-		testmoney.WithOwnerFeeCreditRecord(testmoney.NewMoneyFCR(t, accountKeys.AccountKey.PubKeyHash.Sha256, 100, 0, 100)),
+		testmoney.WithOwnerFeeCreditRecord(testmoney.NewMoneyFCR(t, accountKeys.AccountKey.PubKeyHash.Sha256, 100, nil, 100)),
 	)
 	w := NewDustCollector(maxBillsPerDC, 10, moneyClient, maxFee, logger.New(t))
 
@@ -106,7 +106,7 @@ func TestOnlyFirstNBillsAreSwapped_WhenBillCountOverLimit(t *testing.T) {
 		testmoney.WithOwnerBill(testmoney.NewBill(t, 2, 2)),
 		testmoney.WithOwnerBill(testmoney.NewBill(t, 3, 3)),
 		testmoney.WithOwnerBill(targetBill),
-		testmoney.WithOwnerFeeCreditRecord(testmoney.NewMoneyFCR(t, accountKeys.AccountKey.PubKeyHash.Sha256, 100, 0, 100)),
+		testmoney.WithOwnerFeeCreditRecord(testmoney.NewMoneyFCR(t, accountKeys.AccountKey.PubKeyHash.Sha256, 100, nil, 100)),
 	)
 	w := NewDustCollector(maxBillsPerDC, 10, moneyClient, maxFee, logger.New(t))
 

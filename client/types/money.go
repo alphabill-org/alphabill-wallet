@@ -9,7 +9,9 @@ import (
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/nop"
 	"github.com/alphabill-org/alphabill-go-base/types"
+	"github.com/alphabill-org/alphabill-go-base/types/hex"
 )
 
 type (
@@ -25,7 +27,7 @@ type (
 		PartitionID types.PartitionID
 		ID          types.UnitID
 		Value       uint64
-		LockStatus  uint64
+		StateLockTx hex.Bytes
 		Counter     uint64
 	}
 )
@@ -108,17 +110,18 @@ func (b *Bill) ReclaimFromFeeCredit(closeFCProof *types.TxRecordProof, txOptions
 	return NewTransactionOrder(b.NetworkID, b.PartitionID, b.ID, fc.TransactionTypeReclaimFeeCredit, attr, txOptions...)
 }
 
-func (b *Bill) Lock(lockStatus uint64, txOptions ...Option) (*types.TransactionOrder, error) {
-	attr := &money.LockAttributes{
-		LockStatus: lockStatus,
-		Counter:    b.Counter,
+func (b *Bill) Lock(stateLock *types.StateLock, txOptions ...Option) (*types.TransactionOrder, error) {
+	attr := &nop.Attributes{
+		Counter: &(b.Counter),
 	}
-	return NewTransactionOrder(b.NetworkID, b.PartitionID, b.ID, money.TransactionTypeLock, attr, txOptions...)
+	txOptions = append(txOptions, WithStateLock(stateLock))
+	return NewTransactionOrder(b.NetworkID, b.PartitionID, b.ID, nop.TransactionTypeNOP, attr, txOptions...)
 }
 
 func (b *Bill) Unlock(txOptions ...Option) (*types.TransactionOrder, error) {
-	attr := &money.UnlockAttributes{
-		Counter: b.Counter,
+	counter := b.Counter + 1 // the lock transaction has not been executed yet
+	attr := &nop.Attributes{
+		Counter: &counter,
 	}
-	return NewTransactionOrder(b.NetworkID, b.PartitionID, b.ID, money.TransactionTypeUnlock, attr, txOptions...)
+	return NewTransactionOrder(b.NetworkID, b.PartitionID, b.ID, nop.TransactionTypeNOP, attr, txOptions...)
 }

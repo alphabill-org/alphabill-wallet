@@ -82,3 +82,7 @@ func (s *MoneyTxSigner) newAuthProof(tx *types.TransactionOrder, ownerProof []by
 		return nil, fmt.Errorf("unsupported transaction type: %d", tx.Type)
 	}
 }
+
+func (s *MoneyTxSigner) Signer() abcrypto.Signer {
+	return s.signer
+}

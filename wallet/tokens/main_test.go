@@ -9,21 +9,19 @@ import (
 	"math"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/stretchr/testify/require"
-
 	"github.com/alphabill-org/alphabill-go-base/hash"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	tokenid "github.com/alphabill-org/alphabill-go-base/testutils/tokens"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/nop"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-go-base/types/hex"
-
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
-	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -340,17 +338,17 @@ func TestNewFungibleToken(t *testing.T) {
 	}
 }
 
-func newFungibleToken(_ *testing.T, id sdktypes.TokenID, typeID sdktypes.TokenTypeID, symbol string, amount, lockStatus uint64) *sdktypes.FungibleToken {
+func newFungibleToken(_ *testing.T, id sdktypes.TokenID, typeID sdktypes.TokenTypeID, symbol string, amount uint64, stateLockTx hex.Bytes) *sdktypes.FungibleToken {
 	return &sdktypes.FungibleToken{
-		ID:         id,
-		TypeID:     typeID,
-		Symbol:     symbol,
-		LockStatus: lockStatus,
-		Amount:     amount,
+		ID:          id,
+		TypeID:      typeID,
+		Symbol:      symbol,
+		StateLockTx: stateLockTx,
+		Amount:      amount,
 	}
 }
 
-func newNonFungibleToken(t *testing.T, symbol string, ownerPredicate []byte, lockStatus, counter uint64) *sdktypes.NonFungibleToken {
+func newNonFungibleToken(t *testing.T, symbol string, ownerPredicate []byte, stateLockTx hex.Bytes, counter uint64) *sdktypes.NonFungibleToken {
 	nftID := tokenid.NewNonFungibleTokenID(t)
 	nftTypeID := tokenid.NewNonFungibleTokenTypeID(t)
 
@@ -359,7 +357,7 @@ func newNonFungibleToken(t *testing.T, symbol string, ownerPredicate []byte, loc
 		TypeID:         nftTypeID,
 		Symbol:         symbol,
 		OwnerPredicate: ownerPredicate,
-		LockStatus:     lockStatus,
+		StateLockTx:    stateLockTx,
 		Counter:        counter,
 	}
 }
@@ -374,14 +372,14 @@ func TestSendFungible(t *testing.T) {
 		pdr: &pdr,
 		getFungibleTokens: func(ctx context.Context, ownerID []byte) ([]*sdktypes.FungibleToken, error) {
 			return []*sdktypes.FungibleToken{
-				newFungibleToken(t, test.RandomBytes(32), typeId, "AB", 3, 0),
-				newFungibleToken(t, test.RandomBytes(32), typeId, "AB", 5, 0),
-				newFungibleToken(t, test.RandomBytes(32), typeId, "AB", 7, 0),
-				newFungibleToken(t, test.RandomBytes(32), typeId, "AB", 18, 0),
+				newFungibleToken(t, test.RandomBytes(32), typeId, "AB", 3, nil),
+				newFungibleToken(t, test.RandomBytes(32), typeId, "AB", 5, nil),
+				newFungibleToken(t, test.RandomBytes(32), typeId, "AB", 7, nil),
+				newFungibleToken(t, test.RandomBytes(32), typeId, "AB", 18, nil),
 
-				newFungibleToken(t, test.RandomBytes(32), typeIdForOverflow, "AB2", math.MaxUint64, 0),
-				newFungibleToken(t, test.RandomBytes(32), typeIdForOverflow, "AB2", 1, 0),
-				newFungibleToken(t, test.RandomBytes(32), typeId2, "AB3", 1, 1),
+				newFungibleToken(t, test.RandomBytes(32), typeIdForOverflow, "AB2", math.MaxUint64, nil),
+				newFungibleToken(t, test.RandomBytes(32), typeIdForOverflow, "AB2", 1, nil),
+				newFungibleToken(t, test.RandomBytes(32), typeId2, "AB3", 1, []byte{1}),
 			}, nil
 		},
 		getUnitsByOwnerID: func(ctx context.Context, ownerID hex.Bytes) ([]types.UnitID, error) {
@@ -698,7 +696,7 @@ func TestTransferNFT(t *testing.T) {
 	}{
 		{
 			name:  "to 'always true' predicate",
-			token: newNonFungibleToken(t, "AB", templates.NewP2pkh256BytesFromKey(ak.PubKey), 0, 0),
+			token: newNonFungibleToken(t, "AB", templates.NewP2pkh256BytesFromKey(ak.PubKey), nil, 0),
 			key:   nil,
 			validateOwner: func(t *testing.T, accountNumber uint64, key sdktypes.PubKey, tok *tokens.TransferNonFungibleTokenAttributes) {
 				require.EqualValues(t, templates.AlwaysTrueBytes(), tok.NewOwnerPredicate)
@@ -706,7 +704,7 @@ func TestTransferNFT(t *testing.T) {
 		},
 		{
 			name:  "to public key hash predicate",
-			token: newNonFungibleToken(t, "AB", templates.NewP2pkh256BytesFromKey(ak.PubKey), 0, 0),
+			token: newNonFungibleToken(t, "AB", templates.NewP2pkh256BytesFromKey(ak.PubKey), nil, 0),
 			key:   first(hexutil.Decode("0x0290a43bc454babf1ea8b0b76fcbb01a8f27a989047cf6d6d76397cc4756321e64")),
 			validateOwner: func(t *testing.T, accountNumber uint64, key sdktypes.PubKey, tok *tokens.TransferNonFungibleTokenAttributes) {
 				require.EqualValues(t, templates.NewP2pkh256BytesFromKeyHash(hash.Sum256(key)), tok.NewOwnerPredicate)
@@ -714,7 +712,7 @@ func TestTransferNFT(t *testing.T) {
 		},
 		{
 			name:    "locked token is not sent",
-			token:   newNonFungibleToken(t, "AB", templates.NewP2pkh256BytesFromKey(ak.PubKey), 1, 0),
+			token:   newNonFungibleToken(t, "AB", templates.NewP2pkh256BytesFromKey(ak.PubKey), []byte{1}, 0),
 			wantErr: "token is locked",
 		},
 	}
@@ -755,7 +753,7 @@ func TestUpdateNFTData(t *testing.T) {
 		},
 	}
 	tw := initTestWallet(t, rpcClient)
-	tok := newNonFungibleToken(t, "AB", nil, 0, 0)
+	tok := newNonFungibleToken(t, "AB", nil, nil, 0)
 	tokenz[string(tok.ID)] = tok
 
 	ak, err := tw.am.GetAccountKey(0)
@@ -772,7 +770,7 @@ func TestUpdateNFTData(t *testing.T) {
 	require.Equal(t, tokens.TransactionTypeUpdateNFT, tx.Type)
 
 	// test that locked token tx is not sent
-	lockedToken := newNonFungibleToken(t, "AB", nil, 1, 0)
+	lockedToken := newNonFungibleToken(t, "AB", nil, []byte{1}, 0)
 	tokenz[string(tok.ID)] = lockedToken
 	result, err = tw.UpdateNFTData(context.Background(), 1, tok.ID, data, &PredicateInput{Argument: nil}, []*PredicateInput{{AccountKey: ak}})
 	require.ErrorContains(t, err, "token is locked")
@@ -804,20 +802,20 @@ func TestLockToken(t *testing.T) {
 	require.NoError(t, err)
 
 	// test token is already locked
-	token = newNonFungibleToken(t, "AB", templates.NewP2pkh256BytesFromKey(ak.PubKey), wallet.LockReasonManual, 0)
+	token = newNonFungibleToken(t, "AB", templates.NewP2pkh256BytesFromKey(ak.PubKey), []byte{1}, 0)
 	result, err := tw.LockToken(context.Background(), 1, token.ID, &PredicateInput{Argument: nil})
 	require.ErrorContains(t, err, "token is already locked")
 	require.Nil(t, result)
 
 	// test lock token ok
-	token = newNonFungibleToken(t, "AB", templates.NewP2pkh256BytesFromKey(ak.PubKey), 0, 0)
+	token = newNonFungibleToken(t, "AB", templates.NewP2pkh256BytesFromKey(ak.PubKey), nil, 0)
 	result, err = tw.LockToken(context.Background(), 1, token.ID, &PredicateInput{Argument: nil})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	tx, found := recTxs[string(token.ID)]
 	require.True(t, found)
 	require.EqualValues(t, token.ID, tx.GetUnitID())
-	require.Equal(t, tokens.TransactionTypeLockToken, tx.Type)
+	require.Equal(t, nop.TransactionTypeNOP, tx.Type)
 }
 
 func TestUnlockToken(t *testing.T) {
@@ -845,27 +843,27 @@ func TestUnlockToken(t *testing.T) {
 	require.NoError(t, err)
 
 	// test token is already unlocked
-	token = newNonFungibleToken(t, "AB", templates.NewP2pkh256BytesFromKey(ak.PubKey), 0, 0)
+	token = newNonFungibleToken(t, "AB", templates.NewP2pkh256BytesFromKey(ak.PubKey), nil, 0)
 	result, err := tw.UnlockToken(context.Background(), 1, token.ID, &PredicateInput{Argument: nil})
 	require.ErrorContains(t, err, "token is already unlocked")
 	require.Nil(t, result)
 
 	// test unlock token ok
-	token = newNonFungibleToken(t, "AB", templates.NewP2pkh256BytesFromKey(ak.PubKey), wallet.LockReasonManual, 0)
+	token = newNonFungibleToken(t, "AB", templates.NewP2pkh256BytesFromKey(ak.PubKey), []byte{1}, 0)
 	result, err = tw.UnlockToken(context.Background(), 1, token.ID, &PredicateInput{Argument: nil})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	tx, found := recTxs[string(token.ID)]
 	require.True(t, found)
 	require.EqualValues(t, token.ID, tx.GetUnitID())
-	require.Equal(t, tokens.TransactionTypeUnlockToken, tx.Type)
+	require.Equal(t, nop.TransactionTypeNOP, tx.Type)
 }
 
 func TestSendFungibleByID(t *testing.T) {
 	t.Parallel()
 
 	pdr := tokenid.PDR()
-	token := newFungibleToken(t, test.RandomBytes(32), test.RandomBytes(32), "AB", 100, 0)
+	token := newFungibleToken(t, test.RandomBytes(32), test.RandomBytes(32), "AB", 100, nil)
 
 	be := &mockTokensPartitionClient{
 		pdr: &pdr,

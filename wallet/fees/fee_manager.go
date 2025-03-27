@@ -9,7 +9,6 @@ import (
 	"sort"
 	"time"
 
-	abcrypto "github.com/alphabill-org/alphabill-go-base/crypto"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/types"
@@ -80,7 +79,6 @@ type (
 
 	LockFeeCreditCmd struct {
 		AccountIndex uint64
-		LockStatus   uint64
 	}
 
 	UnlockFeeCreditCmd struct {
@@ -315,27 +313,27 @@ func (w *FeeManager) LockFeeCredit(ctx context.Context, cmd LockFeeCreditCmd) (*
 	if fcr == nil || fcr.Balance < 2*w.maxFee {
 		return nil, errors.New("not enough fee credit in wallet")
 	}
-	if fcr.LockStatus != 0 {
+	if fcr.StateLockTx != nil {
 		return nil, fmt.Errorf("fee credit record is already locked")
 	}
 	timeout, err := w.getTargetPartitionTimeout(ctx)
 	if err != nil {
 		return nil, err
 	}
-	tx, err := fcr.Lock(cmd.LockStatus,
+	tx, err := fcr.Lock(wallet.NewP2PKHStateLock(accountKey.PubKeyHash.Sha256),
 		sdktypes.WithTimeout(timeout),
 		sdktypes.WithMaxFee(w.maxFee),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create lockFC transaction: %w", err)
 	}
-	ownerProof, err := sdktypes.NewP2pkhAuthProofSignatureFromKey(tx, accountKey.PrivKey)
+
+	txSigner, err := sdktypes.NewNopTxSignerFromKey(accountKey.PrivKey)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create nop tx signer: %w", err)
 	}
-	err = tx.SetAuthProof(fc.LockFeeCreditAuthProof{OwnerProof: ownerProof})
-	if err != nil {
-		return nil, fmt.Errorf("failed to sign tx auth proof: %w", err)
+	if err = txSigner.SignLockTx(tx); err != nil {
+		return nil, fmt.Errorf("failed to sign tx: %w", err)
 	}
 
 	proof, err := w.targetPartitionClient.ConfirmTransaction(ctx, tx, w.log)
@@ -359,7 +357,7 @@ func (w *FeeManager) UnlockFeeCredit(ctx context.Context, cmd UnlockFeeCreditCmd
 	if fcr == nil || fcr.Balance < w.maxFee {
 		return nil, errors.New("not enough fee credit in wallet")
 	}
-	if fcr.LockStatus == 0 {
+	if fcr.StateLockTx == nil {
 		return nil, fmt.Errorf("fee credit record is already unlocked")
 	}
 	timeout, err := w.getTargetPartitionTimeout(ctx)
@@ -373,13 +371,13 @@ func (w *FeeManager) UnlockFeeCredit(ctx context.Context, cmd UnlockFeeCreditCmd
 	if err != nil {
 		return nil, fmt.Errorf("failed to create unlockFC transaction: %w", err)
 	}
-	ownerProof, err := sdktypes.NewP2pkhAuthProofSignatureFromKey(tx, accountKey.PrivKey)
+
+	txSigner, err := sdktypes.NewNopTxSignerFromKey(accountKey.PrivKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create owner predicate signature: %w", err)
+		return nil, fmt.Errorf("failed to create nop tx signer: %w", err)
 	}
-	err = tx.SetAuthProof(fc.UnlockFeeCreditAuthProof{OwnerProof: ownerProof})
-	if err != nil {
-		return nil, fmt.Errorf("failed to sign tx auth proof: %w", err)
+	if err := txSigner.SignCommitTx(tx); err != nil {
+		return nil, fmt.Errorf("failed to sign nop tx: %w", err)
 	}
 
 	proof, err := w.targetPartitionClient.ConfirmTransaction(ctx, tx, w.log)
@@ -405,7 +403,7 @@ func (w *FeeManager) addFees(ctx context.Context, accountKey *account.AccountKey
 		return nil, fmt.Errorf("failed to fetch fee credit record: %w", err)
 	}
 	// verify fee credit record is not locked
-	if fcr != nil && fcr.LockStatus != 0 {
+	if fcr != nil && fcr.StateLockTx != nil {
 		return nil, fmt.Errorf("fee credit record is locked")
 	}
 
@@ -421,7 +419,7 @@ func (w *FeeManager) addFees(ctx context.Context, accountKey *account.AccountKey
 
 	// filter locked bills
 	bills, _ = util.FilterSlice(bills, func(b *sdktypes.Bill) (bool, error) {
-		return b.LockStatus == 0, nil
+		return b.StateLockTx == nil, nil
 	})
 
 	// filter bills of too small value
@@ -529,7 +527,7 @@ func (w *FeeManager) sendLockFCTx(ctx context.Context, accountKey *account.Accou
 		return nil
 	}
 	// verify fee credit record is not locked
-	if fcr.LockStatus != 0 {
+	if fcr.StateLockTx != nil {
 		return errors.New("fee credit record is locked")
 	}
 
@@ -541,20 +539,19 @@ func (w *FeeManager) sendLockFCTx(ctx context.Context, accountKey *account.Accou
 
 	// create lockFC
 	w.log.InfoContext(ctx, "sending lock fee credit transaction")
-	tx, err := fcr.Lock(wallet.LockReasonAddFees,
+	tx, err := fcr.Lock(wallet.NewP2PKHStateLock(accountKey.PubKeyHash.Sha256),
 		sdktypes.WithTimeout(targetPartitionTimeout),
 		sdktypes.WithMaxFee(w.maxFee),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create lockFC transaction: %w", err)
 	}
-	ownerProof, err := sdktypes.NewP2pkhAuthProofSignatureFromKey(tx, accountKey.PrivKey)
+	txSigner, err := sdktypes.NewNopTxSignerFromKey(accountKey.PrivKey)
 	if err != nil {
-		return fmt.Errorf("failed to create owner predicate signature: %w", err)
+		return fmt.Errorf("failed to create nop tx signer: %w", err)
 	}
-	err = tx.SetAuthProof(fc.LockFeeCreditAuthProof{OwnerProof: ownerProof})
-	if err != nil {
-		return fmt.Errorf("failed to sign tx auth proof: %w", err)
+	if err = txSigner.SignLockTx(tx); err != nil {
+		return fmt.Errorf("failed to sign nop tx: %w", err)
 	}
 
 	// store lockFC write-ahead log
@@ -760,6 +757,15 @@ func (w *FeeManager) sendAddFCTx(ctx context.Context, accountKey *account.Accoun
 	if err != nil {
 		return fmt.Errorf("failed to create addFC transaction: %w", err)
 	}
+	// if FCR is locked add state unlock proof
+	if feeCtx.LockFCProof != nil {
+		stateUnlockProof, err := sdktypes.NewP2pkhStateLockSignatureFromKey(addFCTx, accountKey.PrivKey)
+		if err != nil {
+			return fmt.Errorf("failed to create state unlock proof: %w", err)
+		}
+		addFCTx.StateUnlock = append([]byte{1}, stateUnlockProof...) // 0=rollback 1=commit
+	}
+
 	ownerProof, err := sdktypes.NewP2pkhAuthProofSignatureFromKey(addFCTx, accountKey.PrivKey)
 	if err != nil {
 		return fmt.Errorf("failed to create owner predicate signature: %w", err)
@@ -802,7 +808,7 @@ func (w *FeeManager) reclaimFees(ctx context.Context, accountKey *account.Accoun
 	if fcr == nil {
 		return nil, errors.New("fee credit record not found")
 	}
-	if fcr.LockStatus != 0 {
+	if fcr.StateLockTx != nil {
 		return nil, errors.New("fee credit record is locked")
 	}
 	if fcr.Balance < w.MinReclaimFeeAmount() {
@@ -815,7 +821,7 @@ func (w *FeeManager) reclaimFees(ctx context.Context, accountKey *account.Accoun
 		return nil, err
 	}
 	bills, _ = util.FilterSlice(bills, func(b *sdktypes.Bill) (bool, error) {
-		return b.LockStatus == 0, nil
+		return b.StateLockTx == nil, nil
 	})
 	if len(bills) == 0 {
 		return nil, errors.New("wallet must have a source bill to which to add reclaimed fee credits")
@@ -882,7 +888,6 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 			}
 			w.log.InfoContext(ctx, fmt.Sprintf("lock tx '%x' confirmed", txHash))
 			feeCtx.LockTxProof = proof
-			feeCtx.TargetBillCounter += 1
 			if err := w.db.SetReclaimFeeContext(accountKey.PubKey, feeCtx); err != nil {
 				return fmt.Errorf("failed to store lock tx proof: %w", err)
 			}
@@ -911,7 +916,7 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 		ID:          feeCtx.TargetBillID,
 		Counter:     feeCtx.TargetBillCounter,
 	}
-	tx, err := targetBill.Lock(wallet.LockReasonReclaimFees,
+	tx, err := targetBill.Lock(wallet.NewP2PKHStateLock(accountKey.PubKeyHash.Sha256),
 		sdktypes.WithTimeout(timeout),
 		sdktypes.WithMaxFee(w.maxFee),
 		sdktypes.WithFeeCreditRecordID(moneyFCR.ID),
@@ -919,12 +924,12 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 	if err != nil {
 		return fmt.Errorf("failed to create lock transaction: %w", err)
 	}
-	txSigner, err := sdktypes.NewMoneyTxSignerFromKey(accountKey.PrivKey)
+	txSigner, err := sdktypes.NewNopTxSignerFromKey(accountKey.PrivKey)
 	if err != nil {
-		return fmt.Errorf("failed to money tx signer: %w", err)
+		return fmt.Errorf("failed to create nop tx signer: %w", err)
 	}
-	if err = txSigner.SignTx(tx); err != nil {
-		return fmt.Errorf("failed to sign tx: %w", err)
+	if err = txSigner.SignCommitTx(tx); err != nil {
+		return fmt.Errorf("failed to sign nop tx: %w", err)
 	}
 
 	// store lock transaction write-ahead log
@@ -942,7 +947,6 @@ func (w *FeeManager) sendLockTx(ctx context.Context, accountKey *account.Account
 
 	// store lock transaction proof in fee context
 	feeCtx.LockTxProof = proof
-	feeCtx.TargetBillCounter += 1
 	if err = w.db.SetReclaimFeeContext(accountKey.PubKey, feeCtx); err != nil {
 		return fmt.Errorf("failed to store lock transaction fee context: %w", err)
 	}
@@ -1086,6 +1090,16 @@ func (w *FeeManager) sendReclaimFCTx(ctx context.Context, accountKey *account.Ac
 	if err != nil {
 		return fmt.Errorf("failed to create reclaimFC transaction: %w", err)
 	}
+
+	// if we sent lock tx add unlock proof
+	if feeCtx.LockTxProof != nil {
+		stateUnlockProof, err := sdktypes.NewP2pkhStateLockSignatureFromKey(reclaimFC, accountKey.PrivKey)
+		if err != nil {
+			return fmt.Errorf("failed to create state unlock proof: %w", err)
+		}
+		reclaimFC.StateUnlock = append([]byte{1}, stateUnlockProof...) // 0=rollback 1=commit
+	}
+
 	ownerProof, err := sdktypes.NewP2pkhAuthProofSignatureFromKey(reclaimFC, accountKey.PrivKey)
 	if err != nil {
 		return fmt.Errorf("failed to create owner predicate signature: %w", err)
@@ -1165,7 +1179,7 @@ func (w *FeeManager) unlockFeeCreditRecord(ctx context.Context, accountKey *acco
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch fee credit record: %w", err)
 	}
-	if fcr == nil || fcr.LockStatus == 0 {
+	if fcr == nil || fcr.StateLockTx == nil {
 		return nil, nil
 	}
 	timeout, err := w.getTargetPartitionTimeout(ctx)
@@ -1179,21 +1193,13 @@ func (w *FeeManager) unlockFeeCreditRecord(ctx context.Context, accountKey *acco
 	if err != nil {
 		return nil, fmt.Errorf("failed to create unlockFC transaction: %w", err)
 	}
-	signer, err := abcrypto.NewInMemorySecp256K1SignerFromKey(accountKey.PrivKey)
+
+	txSigner, err := sdktypes.NewNopTxSignerFromKey(accountKey.PrivKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create tx signer: %w", err)
+		return nil, fmt.Errorf("failed to create nop tx signer: %w", err)
 	}
-	ownerProof, err := sdktypes.NewP2pkhAuthProofSignature(tx, signer)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create owner predicate signature: %w", err)
-	}
-	err = tx.SetAuthProof(fc.UnlockFeeCreditAuthProof{OwnerProof: ownerProof})
-	if err != nil {
-		return nil, fmt.Errorf("failed to set auth proof: %w", err)
-	}
-	tx.FeeProof, err = sdktypes.NewP2pkhFeeProofSignature(tx, signer)
-	if err != nil {
-		return nil, fmt.Errorf("failed to sign tx fee proof: %w", err)
+	if err = txSigner.SignCommitTx(tx); err != nil {
+		return nil, fmt.Errorf("failed to sign nop tx: %w", err)
 	}
 
 	proof, err := w.targetPartitionClient.ConfirmTransaction(ctx, tx, w.log)
@@ -1207,7 +1213,7 @@ func (w *FeeManager) unlockBill(ctx context.Context, accountKey *account.Account
 	if bill == nil {
 		return nil, nil
 	}
-	if bill.LockStatus != 0 {
+	if bill.StateLockTx != nil {
 		timeout, err := w.getMoneyPartitionTimeout(ctx)
 		if err != nil {
 			return nil, err
@@ -1227,12 +1233,13 @@ func (w *FeeManager) unlockBill(ctx context.Context, accountKey *account.Account
 		if err != nil {
 			return nil, fmt.Errorf("failed to create unlock tx: %w", err)
 		}
-		txSigner, err := sdktypes.NewMoneyTxSignerFromKey(accountKey.PrivKey)
+
+		txSigner, err := sdktypes.NewNopTxSignerFromKey(accountKey.PrivKey)
 		if err != nil {
-			return nil, fmt.Errorf("failed to money tx signer: %w", err)
+			return nil, fmt.Errorf("failed to create nop tx signer: %w", err)
 		}
-		if err = txSigner.SignTx(unlockTx); err != nil {
-			return nil, fmt.Errorf("failed to sign tx: %w", err)
+		if err = txSigner.SignCommitTx(unlockTx); err != nil {
+			return nil, fmt.Errorf("failed to sign nop tx: %w", err)
 		}
 
 		proof, err := w.moneyClient.ConfirmTransaction(ctx, unlockTx, w.log)

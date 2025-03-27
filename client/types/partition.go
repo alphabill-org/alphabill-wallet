@@ -6,6 +6,7 @@ import (
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc/permissioned"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/nop"
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-go-base/types/hex"
 )
@@ -29,7 +30,7 @@ type (
 		Balance        uint64            `json:"balance"`
 		OwnerPredicate hex.Bytes         `json:"ownerPredicate"`
 		MinLifetime    uint64            `json:"minLifetime"`
-		LockStatus     uint64            `json:"lockStatus"`
+		StateLockTx    hex.Bytes         `json:"StateLockTx,omitempty"`
 		Counter        *uint64           `json:"counter"`
 	}
 
@@ -71,7 +72,6 @@ func (f *FeeCreditRecord) SetFeeCredit(ownerPredicate []byte, amount uint64, txO
 		Amount:         amount,
 		Counter:        f.Counter,
 	}
-
 	return NewTransactionOrder(f.NetworkID, f.PartitionID, f.ID, permissioned.TransactionTypeSetFeeCredit, attr, txOptions...)
 }
 
@@ -79,7 +79,6 @@ func (f *FeeCreditRecord) DeleteFeeCredit(txOptions ...Option) (*types.Transacti
 	attr := &permissioned.DeleteFeeCreditAttributes{
 		Counter: *f.Counter,
 	}
-
 	return NewTransactionOrder(f.NetworkID, f.PartitionID, f.ID, permissioned.TransactionTypeDeleteFeeCredit, attr, txOptions...)
 }
 
@@ -93,17 +92,20 @@ func (f *FeeCreditRecord) CloseFeeCredit(targetBillID types.UnitID, targetBillCo
 	return NewTransactionOrder(f.NetworkID, f.PartitionID, f.ID, fc.TransactionTypeCloseFeeCredit, attr, txOptions...)
 }
 
-func (f *FeeCreditRecord) Lock(lockStatus uint64, txOptions ...Option) (*types.TransactionOrder, error) {
-	attr := &fc.LockFeeCreditAttributes{
-		LockStatus: lockStatus,
-		Counter:    *f.Counter,
+func (f *FeeCreditRecord) Lock(stateLock *types.StateLock, txOptions ...Option) (*types.TransactionOrder, error) {
+	attr := &nop.Attributes{
+		Counter: f.Counter,
 	}
-	return NewTransactionOrder(f.NetworkID, f.PartitionID, f.ID, fc.TransactionTypeLockFeeCredit, attr, txOptions...)
+	txOptions = append(txOptions, WithFeeCreditRecordID(f.ID))
+	txOptions = append(txOptions, WithStateLock(stateLock))
+	return NewTransactionOrder(f.NetworkID, f.PartitionID, f.ID, nop.TransactionTypeNOP, attr, txOptions...)
 }
 
 func (f *FeeCreditRecord) Unlock(txOptions ...Option) (*types.TransactionOrder, error) {
-	attr := &fc.UnlockFeeCreditAttributes{
-		Counter: *f.Counter,
+	counter := *f.Counter + 1 // the lock transaction has not been executed yet
+	attr := &nop.Attributes{
+		Counter: &counter,
 	}
-	return NewTransactionOrder(f.NetworkID, f.PartitionID, f.ID, fc.TransactionTypeUnlockFeeCredit, attr, txOptions...)
+	txOptions = append(txOptions, WithFeeCreditRecordID(f.ID))
+	return NewTransactionOrder(f.NetworkID, f.PartitionID, f.ID, nop.TransactionTypeNOP, attr, txOptions...)
 }

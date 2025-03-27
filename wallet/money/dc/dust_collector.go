@@ -8,7 +8,6 @@ import (
 
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
-
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
@@ -57,7 +56,7 @@ func (w *DustCollector) runDustCollection(ctx context.Context, accountKey *accou
 
 	// filter any locked bills
 	bills, _ = util.FilterSlice(bills, func(b *sdktypes.Bill) (bool, error) {
-		return b.LockStatus == 0, nil
+		return b.StateLockTx == nil, nil
 	})
 
 	// sort bills by value smallest first
@@ -172,6 +171,15 @@ func (w *DustCollector) swapDCBills(ctx context.Context, txSigner *sdktypes.Mone
 	if err != nil {
 		return nil, fmt.Errorf("failed to build swap tx: %w", err)
 	}
+
+	// add state unlock proof if target bill was locked; currently target bill is always locked
+	stateUnlockProof, err := sdktypes.NewP2pkhStateLockProofSignature(swapTx, txSigner.Signer())
+	if err != nil {
+		return nil, fmt.Errorf("failed to create state unlock proof: %w", err)
+	}
+	swapTx.StateUnlock = append([]byte{1}, stateUnlockProof...) // 0=rollback 1=commit
+
+	// sign tx
 	if err = txSigner.SignTx(swapTx); err != nil {
 		return nil, fmt.Errorf("failed to sign tx: %w", err)
 	}
@@ -198,7 +206,7 @@ func (w *DustCollector) lockTargetBill(ctx context.Context, k *account.AccountKe
 	if err != nil {
 		return nil, err
 	}
-	lockTx, err := targetBill.Lock(wallet.LockReasonCollectDust,
+	lockTx, err := targetBill.Lock(wallet.NewP2PKHStateLock(k.PubKeyHash.Sha256),
 		sdktypes.WithTimeout(timeout),
 		sdktypes.WithFeeCreditRecordID(fcrID),
 		sdktypes.WithMaxFee(w.maxFee),
@@ -206,11 +214,11 @@ func (w *DustCollector) lockTargetBill(ctx context.Context, k *account.AccountKe
 	if err != nil {
 		return nil, err
 	}
-	txSigner, err := sdktypes.NewMoneyTxSignerFromKey(k.PrivKey)
+	txSigner, err := sdktypes.NewNopTxSignerFromKey(k.PrivKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create money tx signer: %w", err)
 	}
-	if err = txSigner.SignTx(lockTx); err != nil {
+	if err = txSigner.SignLockTx(lockTx); err != nil {
 		return nil, fmt.Errorf("failed to sign tx: %w", err)
 	}
 

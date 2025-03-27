@@ -165,14 +165,14 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if bill == nil {
 		return fmt.Errorf("bill not found")
 	}
-	if bill.LockStatus != 0 {
+	if bill.StateLockTx != nil {
 		return errors.New("bill is already locked")
 	}
 	roundInfo, err := moneyClient.GetRoundInfo(cmd.Context())
 	if err != nil {
 		return fmt.Errorf("failed to fetch round info: %w", err)
 	}
-	tx, err := bill.Lock(wallet.LockReasonManual,
+	tx, err := bill.Lock(wallet.NewP2PKHStateLock(accountKey.PubKeyHash.Sha256),
 		sdktypes.WithTimeout(roundInfo.RoundNumber+10),
 		sdktypes.WithFeeCreditRecordID(fcr.ID),
 		sdktypes.WithMaxFee(maxFee),
@@ -180,11 +180,11 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to create lock tx: %w", err)
 	}
-	txSigner, err := sdktypes.NewMoneyTxSignerFromKey(accountKey.PrivKey)
+	txSigner, err := sdktypes.NewNopTxSignerFromKey(accountKey.PrivKey)
 	if err != nil {
 		return fmt.Errorf("failed to create money tx signer: %w", err)
 	}
-	if err = txSigner.SignTx(tx); err != nil {
+	if err = txSigner.SignLockTx(tx); err != nil {
 		return fmt.Errorf("failed to sign tx: %w", err)
 	}
 
@@ -258,7 +258,7 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if bill == nil {
 		return fmt.Errorf("bill not found")
 	}
-	if bill.LockStatus == 0 {
+	if bill.StateLockTx == nil {
 		return errors.New("bill is already unlocked")
 	}
 
@@ -274,11 +274,11 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to create unlock tx: %w", err)
 	}
-	txSigner, err := sdktypes.NewMoneyTxSignerFromKey(accountKey.PrivKey)
+	txSigner, err := sdktypes.NewNopTxSignerFromKey(accountKey.PrivKey)
 	if err != nil {
-		return fmt.Errorf("failed to create money tx signer: %w", err)
+		return fmt.Errorf("failed to create tx signer: %w", err)
 	}
-	if err = txSigner.SignTx(tx); err != nil {
+	if err = txSigner.SignCommitTx(tx); err != nil {
 		return fmt.Errorf("failed to sign tx: %w", err)
 	}
 
@@ -292,8 +292,8 @@ func execUnlockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 }
 
 func getLockedReasonString(bill *sdktypes.Bill) string {
-	if bill.LockStatus != 0 {
-		return fmt.Sprintf(" lockStatus=%d (%s)", bill.LockStatus, wallet.LockReason(bill.LockStatus).String())
+	if bill.StateLockTx == nil {
+		return ""
 	}
-	return ""
+	return fmt.Sprintf(" locked='0x%X'", bill.StateLockTx)
 }
