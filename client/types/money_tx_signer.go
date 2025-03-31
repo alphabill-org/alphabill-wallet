@@ -74,10 +74,6 @@ func (s *MoneyTxSigner) newAuthProof(tx *types.TransactionOrder, ownerProof []by
 		return money.TransferDCAuthProof{OwnerProof: ownerProof}, nil
 	case money.TransactionTypeSwapDC:
 		return money.SwapDCAuthProof{OwnerProof: ownerProof}, nil
-	case money.TransactionTypeLock:
-		return money.LockAuthProof{OwnerProof: ownerProof}, nil
-	case money.TransactionTypeUnlock:
-		return money.UnlockAuthProof{OwnerProof: ownerProof}, nil
 	default:
 		return nil, fmt.Errorf("unsupported transaction type: %d", tx.Type)
 	}
