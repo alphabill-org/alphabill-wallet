@@ -15,6 +15,7 @@ type (
 		UnitID      types.UnitID          `json:"unitId"`
 		Data        T                     `json:"data"`
 		StateProof  *types.UnitStateProof `json:"stateProof,omitempty"`
+		StateLockTx hex.Bytes             `json:"stateLockTx,omitempty"`
 	}
 
 	TransactionRecordAndProof struct {

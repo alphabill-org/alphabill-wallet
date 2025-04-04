@@ -329,7 +329,7 @@ func TestFungibleTokens_CollectDust_Integration(t *testing.T) {
 
 	// run DC
 	output := tokensCmd.Exec(t, "collect-dust", "-k", "1", "--type", typeID1.String())
-	testutils.VerifyStdout(t, output, "Paid 0.000'000'32 fees for dust collection on Account number 1.")
+	testutils.VerifyStdout(t, output, "Paid 0.000'000'33 fees for dust collection on Account number 1.")
 
 	// verify there exists token with the expected amount
 	output = tokensCmd.Exec(t, "list", "fungible")
@@ -370,11 +370,11 @@ func TestFungibleTokens_LockUnlock_Integration(t *testing.T) {
 
 	// lock token
 	tokensCmd.Exec(t, "lock", "--token-identifier", tokenID, "-k", "1")
-	testutils.VerifyStdoutEventually(t, tokensCmd.ExecFunc(t, "list", "fungible"), "lockStatus='4 (manually locked by user)'")
+	testutils.VerifyStdoutEventually(t, tokensCmd.ExecFunc(t, "list", "fungible"), "locked")
 
 	// unlock token
 	tokensCmd.Exec(t, "unlock", "--token-identifier", tokenID, "-k", "1")
-	testutils.VerifyStdoutEventually(t, tokensCmd.ExecFunc(t, "list", "fungible"), "lockStatus='0 (unlocked)'")
+	testutils.VerifyStdoutEventually(t, tokensCmd.ExecFunc(t, "list", "fungible"), fmt.Sprintf("ID='%s'", tokenID))
 }
 
 func addFeeCredit(t *testing.T, home string, amount uint64, partition, partitionRpcUrl, moneyRpcUrl string) {

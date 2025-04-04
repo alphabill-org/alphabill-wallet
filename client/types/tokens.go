@@ -5,8 +5,10 @@ import (
 	"fmt"
 
 	"github.com/alphabill-org/alphabill-go-base/hash"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/nop"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill-go-base/types"
+	"github.com/alphabill-org/alphabill-go-base/types/hex"
 )
 
 var NoParent = TokenTypeID(nil)
@@ -63,7 +65,7 @@ type (
 		TypeName       string
 		OwnerPredicate []byte // TODO: could use sdktypes.Predicate?
 		Counter        uint64
-		LockStatus     uint64
+		StateLockTx    hex.Bytes
 		Amount         uint64
 		DecimalPlaces  uint32
 		Burned         bool
@@ -78,7 +80,7 @@ type (
 		TypeName            string
 		OwnerPredicate      []byte // TODO: could use sdktypes.Predicate?
 		Counter             uint64
-		LockStatus          uint64
+		StateLockTx         hex.Bytes
 		Name                string
 		URI                 string
 		Data                []byte
@@ -180,12 +182,12 @@ func (t *FungibleToken) Join(burnTxProofs []*types.TxRecordProof, txOptions ...O
 	return NewTransactionOrder(t.NetworkID, t.PartitionID, t.ID, tokens.TransactionTypeJoinFT, attr, txOptions...)
 }
 
-func (t *FungibleToken) Lock(lockStatus uint64, txOptions ...Option) (*types.TransactionOrder, error) {
-	return lockToken(t.NetworkID, t.PartitionID, t.ID, t.Counter, lockStatus, txOptions...)
+func (t *FungibleToken) Lock(stateLock *types.StateLock, txOptions ...Option) (*types.TransactionOrder, error) {
+	return lockToken(stateLock, t.NetworkID, t.PartitionID, t.ID, t.Counter, txOptions...)
 }
 
 func (t *FungibleToken) Unlock(txOptions ...Option) (*types.TransactionOrder, error) {
-	return unlockToken(t.NetworkID, t.PartitionID, t.ID, t.Counter, txOptions...)
+	return unlockToken(t.NetworkID, t.PartitionID, t.ID, t.Counter+1, txOptions...) // +1 for not yet executed lock tx
 }
 
 func (t *FungibleToken) GetID() TokenID {
@@ -196,8 +198,8 @@ func (t *FungibleToken) GetOwnerPredicate() Predicate {
 	return t.OwnerPredicate
 }
 
-func (t *FungibleToken) GetLockStatus() uint64 {
-	return t.LockStatus
+func (t *FungibleToken) GetStateLockTx() hex.Bytes {
+	return t.StateLockTx
 }
 
 func (t *NonFungibleToken) Mint(pdr *types.PartitionDescriptionRecord, txOptions ...Option) (*types.TransactionOrder, error) {
@@ -240,12 +242,12 @@ func (t *NonFungibleToken) Update(data []byte, txOptions ...Option) (*types.Tran
 	return NewTransactionOrder(t.NetworkID, t.PartitionID, t.ID, tokens.TransactionTypeUpdateNFT, attr, txOptions...)
 }
 
-func (t *NonFungibleToken) Lock(lockStatus uint64, txOptions ...Option) (*types.TransactionOrder, error) {
-	return lockToken(t.NetworkID, t.PartitionID, t.ID, t.Counter, lockStatus, txOptions...)
+func (t *NonFungibleToken) Lock(stateLock *types.StateLock, txOptions ...Option) (*types.TransactionOrder, error) {
+	return lockToken(stateLock, t.NetworkID, t.PartitionID, t.ID, t.Counter, txOptions...)
 }
 
 func (t *NonFungibleToken) Unlock(txOptions ...Option) (*types.TransactionOrder, error) {
-	return unlockToken(t.NetworkID, t.PartitionID, t.ID, t.Counter, txOptions...)
+	return unlockToken(t.NetworkID, t.PartitionID, t.ID, t.Counter+1, txOptions...)
 }
 
 func (t *NonFungibleToken) GetID() TokenID {
@@ -256,25 +258,25 @@ func (t *NonFungibleToken) GetOwnerPredicate() Predicate {
 	return t.OwnerPredicate
 }
 
-func (t *NonFungibleToken) GetLockStatus() uint64 {
-	return t.LockStatus
+func (t *NonFungibleToken) GetStateLockTx() hex.Bytes {
+	return t.StateLockTx
 }
 
 func (pk PubKey) Hash() PubKeyHash {
 	return hash.Sum256(pk)
 }
 
-func lockToken(networkID types.NetworkID, partitionID types.PartitionID, id types.UnitID, counter uint64, lockStatus uint64, txOptions ...Option) (*types.TransactionOrder, error) {
-	attr := &tokens.LockTokenAttributes{
-		LockStatus: lockStatus,
-		Counter:    counter,
+func lockToken(stateLock *types.StateLock, networkID types.NetworkID, partitionID types.PartitionID, id types.UnitID, counter uint64, txOptions ...Option) (*types.TransactionOrder, error) {
+	attr := &nop.Attributes{
+		Counter: &counter,
 	}
-	return NewTransactionOrder(networkID, partitionID, id, tokens.TransactionTypeLockToken, attr, txOptions...)
+	txOptions = append(txOptions, WithStateLock(stateLock))
+	return NewTransactionOrder(networkID, partitionID, id, nop.TransactionTypeNOP, attr, txOptions...)
 }
 
 func unlockToken(networkID types.NetworkID, partitionID types.PartitionID, id types.UnitID, counter uint64, txOptions ...Option) (*types.TransactionOrder, error) {
-	attr := &tokens.UnlockTokenAttributes{
-		Counter: counter,
+	attr := &nop.Attributes{
+		Counter: &counter,
 	}
-	return NewTransactionOrder(networkID, partitionID, id, tokens.TransactionTypeUnlockToken, attr, txOptions...)
+	return NewTransactionOrder(networkID, partitionID, id, nop.TransactionTypeNOP, attr, txOptions...)
 }

@@ -79,7 +79,7 @@ func (c *evmPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ow
 		Balance:     fcr.Balance,
 		Counter:     &counterCopy,
 		MinLifetime: fcr.MinLifetime,
-		LockStatus:  0,
+		StateLockTx: u.StateLockTx,
 	}, nil
 }
 

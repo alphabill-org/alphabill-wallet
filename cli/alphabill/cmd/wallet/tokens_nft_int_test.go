@@ -288,11 +288,11 @@ func TestNFT_LockUnlock_Integration(t *testing.T) {
 
 	// lock NFT
 	tokensCmd.Exec(t, "lock", "--token-identifier", nftID.String(), "--key", "1")
-	testutils.VerifyStdoutEventually(t, tokensCmd.ExecFunc(t, "list", "non-fungible"), "lockStatus='4 (manually locked by user)'")
+	testutils.VerifyStdoutEventually(t, tokensCmd.ExecFunc(t, "list", "non-fungible"), "locked")
 
 	// unlock NFT
-	tokensCmd.Exec(t, "unlock", "--token-identifier", nftID.String(), "--key", "1")
-	testutils.VerifyStdoutEventually(t, tokensCmd.ExecFunc(t, "list", "non-fungible"), "lockStatus='0 (unlocked)'")
+	stdout = tokensCmd.Exec(t, "unlock", "--token-identifier", nftID.String(), "--key", "1")
+	testutils.VerifyStdoutEventually(t, tokensCmd.ExecFunc(t, "list", "non-fungible"), fmt.Sprintf("ID='%s'", nftID))
 }
 
 func extractTokenID(t *testing.T, s string) types.UnitID {

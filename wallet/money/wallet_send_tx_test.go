@@ -6,14 +6,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-go-base/hash"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	testmoney "github.com/alphabill-org/alphabill-wallet/internal/testutils/money"
 	"github.com/stretchr/testify/require"
-
-	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
-	"github.com/alphabill-org/alphabill-wallet/wallet"
 )
 
 func TestWalletSendFunction_Ok(t *testing.T) {
@@ -142,7 +139,7 @@ func TestWholeBalanceIsSentUsingBillTransferOrder(t *testing.T) {
 
 func TestWalletSendFunction_LockedBillIsNotUsed(t *testing.T) {
 	w := createTestWallet(t, testmoney.NewRpcClientMock(
-		testmoney.WithOwnerBill(testmoney.NewLockedBill(t, 50, 1, wallet.LockReasonManual)),
+		testmoney.WithOwnerBill(testmoney.NewLockedBill(t, 50, 1, []byte{1})),
 		testmoney.WithOwnerFeeCreditRecord(newMoneyFCR(t, testPubKey0Hash, 100*1e8, 200)),
 	))
 	pubKey, err := hex.DecodeString(testPubKey0Hex)
@@ -215,12 +212,12 @@ func TestWalletSendFunction_NWaySplit(t *testing.T) {
 	require.Len(t, attr.TargetUnits, 5)
 	for _, u := range attr.TargetUnits {
 		require.EqualValues(t, 5, u.Amount)
-		require.EqualValues(t, templates.NewP2pkh256BytesFromKeyHash(hash.Sum256(pubKey)), u.OwnerPredicate)
+		require.EqualValues(t, templates.NewP2pkh256BytesFromKey(pubKey), u.OwnerPredicate)
 	}
 }
 
 func newMoneyFCR(t *testing.T, pubKeyHashHex string, balance, counter uint64) *sdktypes.FeeCreditRecord {
 	pubKeyHash, err := hex.DecodeString(pubKeyHashHex)
 	require.NoError(t, err)
-	return testmoney.NewMoneyFCR(t, pubKeyHash, balance, 0, counter)
+	return testmoney.NewMoneyFCR(t, pubKeyHash, balance, nil, counter)
 }

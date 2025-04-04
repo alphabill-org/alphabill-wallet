@@ -45,7 +45,7 @@ func (c *moneyPartitionClient) GetBill(ctx context.Context, unitID types.UnitID)
 		ID:          u.UnitID,
 		Value:       u.Data.Value,
 		Counter:     u.Data.Counter,
-		LockStatus:  u.Data.Locked,
+		StateLockTx: u.StateLockTx,
 	}, nil
 }
 
@@ -85,7 +85,7 @@ func (c *moneyPartitionClient) GetBills(ctx context.Context, ownerID []byte) ([]
 			ID:          u.UnitID,
 			Value:       u.Data.Value,
 			Counter:     u.Data.Counter,
-			LockStatus:  u.Data.Locked,
+			StateLockTx: u.StateLockTx,
 		})
 	}
 

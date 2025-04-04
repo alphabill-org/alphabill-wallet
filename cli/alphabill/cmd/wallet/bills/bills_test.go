@@ -8,10 +8,8 @@ import (
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	basetypes "github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
-
 	"github.com/alphabill-org/alphabill-wallet/client/rpc/mocksrv"
 	"github.com/alphabill-org/alphabill-wallet/client/types"
-	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/stretchr/testify/require"
 )
 
@@ -90,46 +88,21 @@ func TestWalletBillsListCmd_ExtraAccountTotal(t *testing.T) {
 	testutils.VerifyStdout(t, stdout, "Account #2 - empty")
 }
 
-func TestWalletBillsListCmd_ShowUnswappedFlag(t *testing.T) {
-	t.Skipf("implement --show-unswapped after dust collector refactor")
-	//homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic(), testutils.WithNumberOfAccounts(2))
-	//
-	//// verify no -s flag sends includeDcBills=false by default
-	//mockServer, addr := mocksrv.MockBackendCalls(&mocksrv.BackendMockReturnConf{
-	//	CustomFullPath: "/" + client.ListBillsPath + "?includeDcBills=false&limit=100&pubkey=" + pubKey,
-	//	CustomResponse: `{"bills": [{"value":"22222222"}]}`})
-	//
-	//stdout, err := execBillsCommand(t, homedir, "list --rpc-url "+addr.Host)
-	//require.NoError(t, err)
-	//testutils.VerifyStdout(t, stdout, "#1 0x 0.222'222'22")
-	//mockServer.Close()
-	//
-	//// verify -s flag sends includeDcBills=true
-	//mockServer, addr = mocksrv.MockBackendCalls(&mocksrv.BackendMockReturnConf{
-	//	CustomFullPath: "/" + client.ListBillsPath + "?includeDcBills=true&limit=100&pubkey=" + pubKey,
-	//	CustomResponse: `{"bills": [{"value":"33333333"}]}`})
-	//
-	//stdout, err = execBillsCommand(t, homedir, "list --rpc-url "+addr.Host+" -s")
-	//require.NoError(t, err)
-	//testutils.VerifyStdout(t, stdout, "#1 0x 0.333'333'33")
-	//mockServer.Close()
-}
-
 func TestWalletBillsListCmd_ShowLockedBills(t *testing.T) {
 	pdr := moneyid.PDR()
 	homedir := testutils.CreateNewTestWallet(t, testutils.WithDefaultMnemonic())
 	rpcUrl := mocksrv.StartStateApiServer(t, &pdr, mocksrv.NewStateServiceMock(
-		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: moneyid.BillIDWithSuffix(t, 1, &pdr), Data: money.BillData{Value: 1e8, Locked: wallet.LockReasonAddFees}}),
-		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: moneyid.BillIDWithSuffix(t, 2, &pdr), Data: money.BillData{Value: 1e8, Locked: wallet.LockReasonReclaimFees}}),
-		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: moneyid.BillIDWithSuffix(t, 3, &pdr), Data: money.BillData{Value: 1e8, Locked: wallet.LockReasonCollectDust}}),
+		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: moneyid.BillIDWithSuffix(t, 1, &pdr), Data: money.BillData{Value: 1e8}, StateLockTx: []byte{1}}),
+		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: moneyid.BillIDWithSuffix(t, 2, &pdr), Data: money.BillData{Value: 1e8}, StateLockTx: []byte{2}}),
+		mocksrv.WithOwnerUnit(testutils.TestPubKey0Hash(t), &types.Unit[any]{UnitID: moneyid.BillIDWithSuffix(t, 3, &pdr), Data: money.BillData{Value: 1e8}, StateLockTx: []byte{15}}),
 	))
 	billsCmd := testutils.NewSubCmdExecutor(NewBillsCmd, "--rpc-url", rpcUrl).WithHome(homedir)
 
 	stdout := billsCmd.Exec(t, "list")
 	require.Len(t, stdout.Lines, 4)
-	require.Equal(t, "#1 0x000000000000000000000000000000000000000000000000000000000000000101 1.000'000'00 lockStatus=1 (locked for adding fees)", stdout.Lines[1])
-	require.Equal(t, "#2 0x000000000000000000000000000000000000000000000000000000000000000201 1.000'000'00 lockStatus=2 (locked for reclaiming fees)", stdout.Lines[2])
-	require.Equal(t, "#3 0x000000000000000000000000000000000000000000000000000000000000000301 1.000'000'00 lockStatus=3 (locked for dust collection)", stdout.Lines[3])
+	require.Equal(t, "#1 0x000000000000000000000000000000000000000000000000000000000000000101 1.000'000'00 locked='0x01'", stdout.Lines[1])
+	require.Equal(t, "#2 0x000000000000000000000000000000000000000000000000000000000000000201 1.000'000'00 locked='0x02'", stdout.Lines[2])
+	require.Equal(t, "#3 0x000000000000000000000000000000000000000000000000000000000000000301 1.000'000'00 locked='0x0F'", stdout.Lines[3])
 }
 
 func TestWalletBillsLockUnlockCmd_Nok(t *testing.T) {

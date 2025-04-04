@@ -15,7 +15,6 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/client"
 	"github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/util"
-	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	evmwallet "github.com/alphabill-org/alphabill-wallet/wallet/evm"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
@@ -243,7 +242,7 @@ func lockFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
 	}
 	defer fm.Close()
 
-	_, err = fm.LockFeeCredit(cmd.Context(), fees.LockFeeCreditCmd{AccountIndex: accountNumber - 1, LockStatus: wallet.LockReasonManual})
+	_, err = fm.LockFeeCredit(cmd.Context(), fees.LockFeeCreditCmd{AccountIndex: accountNumber - 1})
 	if err != nil {
 		return fmt.Errorf("failed to lock fee credit: %w", err)
 	}
@@ -580,10 +579,10 @@ func getAccountInfo(accountIndex uint64, showFcrId bool, ctx context.Context, w 
 }
 
 func getLockedReasonString(fcr *types.FeeCreditRecord) string {
-	if fcr != nil && fcr.LockStatus != 0 {
-		return fmt.Sprintf(" lockStatus=%d (%s)", fcr.LockStatus, wallet.LockReason(fcr.LockStatus).String())
+	if fcr == nil || fcr.StateLockTx == nil {
+		return ""
 	}
-	return ""
+	return fmt.Sprintf(" locked='0x%X'", fcr.StateLockTx)
 }
 
 type AccountInfoWrapper struct {

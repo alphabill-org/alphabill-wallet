@@ -27,7 +27,6 @@ func TestMoneyClient(t *testing.T) {
 			ID:          []byte{1},
 			Value:       192,
 			Counter:     123,
-			LockStatus:  0,
 		}
 		service.Units = map[string]*sdktypes.Unit[any]{
 			string(bill.ID): {
@@ -37,7 +36,6 @@ func TestMoneyClient(t *testing.T) {
 				Data: &money.BillData{
 					Value:   bill.Value,
 					Counter: bill.Counter,
-					Locked:  bill.LockStatus,
 				},
 			},
 		}

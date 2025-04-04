@@ -14,6 +14,7 @@ type (
 		FeeCreditRecordID types.UnitID
 		MaxFee            uint64
 		ReferenceNumber   []byte
+		StateLock         *types.StateLock
 	}
 
 	Option func(*Options)
@@ -34,6 +35,7 @@ func NewTransactionOrder(networkID types.NetworkID, partitionID types.PartitionI
 			UnitID:      unitID,
 			Type:        txType,
 			Attributes:  attrBytes,
+			StateLock:   o.StateLock,
 			ClientMetadata: &types.ClientMetadata{
 				Timeout:           o.Timeout,
 				MaxTransactionFee: o.MaxFee,
@@ -68,6 +70,12 @@ func WithMaxFee(maxFee uint64) Option {
 	}
 }
 
+func WithStateLock(stateLock *types.StateLock) Option {
+	return func(os *Options) {
+		os.StateLock = stateLock
+	}
+}
+
 func OptionsWithDefaults(txOptions []Option) *Options {
 	opts := &Options{
 		MaxFee: 10,
@@ -76,6 +84,11 @@ func OptionsWithDefaults(txOptions []Option) *Options {
 		txOption(opts)
 	}
 	return opts
+}
+
+// NewP2pkhStateLockProofSignature creates a standard P2PKH fee predicate signature for StateLockProof.
+func NewP2pkhStateLockProofSignature(txo *types.TransactionOrder, signer crypto.Signer) ([]byte, error) {
+	return NewP2pkhSignature(signer, txo.StateLockProofSigBytes)
 }
 
 // NewP2pkhAuthProofSignature creates a standard P2PKH predicate signature for AuthProof.
@@ -121,6 +134,15 @@ func NewP2pkhFeeSignatureFromKey(txo *types.TransactionOrder, privKey []byte) ([
 		return nil, fmt.Errorf("failed to create signer from private key: %w", err)
 	}
 	return NewP2pkhFeeProofSignature(txo, signer)
+}
+
+// NewP2pkhStateLockSignatureFromKey creates a standard P2PKH state lock predicate signature for StateLockProof.
+func NewP2pkhStateLockSignatureFromKey(txo *types.TransactionOrder, privKey []byte) ([]byte, error) {
+	signer, err := crypto.NewInMemorySecp256K1SignerFromKey(privKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create signer from private key: %w", err)
+	}
+	return NewP2pkhStateLockProofSignature(txo, signer)
 }
 
 func extractPubKey(signer crypto.Signer) ([]byte, error) {

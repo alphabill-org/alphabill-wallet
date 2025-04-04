@@ -224,20 +224,20 @@ func (c *RpcClientMock) Close() {
 }
 
 func NewBill(t *testing.T, value, counter uint64) *sdktypes.Bill {
-	return NewLockedBill(t, value, counter, 0)
+	return NewLockedBill(t, value, counter, nil)
 }
 
-func NewLockedBill(t *testing.T, value uint64, counter, lockStatus uint64) *sdktypes.Bill {
+func NewLockedBill(t *testing.T, value uint64, counter uint64, stateLockTx hex.Bytes) *sdktypes.Bill {
 	return &sdktypes.Bill{
 		PartitionID: money.DefaultPartitionID,
 		ID:          moneyid.NewBillID(t),
 		Value:       value,
-		LockStatus:  lockStatus,
+		StateLockTx: stateLockTx,
 		Counter:     counter,
 	}
 }
 
-func NewMoneyFCR(t *testing.T, pubKeyHash []byte, balance uint64, lockStatus uint64, counter uint64) *sdktypes.FeeCreditRecord {
+func NewMoneyFCR(t *testing.T, pubKeyHash []byte, balance uint64, stateLockTx hex.Bytes, counter uint64) *sdktypes.FeeCreditRecord {
 	pdr := moneyid.PDR()
 	id, err := money.NewFeeCreditRecordIDFromPublicKeyHash(&pdr, types.ShardID{}, pubKeyHash, 1000+transferFCLatestAdditionTime)
 	require.NoError(t, err)
@@ -245,8 +245,7 @@ func NewMoneyFCR(t *testing.T, pubKeyHash []byte, balance uint64, lockStatus uin
 		PartitionID: money.DefaultPartitionID,
 		ID:          id,
 		Balance:     balance,
-		LockStatus:  lockStatus,
+		StateLockTx: stateLockTx,
 		Counter:     &counter,
 	}
-
 }

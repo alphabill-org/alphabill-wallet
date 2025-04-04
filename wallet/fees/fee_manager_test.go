@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"testing"
 
+	"github.com/alphabill-org/alphabill-go-base/txsystem/nop"
+	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/stretchr/testify/require"
 
 	moneyid "github.com/alphabill-org/alphabill-go-base/testutils/money"
@@ -16,7 +18,6 @@ import (
 
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils/logger"
-	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 )
 
@@ -226,7 +227,7 @@ func TestAddFeeCredit_WalletContainsLockedBillForDustCollection(t *testing.T) {
 	unlockedBill := testmoney.NewBill(t, 100000001, 1)
 	moneyClient := testmoney.NewRpcClientMock(
 		testmoney.WithOwnerBill(unlockedBill),
-		testmoney.WithOwnerBill(testmoney.NewLockedBill(t, 100000002, 2, wallet.LockReasonCollectDust)),
+		testmoney.WithOwnerBill(testmoney.NewLockedBill(t, 100000002, 2, []byte{1})),
 	)
 	feeManagerDB := createFeeManagerDB(t)
 	feeManager := newMoneyPartitionFeeManager(am, feeManagerDB, moneyClient, logger.New(t))
@@ -322,7 +323,7 @@ func TestReclaimFeeCredit_WalletContainsLockedBillForDustCollection(t *testing.T
 	unlockedBill := testmoney.NewBill(t, 100000001, 1)
 	moneyClient := testmoney.NewRpcClientMock(
 		testmoney.WithOwnerBill(unlockedBill),
-		testmoney.WithOwnerBill(testmoney.NewLockedBill(t, 100000002, 2, wallet.LockReasonCollectDust)),
+		testmoney.WithOwnerBill(testmoney.NewLockedBill(t, 100000002, 2, []byte{1})),
 		testmoney.WithOwnerFeeCreditRecord(newMoneyFCR(t, accountKey, &fc.FeeCreditRecord{Balance: 100, Counter: 111})),
 	)
 	feeManagerDB := createFeeManagerDB(t)
@@ -426,9 +427,11 @@ func TestAddFeeCredit_FeeCreditRecordIsLocked(t *testing.T) {
 
 	accountKey, err := am.GetAccountKey(0)
 	require.NoError(t, err)
+	fcr := newMoneyFCR(t, accountKey, &fc.FeeCreditRecord{Balance: 2, Counter: 111})
+	fcr.StateLockTx = []byte{1}
 	moneyClient := testmoney.NewRpcClientMock(
 		testmoney.WithOwnerBill(testmoney.NewBill(t, 100, 1)),
-		testmoney.WithOwnerFeeCreditRecord(newMoneyFCR(t, accountKey, &fc.FeeCreditRecord{Balance: 2, Counter: 111, Locked: wallet.LockReasonManual})),
+		testmoney.WithOwnerFeeCreditRecord(fcr),
 	)
 	feeManagerDB := createFeeManagerDB(t)
 	feeManager := newMoneyPartitionFeeManager(am, feeManagerDB, moneyClient, logger.New(t))
@@ -508,7 +511,7 @@ func TestAddFeeCredit_ExistingLockFC(t *testing.T) {
 		ID:          moneyid.NewFeeCreditRecordID(t),
 		Counter:     &fcrCounter,
 	}
-	lockFCTx, err := fcr.Lock(wallet.LockReasonManual)
+	lockFCTx, err := fcr.Lock(wallet.NewP2PKHStateLock(accountKey.PubKeyHash.Sha256))
 	require.NoError(t, err)
 	lockFCRecord := &types.TransactionRecord{
 		TransactionOrder: txV1ToBytes(t, lockFCTx),
@@ -878,7 +881,7 @@ func TestReclaimFeeCredit_ExistingLock(t *testing.T) {
 	lockTxHash := testutils.TxHash(t, getTxoV1(t, lockTxRecord))
 	targetBill := testmoney.NewBill(t, 50, 200)
 
-	t.Run("lock tx confirmed => update target bill counter and send follow-up transactions", func(t *testing.T) {
+	t.Run("lock tx confirmed => send follow-up transactions", func(t *testing.T) {
 		// create fee context
 		err = feeManagerDB.SetReclaimFeeContext(accountKey.PubKey, &ReclaimFeeCreditCtx{
 			TargetPartitionID: moneyPartitionID,
@@ -889,8 +892,10 @@ func TestReclaimFeeCredit_ExistingLock(t *testing.T) {
 		require.NoError(t, err)
 
 		// mock locked fee credit record
+		fcr := newMoneyFCR(t, accountKey, &fc.FeeCreditRecord{Balance: 100, Counter: 0})
+		fcr.StateLockTx = []byte{1}
 		moneyClient := testmoney.NewRpcClientMock(
-			testmoney.WithOwnerFeeCreditRecord(newMoneyFCR(t, accountKey, &fc.FeeCreditRecord{Balance: 100, Counter: 0, Locked: wallet.LockReasonReclaimFees})),
+			testmoney.WithOwnerFeeCreditRecord(fcr),
 			testmoney.WithTxProof(lockTxHash, lockTxProof),
 			testmoney.WithOwnerBill(targetBill),
 		)
@@ -906,12 +911,6 @@ func TestReclaimFeeCredit_ExistingLock(t *testing.T) {
 		require.NotNil(t, res.Proofs.Lock)
 		require.NotNil(t, res.Proofs.CloseFC)
 		require.NotNil(t, res.Proofs.ReclaimFC)
-
-		// with updated target unit counter
-		var attr *fc.CloseFeeCreditAttributes
-		err = getTxoV1(t, res.Proofs.CloseFC).UnmarshalAttributes(&attr)
-		require.NoError(t, err)
-		require.EqualValues(t, 201, attr.TargetUnitCounter)
 
 		// and fee context must be cleared
 		feeCtx, err := feeManagerDB.GetAddFeeContext(accountKey.PubKey)
@@ -1209,21 +1208,23 @@ func TestLockFeeCredit(t *testing.T) {
 		feeManager := newMoneyPartitionFeeManager(am, feeManagerDB, moneyClient, logger.New(t))
 
 		// when fee credit is successfully locked then lockFC proof should be returned
-		res, err := feeManager.LockFeeCredit(context.Background(), LockFeeCreditCmd{LockStatus: wallet.LockReasonManual})
+		res, err := feeManager.LockFeeCredit(context.Background(), LockFeeCreditCmd{})
 		require.NoError(t, err)
 		require.NotNil(t, res)
-		require.Equal(t, fc.TransactionTypeLockFeeCredit, getTxoV1(t, res).Type)
+		require.Equal(t, nop.TransactionTypeNOP, getTxoV1(t, res).Type)
 	})
 
 	t.Run("fcb already locked", func(t *testing.T) {
 		// fcb already locked
+		fcr := newMoneyFCR(t, accountKey, &fc.FeeCreditRecord{Balance: 21, Counter: 100})
+		fcr.StateLockTx = []byte{1}
 		moneyClient := testmoney.NewRpcClientMock(
-			testmoney.WithOwnerFeeCreditRecord(newMoneyFCR(t, accountKey, &fc.FeeCreditRecord{Balance: 21, Counter: 100, Locked: wallet.LockReasonManual})),
+			testmoney.WithOwnerFeeCreditRecord(fcr),
 		)
 		feeManager := newMoneyPartitionFeeManager(am, feeManagerDB, moneyClient, logger.New(t))
 
 		// when fees are added
-		res, err := feeManager.LockFeeCredit(context.Background(), LockFeeCreditCmd{LockStatus: wallet.LockReasonManual})
+		res, err := feeManager.LockFeeCredit(context.Background(), LockFeeCreditCmd{})
 		require.ErrorContains(t, err, "fee credit record is already locked")
 		require.Nil(t, res)
 	})
@@ -1234,7 +1235,7 @@ func TestLockFeeCredit(t *testing.T) {
 		feeManager := newMoneyPartitionFeeManager(am, feeManagerDB, moneyClient, logger.New(t))
 
 		// when fees are added
-		res, err := feeManager.LockFeeCredit(context.Background(), LockFeeCreditCmd{LockStatus: wallet.LockReasonManual})
+		res, err := feeManager.LockFeeCredit(context.Background(), LockFeeCreditCmd{})
 		require.ErrorContains(t, err, "not enough fee credit in wallet")
 		require.Nil(t, res)
 	})
@@ -1247,7 +1248,7 @@ func TestLockFeeCredit(t *testing.T) {
 		feeManager := newMoneyPartitionFeeManager(am, feeManagerDB, moneyClient, logger.New(t))
 
 		// when fees are added
-		res, err := feeManager.LockFeeCredit(context.Background(), LockFeeCreditCmd{LockStatus: wallet.LockReasonManual})
+		res, err := feeManager.LockFeeCredit(context.Background(), LockFeeCreditCmd{})
 		require.ErrorContains(t, err, "not enough fee credit in wallet")
 		require.Nil(t, res)
 	})
@@ -1262,8 +1263,10 @@ func TestUnlockFeeCredit(t *testing.T) {
 
 	t.Run("ok", func(t *testing.T) {
 		// locked fcb exists
+		fcr := newMoneyFCR(t, accountKey, &fc.FeeCreditRecord{Balance: 3, Counter: 100})
+		fcr.StateLockTx = []byte{1}
 		moneyClient := testmoney.NewRpcClientMock(
-			testmoney.WithOwnerFeeCreditRecord(newMoneyFCR(t, accountKey, &fc.FeeCreditRecord{Balance: 3, Counter: 100, Locked: wallet.LockReasonManual})),
+			testmoney.WithOwnerFeeCreditRecord(fcr),
 		)
 		feeManager := newMoneyPartitionFeeManager(am, feeManagerDB, moneyClient, logger.New(t))
 
@@ -1271,7 +1274,7 @@ func TestUnlockFeeCredit(t *testing.T) {
 		res, err := feeManager.UnlockFeeCredit(context.Background(), UnlockFeeCreditCmd{})
 		require.NoError(t, err)
 		require.NotNil(t, res)
-		require.Equal(t, fc.TransactionTypeUnlockFeeCredit, getTxoV1(t, res).Type)
+		require.Equal(t, nop.TransactionTypeNOP, getTxoV1(t, res).Type)
 	})
 
 	t.Run("fcb already unlocked", func(t *testing.T) {
@@ -1362,7 +1365,7 @@ func testFeeCreditRecordIDFromPublicKey(shard types.ShardID, pubKey []byte, late
 }
 
 func newMoneyFCR(t *testing.T, accountKey *account.AccountKey, fcr *fc.FeeCreditRecord) *sdktypes.FeeCreditRecord {
-	return testmoney.NewMoneyFCR(t, accountKey.PubKeyHash.Sha256, fcr.Balance, fcr.Locked, fcr.Counter)
+	return testmoney.NewMoneyFCR(t, accountKey.PubKeyHash.Sha256, fcr.Balance, nil, fcr.Counter)
 }
 
 type txFetcher interface {
