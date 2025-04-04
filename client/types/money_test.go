@@ -8,8 +8,8 @@ import (
 	moneyid "github.com/alphabill-org/alphabill-go-base/testutils/money"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/nop"
 	"github.com/alphabill-org/alphabill-go-base/types"
-
 	"github.com/stretchr/testify/require"
 )
 
@@ -231,18 +231,21 @@ func TestBillLock(t *testing.T) {
 		Value:       2,
 		Counter:     3,
 	}
-	lockStatus := uint64(4)
-	tx, err := b.Lock(lockStatus)
+	stateLock := &types.StateLock{
+		ExecutionPredicate: []byte{1},
+		RollbackPredicate:  []byte{1},
+	}
+	tx, err := b.Lock(stateLock)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.Type, money.TransactionTypeLock)
+	require.Equal(t, tx.Type, nop.TransactionTypeNOP)
 	require.Equal(t, b.PartitionID, tx.GetPartitionID())
 	require.Equal(t, b.ID, tx.GetUnitID())
+	require.Equal(t, stateLock, tx.StateLock)
 
-	attr := &money.LockAttributes{}
+	attr := &nop.Attributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))
-	require.Equal(t, lockStatus, attr.LockStatus)
-	require.Equal(t, b.Counter, attr.Counter)
+	require.Equal(t, b.Counter, *attr.Counter)
 }
 
 func TestBillUnlock(t *testing.T) {
@@ -256,11 +259,11 @@ func TestBillUnlock(t *testing.T) {
 	tx, err := b.Unlock()
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.Type, money.TransactionTypeUnlock)
+	require.Equal(t, tx.Type, nop.TransactionTypeNOP)
 	require.Equal(t, b.PartitionID, tx.GetPartitionID())
 	require.Equal(t, b.ID, tx.GetUnitID())
 
-	attr := &money.UnlockAttributes{}
+	attr := &nop.Attributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))
-	require.Equal(t, b.Counter, attr.Counter)
+	require.EqualValues(t, 4, *attr.Counter)
 }

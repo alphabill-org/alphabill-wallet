@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/alphabill-org/alphabill-go-base/txsystem/nop"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill-go-base/types"
 	"github.com/alphabill-org/alphabill-go-base/util"
+	"github.com/alphabill-org/alphabill-wallet/wallet"
 
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
-	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/txsubmitter"
 )
 
@@ -138,6 +139,11 @@ func (w *Wallet) joinTokenForDC(ctx context.Context, acc *accountKey, burnProofs
 	if err != nil {
 		return 0, err
 	}
+	unlockProof, err := sdktypes.NewP2pkhStateLockSignatureFromKey(tx, acc.PrivKey)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create state unlock proof: %w", err)
+	}
+	tx.AddStateUnlockCommitProof(unlockProof)
 
 	sigBytes, err := tx.AuthProofSigBytes()
 	if err != nil {
@@ -254,7 +260,7 @@ func (w *Wallet) getTokensForDC(ctx context.Context, key sdktypes.PubKey, allowe
 			// if filter is set, skip tokens of other types
 			continue
 		}
-		if tok.LockStatus != 0 {
+		if tok.StateLockTx != nil {
 			continue
 		}
 		tokensByTypes[typeID] = append(tokenz, tok)
@@ -272,7 +278,7 @@ func (w *Wallet) lockTokenForDC(ctx context.Context, acc *accountKey, fcrID type
 	if err != nil {
 		return 0, err
 	}
-	tx, err := targetToken.Lock(wallet.LockReasonCollectDust,
+	tx, err := targetToken.Lock(wallet.NewP2PKHStateLock(acc.PubKeyHash.Sha256),
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
 		sdktypes.WithMaxFee(w.maxFee),
@@ -289,7 +295,7 @@ func (w *Wallet) lockTokenForDC(ctx context.Context, acc *accountKey, fcrID type
 	if err != nil {
 		return 0, err
 	}
-	err = tx.SetAuthProof(tokens.LockTokenAuthProof{
+	err = tx.SetAuthProof(nop.AuthProof{
 		OwnerProof: ownerProof,
 	})
 	if err != nil {

@@ -57,7 +57,7 @@ func TestWalletFeesCmds_MoneyPartition(t *testing.T) {
 	require.Equal(t, fmt.Sprintf("Successfully created %d fee credits on money partition.", amount), stdout.Lines[0])
 
 	// verify fee credits
-	expectedFees = amount*2*1e8 - 5 // minus 2 for first run, minus 3 for second run
+	expectedFees = amount*2*1e8 - 7 // 7 tema charged for 5 transactions (2 from first batch: transFC, addFC; 3 from second batch: lockFC, transFC, addFC)
 	stdout = feesCmd.Exec(t, "list", "--fcr-id")
 	require.Equal(t, "Partition: money", stdout.Lines[0])
 	require.Equal(t, fmt.Sprintf("Account #1 %s %s", fcrId, util.AmountToString(expectedFees, 8)), stdout.Lines[1])
@@ -113,7 +113,7 @@ func TestWalletFeesCmds_TokenPartition(t *testing.T) {
 	require.Equal(t, fmt.Sprintf("Successfully created %d fee credits on tokens partition.", amount), stdout.Lines[0])
 
 	// verify fee credits to token partition
-	expectedFees = amount*2*1e8 - 5
+	expectedFees = amount*2*1e8 - 7
 	stdout = feesCmd.Exec(t, "list")
 	require.Equal(t, "Partition: tokens", stdout.Lines[0])
 	require.Equal(t, fmt.Sprintf("Account #1 %s", util.AmountToString(expectedFees, 8)), stdout.Lines[1])
@@ -232,7 +232,7 @@ func TestWalletFeesCmds_MinimumFeeAmount(t *testing.T) {
 	require.Equal(t, "Successfully created 0.00000045 fee credits on money partition.", stdout.Lines[0])
 
 	// verify fee credit is valid for reclaim
-	expectedFees = uint64(51) // 9 - 1 (lockFC) + 45 - 1 (transFC) - 1 (addFC) = 51
+	expectedFees = uint64(49) // 9 - 2 (lockFC) + 45 - 1 (transFC) - 2 (addFC) = 49
 	stdout = feesCmd.Exec(t, "list")
 	require.Equal(t, "Partition: money", stdout.Lines[0])
 	require.Equal(t, fmt.Sprintf("Account #1 %s", util.AmountToString(expectedFees, 8)), stdout.Lines[1])
@@ -258,7 +258,7 @@ func TestWalletFeesLockCmds_Ok(t *testing.T) {
 	// verify fee credit bill locked
 	stdout = feesCmd.Exec(t, "list")
 	require.Equal(t, "Partition: money", stdout.Lines[0])
-	require.Equal(t, "Account #1 0.999'999'97 lockStatus=4 (manually locked by user)", stdout.Lines[1])
+	require.Contains(t, stdout.Lines[1], "Account #1 0.999'999'96 locked")
 
 	// unlock fee credit record
 	stdout = feesCmd.Exec(t, "unlock", "--key", "1")
@@ -267,5 +267,5 @@ func TestWalletFeesLockCmds_Ok(t *testing.T) {
 	// list fees
 	stdout = feesCmd.Exec(t, "list")
 	require.Equal(t, "Partition: money", stdout.Lines[0])
-	require.Equal(t, "Account #1 0.999'999'96", stdout.Lines[1])
+	require.Equal(t, "Account #1 0.999'999'93", stdout.Lines[1])
 }

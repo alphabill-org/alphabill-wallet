@@ -10,8 +10,10 @@ import (
 
 	"github.com/alphabill-org/alphabill-go-base/predicates"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/nop"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill-go-base/types"
+	"github.com/alphabill-org/alphabill-go-base/types/hex"
 	"github.com/alphabill-org/alphabill-go-base/util"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/wallet"
@@ -56,8 +58,8 @@ type (
 	Token interface {
 		GetID() sdktypes.TokenID
 		GetOwnerPredicate() sdktypes.Predicate
-		GetLockStatus() uint64
-		Lock(lockStatus uint64, txOptions ...sdktypes.Option) (*types.TransactionOrder, error)
+		GetStateLockTx() hex.Bytes
+		Lock(stateLock *types.StateLock, txOptions ...sdktypes.Option) (*types.TransactionOrder, error)
 		Unlock(txOptions ...sdktypes.Option) (*types.TransactionOrder, error)
 	}
 )
@@ -547,7 +549,7 @@ func (w *Wallet) TransferNFT(ctx context.Context, accountNumber uint64, tokenID 
 	if err = ensureTokenOwnership(acc, token, ownerPredicateInput); err != nil {
 		return nil, err
 	}
-	if token.GetLockStatus() != 0 {
+	if token.GetStateLockTx() != nil {
 		return nil, errors.New("token is locked")
 	}
 	roundNumber, err := w.GetRoundNumber(ctx)
@@ -621,7 +623,7 @@ func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId 
 		if !typeId.Eq(token.TypeID) {
 			continue
 		}
-		if token.LockStatus != 0 {
+		if token.StateLockTx != nil {
 			continue
 		}
 		matchingTokens = append(matchingTokens, token)
@@ -675,7 +677,7 @@ func (w *Wallet) UpdateNFTData(ctx context.Context, accountNumber uint64, tokenI
 	if err != nil {
 		return nil, err
 	}
-	if t.GetLockStatus() != 0 {
+	if t.GetStateLockTx() != nil {
 		return nil, errors.New("token is locked")
 	}
 	roundNumber, err := w.GetRoundNumber(ctx)
@@ -828,7 +830,7 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID ty
 	if err = ensureTokenOwnership(key, token, ownerPredicateInput); err != nil {
 		return nil, fmt.Errorf("failed to ensure token ownership: %w", err)
 	}
-	if token.GetLockStatus() != 0 {
+	if token.GetStateLockTx() != nil {
 		return nil, errors.New("token is already locked")
 	}
 	roundNumber, err := w.GetRoundNumber(ctx)
@@ -836,7 +838,7 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID ty
 		return nil, err
 	}
 
-	tx, err := token.Lock(wallet.LockReasonManual,
+	tx, err := token.Lock(wallet.NewP2PKHStateLock(key.PubKeyHash.Sha256),
 		sdktypes.WithTimeout(roundNumber+txTimeoutRoundCount),
 		sdktypes.WithFeeCreditRecordID(fcrID),
 		sdktypes.WithMaxFee(w.maxFee),
@@ -853,7 +855,7 @@ func (w *Wallet) LockToken(ctx context.Context, accountNumber uint64, tokenID ty
 	if err != nil {
 		return nil, err
 	}
-	err = tx.SetAuthProof(tokens.LockTokenAuthProof{
+	err = tx.SetAuthProof(nop.AuthProof{
 		OwnerProof: ownerProof,
 	})
 	if err != nil {
@@ -901,7 +903,7 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	if err = ensureTokenOwnership(key, token, ownerPredicateInput); err != nil {
 		return nil, err
 	}
-	if token.GetLockStatus() == 0 {
+	if token.GetStateLockTx() == nil {
 		return nil, errors.New("token is already unlocked")
 	}
 	roundNumber, err := w.GetRoundNumber(ctx)
@@ -917,6 +919,12 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	if err != nil {
 		return nil, err
 	}
+	// add state unlock proof
+	unlockProof, err := sdktypes.NewP2pkhStateLockSignatureFromKey(tx, acc.PrivKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create state unlock proof: %w", err)
+	}
+	tx.AddStateUnlockCommitProof(unlockProof)
 
 	sigBytes, err := tx.AuthProofSigBytes()
 	if err != nil {
@@ -926,7 +934,7 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	if err != nil {
 		return nil, err
 	}
-	err = tx.SetAuthProof(tokens.UnlockTokenAuthProof{
+	err = tx.SetAuthProof(nop.AuthProof{
 		OwnerProof: ownerProof,
 	})
 	if err != nil {

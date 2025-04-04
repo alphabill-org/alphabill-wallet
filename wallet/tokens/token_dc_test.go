@@ -19,11 +19,11 @@ func TestGetTokensForDC(t *testing.T) {
 	typeID4 := test.RandomBytes(32)
 
 	allTokens := []*types.FungibleToken{
-		newFungibleToken(t, testutils.RandomBytes(32), typeID1, "AB1", 100, 0),
-		newFungibleToken(t, testutils.RandomBytes(32), typeID1, "AB1", 100, 0),
-		newFungibleToken(t, testutils.RandomBytes(32), typeID2, "AB2", 100, 0),
-		newFungibleToken(t, testutils.RandomBytes(32), typeID2, "AB2", 100, 0),
-		newFungibleToken(t, testutils.RandomBytes(32), typeID4, "AB4", 0, 1),
+		newFungibleToken(t, testutils.RandomBytes(32), typeID1, "AB1", 100, nil),
+		newFungibleToken(t, testutils.RandomBytes(32), typeID1, "AB1", 100, nil),
+		newFungibleToken(t, testutils.RandomBytes(32), typeID2, "AB2", 100, nil),
+		newFungibleToken(t, testutils.RandomBytes(32), typeID2, "AB2", 100, nil),
+		newFungibleToken(t, testutils.RandomBytes(32), typeID4, "AB4", 0, []byte{1}),
 	}
 
 	be := &mockTokensPartitionClient{

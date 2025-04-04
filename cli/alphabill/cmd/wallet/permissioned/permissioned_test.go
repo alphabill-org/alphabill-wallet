@@ -131,8 +131,8 @@ func TestListFeeCreditCmd(t *testing.T) {
 	stdout = permissionedCmd.Exec(t, "list-credit", "--verbose")
 	require.Len(t, stdout.Lines, 3)
 	require.Equal(t, "Total Fee Credit Records: 2", stdout.Lines[0])
-	require.Equal(t, `{"networkId":0,"partitionId":0,"id":"0x16d9c685a84b761a6f96fa81bc59aeb55a697bf64f029f8a2204c6ec3622ac8a10","balance":1,"ownerPredicate":"","minLifetime":0,"lockStatus":0,"counter":0}`, stdout.Lines[1])
-	require.Equal(t, `{"networkId":0,"partitionId":0,"id":"0x2edd94bd4ad931f281ebe9cd6bcf0180f4ae0b607370c8d63fcf72d81db6c8e710","balance":2,"ownerPredicate":"","minLifetime":0,"lockStatus":0,"counter":0}`, stdout.Lines[2])
+	require.Equal(t, `{"networkId":0,"partitionId":0,"id":"0x16d9c685a84b761a6f96fa81bc59aeb55a697bf64f029f8a2204c6ec3622ac8a10","balance":1,"ownerPredicate":"","minLifetime":0,"counter":0}`, stdout.Lines[1])
+	require.Equal(t, `{"networkId":0,"partitionId":0,"id":"0x2edd94bd4ad931f281ebe9cd6bcf0180f4ae0b607370c8d63fcf72d81db6c8e710","balance":2,"ownerPredicate":"","minLifetime":0,"counter":0}`, stdout.Lines[2])
 }
 
 func decodeHex(t *testing.T, s string) []byte {

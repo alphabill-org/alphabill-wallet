@@ -36,14 +36,6 @@ func TestMoneyTxSigner_EachTxTypeCanBeSigned(t *testing.T) {
 			name: "swap",
 			txo:  &types.TransactionOrder{Payload: types.Payload{Type: money.TransactionTypeSwapDC}},
 		},
-		{
-			name: "lock",
-			txo:  &types.TransactionOrder{Payload: types.Payload{Type: money.TransactionTypeLock}},
-		},
-		{
-			name: "unlock",
-			txo:  &types.TransactionOrder{Payload: types.Payload{Type: money.TransactionTypeUnlock}},
-		},
 	}
 
 	for _, tt := range tests {

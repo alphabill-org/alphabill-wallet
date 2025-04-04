@@ -14,7 +14,6 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/client"
 	sdktypes "github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/util"
-	"github.com/alphabill-org/alphabill-wallet/wallet"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
 	tokenswallet "github.com/alphabill-org/alphabill-wallet/wallet/tokens"
 	"github.com/spf13/cobra"
@@ -960,8 +959,8 @@ func execTokenCmdList(cmd *cobra.Command, config *types.WalletConfig, accountNum
 					typeName = fmt.Sprintf(", token-type-name='%s'", t.TypeName)
 				}
 				amount := util.AmountToString(t.Amount, t.DecimalPlaces)
-				config.Base.ConsoleWriter.Println(fmt.Sprintf("ID='%s', symbol='%s', amount='%v', token-type='%s', lockStatus='%d (%s)'",
-					t.ID, t.Symbol, amount, t.TypeID, t.LockStatus, wallet.LockReason(t.LockStatus).String()) + typeName + " (fungible)")
+				config.Base.ConsoleWriter.Println(fmt.Sprintf("ID='%s', symbol='%s', amount='%v', token-type='%s', locked='0x%X'",
+					t.ID, t.Symbol, amount, t.TypeID, t.StateLockTx) + typeName + " (fungible)")
 			}
 		}
 
@@ -988,8 +987,8 @@ func execTokenCmdList(cmd *cobra.Command, config *types.WalletConfig, accountNum
 					nftData = fmt.Sprintf(", data='%X'", t.Data)
 				}
 
-				config.Base.ConsoleWriter.Println(fmt.Sprintf("ID='%s', symbol='%s', name='%s', token-type='%s', lockStatus='%d (%s)'",
-					t.ID, t.Symbol, t.Name, t.TypeID, t.LockStatus, wallet.LockReason(t.LockStatus).String()) + typeName + nftURI + nftData + " (nft)")
+				config.Base.ConsoleWriter.Println(fmt.Sprintf("ID='%s', symbol='%s', name='%s', token-type='%s', locked='0x%X'",
+					t.ID, t.Symbol, t.Name, t.TypeID, t.StateLockTx) + typeName + nftURI + nftData + " (nft)")
 			}
 		}
 	}

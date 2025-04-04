@@ -6,8 +6,8 @@ import (
 	moneyid "github.com/alphabill-org/alphabill-go-base/testutils/money"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc/permissioned"
+	"github.com/alphabill-org/alphabill-go-base/txsystem/nop"
 	"github.com/alphabill-org/alphabill-go-base/types"
-
 	"github.com/stretchr/testify/require"
 )
 
@@ -75,18 +75,21 @@ func TestFeeCreditRecordLock(t *testing.T) {
 		ID:          moneyid.NewFeeCreditRecordID(t),
 		Counter:     &fcrCounter,
 	}
-	lockStatus := uint64(4)
-	tx, err := fcr.Lock(lockStatus)
+	stateLock := &types.StateLock{
+		ExecutionPredicate: []byte{1},
+		RollbackPredicate:  []byte{1},
+	}
+	tx, err := fcr.Lock(stateLock)
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.Type, fc.TransactionTypeLockFeeCredit)
+	require.Equal(t, tx.Type, nop.TransactionTypeNOP)
 	require.Equal(t, fcr.PartitionID, tx.GetPartitionID())
 	require.Equal(t, fcr.ID, tx.GetUnitID())
+	require.Equal(t, stateLock, tx.StateLock)
 
-	attr := &fc.LockFeeCreditAttributes{}
+	attr := &nop.Attributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))
-	require.Equal(t, lockStatus, attr.LockStatus)
-	require.Equal(t, *fcr.Counter, attr.Counter)
+	require.Equal(t, *fcr.Counter, *attr.Counter)
 }
 
 func TestFeeCreditRecordUnlock(t *testing.T) {
@@ -100,13 +103,13 @@ func TestFeeCreditRecordUnlock(t *testing.T) {
 	tx, err := fcr.Unlock()
 	require.NoError(t, err)
 	require.NotNil(t, tx)
-	require.Equal(t, tx.Type, fc.TransactionTypeUnlockFeeCredit)
+	require.Equal(t, tx.Type, nop.TransactionTypeNOP)
 	require.Equal(t, fcr.PartitionID, tx.GetPartitionID())
 	require.Equal(t, fcr.ID, tx.GetUnitID())
 
-	attr := &fc.UnlockFeeCreditAttributes{}
+	attr := &nop.Attributes{}
 	require.NoError(t, tx.UnmarshalAttributes(attr))
-	require.Equal(t, *fcr.Counter, attr.Counter)
+	require.EqualValues(t, 2, *attr.Counter)
 }
 
 func TestFeeCreditRecordSetFeeCredit(t *testing.T) {
