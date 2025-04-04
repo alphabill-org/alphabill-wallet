@@ -17,7 +17,7 @@ func TestNopTxSigner_NopTxCanBeSigned(t *testing.T) {
 
 	t.Run("sign locking tx", func(t *testing.T) {
 		tx := &types.TransactionOrder{Payload: types.Payload{Type: nop.TransactionTypeNOP}}
-		require.NoError(t, txSigner.SignLockTx(tx))
+		require.NoError(t, txSigner.SignTx(tx))
 		require.NotEmpty(t, tx.AuthProof)
 		require.NotEmpty(t, tx.FeeProof)
 	})
@@ -26,7 +26,7 @@ func TestNopTxSigner_NopTxCanBeSigned(t *testing.T) {
 		tx := &types.TransactionOrder{Payload: types.Payload{Type: nop.TransactionTypeNOP}}
 		require.NoError(t, txSigner.SignCommitTx(tx))
 		require.NotEmpty(t, tx.StateUnlock)
-		require.Equal(t, byte(1), tx.StateUnlock[0])
+		require.EqualValues(t, types.StateUnlockExecute, tx.StateUnlock[0])
 		require.NotEmpty(t, tx.AuthProof)
 		require.NotEmpty(t, tx.FeeProof)
 	})
@@ -35,7 +35,7 @@ func TestNopTxSigner_NopTxCanBeSigned(t *testing.T) {
 		tx := &types.TransactionOrder{Payload: types.Payload{Type: nop.TransactionTypeNOP}}
 		require.NoError(t, txSigner.SignRollbackTx(tx))
 		require.NotEmpty(t, tx.StateUnlock)
-		require.Equal(t, byte(0), tx.StateUnlock[0])
+		require.EqualValues(t, types.StateUnlockRollback, tx.StateUnlock[0])
 		require.NotEmpty(t, tx.AuthProof)
 		require.NotEmpty(t, tx.FeeProof)
 	})

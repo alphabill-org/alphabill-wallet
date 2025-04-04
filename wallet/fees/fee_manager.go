@@ -332,7 +332,7 @@ func (w *FeeManager) LockFeeCredit(ctx context.Context, cmd LockFeeCreditCmd) (*
 	if err != nil {
 		return nil, fmt.Errorf("failed to create nop tx signer: %w", err)
 	}
-	if err = txSigner.SignLockTx(tx); err != nil {
+	if err = txSigner.SignTx(tx); err != nil {
 		return nil, fmt.Errorf("failed to sign tx: %w", err)
 	}
 
@@ -550,7 +550,7 @@ func (w *FeeManager) sendLockFCTx(ctx context.Context, accountKey *account.Accou
 	if err != nil {
 		return fmt.Errorf("failed to create nop tx signer: %w", err)
 	}
-	if err = txSigner.SignLockTx(tx); err != nil {
+	if err = txSigner.SignTx(tx); err != nil {
 		return fmt.Errorf("failed to sign nop tx: %w", err)
 	}
 
@@ -763,7 +763,7 @@ func (w *FeeManager) sendAddFCTx(ctx context.Context, accountKey *account.Accoun
 		if err != nil {
 			return fmt.Errorf("failed to create state unlock proof: %w", err)
 		}
-		addFCTx.StateUnlock = append([]byte{1}, stateUnlockProof...) // 0=rollback 1=commit
+		addFCTx.AddStateUnlockCommitProof(stateUnlockProof)
 	}
 
 	ownerProof, err := sdktypes.NewP2pkhAuthProofSignatureFromKey(addFCTx, accountKey.PrivKey)
@@ -1097,7 +1097,7 @@ func (w *FeeManager) sendReclaimFCTx(ctx context.Context, accountKey *account.Ac
 		if err != nil {
 			return fmt.Errorf("failed to create state unlock proof: %w", err)
 		}
-		reclaimFC.StateUnlock = append([]byte{1}, stateUnlockProof...) // 0=rollback 1=commit
+		reclaimFC.AddStateUnlockCommitProof(stateUnlockProof)
 	}
 
 	ownerProof, err := sdktypes.NewP2pkhAuthProofSignatureFromKey(reclaimFC, accountKey.PrivKey)

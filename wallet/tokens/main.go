@@ -924,7 +924,7 @@ func (w *Wallet) UnlockToken(ctx context.Context, accountNumber uint64, tokenID 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create state unlock proof: %w", err)
 	}
-	tx.StateUnlock = append([]byte{1}, unlockProof...) // 0=rollback; 1=commit
+	tx.AddStateUnlockCommitProof(unlockProof)
 
 	sigBytes, err := tx.AuthProofSigBytes()
 	if err != nil {

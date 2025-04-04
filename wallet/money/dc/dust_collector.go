@@ -177,7 +177,7 @@ func (w *DustCollector) swapDCBills(ctx context.Context, txSigner *sdktypes.Mone
 	if err != nil {
 		return nil, fmt.Errorf("failed to create state unlock proof: %w", err)
 	}
-	swapTx.StateUnlock = append([]byte{1}, stateUnlockProof...) // 0=rollback 1=commit
+	swapTx.AddStateUnlockCommitProof(stateUnlockProof)
 
 	// sign tx
 	if err = txSigner.SignTx(swapTx); err != nil {
@@ -218,7 +218,7 @@ func (w *DustCollector) lockTargetBill(ctx context.Context, k *account.AccountKe
 	if err != nil {
 		return nil, fmt.Errorf("failed to create money tx signer: %w", err)
 	}
-	if err = txSigner.SignLockTx(lockTx); err != nil {
+	if err = txSigner.SignTx(lockTx); err != nil {
 		return nil, fmt.Errorf("failed to sign tx: %w", err)
 	}
 

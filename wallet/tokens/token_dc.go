@@ -143,7 +143,7 @@ func (w *Wallet) joinTokenForDC(ctx context.Context, acc *accountKey, burnProofs
 	if err != nil {
 		return 0, fmt.Errorf("failed to create state unlock proof: %w", err)
 	}
-	tx.StateUnlock = append([]byte{1}, unlockProof...) // 1=commit 0=rollback
+	tx.AddStateUnlockCommitProof(unlockProof)
 
 	sigBytes, err := tx.AuthProofSigBytes()
 	if err != nil {

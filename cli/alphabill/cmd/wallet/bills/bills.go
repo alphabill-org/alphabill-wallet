@@ -184,7 +184,7 @@ func execLockCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to create money tx signer: %w", err)
 	}
-	if err = txSigner.SignLockTx(tx); err != nil {
+	if err = txSigner.SignTx(tx); err != nil {
 		return fmt.Errorf("failed to sign tx: %w", err)
 	}
 

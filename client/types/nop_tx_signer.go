@@ -29,8 +29,8 @@ func NewNopTxSignerFromKey(privKey []byte) (*NopTxSigner, error) {
 	return NewNopTxSigner(signer)
 }
 
-// SignLockTx generates transaction specific P2PKH AuthProof and FeeProof.
-func (s *NopTxSigner) SignLockTx(tx *types.TransactionOrder) error {
+// SignTx generates transaction specific P2PKH AuthProof and FeeProof.
+func (s *NopTxSigner) SignTx(tx *types.TransactionOrder) error {
 	if err := s.AddAuthProof(tx); err != nil {
 		return fmt.Errorf("failed to add auth proof: %w", err)
 	}
@@ -42,35 +42,22 @@ func (s *NopTxSigner) SignLockTx(tx *types.TransactionOrder) error {
 
 // SignCommitTx generates transaction specific P2PKH StateUnlockProof for commit, and AuthProof and FeeProof.
 func (s *NopTxSigner) SignCommitTx(tx *types.TransactionOrder) error {
-	return s.SignUnlockTx(tx, []byte{1})
-}
-
-// SignRollbackTx generates transaction specific P2PKH StateUnlockProof for rollback, and AuthProof and FeeProof.
-func (s *NopTxSigner) SignRollbackTx(tx *types.TransactionOrder) error {
-	return s.SignUnlockTx(tx, []byte{0})
-}
-
-// SignUnlockTx generates transaction specific P2PKH StateUnlockProof, AuthProof and FeeProof.
-func (s *NopTxSigner) SignUnlockTx(tx *types.TransactionOrder, stateUnlockPrefix []byte) error {
-	if err := s.AddStateUnlockProof(tx, stateUnlockPrefix); err != nil {
-		return fmt.Errorf("failed to add state unlock proof: %w", err)
-	}
-	if err := s.AddAuthProof(tx); err != nil {
-		return fmt.Errorf("failed to add auth proof: %w", err)
-	}
-	if err := s.AddFeeProof(tx); err != nil {
-		return fmt.Errorf("failed to add fee proof: %w", err)
-	}
-	return nil
-}
-
-func (s *NopTxSigner) AddStateUnlockProof(tx *types.TransactionOrder, stateUnlockPrefix []byte) error {
 	unlockProof, err := NewP2pkhStateLockProofSignature(tx, s.signer)
 	if err != nil {
 		return fmt.Errorf("failed to create state unlock proof: %w", err)
 	}
-	tx.StateUnlock = append(stateUnlockPrefix, unlockProof...)
-	return nil
+	tx.AddStateUnlockCommitProof(unlockProof)
+	return s.SignTx(tx)
+}
+
+// SignRollbackTx generates transaction specific P2PKH StateUnlockProof for rollback, and AuthProof and FeeProof.
+func (s *NopTxSigner) SignRollbackTx(tx *types.TransactionOrder) error {
+	unlockProof, err := NewP2pkhStateLockProofSignature(tx, s.signer)
+	if err != nil {
+		return fmt.Errorf("failed to create state unlock proof: %w", err)
+	}
+	tx.AddStateUnlockRollbackProof(unlockProof)
+	return s.SignTx(tx)
 }
 
 func (s *NopTxSigner) AddAuthProof(tx *types.TransactionOrder) error {
