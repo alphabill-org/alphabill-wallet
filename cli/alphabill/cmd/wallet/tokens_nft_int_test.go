@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -13,7 +14,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/alphabill-org/alphabill-go-base/hash"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	tokenid "github.com/alphabill-org/alphabill-go-base/testutils/tokens"
 	"github.com/alphabill-org/alphabill-go-base/types"
@@ -114,7 +114,7 @@ func TestNFTs_Integration(t *testing.T) {
 	stdout = tokensCmd.Exec(t, "new", "non-fungible",
 		"--key", "2",
 		"--type", typeID.String(),
-		"--bearer-clause", fmt.Sprintf("ptpkh:0x%X", hash.Sum256(wallets[1].PubKeys[0])))
+		"--bearer-clause", fmt.Sprintf("ptpkh:0x%X", sha256.Sum256(wallets[1].PubKeys[0])))
 	nftID2 := extractTokenID(t, stdout.Lines[0])
 	testutils.VerifyStdout(t, tokensCmd.WithHome(wallets[1].Homedir).Exec(t, "list", "non-fungible"), fmt.Sprintf("ID='%s'", nftID2))
 }
