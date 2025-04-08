@@ -2,10 +2,10 @@ package tokens
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"sort"
 
-	"github.com/alphabill-org/alphabill-go-base/hash"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 
@@ -28,11 +28,12 @@ func ownerPredicateFromHash(receiverPubKeyHash []byte) sdktypes.Predicate {
 }
 
 func OwnerPredicateFromPubKey(receiverPubKey sdktypes.PubKey) sdktypes.Predicate {
-	var h []byte
+	var pkh []byte
 	if receiverPubKey != nil {
-		h = hash.Sum256(receiverPubKey)
+		h := sha256.Sum256(receiverPubKey)
+		pkh = h[:]
 	}
-	return ownerPredicateFromHash(h)
+	return ownerPredicateFromHash(pkh)
 }
 
 // assumes there's sufficient balance for the given amount, sends transactions immediately

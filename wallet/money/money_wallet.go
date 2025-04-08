@@ -2,13 +2,13 @@ package money
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
 
 	abcrypto "github.com/alphabill-org/alphabill-go-base/crypto"
-	"github.com/alphabill-org/alphabill-go-base/hash"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/types"
@@ -203,7 +203,8 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*types.TxRecordProof,
 		return nil, errors.New("fee credit record not found")
 	}
 
-	bills, err := w.getUnlockedBills(ctx, hash.Sum256(pubKey))
+	pkh := sha256.Sum256(pubKey)
+	bills, err := w.getUnlockedBills(ctx, pkh[:])
 	if err != nil {
 		return nil, err
 	}
@@ -244,7 +245,7 @@ func (w *Wallet) Send(ctx context.Context, cmd SendCmd) ([]*types.TxRecordProof,
 		for _, r := range cmd.Receivers {
 			targetUnits = append(targetUnits, &money.TargetUnit{
 				Amount:         r.Amount,
-				OwnerPredicate: templates.NewP2pkh256BytesFromKeyHash(hash.Sum256(r.PubKey)),
+				OwnerPredicate: templates.NewP2pkh256BytesFromKey(r.PubKey),
 			})
 		}
 		tx, err := largestBill.Split(targetUnits,

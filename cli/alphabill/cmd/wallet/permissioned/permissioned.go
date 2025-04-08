@@ -1,10 +1,10 @@
 package permissioned
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 
-	"github.com/alphabill-org/alphabill-go-base/hash"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc/permissioned"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
@@ -111,8 +111,8 @@ func addFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 	}
 
 	targetPubkey := *cmd.Flag(args.TargetPubkeyFlagName).Value.(*clitypes.BytesHex)
-	ownerID := hash.Sum256(targetPubkey)
-	fcr, err := tokensClient.GetFeeCreditRecordByOwnerID(cmd.Context(), ownerID)
+	ownerID := sha256.Sum256(targetPubkey)
+	fcr, err := tokensClient.GetFeeCreditRecordByOwnerID(cmd.Context(), ownerID[:])
 	if err != nil {
 		return fmt.Errorf("failed to fetch fee credit record: %w", err)
 	}
@@ -123,7 +123,7 @@ func addFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 	}
 	timeout := roundInfo.RoundNumber + txTimeoutBlockCount
 
-	ownerPredicate := templates.NewP2pkh256BytesFromKeyHash(ownerID)
+	ownerPredicate := templates.NewP2pkh256BytesFromKeyHash(ownerID[:])
 	if fcr == nil {
 		fcrID, err := tokens.NewFeeCreditRecordIDFromOwnerPredicate(pdr, types.ShardID{}, ownerPredicate, timeout)
 		if err != nil {
@@ -213,8 +213,8 @@ func deleteFeeCreditCmdExec(cmd *cobra.Command, config *config) error {
 	}
 
 	targetPubkey := *cmd.Flag(args.TargetPubkeyFlagName).Value.(*clitypes.BytesHex)
-	ownerID := hash.Sum256(targetPubkey)
-	fcr, err := tokensClient.GetFeeCreditRecordByOwnerID(cmd.Context(), ownerID)
+	ownerID := sha256.Sum256(targetPubkey)
+	fcr, err := tokensClient.GetFeeCreditRecordByOwnerID(cmd.Context(), ownerID[:])
 	if err != nil {
 		return fmt.Errorf("failed to fetch fee credit record: %w", err)
 	}
