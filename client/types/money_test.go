@@ -3,14 +3,15 @@ package types
 import (
 	"testing"
 
-	"github.com/alphabill-org/alphabill-go-base/hash"
+	"github.com/stretchr/testify/require"
+
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	moneyid "github.com/alphabill-org/alphabill-go-base/testutils/money"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/nop"
 	"github.com/alphabill-org/alphabill-go-base/types"
-	"github.com/stretchr/testify/require"
+	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
 )
 
 func TestBillTransfer(t *testing.T) {
@@ -51,7 +52,7 @@ func TestBillTransfer(t *testing.T) {
 }
 
 func TestSplitTransactionAmount(t *testing.T) {
-	receiverPubKeyHash := hash.Sum256([]byte{1})
+	receiverPubKeyHash := testutils.RandomBytes(32)
 	billID := moneyid.NewBillID(t)
 	b := &Bill{
 		PartitionID: money.DefaultPartitionID,

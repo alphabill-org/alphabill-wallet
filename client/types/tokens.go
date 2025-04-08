@@ -2,9 +2,9 @@ package types
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 
-	"github.com/alphabill-org/alphabill-go-base/hash"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/nop"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/tokens"
 	"github.com/alphabill-org/alphabill-go-base/types"
@@ -263,7 +263,8 @@ func (t *NonFungibleToken) GetStateLockTx() hex.Bytes {
 }
 
 func (pk PubKey) Hash() PubKeyHash {
-	return hash.Sum256(pk)
+	h := sha256.Sum256(pk)
+	return h[:]
 }
 
 func lockToken(stateLock *types.StateLock, networkID types.NetworkID, partitionID types.PartitionID, id types.UnitID, counter uint64, txOptions ...Option) (*types.TransactionOrder, error) {

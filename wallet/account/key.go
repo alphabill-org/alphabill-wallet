@@ -2,11 +2,11 @@ package account
 
 import (
 	"crypto/ecdsa"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 
 	abcrypto "github.com/alphabill-org/alphabill-go-base/crypto"
-	"github.com/alphabill-org/alphabill-go-base/hash"
 	"github.com/btcsuite/btcd/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg"
 	acc "github.com/ethereum/go-ethereum/accounts"
@@ -120,8 +120,9 @@ func NewDerivationPath(accountIndex uint64) string {
 
 // NewKeyHash creates sha256/sha512 hash pair from given key
 func NewKeyHash(key []byte) *KeyHashes {
+	pkh := sha256.Sum256(key)
 	return &KeyHashes{
-		Sha256: hash.Sum256(key),
+		Sha256: pkh[:],
 	}
 }
 

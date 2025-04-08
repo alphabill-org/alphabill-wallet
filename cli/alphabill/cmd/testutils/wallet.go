@@ -1,13 +1,13 @@
 package testutils
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/alphabill-org/alphabill-go-base/hash"
 	"github.com/stretchr/testify/require"
 
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
@@ -64,13 +64,15 @@ func SetupTestHomeDir(t *testing.T, dir string) string {
 func TestPubKey0Hash(t *testing.T) []byte {
 	pubKeyBytes, err := hex.DecodeString(TestPubKey0Hex)
 	require.NoError(t, err)
-	return hash.Sum256(pubKeyBytes)
+	pkh := sha256.Sum256(pubKeyBytes)
+	return pkh[:]
 }
 
 func TestPubKey1Hash(t *testing.T) []byte {
 	pubKeyBytes, err := hex.DecodeString(TestPubKey1Hex)
 	require.NoError(t, err)
-	return hash.Sum256(pubKeyBytes)
+	pkh := sha256.Sum256(pubKeyBytes)
+	return pkh[:]
 }
 
 type (
