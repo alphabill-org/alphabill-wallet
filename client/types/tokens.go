@@ -138,7 +138,7 @@ func (t *FungibleToken) Mint(pdr *types.PartitionDescriptionRecord, txOptions ..
 	}
 
 	// generate tokenID
-	if err = tokens.GenerateUnitID(tx, types.ShardID{}, pdr); err != nil {
+	if err = tokens.GenerateUnitID(tx, pdr); err != nil {
 		return nil, fmt.Errorf("generating token ID: %w", err)
 	}
 	t.ID = tx.UnitID
@@ -217,7 +217,7 @@ func (t *NonFungibleToken) Mint(pdr *types.PartitionDescriptionRecord, txOptions
 		return nil, fmt.Errorf("building transaction order: %w", err)
 	}
 
-	if err = tokens.GenerateUnitID(tx, types.ShardID{}, pdr); err != nil {
+	if err = tokens.GenerateUnitID(tx, pdr); err != nil {
 		return nil, fmt.Errorf("generating token ID: %w", err)
 	}
 	t.ID = tx.UnitID

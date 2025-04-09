@@ -179,7 +179,7 @@ func (w *Wallet) NewFungibleType(ctx context.Context, accountNumber uint64, ft *
 		return nil, err
 	}
 	if len(ft.ID) == 0 {
-		if err = tokens.GenerateUnitID(tx, types.ShardID{}, w.pdr); err != nil {
+		if err = tokens.GenerateUnitID(tx, w.pdr); err != nil {
 			return nil, fmt.Errorf("failed to generate fungible token type ID: %w", err)
 		}
 		ft.ID = tx.UnitID
@@ -243,7 +243,7 @@ func (w *Wallet) NewNonFungibleType(ctx context.Context, accountNumber uint64, n
 		return nil, err
 	}
 	if len(tx.UnitID) == 0 {
-		if err = tokens.GenerateUnitID(tx, types.ShardID{}, w.pdr); err != nil {
+		if err = tokens.GenerateUnitID(tx, w.pdr); err != nil {
 			return nil, fmt.Errorf("failed to generate non-fungible token type ID: %w", err)
 		}
 		nft.ID = tx.UnitID
