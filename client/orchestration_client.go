@@ -48,8 +48,3 @@ func (c *orchestrationPartitionClient) ConfirmTransaction(ctx context.Context, t
 	}
 	return txBatch.Submissions()[0].Proof, nil
 }
-
-func (c *orchestrationPartitionClient) Close() {
-	c.AdminAPIClient.Close()
-	c.StateAPIClient.Close()
-}
