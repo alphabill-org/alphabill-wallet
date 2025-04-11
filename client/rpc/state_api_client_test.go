@@ -148,10 +148,11 @@ func TestRpcClient(t *testing.T) {
 
 func startStateServer(t *testing.T, service *mocksrv.StateServiceMock) *StateAPIClient {
 	srv := mocksrv.StartServer(t, map[string]interface{}{"state": service})
-
-	client, err := NewStateAPIClient(context.Background(), "http://"+srv)
+	rpcClient, err := NewClient(context.Background(), "http://"+srv)
 	require.NoError(t, err)
-	t.Cleanup(client.Close)
+	client, err := NewStateAPIClient(context.Background(), rpcClient)
+	require.NoError(t, err)
+	t.Cleanup(rpcClient.Close)
 
 	return client
 }
