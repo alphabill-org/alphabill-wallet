@@ -1,10 +1,10 @@
 package permissioned
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"testing"
 
-	"github.com/alphabill-org/alphabill-go-base/hash"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	tokenid "github.com/alphabill-org/alphabill-go-base/testutils/tokens"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
@@ -66,8 +66,9 @@ func TestDeleteFeeCreditCmd(t *testing.T) {
 			PartitionTypeID:  tokens.PartitionTypeID,
 			PermissionedMode: true,
 		}))
+	pkh := sha256.Sum256(targetPubkey)
 	ss := mocksrv.NewStateServiceMock(
-		mocksrv.WithOwnerUnit(hash.Sum256(targetPubkey),
+		mocksrv.WithOwnerUnit(pkh[:],
 			&sdktypes.Unit[any]{
 				UnitID: tokenid.NewFeeCreditRecordID(t),
 				Data:   fc.FeeCreditRecord{Balance: 3, OwnerPredicate: nil},

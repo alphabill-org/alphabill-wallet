@@ -10,7 +10,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/alphabill-org/alphabill-go-base/hash"
 	"github.com/alphabill-org/alphabill-go-base/predicates/templates"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/fc"
 	"github.com/alphabill-org/alphabill-go-base/txsystem/money"
@@ -222,7 +221,7 @@ func createAddFC(networkID types.NetworkID, partitionID types.PartitionID, unitI
 func createTransferTx(networkID types.NetworkID, partitionID types.PartitionID, pubKey []byte, unitID []byte, billValue uint64, fcrID []byte, timeout uint64, counter uint64) (*types.TransactionOrder, error) {
 	attr, err := cbor.Marshal(
 		&money.TransferAttributes{
-			NewOwnerPredicate: templates.NewP2pkh256BytesFromKeyHash(hash.Sum256(pubKey)),
+			NewOwnerPredicate: templates.NewP2pkh256BytesFromKey(pubKey),
 			TargetValue:       billValue,
 			Counter:           counter,
 		},

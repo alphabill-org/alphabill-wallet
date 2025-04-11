@@ -3,6 +3,7 @@
 package wallet
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/alphabill-org/alphabill-go-base/hash"
 	tokenid "github.com/alphabill-org/alphabill-go-base/testutils/tokens"
 
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/testutils"
@@ -276,7 +276,7 @@ func TestWalletCreateFungibleTokenTypeAndTokenAndSendCmd_IntegrationTest(t *test
 		"amount='3.000'", "amount='1.100'", "amount='1.110'", "amount='1.111'")
 
 	// mint tokens from w1 and set the owner to w2
-	newFungibleCmd.Exec(t, "--amount", "2.222", "--bearer-clause", fmt.Sprintf("ptpkh:0x%X", hash.Sum256(wallets[1].PubKeys[0])))
+	newFungibleCmd.Exec(t, "--amount", "2.222", "--bearer-clause", fmt.Sprintf("ptpkh:0x%X", sha256.Sum256(wallets[1].PubKeys[0])))
 
 	testutils.VerifyStdoutEventually(t, tokensCmd.WithHome(wallets[1].Homedir).ExecFunc(t, "list", "fungible"), "amount='2.222'")
 
