@@ -61,7 +61,7 @@ func NewClient(ctx context.Context, rpcUrl string, opts ...Option) (*Client, err
 	}, nil
 }
 
-func (c *Client) BatchCallWithLimit(ctx context.Context, batch []*ethrpc.BatchElem) error {
+func (c *Client) BatchCall(ctx context.Context, batch []*ethrpc.BatchElem) error {
 	start, end := 0, 0
 	for len(batch) > end {
 		if c.options.batchItemLimit == 0 {
@@ -78,20 +78,16 @@ func (c *Client) BatchCallWithLimit(ctx context.Context, batch []*ethrpc.BatchEl
 }
 
 func (c *Client) batchCallWithRetry(ctx context.Context, batch []*ethrpc.BatchElem) error {
-	var err error
-	countdown := c.options.retryCount
-	for {
-		err = c.batchCallContext(ctx, batch)
-
-		var retryBatch []*ethrpc.BatchElem
+	for countdown := c.options.retryCount; ; countdown-- {
+		err := c.batchCallContext(ctx, batch)
 		if err == nil {
-			for i, batchElem := range batch {
-				if batchElem.Error != nil {
-					err = batchElem.Error
-					retryBatch = append(retryBatch, batch[i])
+			var retryBatch []*ethrpc.BatchElem
+			for _, elem := range batch {
+				if elem.Error != nil {
+					retryBatch = append(retryBatch, elem)
 				}
 			}
-			if len(retryBatch) == 0 {
+			if len(retryBatch) == 0 || countdown <= 0 {
 				return nil
 			}
 			batch = retryBatch
@@ -100,7 +96,7 @@ func (c *Client) batchCallWithRetry(ctx context.Context, batch []*ethrpc.BatchEl
 		if countdown <= 0 {
 			return fmt.Errorf("batch request failed (retries %d): err %w", c.options.retryCount, err)
 		}
-		countdown--
+
 		select {
 		case <-time.After(c.options.retryTime):
 			continue
@@ -125,14 +121,12 @@ func (c *Client) batchCallContext(ctx context.Context, batch []*ethrpc.BatchElem
 }
 
 func (c *Client) CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error {
-	var err error
-	countdown := c.options.retryCount
-	for {
-		err = c.rpcClient.CallContext(ctx, result, method, args...)
+	for countdown := c.options.retryCount; ; countdown-- {
+		err := c.rpcClient.CallContext(ctx, result, method, args...)
 		if err == nil || countdown <= 0 {
-			break
+			return err
 		}
-		countdown--
+
 		select {
 		case <-time.After(c.options.retryTime):
 			continue
@@ -140,8 +134,6 @@ func (c *Client) CallContext(ctx context.Context, result interface{}, method str
 			return ctx.Err()
 		}
 	}
-
-	return err
 }
 
 func (c *Client) Close() {

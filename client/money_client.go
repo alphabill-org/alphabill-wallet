@@ -71,7 +71,7 @@ func (c *moneyPartitionClient) GetBills(ctx context.Context, ownerID []byte) ([]
 	if len(batch) == 0 {
 		return bills, nil
 	}
-	if err := c.rpcClient.BatchCallWithLimit(ctx, batch); err != nil {
+	if err := c.rpcClient.BatchCall(ctx, batch); err != nil {
 		return nil, fmt.Errorf("failed to fetch bills: %w", err)
 	}
 	for _, batchElem := range batch {

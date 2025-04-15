@@ -132,7 +132,7 @@ func (c *TokensPartitionClient) GetFungibleTokens(ctx context.Context, ownerID [
 	if len(batch) == 0 {
 		return fts, nil
 	}
-	if err := c.rpcClient.BatchCallWithLimit(ctx, batch); err != nil {
+	if err := c.rpcClient.BatchCall(ctx, batch); err != nil {
 		return nil, fmt.Errorf("failed to fetch fungible tokens: %w", err)
 	}
 
@@ -156,7 +156,7 @@ func (c *TokensPartitionClient) GetFungibleTokens(ctx context.Context, ownerID [
 		})
 	}
 	if len(typesBatch) > 0 {
-		if err := c.rpcClient.BatchCallWithLimit(ctx, typesBatch); err != nil {
+		if err := c.rpcClient.BatchCall(ctx, typesBatch); err != nil {
 			return nil, fmt.Errorf("failed to fetch fungible token types: %w", err)
 		}
 		for _, batchElem := range typesBatch {
@@ -215,7 +215,7 @@ func (c *TokensPartitionClient) GetNonFungibleTokens(ctx context.Context, ownerI
 	if len(batch) == 0 {
 		return nfts, nil
 	}
-	if err := c.rpcClient.BatchCallWithLimit(ctx, batch); err != nil {
+	if err := c.rpcClient.BatchCall(ctx, batch); err != nil {
 		return nil, fmt.Errorf("failed to fetch non-fungible tokens: %w", err)
 	}
 
@@ -239,7 +239,7 @@ func (c *TokensPartitionClient) GetNonFungibleTokens(ctx context.Context, ownerI
 		})
 	}
 	if len(typesBatch) > 0 {
-		if err := c.rpcClient.BatchCallWithLimit(ctx, typesBatch); err != nil {
+		if err := c.rpcClient.BatchCall(ctx, typesBatch); err != nil {
 			return nil, fmt.Errorf("failed to fetch non-fungible token types: %w", err)
 		}
 		for _, batchElem := range typesBatch {

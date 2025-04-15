@@ -37,7 +37,7 @@ func TestBatchCallWithLimit(t *testing.T) {
 		client, err := newPartitionClient(context.Background(), "http://"+srv, pdr.PartitionTypeID, WithBatchItemLimit(limit))
 		require.NoError(t, err)
 		t.Cleanup(client.Close)
-		require.NoError(t, client.rpcClient.BatchCallWithLimit(context.Background(), batch))
+		require.NoError(t, client.rpcClient.BatchCall(context.Background(), batch))
 		require.Equal(t, 11, service.GetUnitCalls)
 		service.Reset()
 	}
