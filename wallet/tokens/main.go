@@ -627,9 +627,8 @@ func (w *Wallet) SendFungible(ctx context.Context, accountNumber uint64, typeId 
 			continue
 		}
 		matchingTokens = append(matchingTokens, token)
-		var overflow bool
-		totalBalance, overflow, _ = util.AddUint64(totalBalance, token.Amount)
-		if overflow {
+		var ok bool
+		if totalBalance, ok = util.SafeAdd(totalBalance, token.Amount); !ok {
 			// capping the total balance to maxUint64 should be enough to perform the transfer
 			totalBalance = math.MaxUint64
 		}
