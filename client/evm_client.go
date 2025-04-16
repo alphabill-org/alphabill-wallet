@@ -59,7 +59,7 @@ func (c *evmPartitionClient) GetFeeCreditRecordByOwnerID(ctx context.Context, ow
 		return nil, nil
 	}
 	var u *sdktypes.Unit[stateObject]
-	if err := c.RpcClient.CallContext(ctx, &u, "state_getUnit", unitIDs[0], false); err != nil {
+	if err := c.GetUnit(ctx, &u, unitIDs[0], false); err != nil {
 		return nil, err
 	}
 	if u == nil {
@@ -104,9 +104,4 @@ func (c *evmPartitionClient) ConfirmTransaction(ctx context.Context, tx *types.T
 		return nil, err
 	}
 	return txBatch.Submissions()[0].Proof, nil
-}
-
-func (c *evmPartitionClient) Close() {
-	c.AdminAPIClient.Close()
-	c.StateAPIClient.Close()
 }

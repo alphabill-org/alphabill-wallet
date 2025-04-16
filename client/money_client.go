@@ -33,7 +33,7 @@ func NewMoneyPartitionClient(ctx context.Context, rpcUrl string, opts ...Option)
 // Returns nil,nil if the bill does not exist.
 func (c *moneyPartitionClient) GetBill(ctx context.Context, unitID types.UnitID) (*sdktypes.Bill, error) {
 	var u *sdktypes.Unit[money.BillData]
-	if err := c.RpcClient.CallContext(ctx, &u, "state_getUnit", unitID, false); err != nil {
+	if err := c.GetUnit(ctx, &u, unitID, false); err != nil {
 		return nil, err
 	}
 	if u == nil {
@@ -55,14 +55,14 @@ func (c *moneyPartitionClient) GetBills(ctx context.Context, ownerID []byte) ([]
 		return nil, fmt.Errorf("failed to fetch owner units: %w", err)
 	}
 	var bills []*sdktypes.Bill
-	var batch []rpc.BatchElem
+	var batch []*rpc.BatchElem
 	for _, unitID := range unitIDs {
 		if unitID.TypeMustBe(money.BillUnitType, c.pdr) != nil {
 			continue
 		}
 
 		var u sdktypes.Unit[money.BillData]
-		batch = append(batch, rpc.BatchElem{
+		batch = append(batch, &rpc.BatchElem{
 			Method: "state_getUnit",
 			Args:   []any{unitID, false},
 			Result: &u,
@@ -71,7 +71,7 @@ func (c *moneyPartitionClient) GetBills(ctx context.Context, ownerID []byte) ([]
 	if len(batch) == 0 {
 		return bills, nil
 	}
-	if err := c.batchCallWithLimit(ctx, batch); err != nil {
+	if err := c.rpcClient.BatchCall(ctx, batch); err != nil {
 		return nil, fmt.Errorf("failed to fetch bills: %w", err)
 	}
 	for _, batchElem := range batch {
