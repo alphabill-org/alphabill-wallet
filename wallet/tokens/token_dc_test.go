@@ -9,14 +9,13 @@ import (
 
 	"github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/internal/testutils"
-	test "github.com/alphabill-org/alphabill-wallet/internal/testutils"
 )
 
 func TestGetTokensForDC(t *testing.T) {
-	typeID1 := test.RandomBytes(32)
-	typeID2 := test.RandomBytes(32)
-	typeID3 := test.RandomBytes(32)
-	typeID4 := test.RandomBytes(32)
+	typeID1 := testutils.RandomBytes(32)
+	typeID2 := testutils.RandomBytes(32)
+	typeID3 := testutils.RandomBytes(32)
+	typeID4 := testutils.RandomBytes(32)
 
 	allTokens := []*types.FungibleToken{
 		newFungibleToken(t, testutils.RandomBytes(32), typeID1, "AB1", 100, nil),
@@ -48,7 +47,7 @@ func TestGetTokensForDC(t *testing.T) {
 			expected:     map[string][]*types.FungibleToken{string(typeID1): allTokens[:2], string(typeID2): allTokens[2:4]},
 		},
 		{
-			allowedTypes: []types.TokenTypeID{test.RandomBytes(32)},
+			allowedTypes: []types.TokenTypeID{testutils.RandomBytes(32)},
 			expected:     map[string][]*types.FungibleToken{},
 		},
 		{
