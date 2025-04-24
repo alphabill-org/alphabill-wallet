@@ -1,9 +1,0 @@
-{
-  "networkId": 3,
-  "partitionId": 4,
-  "partitionTypeId": 4,
-  "typeIdLength": 8,
-  "unitIdLength": 256,
-  "shardingScheme": null,
-  "t2timeout": 2500000000
-}
