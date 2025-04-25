@@ -1,56 +1,50 @@
 #!/busybox/sh
 
-/app/alphabill money-genesis \
-               --home /home/nonroot/genesis/money1 \
-               --partition-description /home/nonroot/pdr-1.json \
-               --gen-keys \
-               --dc-money-supply-value "10000" \
-               --initial-bill-owner-predicate $1
+cd
 
-/app/alphabill tokens-genesis \
-               --home /home/nonroot/genesis/tokens1 \
-               --partition-description /home/nonroot/pdr-2.json \
-               --gen-keys
+for partitionId in 1 2 3 4 5; do
+  home=nodes/${partitionId}
+  partitionTypeId=$partitionId
+  shardConfParams=""
 
-/app/alphabill evm-genesis \
-               --home /home/nonroot/genesis/evm1 \
-               --partition-description /home/nonroot/pdr-3.json \
-               --gen-keys
+  case $partitionId in
+    1)
+      shardConfParams="--initial-bill-owner-predicate 0x$1"
+      ;;
+    4)
+      shardConfParams="--owner-predicate 0x$1"
+      ;;
+    5)
+      shardConfParams="--admin-owner-predicate 0x$1"
+      partitionTypeId=2
+      ;;
+  esac
 
-/app/alphabill orchestration-genesis \
-               --home /home/nonroot/genesis/orchestration1 \
-               --partition-description /home/nonroot/pdr-4.json \
-               --gen-keys \
-               --owner-predicate $1
+  /app/alphabill shard-node init --home $home --generate
 
-/app/alphabill tokens-genesis \
-               --home /home/nonroot/genesis/enterprise-tokens1 \
-               --partition-description /home/nonroot/pdr-5.json \
-               --admin-owner-predicate $1 \
-               --gen-keys
+  /app/alphabill shard-conf generate \
+                 --home $home \
+                 --network-id 3 \
+                 --partition-id $partitionId \
+                 --partition-type-id $partitionTypeId \
+                 --epoch-start 1 \
+                 --node-info ${home}/node-info.json \
+                 $shardConfParams
 
-/app/alphabill root-genesis new \
-               --home /home/nonroot/genesis/root1 \
-               --gen-keys \
-               --block-rate "400" \
-               --consensus-timeout "2500" \
-               --total-nodes "1" \
-               -p /home/nonroot/genesis/money1/money/node-genesis.json \
-               -p /home/nonroot/genesis/tokens1/tokens/node-genesis.json \
-               -p /home/nonroot/genesis/evm1/evm/node-genesis.json \
-               -p /home/nonroot/genesis/orchestration1/orchestration/node-genesis.json \
-               -p /home/nonroot/genesis/enterprise-tokens1/tokens/node-genesis.json
+  # move shard conf to default location
+  mv ${home}/shard-conf-${partitionId}_0.json ${home}/shard-conf.json
 
-/app/alphabill root-genesis combine \
-               --home /home/nonroot/genesis/root1 \
-               --root-genesis=/home/nonroot/genesis/root1/rootchain/root-genesis.json
+  # generate genesis state
+  /app/alphabill shard-conf genesis --home $home
+done
 
-/app/alphabill root-genesis gen-trust-base \
-               --home /home/nonroot/genesis \
-               --root-genesis=/home/nonroot/genesis/root1/rootchain/root-genesis.json
+/app/alphabill root-node init --home nodes/root --generate
 
-/app/alphabill root-genesis sign-trust-base \
-               --home /home/nonroot/genesis \
-               --key-file /home/nonroot/genesis/root1/rootchain/keys.json
+/app/alphabill trust-base generate \
+               --home nodes/root \
+               --network-id 3 \
+               --node-info nodes/root/node-info.json
 
-cd /home/nonroot && tar -cf genesis.tar -C genesis .
+/app/alphabill trust-base sign --home nodes/root
+
+tar -cf genesis.tar -C nodes .
