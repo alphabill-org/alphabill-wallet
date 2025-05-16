@@ -41,7 +41,7 @@ func NewFeesCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 
 	cmd.PersistentFlags().StringVarP(&config.moneyPartitionNodeUrl, args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "money rpc node url")
 	cmd.PersistentFlags().VarP(&config.targetPartitionType, args.PartitionCmdName, "n", "partition name for which to manage fees [money|tokens|enterprise-tokens]")
-	usage := fmt.Sprintf("partition rpc node url for which to manage fees (default: [%s|%s|%s|%s] based on --partition flag)", args.DefaultMoneyRpcUrl, args.DefaultTokensRpcUrl, args.DefaultEnterpriseTokensRpcUrl)
+	usage := fmt.Sprintf("partition rpc node url for which to manage fees (default: [%s|%s|%s] based on --partition flag)", args.DefaultMoneyRpcUrl, args.DefaultTokensRpcUrl, args.DefaultEnterpriseTokensRpcUrl)
 	cmd.PersistentFlags().StringVarP(&config.targetPartitionNodeUrl, args.PartitionRpcUrlCmdName, "m", "", usage)
 	return cmd
 }
