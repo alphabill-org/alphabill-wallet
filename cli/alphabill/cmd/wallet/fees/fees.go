@@ -16,7 +16,6 @@ import (
 	"github.com/alphabill-org/alphabill-wallet/client/types"
 	"github.com/alphabill-org/alphabill-wallet/util"
 	"github.com/alphabill-org/alphabill-wallet/wallet/account"
-	evmwallet "github.com/alphabill-org/alphabill-wallet/wallet/evm"
 	"github.com/alphabill-org/alphabill-wallet/wallet/fees"
 	"github.com/spf13/cobra"
 )
@@ -41,8 +40,8 @@ func NewFeesCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 	cmd.AddCommand(unlockFeeCreditCmd(config))
 
 	cmd.PersistentFlags().StringVarP(&config.moneyPartitionNodeUrl, args.RpcUrl, "r", args.DefaultMoneyRpcUrl, "money rpc node url")
-	cmd.PersistentFlags().VarP(&config.targetPartitionType, args.PartitionCmdName, "n", "partition name for which to manage fees [money|tokens|enterprise-tokens|evm]")
-	usage := fmt.Sprintf("partition rpc node url for which to manage fees (default: [%s|%s|%s|%s] based on --partition flag)", args.DefaultMoneyRpcUrl, args.DefaultTokensRpcUrl, args.DefaultEnterpriseTokensRpcUrl, args.DefaultEvmRpcUrl)
+	cmd.PersistentFlags().VarP(&config.targetPartitionType, args.PartitionCmdName, "n", "partition name for which to manage fees [money|tokens|enterprise-tokens]")
+	usage := fmt.Sprintf("partition rpc node url for which to manage fees (default: [%s|%s|%s] based on --partition flag)", args.DefaultMoneyRpcUrl, args.DefaultTokensRpcUrl, args.DefaultEnterpriseTokensRpcUrl)
 	cmd.PersistentFlags().StringVarP(&config.targetPartitionNodeUrl, args.PartitionRpcUrlCmdName, "m", "", usage)
 	return cmd
 }
@@ -207,7 +206,7 @@ func lockFeeCreditCmd(config *feesConfig) *cobra.Command {
 }
 
 func lockFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
-	if config.targetPartitionType == clitypes.EvmType || config.targetPartitionType == clitypes.EnterpriseTokensType {
+	if config.targetPartitionType == clitypes.EnterpriseTokensType {
 		return fmt.Errorf("locking fee credit is not supported for %s partition", config.targetPartitionType.String())
 	}
 
@@ -265,7 +264,7 @@ func unlockFeeCreditCmd(config *feesConfig) *cobra.Command {
 }
 
 func unlockFeeCreditCmdExec(cmd *cobra.Command, config *feesConfig) error {
-	if config.targetPartitionType == clitypes.EvmType || config.targetPartitionType == clitypes.EnterpriseTokensType {
+	if config.targetPartitionType == clitypes.EnterpriseTokensType {
 		return fmt.Errorf("locking fee credit is not supported for %s partition", config.targetPartitionType.String())
 	}
 	accountNumber, err := cmd.Flags().GetUint64(args.KeyCmdName)
@@ -351,7 +350,7 @@ func addFees(ctx context.Context, accountNumber uint64, amountString string, c *
 	rsp, err := w.AddFeeCredit(ctx, fees.AddFeeCmd{
 		Amount:         amount,
 		AccountIndex:   accountNumber - 1,
-		DisableLocking: c.targetPartitionType == clitypes.EvmType,
+		DisableLocking: false,
 	})
 	if err != nil {
 		if errors.Is(err, fees.ErrMinimumFeeAmount) {
@@ -418,8 +417,6 @@ func (c *feesConfig) getTargetPartitionUrl() string {
 		return args.DefaultTokensRpcUrl
 	case clitypes.EnterpriseTokensType:
 		return args.DefaultEnterpriseTokensRpcUrl
-	case clitypes.EvmType:
-		return args.DefaultEvmRpcUrl
 	default:
 		panic("invalid \"partition\" flag value: " + c.targetPartitionType)
 	}
@@ -513,42 +510,6 @@ func getFeeCreditManager(ctx context.Context, c *feesConfig, am account.Manager,
 			func(shard basetypes.ShardID, pubKey []byte, latestAdditionTime uint64) (basetypes.UnitID, error) {
 				return tokens.NewFeeCreditRecordIDFromPublicKey(pdr, shard, pubKey, latestAdditionTime)
 			},
-			maxFee,
-			logger,
-		), nil
-	case clitypes.EvmType:
-		moneyClient, err := client.NewMoneyPartitionClient(ctx, c.getMoneyRpcUrl())
-		if err != nil {
-			return nil, fmt.Errorf("failed to create money rpc client: %w", err)
-		}
-		moneyPDR, err := moneyClient.PartitionDescription(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("loading money PDR: %w", err)
-		}
-		evmRpcUrl := c.getTargetPartitionRpcUrl()
-		evmClient, err := client.NewEvmPartitionClient(ctx, evmRpcUrl)
-		if err != nil {
-			return nil, fmt.Errorf("failed to dial evm rpc url: %w", err)
-		}
-		nodeInfo, err := evmClient.GetNodeInfo(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch evm partition info: %w", err)
-		}
-		if moneyPDR.NetworkID != nodeInfo.NetworkID {
-			return nil, errors.New("money and evm rpc clients must be in the same network")
-		}
-		return fees.NewFeeManager(
-			moneyPDR.NetworkID,
-			am,
-			feeManagerDB,
-			moneyPDR.PartitionID,
-			moneyClient,
-			func(shard basetypes.ShardID, pubKey []byte, latestAdditionTime uint64) (basetypes.UnitID, error) {
-				return money.NewFeeCreditRecordIDFromPublicKey(moneyPDR, shard, pubKey, latestAdditionTime)
-			},
-			nodeInfo.PartitionID,
-			evmClient,
-			evmwallet.NewFeeCreditRecordIDFromPublicKey,
 			maxFee,
 			logger,
 		), nil

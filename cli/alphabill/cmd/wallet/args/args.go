@@ -14,7 +14,6 @@ const (
 	RpcUrl                        = "rpc-url"
 	DefaultMoneyRpcUrl            = "localhost:26866"
 	DefaultTokensRpcUrl           = "localhost:28866"
-	DefaultEvmRpcUrl              = "localhost:29866"
 	DefaultOrchestrationRpcUrl    = "localhost:30866"
 	DefaultEnterpriseTokensRpcUrl = "localhost:31866"
 	PartitionCmdName              = "partition"

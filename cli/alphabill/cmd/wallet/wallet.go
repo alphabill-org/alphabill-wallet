@@ -19,7 +19,6 @@ import (
 	cliaccount "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/util/account"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/args"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/bills"
-	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/evm"
 	clifees "github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/fees"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/orchestration"
 	"github.com/alphabill-org/alphabill-wallet/cli/alphabill/cmd/wallet/permissioned"
@@ -58,7 +57,6 @@ func NewWalletCmd(baseConfig *types.BaseConfiguration) *cobra.Command {
 	walletCmd.AddCommand(CollectDustCmd(config))
 	walletCmd.AddCommand(AddKeyCmd(config))
 	walletCmd.AddCommand(tokens.NewTokenCmd(config))
-	walletCmd.AddCommand(evm.NewEvmCmd(config))
 	walletCmd.AddCommand(orchestration.NewCmd(config))
 	walletCmd.AddCommand(permissioned.NewCmd(config))
 	// add passwords flags for (encrypted)wallet
