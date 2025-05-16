@@ -19,8 +19,7 @@ import (
 )
 
 const (
-	
-	defaultDockerImage   = "ghcr.io/alphabill-org/alphabill:2f805e854307903f133ab65c9e5c2d4fb4906a04"
+	defaultDockerImage   = "docker.io/library/alphabill:local"
 	containerGenesisPath = "/home/nonroot/genesis.tar"
 	containerP2pPort     = "8000"
 	containerRpcPort     = "8001"
@@ -35,7 +34,6 @@ type (
 	AlphabillNetwork struct {
 		MoneyRpcUrl            string
 		TokensRpcUrl           string
-		EvmRpcUrl              string
 		OrchestrationRpcUrl    string
 		EnterpriseTokensRpcUrl string
 
@@ -79,12 +77,6 @@ func WithOrchestrationNode(t *testing.T) AlphabillNetworkOption {
 	}
 }
 
-func WithEvmNode(t *testing.T) AlphabillNetworkOption {
-	return func(n *AlphabillNetwork) {
-		n.startEvmNode(t)
-	}
-}
-
 func WithEnterpriseTokensNode(t *testing.T) AlphabillNetworkOption {
 	return func(n *AlphabillNetwork) {
 		n.startEnterpriseTokensNode(t)
@@ -92,7 +84,7 @@ func WithEnterpriseTokensNode(t *testing.T) AlphabillNetworkOption {
 }
 
 // SetupNetworkWithWallets sets up the Alphabill network and creates two wallets with two keys in both of them.
-// Starts money partition, and with given options, tokens, evm and/or orchestration partitions, with rpc servers up and running.
+// Starts money partition, and with given options, tokens, and/or orchestration partitions, with rpc servers up and running.
 // The owner of the initial bill is set to the first key of the first wallet.
 // Returns the created wallets and a reference to the Alphabill network.
 func SetupNetworkWithWallets(t *testing.T, opts ...AlphabillNetworkOption) ([]*Wallet, *AlphabillNetwork) {
@@ -191,7 +183,7 @@ func (n *AlphabillNetwork) startRootNode(t *testing.T) {
 	args := []string{
 		"root-node", "run",
 		"--home", "/home/nonroot/root",
-		"--address", "/ip4/0.0.0.0/tcp/"+containerP2pPort,
+		"--address", "/ip4/0.0.0.0/tcp/" + containerP2pPort,
 		"--log-file", "stdout",
 		"--log-level", "info",
 		"--log-format", "text",
@@ -235,22 +227,6 @@ func (n *AlphabillNetwork) startTokensNode(t *testing.T) {
 		"--t1-timeout", "188",
 	)
 	n.TokensRpcUrl = rpcUrl(t, n.ctx, container)
-}
-
-func (n *AlphabillNetwork) startEvmNode(t *testing.T) {
-	container := n.startNode(t,
-		"shard-node", "run",
-		"--home", "/home/nonroot/3",
-		"--address", "/ip4/0.0.0.0/tcp/"+containerP2pPort,
-		"--rpc-server-address", "0.0.0.0:"+containerRpcPort,
-		"--log-file", "stdout",
-		"--log-level", "info",
-		"--log-format", "text",
-		"--bootnodes", n.bootstrapNode,
-		"--trust-base", "/home/nonroot/root/trust-base.json",
-		"--t1-timeout", "188",
-	)
-	n.EvmRpcUrl = rpcUrl(t, n.ctx, container)
 }
 
 func (n *AlphabillNetwork) startOrchestrationNode(t *testing.T) {
