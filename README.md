@@ -3,7 +3,6 @@
 Client side software to interface with Alphabill network. This repository contains the following components:
 * Money partition CLI wallet
 * User Token partition CLI wallet
-* EVM partition client
 
 ## Update Alphabill dependency
 
