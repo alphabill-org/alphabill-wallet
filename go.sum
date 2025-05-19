@@ -11,8 +11,8 @@ github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA
 github.com/VictoriaMetrics/fastcache v1.12.2 h1:N0y9ASrJ0F6h0QaC3o6uJb3NIZ9VKLjCM7NQbSmF7WI=
 github.com/VictoriaMetrics/fastcache v1.12.2/go.mod h1:AmC+Nzz1+3G2eCPapF6UcsnkThDcMsQicp4xDukwJYI=
 github.com/aead/siphash v1.0.1/go.mod h1:Nywa3cDsYNNK3gaciGTWPwHt0wlpNV15vwmswBAUSII=
-github.com/alphabill-org/alphabill-go-base v1.0.0-rc2.0.20250516061014-d1f7aea0378f h1:COWYr5WKuTxAC1SX4HFJjPF5AspJFY79yg38e6CWe0E=
-github.com/alphabill-org/alphabill-go-base v1.0.0-rc2.0.20250516061014-d1f7aea0378f/go.mod h1:EcYLxScEReeaxjpS1YG/LRrqTVdttCQsUsSvj4WI58Y=
+github.com/alphabill-org/alphabill-go-base v1.0.0-rc2.0.20250519095234-2160e35d7afb h1:J9Yb92faEb5NBKO70HvT3HC5l5DHo1WZNeXqQprqTuI=
+github.com/alphabill-org/alphabill-go-base v1.0.0-rc2.0.20250519095234-2160e35d7afb/go.mod h1:EcYLxScEReeaxjpS1YG/LRrqTVdttCQsUsSvj4WI58Y=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/bits-and-blooms/bitset v1.15.0 h1:DiCRMscZsGyYePE9AR3sVhKqUXCt5IZvkX5AfAc5xLQ=
