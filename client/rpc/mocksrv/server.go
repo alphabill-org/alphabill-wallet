@@ -4,6 +4,7 @@ import (
 	"net"
 	"net/http"
 	"testing"
+	"time"
 
 	ethrpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/stretchr/testify/require"
@@ -28,8 +29,9 @@ func StartServer(t *testing.T, services map[string]interface{}) string {
 	})
 
 	httpServer := &http.Server{
-		Addr:    listener.Addr().String(),
-		Handler: server,
+		Addr:              listener.Addr().String(),
+		Handler:           server,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	go httpServer.Serve(listener)

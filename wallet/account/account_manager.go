@@ -66,7 +66,7 @@ func newManager(dir string, password string, create bool) (_ *managerImpl, retEr
 	}
 	accs := make([]Account, len(accountKeys))
 	for idx, val := range accountKeys {
-		accs[idx] = *NewAccount(uint64(idx), *val)
+		accs[idx] = *NewAccount(uint64(idx), *val) /* #nosec G115 its unlikely that idx exceeds uint64 */
 	}
 	return &managerImpl{db: db, accounts: &accounts{accounts: accs}, password: password, dir: dir}, nil
 }
@@ -171,7 +171,7 @@ func (m *managerImpl) GetAll() []Account {
 
 func (m *managerImpl) Close() {
 	if m.db != nil {
-		m.db.Close()
+		_ = m.db.Close()
 	}
 }
 

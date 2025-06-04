@@ -13,9 +13,9 @@ import (
 const (
 	RpcUrl                        = "rpc-url"
 	DefaultMoneyRpcUrl            = "localhost:26866"
-	DefaultTokensRpcUrl           = "localhost:28866"
+	DefaultTokensRpcUrl           = "localhost:28866" /* #nosec G101 not hardcoded credentials*/
 	DefaultOrchestrationRpcUrl    = "localhost:30866"
-	DefaultEnterpriseTokensRpcUrl = "localhost:31866"
+	DefaultEnterpriseTokensRpcUrl = "localhost:31866" /* #nosec G101 not hardcoded credentials*/
 	PartitionCmdName              = "partition"
 	PartitionRpcUrlCmdName        = "partition-rpc-url"
 

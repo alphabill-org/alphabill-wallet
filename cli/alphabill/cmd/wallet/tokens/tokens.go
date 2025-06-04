@@ -33,8 +33,8 @@ const (
 	cmdFlagMintClauseInput                   = "mint-input"
 	cmdFlagInheritBearerClause               = "inherit-bearer-clause"
 	cmdFlagInheritBearerClauseInput          = "inherit-bearer-input"
-	cmdFlagTokenDataUpdateClause             = "data-update-clause"
-	cmdFlagTokenDataUpdateClauseInput        = "data-update-input"
+	cmdFlagTokenDataUpdateClause             = "data-update-clause" /* #nosec G101 not hardcoded credentials*/
+	cmdFlagTokenDataUpdateClauseInput        = "data-update-input"  /* #nosec G101 not hardcoded credentials*/
 	cmdFlagInheritTokenDataUpdateClauseInput = "inherit-data-update-input"
 	cmdFlagAmount                            = "amount"
 	cmdFlagType                              = "type"
@@ -1315,7 +1315,7 @@ func readIconFile(iconFilePath string) (*tokens.Icon, error) {
 		return nil, fmt.Errorf("%s read error: missing file extension", cmdFlagIconFile)
 	}
 
-	mime.AddExtensionType(iconFileExtSvgz, iconFileExtSvgzType)
+	_ = mime.AddExtensionType(iconFileExtSvgz, iconFileExtSvgzType)
 	icon.Type = mime.TypeByExtension(ext)
 	if len(icon.Type) == 0 {
 		return nil, fmt.Errorf("%s read error: could not determine MIME type from file extension", cmdFlagIconFile)
@@ -1337,7 +1337,7 @@ func readFile(path string, flag string, sizeLimit int64) ([]byte, error) {
 	if size > sizeLimit {
 		return nil, fmt.Errorf("%s read error: file size over %vKiB limit", flag, sizeLimit/1024)
 	}
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
 		return nil, fmt.Errorf("%s read error: %w", flag, err)
 	}
@@ -1365,7 +1365,7 @@ func saveTxProofs(cmd *cobra.Command, proofs []*basetypes.TxRecordProof, out typ
 		return nil
 	}
 
-	w, err := os.Create(proofFile)
+	w, err := os.Create(filepath.Clean(proofFile))
 	if err != nil {
 		return fmt.Errorf("creating file for transaction proofs: %w", err)
 	}

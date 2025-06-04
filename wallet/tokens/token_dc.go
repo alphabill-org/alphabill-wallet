@@ -45,8 +45,8 @@ func (w *Wallet) CollectDust(ctx context.Context, accountNumber uint64, allowedT
 }
 
 func (w *Wallet) collectDust(ctx context.Context, acc *accountKey, tokens []*sdktypes.FungibleToken, ownerPredicateInput *PredicateInput, typeOwnerPredicateInputs []*PredicateInput) (*SubmissionResult, error) {
-	batchCount := ((len(tokens) - 1) / maxBurnBatchSize) + 1
-	txCount := len(tokens) + batchCount*2 // +lock fee and join fee for every batch
+	batchCount := ((uint64(len(tokens)) - 1) / uint64(maxBurnBatchSize)) + 1
+	txCount := uint64(len(tokens)) + batchCount*2 // +lock fee and join fee for every batch
 	fcrID, err := w.ensureFeeCredit(ctx, acc.AccountKey, txCount)
 	if err != nil {
 		return nil, err

@@ -77,7 +77,7 @@ func execListCmd(cmd *cobra.Command, config *clitypes.BillsConfig) error {
 			if err != nil {
 				return fmt.Errorf("failed to fetch bills: %w", err)
 			}
-			accountBillGroups = append(accountBillGroups, &accountBillGroup{pubKey: pubKey, accountIndex: uint64(accountIndex), bills: bills})
+			accountBillGroups = append(accountBillGroups, &accountBillGroup{pubKey: pubKey, accountIndex: uint64(accountIndex), bills: bills}) /* #nosec G115 its unlikely that accountIndex exceeds uint64 */
 		}
 	} else {
 		accountIndex := accountNumber - 1

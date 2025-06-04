@@ -222,7 +222,7 @@ func ExecSendCmd(ctx context.Context, cmd *cobra.Command, config *types.WalletCo
 		}
 		config.Base.ConsoleWriter.Println("Paid", util.AmountToString(feeSum, 8), "fees for transaction(s).")
 		if proofFile != "" {
-			w, err := os.Create(proofFile)
+			w, err := os.Create(filepath.Clean(proofFile))
 			if err != nil {
 				return fmt.Errorf("creating file for transaction proof: %w", err)
 			}
@@ -252,7 +252,7 @@ func GetBalanceCmd(config *types.WalletConfig) *cobra.Command {
 	cmd.Flags().BoolP(args.QuietCmdName, "q", false, "hides info irrelevant for scripting, "+
 		"e.g. account key numbers, can only be used together with key or total flag")
 	cmd.Flags().BoolP(args.ShowUnswappedCmdName, "s", false, "includes unswapped dust bills in balance output")
-	cmd.Flags().MarkHidden(args.ShowUnswappedCmdName)
+	_ = cmd.Flags().MarkHidden(args.ShowUnswappedCmdName)
 	return cmd
 }
 

@@ -85,7 +85,7 @@ func (w *DustCollector) runDustCollection(ctx context.Context, accountKey *accou
 	billsToSwap := bills[:billCountToSwap]
 
 	// verify balance
-	txsCost := w.maxFee * uint64(len(billsToSwap)+2) // +2 for swap and lock tx
+	txsCost := w.maxFee * (uint64(len(billsToSwap)) + 2) // +2 for swap and lock tx
 	if fcr.Balance < txsCost {
 		return nil, fmt.Errorf("insufficient fee credit balance for transactions: need at least %d Tema "+
 			"but have %d Tema to send lock tx, %d dust transfer transactions and swap tx", txsCost, fcr.Balance, len(billsToSwap))
