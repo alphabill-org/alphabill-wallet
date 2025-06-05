@@ -38,7 +38,7 @@ func NewCmd(walletConfig *clitypes.WalletConfig) *cobra.Command {
 	cmd.AddCommand(listFeeCreditCmd(config))
 
 	cmd.PersistentFlags().StringVarP(&config.rpcUrl, args.RpcUrl, "r", "", "RPC URL of the partition node")
-	cmd.MarkPersistentFlagRequired(args.RpcUrl)
+	_ = cmd.MarkPersistentFlagRequired(args.RpcUrl)
 	return cmd
 }
 

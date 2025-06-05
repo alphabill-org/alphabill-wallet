@@ -32,15 +32,16 @@ func StringToAmount(amountIn string, decimals uint32) (uint64, error) {
 		return amount, nil
 	}
 	fractionStr := splitAmount[1]
-	if len(fractionStr) == 0 {
+	fractionStrLen := uint32(len(fractionStr)) /* #nosec G115 its unlikely that len(fractionStr) exceeds uint32 */
+	if fractionStrLen == 0 {
 		return 0, fmt.Errorf("invalid amount string %s: missing fraction part", amountIn)
 	}
 	// there is a comma in the value
-	if uint32(len(fractionStr)) > decimals {
+	if fractionStrLen > decimals {
 		return 0, fmt.Errorf("invalid precision: %s", amountIn)
 	}
 	// pad with 0's in input is smaller than decimals
-	if uint32(len(fractionStr)) < decimals {
+	if fractionStrLen < decimals {
 		// append 0's so that decimal number of fraction places are present
 		fractionStr += strings.Repeat("0", int(decimals)-len(fractionStr))
 	}
@@ -61,8 +62,9 @@ func AmountToString(amount uint64, decimals uint32) string {
 		return InsertSeparator(amountStr, false)
 	}
 	// length of amount string is less than decimal places, insert decimal point in value
-	if decimals < uint32(len(amountStr)) {
-		return InsertSeparator(amountStr[:uint32(len(amountStr))-decimals], false) + "." + InsertSeparator(amountStr[uint32(len(amountStr))-decimals:], true)
+	amountStrLen := uint32(len(amountStr)) /* #nosec G115 its unlikely that len(amountStr) exceeds uint32 */
+	if decimals < amountStrLen {
+		return InsertSeparator(amountStr[:amountStrLen-decimals], false) + "." + InsertSeparator(amountStr[amountStrLen-decimals:], true)
 	}
 	// resulting amount is less than 0
 	resultStr := ""

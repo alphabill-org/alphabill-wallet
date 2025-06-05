@@ -325,7 +325,7 @@ func listFees(ctx context.Context, accountNumber uint64, listFcrIds bool, am acc
 			return err
 		}
 		for accountIndex := range pubKeys {
-			accountInfo, err := getAccountInfo(uint64(accountIndex), listFcrIds, ctx, w)
+			accountInfo, err := getAccountInfo(uint64(accountIndex), listFcrIds, ctx, w) /* #nosec G115 its unlikely that accountIndex exceeds uint64 */
 			if err != nil {
 				return err
 			}

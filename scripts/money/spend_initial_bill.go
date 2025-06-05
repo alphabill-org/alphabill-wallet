@@ -54,6 +54,12 @@ func main() {
 	if *rpcServerAddr == "" {
 		log.Fatal("rpc-server-address is required")
 	}
+	if *partitionID > uint(^types.PartitionID(0)) {
+		log.Fatal("partition-id is out of range")
+	}
+	if *networkID > uint(^types.NetworkID(0)) {
+		log.Fatal("network-id is out of range")
+	}
 
 	// process command line parameters
 	pubKey, err := hexutil.Decode(*pubKeyHex)

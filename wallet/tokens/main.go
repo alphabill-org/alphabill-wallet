@@ -506,7 +506,7 @@ func (w *Wallet) getAccounts(accountNumber uint64) ([]*accountKey, error) {
 	}
 	wrappers := make([]*accountKey, len(keys))
 	for i := range keys {
-		wrappers[i] = &accountKey{AccountKey: keys[i], idx: uint64(i)}
+		wrappers[i] = &accountKey{AccountKey: keys[i], idx: uint64(i)} /* #nosec G115 its unlikely that i exceeds uint64 */
 	}
 	return wrappers, nil
 }
@@ -780,7 +780,7 @@ func (w *Wallet) ReclaimFeeCredit(ctx context.Context, cmd fees.ReclaimFeeCmd) (
 	return w.feeManager.ReclaimFeeCredit(ctx, cmd)
 }
 
-func (w *Wallet) ensureFeeCredit(ctx context.Context, accountKey *account.AccountKey, txCount int) ([]byte, error) {
+func (w *Wallet) ensureFeeCredit(ctx context.Context, accountKey *account.AccountKey, txCount uint64) ([]byte, error) {
 	fcr, err := w.tokensClient.GetFeeCreditRecordByOwnerID(ctx, accountKey.PubKeyHash.Sha256)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch fee credit record: %w", err)
@@ -788,7 +788,7 @@ func (w *Wallet) ensureFeeCredit(ctx context.Context, accountKey *account.Accoun
 	if fcr == nil {
 		return nil, ErrNoFeeCredit
 	}
-	maxFee := uint64(txCount) * w.maxFee
+	maxFee := txCount * w.maxFee
 	if fcr.Balance < maxFee {
 		return nil, ErrInsufficientFeeCredit
 	}

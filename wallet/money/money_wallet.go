@@ -151,7 +151,7 @@ func (w *Wallet) GetBalances(ctx context.Context, cmd GetBalanceCmd) ([]uint64, 
 	accountTotals := make([]uint64, len(accountKeys))
 	var total uint64
 	for accountIndex := range accountKeys {
-		balance, err := w.GetBalance(ctx, GetBalanceCmd{AccountIndex: uint64(accountIndex), CountDCBills: cmd.CountDCBills})
+		balance, err := w.GetBalance(ctx, GetBalanceCmd{AccountIndex: uint64(accountIndex), CountDCBills: cmd.CountDCBills}) /* #nosec G115 its unlikely that accountIndex exceeds uint64 */
 		if err != nil {
 			return nil, 0, err
 		}
